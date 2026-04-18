@@ -1533,6 +1533,9 @@ function App() {
                 ref={searchInputRef}
                 className="search-panel__input"
                 value={searchQuery}
+                onFocus={() => {
+                  requestLogin()
+                }}
                 onChange={(event) => {
                   setSearchQuery(event.target.value)
                   setAiSearchStatus('idle')
@@ -1558,6 +1561,7 @@ function App() {
                       type="button"
                       className="search-panel__ai-button"
                       onClick={() => {
+                        if (requestLogin()) return
                         void handleAiSearch()
                       }}
                       disabled={aiSearchStatus === 'loading'}
@@ -2000,6 +2004,7 @@ function App() {
                   onMouseDown={(event) => startNodeInteraction(node, event)}
                   onClick={(event) => {
                     event.stopPropagation()
+                    if (requestLogin()) return
                     setSelectedNodeId(node.id)
                     if (suppressNodeClickRef.current) {
                       suppressNodeClickRef.current = false
