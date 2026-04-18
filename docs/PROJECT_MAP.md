@@ -14,6 +14,7 @@ The current product is intentionally narrow:
 - one personal board record per signed-in user
 - persistent people nodes, reusable tags, notes, and undirected connections per signed-in user
 - a right-side inspector for editing the selected person
+- a people search layer that matches locally while typing and can run AI search on Enter
 - no collaboration yet
 
 ## Active Work
@@ -55,12 +56,13 @@ Completed tasks can remain listed here when they explain repository history. Liv
 - `src/lib/supabase.ts`: browser Supabase client configuration.
 - `src/lib/useAuth.ts`: session and Google sign-in state.
 - `src/lib/useBoardGraph.ts`: board graph loading and mutation state.
-- `src/lib/graphStorage.ts`: Supabase CRUD layer for people, tags, notes, and connections.
-- `src/lib/graphTypes.ts`: shared graph interfaces.
+- `src/lib/graphStorage.ts`: Supabase CRUD layer for people, tags, notes, `person_ai_notes`, and AI Edge Functions.
+- `src/lib/graphTypes.ts`: shared graph interfaces, including the structured AI summary contract.
 - `src/lib/userWorkspace.ts`: profile, board, and root-person bootstrap.
 - `src/index.css`: current visual system.
 - `skills-lock.json`: lockfile for installed project agent skills.
 - `supabase/migrations/`: database schema and row-level security migrations.
+- `supabase/functions/`: server-side Supabase Edge Functions for n8n AI note sync and AI people search.
 
 ## Ownership
 

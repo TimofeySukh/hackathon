@@ -34,6 +34,10 @@ Lockfile for project-scoped agent skills installed under `.agents/skills/`.
 
 Supabase database migrations for profiles, personal boards, persisted graph data, and row-level security policies.
 
+### `supabase/functions/`
+
+Supabase Edge Functions. `sync-person-ai-note` forwards person note context to n8n and upserts `person_ai_notes`. `search-people-ai` forwards graph candidates to n8n and returns ranked natural-language search results.
+
 ### `src/`
 
 Application source code.
@@ -54,6 +58,7 @@ Contains the board experience:
 - board zoom state
 - motion-triggered point highlight state
 - selected-person inspector state
+- people search overlay state
 - persisted social graph node and connection rendering
 - drag-to-create node connections
 - shift-drag node repositioning
@@ -66,9 +71,9 @@ Shared low-level helpers.
 
 - `supabase.ts` creates the browser Supabase client from Vite environment variables.
 - `useAuth.ts` owns session loading, Google OAuth sign-in, and sign-out.
-- `useBoardGraph.ts` owns board graph loading and mutation state.
-- `graphStorage.ts` owns Supabase CRUD calls for persisted graph data.
-- `graphTypes.ts` defines shared profile, board, person, note, AI note, tag, and connection interfaces.
+- `useBoardGraph.ts` owns board graph loading, mutation state, and debounced AI note refresh scheduling per person.
+- `graphStorage.ts` owns Supabase CRUD calls for persisted graph data, `person_ai_notes`, and AI Edge Function invocation.
+- `graphTypes.ts` defines shared profile, board, person, note, AI note, tag, and connection interfaces, including the structured AI summary shape.
 - `userWorkspace.ts` upserts profile data and ensures one personal board plus root person for the signed-in user.
 
 Supabase browser configuration reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`. The older `VITE_SUPABASE_ANON_KEY` variable remains supported for compatibility.
@@ -79,6 +84,7 @@ Contains the complete visual system for:
 
 - dark and light themes
 - account controls
+- people search panel
 - very dense point-grid background
 - compact motion-triggered point highlight styling with directional tails for fast cursor movement
 - compact graph node styling
@@ -109,10 +115,11 @@ It currently supports:
 - cursor-centered zoom with the mouse wheel
 - visual theme switching
 - persistent social graph nodes connected by lines
-- one separate AI summary record per person in the database
+- one separate AI summary record per person in the database with `status`, plain-text `summary`, structured JSON data, and sync error state
 - drag-to-connect two existing nodes by releasing on another node hit area
 - drag-to-create node growth from any existing node with an immediate connecting line
 - selected-node detail cards with reusable tag selection, note editing, connection removal, and deletion
+- local people search while typing plus natural-language AI search on Enter
 - shift-drag repositioning for non-root nodes
 - persisted node renaming
 - grid movement through background offset changes
