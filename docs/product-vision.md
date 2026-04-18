@@ -2,77 +2,71 @@
 
 ## Current Product Idea
 
-The product starts as a clean infinite board that focuses on movement, space, and atmosphere.
+The product is now an Obsidian-inspired graph viewer with folder-based navigation.
 
-This first version is intentionally limited:
+Each folder represents a separate graph space. The user can choose a folder from the left sidebar and explore its node network on the right.
 
-- no drawing tools
-- no widgets
-- no sidebars
-- no collaboration features
-- no backend
+## Core Interaction Goal
 
-The core value right now is simple navigation across a large visual surface.
+The graph should feel lightweight, readable, and spatial.
 
-## Interaction Goal
+Users should be able to:
 
-The board should feel calm and frictionless.
-
-Users should be able to open the page and immediately:
-
-1. drag the board with the mouse
-2. move across the board with a trackpad or mouse wheel
-3. understand the available space from the point grid
-4. switch between dark and light visual modes
+1. choose a folder from the sidebar
+2. instantly open that folder as a graph
+3. pan through the graph smoothly
+4. zoom around the cursor
+5. recognize clusters, hubs, and related notes visually
 
 ## Visual Goal
 
-The dark theme should feel deep, green-black, and slightly futuristic, similar to the provided reference.
+The graph should resemble the compact look of Obsidian graph view:
 
-The light theme should keep the same product identity while becoming brighter, cleaner, and easier to use in daylight conditions.
+- small dots
+- thin links
+- readable labels
+- dark neutral background
+- restrained accent color on the focus node
 
-The board background should include visible point markers at regular intervals, similar to spatial references on tools like Miro.
+The light theme should preserve the same structure and interaction model without turning the interface into a different product.
 
 ## Why This Direction
 
-The project needs a strong custom foundation instead of a generic third-party canvas product.
+This gives the project a clearer product identity than a generic empty board.
 
-Building the board ourselves keeps the interaction model simple and gives us complete control over:
+Instead of being “just a canvas”, it becomes a visual explorer for folder knowledge and note relationships.
 
-- movement behavior
-- theme design
-- grid density and styling
-- future product objects and interactions
+That makes the product easier to understand and easier to evolve later.
 
 ## MVP Priorities
 
-1. Smooth drag-based navigation
-2. A distinctive visual identity
-3. Minimal interface chrome
-4. A codebase that is easy to extend with custom board objects later
+1. Folder switching from the sidebar
+2. Clear graph readability
+3. Smooth panning and zooming
+4. A convincing Obsidian-like visual style
+5. Test data that is rich enough to validate the graph experience
 
 ## What We Intentionally Avoid Right Now
 
-- drawing tools
-- sticky notes
-- comments
-- multiplayer
-- authentication
+- graph editing tools
+- note creation UI
 - persistence
 - backend storage
-- templates
+- collaboration
+- filters and search
+- graph physics simulation
 
 ## Possible Future Product Directions
 
-- Custom cards or blocks placed on the board
-- Project nodes and connectors
-- Spatial planning views
-- Board persistence and saved camera positions
-- Multiplayer presence
-- Domain-specific interaction tools
+- Real folder ingestion from the filesystem
+- Search and filtering
+- Highlighting links on hover
+- Local graph mode around one node
+- Note preview panels
+- Tag coloring and graph grouping
 
 ## Product Principle
 
-Each new addition should protect the feeling of a clean board.
+Every new feature should make the folder graph easier to explore, understand, or navigate.
 
-If a feature adds clutter before it adds value, it should not be introduced yet.
+If a feature does not improve graph exploration directly, it should wait.

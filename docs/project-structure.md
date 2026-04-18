@@ -34,21 +34,25 @@ The React entry point. It mounts the app into the root DOM node.
 
 ### `src/App.tsx`
 
-Contains the board experience:
+Contains the full graph viewer behavior:
 
 - theme state
-- mouse drag navigation state
+- active folder state
+- graph dataset definitions
+- board pan state
 - board zoom state
-- theme toggle
-- infinite board surface positioning
+- sidebar folder switching
+- graph rendering for nodes and links
 
 ### `src/index.css`
 
-Contains the complete visual system for:
+Contains the full visual system for:
 
+- sidebar layout
 - dark and light themes
 - point-grid background
-- board overlay styling
+- compact graph node styling
+- edge styling
 - responsive layout behavior
 
 ## Current Technical Shape
@@ -58,40 +62,52 @@ The application is intentionally minimal:
 - React for state and rendering
 - Vite for development and builds
 - TypeScript for maintainability
-- Custom CSS-based board rendering
+- Custom CSS and SVG rendering for the graph view
 
 ## Interaction Model
 
-The board is not an editor yet.
+The application currently supports:
 
-It currently supports:
+- opening a folder from the left sidebar
+- rendering that folder as a graph
+- panning across the graph canvas
+- zooming around the cursor
+- switching between dark and light themes
 
-- mouse drag navigation across the canvas
-- trackpad and wheel-based navigation across the canvas
-- cursor-centered zoom with the mouse wheel
-- visual theme switching
-- grid movement through background offset changes
+The graph content is rendered in a transformed world layer, while the background grid tracks the camera position independently.
 
-The visual board is simulated by shifting layered CSS backgrounds based on the current camera offset.
+## Current Data Model
+
+Folders are currently demo datasets defined directly in `src/App.tsx`.
+
+Each folder contains:
+
+- a unique folder id
+- a name
+- a short description
+- a list of nodes with coordinates
+- a list of edges
+
+The `Test Folder` is the primary demo dataset for visual testing.
 
 ## Extension Strategy
 
 The project should evolve in controlled layers:
 
-1. Preserve smooth navigation and visual clarity.
-2. Add simple board objects only when the base movement feels solid.
-3. Introduce persistence after the object model is clear.
-4. Add advanced interactions only when they fit the clean-board principle.
+1. Preserve visual clarity and smooth navigation.
+2. Add richer graph interactions around the existing folder datasets.
+3. Replace demo datasets with real folder ingestion later.
+4. Add search, filtering, and previews only when the base graph experience feels solid.
 
 ## Future Folders We May Add
 
 ### `src/components/`
 
-Reusable UI pieces such as toggles, overlays, and future board items.
+Reusable UI pieces such as sidebar modules, graph overlays, and controls.
 
 ### `src/features/`
 
-Product-specific features such as persistence, board objects, or collaboration.
+Product-specific features such as search, filters, note previews, or filesystem integration.
 
 ### `src/lib/`
 
@@ -99,7 +115,7 @@ Helpers, utilities, and shared low-level logic.
 
 ### `src/state/`
 
-Centralized board or product state once the app grows beyond a single screen.
+Centralized application and graph state once the product grows beyond a single-screen prototype.
 
 ### `docs/decisions/`
 

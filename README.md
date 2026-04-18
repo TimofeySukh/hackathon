@@ -1,17 +1,18 @@
 # Hackathon Board
 
-A minimal infinite board built with React, Vite, and TypeScript.
+An Obsidian-inspired folder graph viewer built with React, Vite, and TypeScript.
 
 ## Current Experience
 
-- Infinite canvas-style navigation by dragging with the mouse
-- Infinite canvas-style navigation by scrolling on a trackpad or mouse wheel
-- Zoom in and out with the mouse wheel
-- No drawing tools or side panels
-- Theme switcher in the top-right corner
-- Dark green-black theme inspired by the provided reference
-- Light theme designed to match the same visual language
-- High-contrast point grid across the board
+- A left sidebar with folders that can each open their own graph
+- A dedicated `Test Folder` for visual and interaction testing
+- Obsidian-like graph styling with compact dots and thin links
+- Mouse drag panning across the graph canvas
+- Trackpad or wheel panning
+- Mouse wheel zoom around the cursor
+- Theme switcher in the sidebar
+- Dark and light themes using the same visual language
+- Point-grid background for spatial reference
 
 ## Local Development
 
@@ -31,9 +32,9 @@ Open the local Vite URL in your browser.
 
 ## Product Direction
 
-This version is intentionally narrow. It is a navigable board first, not a whiteboard editor.
+This version is focused on graph viewing rather than graph editing.
 
-The goal is to create a strong visual and interaction foundation before adding any product-specific objects or workflows.
+The goal is to make folders feel like separate graph spaces that can be explored visually, starting with realistic demo data and a strong Obsidian-like interaction style.
 
 ## Documentation
 
