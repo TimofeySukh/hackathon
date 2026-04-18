@@ -7,7 +7,7 @@ import type {
 
 import { useAuth } from './lib/useAuth'
 import { normalizeTagName } from './lib/graphStorage'
-import type { PersonNode, PersonNote } from './lib/graphTypes'
+import type { PersonNode, PersonNote, Tag } from './lib/graphTypes'
 import { useBoardGraph } from './lib/useBoardGraph'
 
 type Theme = 'dark' | 'light'
@@ -47,6 +47,12 @@ type NodeDrag = {
 type NoteDraft = {
   title: string
   body: string
+}
+
+type SearchResult = {
+  node: PersonNode
+  score: number
+  matches: string[]
 }
 
 type BoardStyle = CSSProperties & {
@@ -149,11 +155,14 @@ function App() {
   const [pointerPosition, setPointerPosition] = useState<Offset | null>(null)
   const [highlightClock, setHighlightClock] = useState(() => Date.now())
   const [isDraggingBoard, setIsDraggingBoard] = useState(false)
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
 
   const boardRef = useRef<HTMLElement | null>(null)
   const boardSurfaceRef = useRef<HTMLDivElement | null>(null)
   const graphLayerRef = useRef<HTMLDivElement | null>(null)
   const zoomIndicatorRef = useRef<HTMLDivElement | null>(null)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
   const highlightIdRef = useRef(0)
   const lastHighlightSpotRef = useRef<Offset | null>(null)
   const viewportRef = useRef({ offset: { x: 0, y: 0 }, scale: 1 })
@@ -204,6 +213,74 @@ function App() {
     () => notes.filter((note) => note.person_id === inspectorNode?.id),
     [inspectorNode?.id, notes],
   )
+  const tagsById = useMemo(
+    () => Object.fromEntries(tags.map((tag) => [tag.id, tag])) as Record<string, Tag>,
+    [tags],
+  )
+  const notesByPersonId = useMemo(() => {
+    const nextNotesByPersonId: Record<string, PersonNote[]> = {}
+
+    for (const note of notes) {
+      if (!nextNotesByPersonId[note.person_id]) {
+        nextNotesByPersonId[note.person_id] = []
+      }
+      nextNotesByPersonId[note.person_id].push(note)
+    }
+
+    return nextNotesByPersonId
+  }, [notes])
+  const searchResults: SearchResult[] = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase()
+    if (!normalizedQuery) return []
+
+    return boardNodes
+      .map((node) => {
+        const matches: string[] = []
+        let score = 0
+        const tagName = node.tag_id ? tagsById[node.tag_id]?.name ?? '' : ''
+        const personNotes = notesByPersonId[node.id] ?? []
+        const normalizedName = node.name.trim().toLowerCase()
+        const normalizedTag = tagName.toLowerCase()
+
+        if (normalizedName.includes(normalizedQuery)) {
+          matches.push(`Name: ${node.name.trim() || 'Unnamed person'}`)
+          score += normalizedName.startsWith(normalizedQuery) ? 6 : 4
+        }
+
+        if (normalizedTag.includes(normalizedQuery)) {
+          matches.push(`Tag: ${tagName}`)
+          score += normalizedTag.startsWith(normalizedQuery) ? 4 : 3
+        }
+
+        for (const note of personNotes) {
+          const normalizedTitle = note.title.toLowerCase()
+          const normalizedBody = note.body.toLowerCase()
+
+          if (normalizedTitle.includes(normalizedQuery)) {
+            matches.push(`Note title: ${note.title || 'Untitled note'}`)
+            score += 2
+            continue
+          }
+
+          if (normalizedBody.includes(normalizedQuery)) {
+            matches.push(`Note: ${note.body.trim().slice(0, 48) || 'Body match'}`)
+            score += 1
+          }
+        }
+
+        return {
+          node,
+          score,
+          matches: Array.from(new Set(matches)).slice(0, 3),
+        }
+      })
+      .filter((entry) => entry.score > 0)
+      .sort((left, right) => {
+        if (right.score !== left.score) return right.score - left.score
+        return (left.node.name || '').localeCompare(right.node.name || '')
+      })
+      .slice(0, 8)
+  }, [boardNodes, notesByPersonId, searchQuery, tagsById])
 
   const inspectorNodeConnections = useMemo(() => {
     if (!inspectorNode) return []
@@ -232,6 +309,12 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem(THEME_STORAGE_KEY, theme)
   }, [theme])
+
+  useEffect(() => {
+    if (!isSearchOpen) return
+
+    searchInputRef.current?.focus()
+  }, [isSearchOpen])
 
   const applyViewport = useCallback((nextOffset: Offset, nextScale: number) => {
     viewportRef.current = { offset: nextOffset, scale: nextScale }
@@ -677,6 +760,21 @@ function App() {
     setSelectedNodeId(null)
   }
 
+  function focusNode(node: PersonNode) {
+    const nextScale = viewportRef.current.scale
+    queueViewportUpdate(
+      {
+        x: -node.x * nextScale,
+        y: -node.y * nextScale,
+      },
+      nextScale,
+    )
+    setSelectedNodeId(node.id)
+    setInspectorNodeId(node.id)
+    setNameDraft(node.name)
+    setIsSearchOpen(false)
+  }
+
   const previewPath = connectionDrag
     ? getLinkPath(nodesById[connectionDrag.fromId], {
         x: connectionDrag.worldX,
@@ -721,6 +819,77 @@ function App() {
   return (
     <main className={`app-shell theme-${theme}`}>
       <div className="app-actions">
+        <div className={`search-panel${isSearchOpen ? ' is-open' : ''}`}>
+          <div className="search-panel__header">
+            <button
+              type="button"
+              className="search-panel__toggle"
+              onClick={() => {
+                setIsSearchOpen((currentValue) => !currentValue)
+              }}
+              aria-expanded={isSearchOpen}
+              aria-controls="people-search-panel"
+            >
+              Search people
+            </button>
+            {isSearchOpen ? (
+              <button
+                type="button"
+                className="search-panel__clear"
+                onClick={() => {
+                  setSearchQuery('')
+                  setIsSearchOpen(false)
+                }}
+              >
+                Close
+              </button>
+            ) : null}
+          </div>
+
+          {isSearchOpen ? (
+            <div id="people-search-panel" className="search-panel__body">
+              <label className="search-panel__field">
+                <span className="search-panel__label">Find by name, tag, or note</span>
+                <input
+                  ref={searchInputRef}
+                  className="search-panel__input"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search anything about a person"
+                />
+              </label>
+
+              {searchQuery.trim() ? (
+                searchResults.length > 0 ? (
+                  <div className="search-panel__results">
+                    {searchResults.map((result) => (
+                      <button
+                        key={result.node.id}
+                        type="button"
+                        className="search-result"
+                        onClick={() => focusNode(result.node)}
+                      >
+                        <span className="search-result__title">
+                          {result.node.name.trim() || (result.node.is_root ? 'You' : 'Unnamed person')}
+                        </span>
+                        <span className="search-result__meta">
+                          {result.matches.join(' • ')}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="search-panel__empty">No people match this query yet.</p>
+                )
+              ) : (
+                <p className="search-panel__empty">
+                  This is a temporary search layer over names, tags, and notes.
+                </p>
+              )}
+            </div>
+          ) : null}
+        </div>
+
         <div className="account-panel" aria-live="polite">
           {status === 'authenticated' && session?.user ? (
             <>

@@ -14,6 +14,7 @@ The current product is intentionally narrow:
 - one personal board record per signed-in user
 - persistent people nodes, reusable tags, notes, and undirected connections per signed-in user
 - a right-side inspector for editing the selected person
+- a temporary local people search layer that matches names, tags, and notes
 - no collaboration yet
 
 ## Active Work

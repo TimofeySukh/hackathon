@@ -20,6 +20,7 @@ The backend boundary remains intentionally narrow: Supabase Auth provides identi
 
 - `src/main.tsx` mounts the React app.
 - `src/App.tsx` contains the board interaction model and selected-person inspector.
+- `src/App.tsx` also contains the temporary local people search overlay.
 - `src/lib/supabase.ts` creates the browser Supabase client from Vite environment variables.
 - `src/lib/useAuth.ts` owns session loading, Google sign-in, and sign-out.
 - `src/lib/useBoardGraph.ts` owns board graph loading and frontend mutation state.
@@ -48,6 +49,7 @@ Current scope:
 - multiple notes per person
 - at most one separate AI summary note per person
 - undirected person-to-person connections
+- a temporary local people search overlay over names, tags, and notes
 
 Out of scope for the current version:
 

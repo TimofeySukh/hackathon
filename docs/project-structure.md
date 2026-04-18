@@ -54,6 +54,7 @@ Contains the board experience:
 - board zoom state
 - motion-triggered point highlight state
 - selected-person inspector state
+- temporary people search overlay state
 - persisted social graph node and connection rendering
 - drag-to-create node connections
 - shift-drag node repositioning
@@ -79,6 +80,7 @@ Contains the complete visual system for:
 
 - dark and light themes
 - account controls
+- temporary people search panel
 - very dense point-grid background
 - compact motion-triggered point highlight styling with directional tails for fast cursor movement
 - compact graph node styling

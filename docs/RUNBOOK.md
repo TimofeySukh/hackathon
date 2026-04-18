@@ -18,6 +18,7 @@ Current app behavior:
 - persist people, tags, notes, and undirected connections in Supabase
 - allow one separate AI summary row per person in Supabase
 - edit the selected person in the right-side inspector
+- open a temporary people search layer and match by name, tag, or note content
 
 There is no multiplayer or drawing toolset yet.
 
@@ -219,20 +220,22 @@ npm run preview
 
 Manual verification:
 
-1. Open the app in a browser.
-2. Drag anywhere on the board and confirm the point grid moves smoothly.
-3. Scroll on a trackpad and confirm the board pans without triggering zoom.
-4. Use the mouse wheel and confirm zoom centers around the cursor.
-5. Confirm the zoom indicator in the bottom-right updates smoothly.
-6. Toggle the theme.
-7. Reload the page and confirm the selected theme is preserved.
-8. Sign in with Google and confirm the account state appears.
-9. Confirm the signed-in account gets a root node at `0,0`.
-10. Drag out from a node to create a new connected person and confirm it persists after reload.
-11. Hold `Shift` and drag a non-root person to a new position, then reload and confirm the coordinates persist.
-12. Assign a tag to a person, add a note, reload, and confirm both persist.
-13. Create a connection between two existing people and confirm reload preserves it.
-14. Sign out and confirm the anonymous board state returns.
+1. Open the board and confirm the `Search people` control appears in the top action area.
+2. Open the search layer and verify that typing a person name, tag, or note text returns matching people.
+3. Click a search result and verify the board recenters on that person and opens the inspector.
+4. Drag anywhere on the board and confirm the point grid moves smoothly.
+5. Scroll on a trackpad and confirm the board pans without triggering zoom.
+6. Use the mouse wheel and confirm zoom centers around the cursor.
+7. Confirm the zoom indicator in the bottom-right updates smoothly.
+8. Toggle the theme.
+9. Reload the page and confirm the selected theme is preserved.
+10. Sign in with Google and confirm the account state appears.
+11. Confirm the signed-in account gets a root node at `0,0`.
+12. Drag out from a node to create a new connected person and confirm it persists after reload.
+13. Hold `Shift` and drag a non-root person to a new position, then reload and confirm the coordinates persist.
+14. Assign a tag to a person, add a note, reload, and confirm both persist.
+15. Create a connection between two existing people and confirm reload preserves it.
+16. Sign out and confirm the anonymous board state returns.
 
 Supabase verification:
 
