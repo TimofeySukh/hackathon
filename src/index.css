@@ -701,6 +701,25 @@ select {
   text-align: center;
 }
 
+.wheel-debug {
+  position: absolute;
+  left: 24px;
+  bottom: 24px;
+  z-index: 5;
+  display: grid;
+  gap: 3px;
+  min-width: 180px;
+  padding: 10px 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: var(--panel-bg);
+  color: var(--panel-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.25;
+  pointer-events: none;
+}
+
 @media (max-width: 720px) {
   .app-actions {
     top: 16px;

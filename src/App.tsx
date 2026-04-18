@@ -90,6 +90,18 @@ type WheelSequence = {
   lastAt: number
 }
 
+type WheelDebug = {
+  intent: WheelIntent['kind']
+  deltaMode: number
+  deltaX: number
+  deltaY: number
+  rawDeltaX: number
+  rawDeltaY: number
+  ctrlKey: boolean
+  wheelDelta: number
+  sequenceDeltaY: number
+}
+
 const THEME_STORAGE_KEY = 'hackathon-theme'
 const MIN_SCALE = 0.2
 const MAX_SCALE = 2.5
@@ -167,6 +179,7 @@ function App() {
   const [pointerPosition, setPointerPosition] = useState<Offset | null>(null)
   const [highlightClock, setHighlightClock] = useState(() => Date.now())
   const [isDraggingBoard, setIsDraggingBoard] = useState(false)
+  const [wheelDebug, setWheelDebug] = useState<WheelDebug | null>(null)
 
   const boardRef = useRef<HTMLElement | null>(null)
   const boardSurfaceRef = useRef<HTMLDivElement | null>(null)
@@ -607,6 +620,21 @@ function App() {
     const deltaX = event.deltaX * deltaMultiplier
     const deltaY = event.deltaY * deltaMultiplier
     const wheelIntent = getWheelIntent(event, deltaX, deltaY, wheelSequenceRef.current)
+    const wheelDelta = (event as WheelEventLike).wheelDelta ?? 0
+
+    if (import.meta.env.DEV) {
+      setWheelDebug({
+        intent: wheelIntent.kind,
+        deltaMode: event.deltaMode,
+        deltaX,
+        deltaY,
+        rawDeltaX: event.deltaX,
+        rawDeltaY: event.deltaY,
+        ctrlKey: event.ctrlKey,
+        wheelDelta,
+        sequenceDeltaY: wheelSequenceRef.current.deltaY,
+      })
+    }
 
     if (wheelIntent.kind === 'hold') return
 
@@ -1186,6 +1214,19 @@ function App() {
       <div ref={zoomIndicatorRef} className="zoom-indicator" aria-live="polite">
         {zoomPercentage}%
       </div>
+
+      {import.meta.env.DEV && wheelDebug ? (
+        <div className="wheel-debug" aria-live="polite">
+          <span>intent {wheelDebug.intent}</span>
+          <span>mode {wheelDebug.deltaMode}</span>
+          <span>dx {wheelDebug.deltaX.toFixed(2)}</span>
+          <span>dy {wheelDebug.deltaY.toFixed(2)}</span>
+          <span>raw {wheelDebug.rawDeltaX.toFixed(2)}, {wheelDebug.rawDeltaY.toFixed(2)}</span>
+          <span>ctrl {String(wheelDebug.ctrlKey)}</span>
+          <span>wheelDelta {wheelDebug.wheelDelta}</span>
+          <span>seq {wheelDebug.sequenceDeltaY.toFixed(2)}</span>
+        </div>
+      ) : null}
     </main>
   )
 }
