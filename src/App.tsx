@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
+import type {
+  CSSProperties,
+  MouseEvent as ReactMouseEvent,
+  WheelEvent as ReactWheelEvent,
+} from 'react'
 
 type Theme = 'dark' | 'light'
 
@@ -68,6 +72,15 @@ function App() {
     setIsDragging(true)
   }
 
+  const moveWithWheel = (event: ReactWheelEvent<HTMLElement>) => {
+    event.preventDefault()
+
+    setOffset((currentOffset) => ({
+      x: currentOffset.x - event.deltaX,
+      y: currentOffset.y - event.deltaY,
+    }))
+  }
+
   const boardStyle = {
     backgroundPosition: `${offset.x}px ${offset.y}px, ${offset.x}px ${offset.y}px, center, center`,
   } satisfies CSSProperties
@@ -89,16 +102,10 @@ function App() {
       <section
         className={`board-viewport${isDragging ? ' is-dragging' : ''}`}
         onMouseDown={startDragging}
+        onWheel={moveWithWheel}
         aria-label="Infinite board canvas"
       >
         <div className="board-surface" style={boardStyle} />
-        <div className="board-overlay">
-          <p className="board-overlay__eyebrow">Infinite canvas</p>
-          <h1>Drag anywhere to move across the board.</h1>
-          <p className="board-overlay__text">
-            This version stays intentionally clean: no drawing tools, no panels, only space.
-          </p>
-        </div>
       </section>
     </main>
   )

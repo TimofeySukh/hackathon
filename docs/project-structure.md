@@ -66,6 +66,7 @@ The board is not an editor yet.
 It currently supports:
 
 - mouse drag navigation across the canvas
+- trackpad and wheel-based navigation across the canvas
 - visual theme switching
 - grid movement through background offset changes
 

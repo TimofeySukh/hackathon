@@ -21,8 +21,9 @@ The board should feel calm and frictionless.
 Users should be able to open the page and immediately:
 
 1. drag the board with the mouse
-2. understand the available space from the point grid
-3. switch between dark and light visual modes
+2. move across the board with a trackpad or mouse wheel
+3. understand the available space from the point grid
+4. switch between dark and light visual modes
 
 ## Visual Goal
 

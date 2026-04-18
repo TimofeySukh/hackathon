@@ -5,6 +5,7 @@ A minimal infinite board built with React, Vite, and TypeScript.
 ## Current Experience
 
 - Infinite canvas-style navigation by dragging with the mouse
+- Infinite canvas-style navigation by scrolling on a trackpad or mouse wheel
 - No drawing tools or side panels
 - Theme switcher in the top-right corner
 - Dark green-black theme inspired by the provided reference

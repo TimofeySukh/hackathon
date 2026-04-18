@@ -46,15 +46,11 @@ select {
 
 .theme-dark {
   --app-bg: #020806;
-  --panel-bg: rgba(5, 22, 16, 0.74);
-  --panel-border: rgba(43, 170, 131, 0.32);
-  --panel-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
   --text-strong: #e7faf1;
-  --text-soft: rgba(196, 234, 218, 0.76);
-  --eyebrow: #68f3c5;
   --toggle-bg: rgba(7, 28, 20, 0.82);
   --toggle-border: rgba(64, 191, 148, 0.38);
   --toggle-thumb: linear-gradient(135deg, #8affd6 0%, #39c795 100%);
+  --toggle-label: #dff9ef;
   --grid-dot: rgba(94, 226, 180, 0.14);
   --grid-dot-major: rgba(115, 255, 201, 0.3);
   --grid-glow-a: rgba(12, 67, 46, 0.22);
@@ -68,15 +64,11 @@ select {
 
 .theme-light {
   --app-bg: #f4fbf7;
-  --panel-bg: rgba(249, 255, 252, 0.88);
-  --panel-border: rgba(46, 133, 98, 0.18);
-  --panel-shadow: 0 24px 80px rgba(33, 77, 57, 0.12);
   --text-strong: #0c241a;
-  --text-soft: rgba(27, 68, 50, 0.72);
-  --eyebrow: #1b9f72;
-  --toggle-bg: rgba(255, 255, 255, 0.86);
-  --toggle-border: rgba(33, 112, 80, 0.18);
-  --toggle-thumb: linear-gradient(135deg, #eefbf4 0%, #c8f1dd 100%);
+  --toggle-bg: rgba(255, 255, 255, 0.96);
+  --toggle-border: rgba(22, 81, 58, 0.22);
+  --toggle-thumb: linear-gradient(135deg, #9ce7c4 0%, #62c898 100%);
+  --toggle-label: #174c37;
   --grid-dot: rgba(24, 79, 58, 0.12);
   --grid-dot-major: rgba(24, 101, 70, 0.26);
   --grid-glow-a: rgba(69, 181, 135, 0.1);
@@ -111,13 +103,17 @@ select {
   border-radius: 999px;
   border: 1px solid var(--toggle-border);
   background: var(--toggle-bg);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    0 10px 30px rgba(0, 0, 0, 0.08);
   backdrop-filter: blur(14px);
 }
 
 .theme-toggle__label {
+  color: var(--toggle-label);
   font-size: 13px;
   font-weight: 600;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -140,6 +136,7 @@ select {
   height: 100%;
   cursor: grab;
   user-select: none;
+  overscroll-behavior: none;
 }
 
 .board-viewport.is-dragging {
@@ -171,44 +168,6 @@ select {
   pointer-events: none;
 }
 
-.board-overlay {
-  position: absolute;
-  left: clamp(16px, 4vw, 48px);
-  bottom: clamp(16px, 4vw, 48px);
-  z-index: 2;
-  max-width: min(520px, calc(100vw - 32px));
-  padding: 24px 24px 22px;
-  border: 1px solid var(--panel-border);
-  border-radius: 28px;
-  background: var(--panel-bg);
-  box-shadow: var(--panel-shadow);
-  backdrop-filter: blur(18px);
-}
-
-.board-overlay__eyebrow {
-  margin: 0 0 10px;
-  color: var(--eyebrow);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.24em;
-  text-transform: uppercase;
-}
-
-.board-overlay h1 {
-  margin: 0;
-  font-size: clamp(32px, 4vw, 52px);
-  line-height: 0.95;
-  letter-spacing: -0.06em;
-}
-
-.board-overlay__text {
-  margin: 16px 0 0;
-  max-width: 38ch;
-  color: var(--text-soft);
-  font-size: 15px;
-  line-height: 1.6;
-}
-
 @media (max-width: 720px) {
   .theme-toggle {
     top: 16px;
@@ -224,17 +183,5 @@ select {
   .theme-toggle__thumb {
     width: 26px;
     height: 26px;
-  }
-
-  .board-overlay {
-    right: 16px;
-    left: 16px;
-    bottom: 16px;
-    padding: 20px;
-    border-radius: 24px;
-  }
-
-  .board-overlay__text {
-    font-size: 14px;
   }
 }
