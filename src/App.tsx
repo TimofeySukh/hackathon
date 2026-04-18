@@ -80,6 +80,16 @@ type WheelEventLike = WheelEvent & {
   wheelDelta?: number
 }
 
+type WheelIntent =
+  | { kind: 'pan' }
+  | { kind: 'hold' }
+  | { kind: 'zoom'; deltaY: number }
+
+type WheelSequence = {
+  deltaY: number
+  lastAt: number
+}
+
 const THEME_STORAGE_KEY = 'hackathon-theme'
 const MIN_SCALE = 0.2
 const MAX_SCALE = 2.5
@@ -98,6 +108,8 @@ const NODE_RADIUS = 9
 const NODE_HIT_RADIUS = 31
 const CREATE_THRESHOLD = 18
 const WHEEL_ZOOM_INTENSITY = 0.0016
+const WHEEL_SEQUENCE_TIMEOUT_MS = 140
+const WHEEL_SEQUENCE_ZOOM_DELTA = 32
 
 const ANONYMOUS_ROOT: PersonNode = {
   id: 'anonymous-root',
@@ -166,6 +178,7 @@ function App() {
   const pendingViewportRef = useRef<{ offset: Offset; scale: number } | null>(null)
   const viewportFrameRef = useRef<number | null>(null)
   const gestureScaleRef = useRef(1)
+  const wheelSequenceRef = useRef<WheelSequence>({ deltaY: 0, lastAt: 0 })
   const boardDragRef = useRef({
     startX: 0,
     startY: 0,
@@ -593,9 +606,11 @@ function App() {
     const deltaMultiplier = event.deltaMode === 1 ? 16 : 1
     const deltaX = event.deltaX * deltaMultiplier
     const deltaY = event.deltaY * deltaMultiplier
-    const shouldZoom = event.ctrlKey || isDiscreteMouseWheel(event, deltaX, deltaY)
+    const wheelIntent = getWheelIntent(event, deltaX, deltaY, wheelSequenceRef.current)
 
-    if (!shouldZoom) {
+    if (wheelIntent.kind === 'hold') return
+
+    if (wheelIntent.kind === 'pan') {
       queueViewportUpdate(
         {
           x: view.offset.x - deltaX,
@@ -606,7 +621,7 @@ function App() {
       return
     }
 
-    const normalizedDelta = Math.max(-120, Math.min(120, deltaY))
+    const normalizedDelta = Math.max(-120, Math.min(120, wheelIntent.deltaY))
     const nextScale = view.scale * Math.exp(-normalizedDelta * WHEEL_ZOOM_INTENSITY)
     zoomAtClientPoint(event.clientX, event.clientY, nextScale)
   }, [queueViewportUpdate, zoomAtClientPoint])
@@ -1225,14 +1240,46 @@ function clampScale(value: number) {
   return Math.max(MIN_SCALE, Math.min(MAX_SCALE, value))
 }
 
-function isDiscreteMouseWheel(event: WheelEvent, deltaX: number, deltaY: number) {
-  if (event.deltaMode !== 0) return true
-  if (Math.abs(deltaX) > 0.01 || !Number.isInteger(deltaY)) return false
+function getWheelIntent(
+  event: WheelEvent,
+  deltaX: number,
+  deltaY: number,
+  wheelSequence: WheelSequence,
+): WheelIntent {
+  if (event.ctrlKey || event.deltaMode !== 0) {
+    wheelSequence.deltaY = 0
+    wheelSequence.lastAt = 0
+    return { kind: 'zoom', deltaY }
+  }
+
+  if (Math.abs(deltaX) > 0.01 || !Number.isInteger(deltaY)) {
+    wheelSequence.deltaY = 0
+    wheelSequence.lastAt = 0
+    return { kind: 'pan' }
+  }
 
   const wheelDelta = Math.abs((event as WheelEventLike).wheelDelta ?? 0)
-  if (wheelDelta > 0) return true
+  if (wheelDelta > 0 || Math.abs(deltaY) >= 40) {
+    wheelSequence.deltaY = 0
+    wheelSequence.lastAt = 0
+    return { kind: 'zoom', deltaY }
+  }
 
-  return Math.abs(deltaY) >= 40
+  const now = event.timeStamp
+  const continuesSequence =
+    now - wheelSequence.lastAt <= WHEEL_SEQUENCE_TIMEOUT_MS &&
+    Math.sign(wheelSequence.deltaY) === Math.sign(deltaY)
+
+  wheelSequence.deltaY = continuesSequence ? wheelSequence.deltaY + deltaY : deltaY
+  wheelSequence.lastAt = now
+
+  if (Math.abs(wheelSequence.deltaY) < WHEEL_SEQUENCE_ZOOM_DELTA) return { kind: 'hold' }
+
+  const accumulatedDeltaY = wheelSequence.deltaY
+  wheelSequence.deltaY = 0
+  wheelSequence.lastAt = 0
+
+  return { kind: 'zoom', deltaY: accumulatedDeltaY }
 }
 
 export default App
