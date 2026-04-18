@@ -17,6 +17,7 @@ Current app behavior:
 - create one immutable root person at `0,0` for each signed-in user
 - persist people, colored tags, notes, and undirected connections in Supabase
 - open the top-left Tags menu to create tags and adjust tag colors
+- show a login popup when signed-out users try to edit the board
 - allow one separate AI summary row per person in Supabase
 - debounce note create and note update events for 3 seconds before triggering AI enrichment
 - call a Supabase Edge Function that forwards person context to n8n and rewrites `person_ai_notes`

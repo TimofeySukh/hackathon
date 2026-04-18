@@ -223,6 +223,7 @@ function App() {
   const [aiSearchResults, setAiSearchResults] = useState<SearchResult[]>([])
   const [aiSearchStatus, setAiSearchStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [aiSearchError, setAiSearchError] = useState<string | null>(null)
+  const [isLoginPromptOpen, setIsLoginPromptOpen] = useState(false)
   const connectionModifierLabel = IS_MAC_PLATFORM ? 'Command' : 'Control'
 
   const boardRef = useRef<HTMLElement | null>(null)
@@ -432,6 +433,13 @@ function App() {
   const visibleSearchResults = aiSearchQuery === searchQuery.trim() ? aiSearchResults : searchResults
 
   const error = authError ?? graphError
+
+  const requestLogin = useCallback(() => {
+    if (status === 'authenticated' || status === 'loading' || status === 'unconfigured') return false
+
+    setIsLoginPromptOpen(true)
+    return true
+  }, [status])
 
   useEffect(() => {
     window.localStorage.setItem(THEME_STORAGE_KEY, theme)
@@ -851,6 +859,8 @@ function App() {
     if (event.button !== 0) return
 
     event.stopPropagation()
+    if (requestLogin()) return
+
     boardDragRef.current.active = false
     setIsDraggingBoard(false)
     setSelectedNodeId(node.id)
@@ -1383,6 +1393,46 @@ function App() {
 
   return (
     <main className={`app-shell theme-${theme}`}>
+      {isLoginPromptOpen ? (
+        <div className="login-prompt" role="presentation" onMouseDown={() => setIsLoginPromptOpen(false)}>
+          <section
+            className="login-prompt__dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="login-prompt-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <p className="login-prompt__eyebrow">Login Required</p>
+            <h2 id="login-prompt-title" className="login-prompt__title">
+              Sign in to edit your board
+            </h2>
+            <p className="login-prompt__body">
+              You need an account to move nodes, create connections, edit notes, and save tags.
+            </p>
+            <div className="login-prompt__actions">
+              <button
+                type="button"
+                className="login-prompt__button login-prompt__button--ghost"
+                onClick={() => setIsLoginPromptOpen(false)}
+              >
+                Not now
+              </button>
+              <button
+                type="button"
+                className="login-prompt__button"
+                onClick={() => {
+                  setIsLoginPromptOpen(false)
+                  void signInWithGoogle()
+                }}
+                disabled={status === 'loading' || status === 'unconfigured'}
+              >
+                Sign in with Google
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
       <div className="top-bar">
         <div className="top-bar__left">
           <div className="tags-menu">
@@ -1464,9 +1514,10 @@ function App() {
                   type="button"
                   className="tags-menu__new"
                   onClick={() => {
+                    if (requestLogin()) return
                     void handleCreateMenuTag()
                   }}
-                  disabled={!isGraphReady}
+                  disabled={status === 'loading' || status === 'unconfigured'}
                 >
                   + New tag
                 </button>
