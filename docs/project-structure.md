@@ -56,8 +56,8 @@ Contains the board experience:
 - motion-triggered point highlight state
 - selected-person inspector state
 - persisted social graph node and connection rendering
-- drag-to-create node connections
-- shift-drag node repositioning
+- drag node repositioning
+- option-drag node connection creation
 - theme toggle
 - infinite board surface positioning
 
@@ -112,10 +112,10 @@ It currently supports:
 - visual theme switching
 - persistent social graph nodes connected by lines
 - one separate AI summary record per person in the database
-- drag-to-connect two existing nodes by releasing on another node hit area
-- drag-to-create node growth from any existing node with an immediate connecting line
+- option-drag to connect two existing nodes by releasing on another node hit area
+- option-drag to create node growth from any existing node with an immediate connecting line
 - selected-node detail cards with reusable tag selection, note editing, connection removal, and deletion
-- shift-drag repositioning for non-root nodes
+- drag repositioning for non-root nodes
 - persisted node renaming
 - grid movement through background offset changes
 

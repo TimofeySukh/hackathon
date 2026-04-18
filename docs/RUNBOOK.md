@@ -230,7 +230,7 @@ Manual verification:
 8. Sign in with Google and confirm the account state appears.
 9. Confirm the signed-in account gets a root node at `0,0`.
 10. Drag out from a node to create a new connected person and confirm it persists after reload.
-11. Hold `Shift` and drag a non-root person to a new position, then reload and confirm the coordinates persist.
+11. Drag a non-root person to a new position, confirm connected lines follow it, then reload and confirm the coordinates persist.
 12. Assign a tag to a person, add a note, reload, and confirm both persist.
 13. Create a connection between two existing people and confirm reload preserves it.
 14. Sign out and confirm the anonymous board state returns.

@@ -637,7 +637,7 @@ function App() {
 
     if (!isGraphReady) return
 
-    if (event.shiftKey && !node.is_root) {
+    if (!event.altKey && !node.is_root) {
       setNodeDrag({
         nodeId: node.id,
         startClientX: event.clientX,
@@ -647,6 +647,8 @@ function App() {
       })
       return
     }
+
+    if (!event.altKey) return
 
     const view = viewportRef.current
     const worldPoint = screenToWorld(
@@ -1123,7 +1125,7 @@ function App() {
               {inspectorNode.is_root
                 ? 'Root stays at 0,0'
                 : isGraphReady
-                  ? 'Drag to connect. Hold Shift to move.'
+                  ? 'Drag to move. Hold Option and drag to connect.'
                   : 'Sign in to edit'}
             </span>
           </div>
@@ -1401,8 +1403,8 @@ function App() {
                   title={
                     isGraphReady
                       ? node.is_root
-                        ? 'Drag to connect'
-                        : 'Drag to connect. Hold Shift to move.'
+                        ? 'Hold Option and drag to connect'
+                        : 'Drag to move. Hold Option and drag to connect.'
                       : 'Sign in with Google to edit'
                   }
                   onMouseDown={(event) => startNodeInteraction(node, event)}
