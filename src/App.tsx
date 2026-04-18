@@ -76,6 +76,7 @@ function App() {
   const [nodes, setNodes] = useState<GraphNode[]>(INITIAL_NODES)
   const [edges, setEdges] = useState<GraphEdge[]>(INITIAL_EDGES)
   const [selectedNodeId, setSelectedNodeId] = useState('root')
+  const [inspectorNodeId, setInspectorNodeId] = useState<string | null>(null)
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
   const [connectionDrag, setConnectionDrag] = useState<ConnectionDrag | null>(null)
   const [isDraggingBoard, setIsDraggingBoard] = useState(false)
@@ -97,6 +98,7 @@ function App() {
     () => Object.fromEntries(nodes.map((node) => [node.id, node])) as Record<string, GraphNode>,
     [nodes],
   )
+  const inspectorNode = inspectorNodeId ? nodesById[inspectorNodeId] : null
 
   const finishConnectionDrag = useCallback(
     (clientX: number, clientY: number) => {
@@ -141,6 +143,7 @@ function App() {
           ]
         })
         setSelectedNodeId(targetNode.id)
+        setInspectorNodeId(null)
         setConnectionDrag(null)
         return
       }
@@ -163,6 +166,7 @@ function App() {
         },
       ])
       setSelectedNodeId(nextId)
+      setInspectorNodeId(null)
       setEditingNodeId(nextId)
       setConnectionDrag(null)
     },
@@ -227,6 +231,7 @@ function App() {
     }
 
     setIsDraggingBoard(true)
+    setInspectorNodeId(null)
     setEditingNodeId(null)
   }
 
@@ -237,6 +242,7 @@ function App() {
     boardDragRef.current.active = false
     setIsDraggingBoard(false)
     setSelectedNodeId(nodeId)
+    setInspectorNodeId(null)
     setEditingNodeId(null)
     const worldPoint = screenToWorld(event.clientX, event.clientY, boardRef.current, offset, scale)
     setConnectionDrag({
@@ -256,12 +262,27 @@ function App() {
     )
   }
 
+  const deleteNode = (nodeId: string) => {
+    setNodes((currentNodes) => currentNodes.filter((node) => node.id !== nodeId))
+    setEdges((currentEdges) =>
+      currentEdges.filter((edge) => edge.from !== nodeId && edge.to !== nodeId),
+    )
+    setInspectorNodeId(null)
+    setEditingNodeId(null)
+
+    if (selectedNodeId === nodeId) {
+      setSelectedNodeId('root')
+    }
+  }
+
   const moveWithWheel = (event: ReactWheelEvent<HTMLElement>) => {
     event.preventDefault()
 
-    const prefersPan = Math.abs(event.deltaX) > 0 || Math.abs(event.deltaY) < 24
+    const isMouseWheel = event.deltaMode === 1
+    const isTrackpadPinch = event.ctrlKey
+    const prefersZoom = (isMouseWheel || isTrackpadPinch) && Math.abs(event.deltaX) < 1
 
-    if (prefersPan) {
+    if (!prefersZoom) {
       setOffset((currentOffset) => ({
         x: currentOffset.x - event.deltaX,
         y: currentOffset.y - event.deltaY,
@@ -431,10 +452,12 @@ function App() {
                     onClick={(event) => {
                       event.stopPropagation()
                       setSelectedNodeId(node.id)
+                      setInspectorNodeId(null)
                     }}
                     onDoubleClick={(event) => {
                       event.stopPropagation()
-                      setEditingNodeId(node.id)
+                      setSelectedNodeId(node.id)
+                      setInspectorNodeId(node.id)
                     }}
                   >
                     <span className="graph-node__dot" />
@@ -444,6 +467,37 @@ function App() {
               </div>
             )
           })}
+
+          {inspectorNode ? (
+            <div
+              className="node-inspector"
+              style={{ left: `${inspectorNode.x}px`, top: `${inspectorNode.y + 34}px` }}
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="node-inspector__title">{inspectorNode.label || 'Untitled'}</div>
+              <div className="node-inspector__actions">
+                <button
+                  type="button"
+                  className="node-inspector__button"
+                  onClick={() => {
+                    setInspectorNodeId(null)
+                    setEditingNodeId(inspectorNode.id)
+                  }}
+                >
+                  Rename
+                </button>
+                <button
+                  type="button"
+                  className="node-inspector__button node-inspector__button--danger"
+                  onClick={() => deleteNode(inspectorNode.id)}
+                  disabled={inspectorNode.kind === 'root'}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
       </section>
     </main>
