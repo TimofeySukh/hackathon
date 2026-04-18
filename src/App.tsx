@@ -76,10 +76,6 @@ type GestureEventLike = Event & {
   scale: number
 }
 
-type WheelEventLike = WheelEvent & {
-  wheelDelta?: number
-}
-
 const THEME_STORAGE_KEY = 'hackathon-theme'
 const MIN_SCALE = 0.2
 const MAX_SCALE = 2.5
@@ -593,9 +589,8 @@ function App() {
     const deltaMultiplier = event.deltaMode === 1 ? 16 : 1
     const deltaX = event.deltaX * deltaMultiplier
     const deltaY = event.deltaY * deltaMultiplier
-    const shouldZoom = event.ctrlKey || isDiscreteMouseWheel(event, deltaX, deltaY)
 
-    if (!shouldZoom) {
+    if (!event.ctrlKey) {
       queueViewportUpdate(
         {
           x: view.offset.x - deltaX,
@@ -1223,15 +1218,6 @@ function getLinkPath(fromNode?: PersonNode, toNode?: Offset | null) {
 
 function clampScale(value: number) {
   return Math.max(MIN_SCALE, Math.min(MAX_SCALE, value))
-}
-
-function isDiscreteMouseWheel(event: WheelEvent, deltaX: number, deltaY: number) {
-  if (event.deltaMode !== 0) return true
-  if (Math.abs(deltaX) > 0.01 || !Number.isInteger(deltaY)) return false
-
-  const wheelDelta = Math.abs((event as WheelEventLike).wheelDelta ?? 0)
-
-  return Math.abs(deltaY) >= 80 && (wheelDelta === 0 || wheelDelta % 120 === 0)
 }
 
 export default App
