@@ -477,7 +477,10 @@ select {
 
 .graph-connections {
   position: absolute;
-  inset: 0;
+  left: -2200px;
+  top: -2200px;
+  width: 4400px;
+  height: 4400px;
   overflow: visible;
   pointer-events: none;
 }
