@@ -1,6 +1,6 @@
 # Hackathon Board
 
-A minimal social graph board built with React, Vite, and TypeScript.
+A persisted social graph board built with React, Vite, and TypeScript.
 
 ## Current Experience
 
@@ -17,6 +17,10 @@ A minimal social graph board built with React, Vite, and TypeScript.
 - Theme switcher in the top-right corner
 - Optional Google login through Supabase
 - One personal board record for each signed-in user
+- One immutable root node at `0,0` for each signed-in user
+- Persistent people, tags, notes, and undirected connections in Supabase
+- Selected-person inspector for names, tags, notes, and disconnect/delete actions
+- Hold `Shift` and drag a person to move them
 - Dark green-black theme inspired by the provided reference
 - Light theme designed to match the same visual language
 - High-contrast point grid across the board
@@ -63,6 +67,7 @@ Teammates only need to:
 5. Open the local Vite URL shown in the terminal.
 
 If Vite starts on a different local port such as `5173`, `5174`, or `5175`, that origin must be added to the Supabase Auth redirect allow list and to Google Cloud Authorized JavaScript origins.
+For multi-device login, deploy the frontend on one stable server origin and add that exact origin to both configurations.
 
 ## Available Scripts
 

@@ -2,13 +2,11 @@ import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 
 import { supabase } from './supabase'
-import { ensureUserWorkspace, type UserBoard } from './userWorkspace'
 
 type AuthStatus = 'loading' | 'anonymous' | 'authenticated' | 'unconfigured'
 
 type AuthState = {
   session: Session | null
-  board: UserBoard | null
   status: AuthStatus
   error: string | null
 }
@@ -18,7 +16,6 @@ const getStatus = (session: Session | null): AuthStatus => (session ? 'authentic
 export function useAuth() {
   const [authState, setAuthState] = useState<AuthState>(() => ({
     session: null,
-    board: null,
     status: supabase ? 'loading' : 'unconfigured',
     error: null,
   }))
@@ -33,7 +30,6 @@ export function useAuth() {
         if (isMounted) {
           setAuthState({
             session: null,
-            board: null,
             status: 'anonymous',
             error: null,
           })
@@ -41,26 +37,12 @@ export function useAuth() {
         return
       }
 
-      try {
-        const board = await ensureUserWorkspace(session.user)
-
-        if (isMounted) {
-          setAuthState({
-            session,
-            board,
-            status: getStatus(session),
-            error: null,
-          })
-        }
-      } catch (error) {
-        if (isMounted) {
-          setAuthState({
-            session,
-            board: null,
-            status: getStatus(session),
-            error: error instanceof Error ? error.message : 'Unable to load account workspace.',
-          })
-        }
+      if (isMounted) {
+        setAuthState({
+          session,
+          status: getStatus(session),
+          error: null,
+        })
       }
     }
 
@@ -70,7 +52,6 @@ export function useAuth() {
       if (error) {
         setAuthState({
           session: null,
-          board: null,
           status: 'anonymous',
           error: error.message,
         })

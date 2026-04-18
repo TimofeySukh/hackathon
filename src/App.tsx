@@ -6,6 +6,9 @@ import type {
 } from 'react'
 
 import { useAuth } from './lib/useAuth'
+import { normalizeTagName } from './lib/graphStorage'
+import type { PersonNode, PersonNote } from './lib/graphTypes'
+import { useBoardGraph } from './lib/useBoardGraph'
 
 type Theme = 'dark' | 'light'
 
@@ -14,27 +17,13 @@ type Offset = {
   y: number
 }
 
-type GraphNode = {
-  id: string
-  label: string
-  x: number
-  y: number
-  kind?: 'root' | 'default'
-}
-
-type GraphEdge = {
-  id: string
-  from: string
-  to: string
-}
-
-type BoardStyle = CSSProperties & {
-  '--board-offset-x': string
-  '--board-offset-y': string
-  '--dot-gap': string
-  '--major-dot-gap': string
-  '--dot-size': string
-  '--major-dot-size': string
+type HighlightSpot = Offset & {
+  id: number
+  createdAt: number
+  tailX: number
+  tailY: number
+  tailCore: number
+  tailSize: number
 }
 
 type ConnectionDrag = {
@@ -47,14 +36,42 @@ type ConnectionDrag = {
   worldY: number
 }
 
-type EdgeStyle = CSSProperties & {
-  width: string
-  transform: string
+type NodeDrag = {
+  nodeId: string
+  startClientX: number
+  startClientY: number
+  originX: number
+  originY: number
 }
 
-type ViewportState = {
-  offset: Offset
-  scale: number
+type NoteDraft = {
+  title: string
+  body: string
+}
+
+type BoardStyle = CSSProperties & {
+  '--board-offset-x': string
+  '--board-offset-y': string
+  '--dot-gap': string
+  '--major-dot-gap': string
+  '--dot-size': string
+  '--major-dot-size': string
+}
+
+type HighlightSpotStyle = CSSProperties & {
+  '--highlight-x': string
+  '--highlight-y': string
+  '--board-offset-x': string
+  '--board-offset-y': string
+  '--dot-gap': string
+  '--major-dot-gap': string
+  '--dot-size': string
+  '--major-dot-size': string
+  '--highlight-tail-x': string
+  '--highlight-tail-y': string
+  '--highlight-tail-core': string
+  '--highlight-tail-size': string
+  opacity: number
 }
 
 const THEME_STORAGE_KEY = 'hackathon-theme'
@@ -64,34 +81,74 @@ const GRID_GAP = 12
 const MAJOR_GRID_GAP = 96
 const DOT_SIZE = 0.65
 const MAJOR_DOT_SIZE = 2
+const HIGHLIGHT_LIFETIME_MS = 420
+const HIGHLIGHT_DISTANCE = 12
+const HIGHLIGHT_LIMIT = 28
+const HIGHLIGHT_RADIUS = 56
+const HIGHLIGHT_TICK_MS = 50
+const HIGHLIGHT_TAIL_START = 18
+const HIGHLIGHT_TAIL_LIMIT = 48
+const NODE_RADIUS = 9
 const NODE_HIT_RADIUS = 31
 const CREATE_THRESHOLD = 18
-const WHEEL_ZOOM_INTENSITY = 0.0016
 
-const INITIAL_NODES: GraphNode[] = [{ id: 'root', label: 'You', x: 0, y: 0, kind: 'root' }]
-const INITIAL_EDGES: GraphEdge[] = []
+const ANONYMOUS_ROOT: PersonNode = {
+  id: 'anonymous-root',
+  board_id: 'anonymous-board',
+  owner_user_id: 'anonymous-user',
+  name: 'You',
+  tag_id: null,
+  x: 0,
+  y: 0,
+  is_root: true,
+  created_at: new Date(0).toISOString(),
+  updated_at: new Date(0).toISOString(),
+}
 
 function App() {
-  const { session, board, status, error, signInWithGoogle, signOut } = useAuth()
+  const { session, status, error: authError, signInWithGoogle, signOut } = useAuth()
+  const {
+    board,
+    people,
+    tags,
+    notes,
+    connections,
+    status: graphStatus,
+    error: graphError,
+    createPerson,
+    updatePerson,
+    movePerson,
+    deletePerson,
+    createConnection,
+    deleteConnection,
+    createTag,
+    createNote,
+    updateNote,
+    deleteNote,
+  } = useBoardGraph(session?.user ?? null)
+
   const [theme, setTheme] = useState<Theme>(() => {
     const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY)
     return savedTheme === 'light' ? 'light' : 'dark'
   })
   const [offset, setOffset] = useState<Offset>({ x: 0, y: 0 })
   const [scale, setScale] = useState(1)
-  const [nodes, setNodes] = useState<GraphNode[]>(INITIAL_NODES)
-  const [edges, setEdges] = useState<GraphEdge[]>(INITIAL_EDGES)
-  const [selectedNodeId, setSelectedNodeId] = useState('root')
-  const [inspectorNodeId, setInspectorNodeId] = useState<string | null>(null)
-  const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [connectionDrag, setConnectionDrag] = useState<ConnectionDrag | null>(null)
+  const [nodeDrag, setNodeDrag] = useState<NodeDrag | null>(null)
+  const [draggedPositions, setDraggedPositions] = useState<Record<string, Offset>>({})
+  const [tagDraft, setTagDraft] = useState('')
+  const [newNoteTitle, setNewNoteTitle] = useState('')
+  const [newNoteBody, setNewNoteBody] = useState('')
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, NoteDraft>>({})
+  const [highlightSpots, setHighlightSpots] = useState<HighlightSpot[]>([])
+  const [pointerPosition, setPointerPosition] = useState<Offset | null>(null)
+  const [highlightClock, setHighlightClock] = useState(() => Date.now())
   const [isDraggingBoard, setIsDraggingBoard] = useState(false)
-  const [boardSize, setBoardSize] = useState({ width: 0, height: 0 })
 
   const boardRef = useRef<HTMLElement | null>(null)
-  const viewportRef = useRef<ViewportState>({ offset: { x: 0, y: 0 }, scale: 1 })
-  const pendingViewportRef = useRef<ViewportState | null>(null)
-  const viewportFrameRef = useRef<number | null>(null)
+  const highlightIdRef = useRef(0)
+  const lastHighlightSpotRef = useRef<Offset | null>(null)
   const boardDragRef = useRef({
     startX: 0,
     startY: 0,
@@ -100,69 +157,133 @@ function App() {
     active: false,
   })
 
+  const isAuthenticated = status === 'authenticated' && Boolean(session?.user)
+  const isGraphReady = isAuthenticated && graphStatus === 'ready' && Boolean(board)
+  const boardNodes = useMemo(
+    () =>
+      (isGraphReady ? people : [ANONYMOUS_ROOT]).map((node) => {
+        const dragPosition = draggedPositions[node.id]
+        return dragPosition ? { ...node, ...dragPosition } : node
+      }),
+    [draggedPositions, isGraphReady, people],
+  )
+  const boardConnections = useMemo(
+    () => (isGraphReady ? connections : []),
+    [connections, isGraphReady],
+  )
+  const nodesById = useMemo(
+    () => Object.fromEntries(boardNodes.map((node) => [node.id, node])) as Record<string, PersonNode>,
+    [boardNodes],
+  )
+  const defaultSelectedNodeId = boardNodes.find((node) => node.is_root)?.id ?? boardNodes[0]?.id ?? null
+  const activeSelectedNodeId =
+    selectedNodeId && nodesById[selectedNodeId] ? selectedNodeId : defaultSelectedNodeId
+
+  const selectedNode = useMemo(() => {
+    if (boardNodes.length === 0) return null
+    if (activeSelectedNodeId) return nodesById[activeSelectedNodeId] ?? null
+    return null
+  }, [activeSelectedNodeId, boardNodes.length, nodesById])
+
+  const selectedNodeNotes = useMemo(
+    () => notes.filter((note) => note.person_id === selectedNode?.id),
+    [notes, selectedNode?.id],
+  )
+
+  const selectedNodeConnections = useMemo(() => {
+    if (!selectedNode) return []
+
+    return boardConnections
+      .filter(
+        (connection) =>
+          connection.person_a_id === selectedNode.id || connection.person_b_id === selectedNode.id,
+      )
+      .map((connection) => {
+        const otherPersonId =
+          connection.person_a_id === selectedNode.id
+            ? connection.person_b_id
+            : connection.person_a_id
+
+        return {
+          connection,
+          otherPerson: nodesById[otherPersonId] ?? null,
+        }
+      })
+      .filter((entry) => entry.otherPerson)
+  }, [boardConnections, nodesById, selectedNode])
+
+  const error = authError ?? graphError
+
   useEffect(() => {
     window.localStorage.setItem(THEME_STORAGE_KEY, theme)
   }, [theme])
 
   useEffect(() => {
-    viewportRef.current = { offset, scale }
-  }, [offset, scale])
+    if (highlightSpots.length === 0) return undefined
 
-  useEffect(() => {
-    const boardElement = boardRef.current
-    if (!boardElement) return undefined
+    const intervalId = window.setInterval(() => {
+      const now = Date.now()
+      setHighlightClock(now)
+      setHighlightSpots((currentSpots) =>
+        currentSpots.filter((spot) => now - spot.createdAt < HIGHLIGHT_LIFETIME_MS),
+      )
+    }, HIGHLIGHT_TICK_MS)
 
-    const updateBoardSize = () => {
-      setBoardSize({
-        width: boardElement.clientWidth,
-        height: boardElement.clientHeight,
-      })
+    return () => window.clearInterval(intervalId)
+  }, [highlightSpots.length])
+
+  const addHighlightSpot = useCallback((clientX: number, clientY: number, force = false) => {
+    const viewport = boardRef.current?.getBoundingClientRect()
+    if (!viewport) return
+
+    const now = Date.now()
+    const nextSpot = {
+      x: clientX - viewport.left,
+      y: clientY - viewport.top,
     }
+    const previousSpot = lastHighlightSpotRef.current
+    const distanceFromPrevious = previousSpot
+      ? Math.hypot(nextSpot.x - previousSpot.x, nextSpot.y - previousSpot.y)
+      : Number.POSITIVE_INFINITY
 
-    updateBoardSize()
+    if (!force && distanceFromPrevious < HIGHLIGHT_DISTANCE) return
 
-    const resizeObserver = new ResizeObserver(updateBoardSize)
-    resizeObserver.observe(boardElement)
+    const hasTail = previousSpot && Number.isFinite(distanceFromPrevious)
+    const tailReach = hasTail
+      ? Math.min(HIGHLIGHT_TAIL_LIMIT, Math.max(0, distanceFromPrevious - HIGHLIGHT_TAIL_START))
+      : 0
+    const tailUnitX =
+      hasTail && distanceFromPrevious > 0 ? (nextSpot.x - previousSpot.x) / distanceFromPrevious : 0
+    const tailUnitY =
+      hasTail && distanceFromPrevious > 0 ? (nextSpot.y - previousSpot.y) / distanceFromPrevious : 0
+    const tailSize = tailReach * 0.75
 
-    return () => resizeObserver.disconnect()
+    const id = highlightIdRef.current + 1
+    highlightIdRef.current = id
+    lastHighlightSpotRef.current = nextSpot
+    setPointerPosition(nextSpot)
+    setHighlightClock(now)
+
+    setHighlightSpots((currentSpots) => [
+      ...currentSpots.slice(-HIGHLIGHT_LIMIT + 1),
+      {
+        id,
+        createdAt: now,
+        tailX: nextSpot.x - tailUnitX * tailReach,
+        tailY: nextSpot.y - tailUnitY * tailReach,
+        tailCore: tailSize * 0.36,
+        tailSize,
+        ...nextSpot,
+      },
+    ])
   }, [])
-
-  const queueViewportUpdate = useCallback((nextOffset: Offset, nextScale: number) => {
-    pendingViewportRef.current = { offset: nextOffset, scale: nextScale }
-
-    if (viewportFrameRef.current !== null) return
-
-    viewportFrameRef.current = window.requestAnimationFrame(() => {
-      viewportFrameRef.current = null
-
-      const pendingViewport = pendingViewportRef.current
-      if (!pendingViewport) return
-
-      pendingViewportRef.current = null
-      viewportRef.current = pendingViewport
-      setOffset(pendingViewport.offset)
-      setScale(pendingViewport.scale)
-    })
-  }, [])
-
-  useEffect(
-    () => () => {
-      if (viewportFrameRef.current !== null) {
-        window.cancelAnimationFrame(viewportFrameRef.current)
-      }
-    },
-    [],
-  )
-
-  const nodesById = useMemo(
-    () => Object.fromEntries(nodes.map((node) => [node.id, node])) as Record<string, GraphNode>,
-    [nodes],
-  )
-  const inspectorNode = inspectorNodeId ? nodesById[inspectorNodeId] : null
 
   const finishConnectionDrag = useCallback(
-    (clientX: number, clientY: number) => {
-      if (!connectionDrag) return
+    async (clientX: number, clientY: number) => {
+      if (!connectionDrag || !isGraphReady) {
+        setConnectionDrag(null)
+        return
+      }
 
       const distance = Math.hypot(
         clientX - connectionDrag.startClientX,
@@ -174,76 +295,43 @@ function App() {
         return
       }
 
-      const targetNode = nodes.find((node) => {
+      const targetNode = boardNodes.find((node) => {
         if (node.id === connectionDrag.fromId) return false
 
         const distanceToNode = Math.hypot(
           node.x - connectionDrag.worldX,
           node.y - connectionDrag.worldY,
         )
-
         return distanceToNode <= NODE_HIT_RADIUS / scale
       })
 
-      if (targetNode) {
-        setEdges((currentEdges) => {
-          const alreadyConnected = currentEdges.some(
-            (edge) => edge.from === connectionDrag.fromId && edge.to === targetNode.id,
-          )
+      try {
+        if (targetNode) {
+          await createConnection(connectionDrag.fromId, targetNode.id)
+          setSelectedNodeId(targetNode.id)
+          setConnectionDrag(null)
+          return
+        }
 
-          if (alreadyConnected) return currentEdges
-
-          return [
-            ...currentEdges,
-            {
-              id: `edge-${connectionDrag.fromId}-${targetNode.id}`,
-              from: connectionDrag.fromId,
-              to: targetNode.id,
-            },
-          ]
+        const createdNode = await createPerson({
+          name: '',
+          tagId: null,
+          x: connectionDrag.worldX,
+          y: connectionDrag.worldY,
         })
-        setSelectedNodeId(targetNode.id)
-        setInspectorNodeId(null)
+        await createConnection(connectionDrag.fromId, createdNode.id)
+        setSelectedNodeId(createdNode.id)
+      } finally {
         setConnectionDrag(null)
-        return
       }
-
-      const nextId = `node-${crypto.randomUUID()}`
-      const nextNode: GraphNode = {
-        id: nextId,
-        label: '',
-        x: connectionDrag.worldX,
-        y: connectionDrag.worldY,
-      }
-
-      setNodes((currentNodes) => [...currentNodes, nextNode])
-      setEdges((currentEdges) => [
-        ...currentEdges,
-        {
-          id: `edge-${connectionDrag.fromId}-${nextId}`,
-          from: connectionDrag.fromId,
-          to: nextId,
-        },
-      ])
-      setSelectedNodeId(nextId)
-      setInspectorNodeId(null)
-      setEditingNodeId(nextId)
-      setConnectionDrag(null)
     },
-    [connectionDrag, nodes, scale],
+    [boardNodes, connectionDrag, createConnection, createPerson, isGraphReady, scale],
   )
 
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
       if (connectionDrag) {
-        const view = viewportRef.current
-        const worldPoint = screenToWorld(
-          event.clientX,
-          event.clientY,
-          boardRef.current,
-          view.offset,
-          view.scale,
-        )
+        const worldPoint = screenToWorld(event.clientX, event.clientY, boardRef.current, offset, scale)
 
         setConnectionDrag((currentDrag) =>
           currentDrag
@@ -259,22 +347,57 @@ function App() {
         return
       }
 
+      if (nodeDrag) {
+        setDraggedPositions((currentPositions) => ({
+          ...currentPositions,
+          [nodeDrag.nodeId]: {
+            x: nodeDrag.originX + (event.clientX - nodeDrag.startClientX) / scale,
+            y: nodeDrag.originY + (event.clientY - nodeDrag.startClientY) / scale,
+          },
+        }))
+        return
+      }
+
       if (!boardDragRef.current.active) return
 
       const nextX = boardDragRef.current.originX + event.clientX - boardDragRef.current.startX
       const nextY = boardDragRef.current.originY + event.clientY - boardDragRef.current.startY
 
-      queueViewportUpdate({ x: nextX, y: nextY }, viewportRef.current.scale)
+      setOffset({ x: nextX, y: nextY })
+      addHighlightSpot(event.clientX, event.clientY)
     }
 
     const handleMouseUp = (event: MouseEvent) => {
-      if (connectionDrag) {
-        finishConnectionDrag(event.clientX, event.clientY)
-        return
-      }
+      void (async () => {
+        if (connectionDrag) {
+          await finishConnectionDrag(event.clientX, event.clientY)
+          return
+        }
 
-      boardDragRef.current.active = false
-      setIsDraggingBoard(false)
+        if (nodeDrag) {
+          const finalPosition = draggedPositions[nodeDrag.nodeId]
+          setNodeDrag(null)
+          setDraggedPositions((currentPositions) => {
+            const nextPositions = { ...currentPositions }
+            delete nextPositions[nodeDrag.nodeId]
+            return nextPositions
+          })
+
+          if (finalPosition) {
+            const xChanged = Math.abs(finalPosition.x - nodeDrag.originX) > 0.001
+            const yChanged = Math.abs(finalPosition.y - nodeDrag.originY) > 0.001
+
+            if (xChanged || yChanged) {
+              await movePerson(nodeDrag.nodeId, finalPosition.x, finalPosition.y)
+            }
+          }
+          return
+        }
+
+        boardDragRef.current.active = false
+        lastHighlightSpotRef.current = null
+        setIsDraggingBoard(false)
+      })()
     }
 
     window.addEventListener('mousemove', handleMouseMove)
@@ -284,10 +407,10 @@ function App() {
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [connectionDrag, finishConnectionDrag, queueViewportUpdate])
+  }, [addHighlightSpot, connectionDrag, draggedPositions, finishConnectionDrag, movePerson, nodeDrag, offset, scale])
 
-  const startBoardDragging = (event: ReactMouseEvent<HTMLElement>) => {
-    if (event.button !== 0 || connectionDrag) return
+  function startBoardDragging(event: ReactMouseEvent<HTMLElement>) {
+    if (event.button !== 0 || connectionDrag || nodeDrag) return
 
     boardDragRef.current = {
       startX: event.clientX,
@@ -297,85 +420,161 @@ function App() {
       active: true,
     }
 
+    addHighlightSpot(event.clientX, event.clientY, true)
     setIsDraggingBoard(true)
-    setInspectorNodeId(null)
-    setEditingNodeId(null)
   }
 
-  const startConnectionDrag = (nodeId: string, event: ReactMouseEvent<HTMLButtonElement>) => {
+  function startNodeInteraction(node: PersonNode, event: ReactMouseEvent<HTMLButtonElement>) {
     if (event.button !== 0) return
 
     event.stopPropagation()
     boardDragRef.current.active = false
     setIsDraggingBoard(false)
-    setSelectedNodeId(nodeId)
-    setInspectorNodeId(null)
-    setEditingNodeId(null)
-    const view = viewportRef.current
-    const worldPoint = screenToWorld(
-      event.clientX,
-      event.clientY,
-      boardRef.current,
-      view.offset,
-      view.scale,
-    )
+    setSelectedNodeId(node.id)
+
+    if (!isGraphReady) return
+
+    if (event.shiftKey && !node.is_root) {
+      setNodeDrag({
+        nodeId: node.id,
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        originX: node.x,
+        originY: node.y,
+      })
+      return
+    }
+
+    const worldPoint = screenToWorld(event.clientX, event.clientY, boardRef.current, offset, scale)
     setConnectionDrag({
-      fromId: nodeId,
+      fromId: node.id,
       startClientX: event.clientX,
       startClientY: event.clientY,
       clientX: event.clientX,
       clientY: event.clientY,
-      worldX: worldPoint?.x ?? nodesById[nodeId].x,
-      worldY: worldPoint?.y ?? nodesById[nodeId].y,
+      worldX: worldPoint?.x ?? node.x,
+      worldY: worldPoint?.y ?? node.y,
     })
   }
 
-  const updateNodeLabel = (nodeId: string, value: string) => {
-    setNodes((currentNodes) =>
-      currentNodes.map((node) => (node.id === nodeId ? { ...node, label: value } : node)),
-    )
-  }
-
-  const deleteNode = (nodeId: string) => {
-    setNodes((currentNodes) => currentNodes.filter((node) => node.id !== nodeId))
-    setEdges((currentEdges) =>
-      currentEdges.filter((edge) => edge.from !== nodeId && edge.to !== nodeId),
-    )
-    setInspectorNodeId(null)
-    setEditingNodeId(null)
-
-    if (selectedNodeId === nodeId) {
-      setSelectedNodeId('root')
-    }
-  }
-
-  const moveWithWheel = (event: ReactWheelEvent<HTMLElement>) => {
+  function moveWithWheel(event: ReactWheelEvent<HTMLElement>) {
     event.preventDefault()
+    addHighlightSpot(event.clientX, event.clientY, true)
 
-    const view = viewportRef.current
-    const deltaMultiplier = event.deltaMode === 1 ? 16 : 1
-    const normalizedDelta = Math.max(-120, Math.min(120, event.deltaY * deltaMultiplier))
-    const nextScale = clampScale(
-      view.scale * Math.exp(-normalizedDelta * WHEEL_ZOOM_INTENSITY),
-    )
+    const prefersPan = Math.abs(event.deltaX) > 0 || Math.abs(event.deltaY) < 24
 
-    if (nextScale === view.scale) return
+    if (prefersPan) {
+      setOffset((currentOffset) => ({
+        x: currentOffset.x - event.deltaX,
+        y: currentOffset.y - event.deltaY,
+      }))
+      return
+    }
+
+    const zoomIntensity = event.deltaY > 0 ? 0.88 : 1.12
+    const nextScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale * zoomIntensity))
+
+    if (nextScale === scale) return
 
     const { left, top } = event.currentTarget.getBoundingClientRect()
     const pointerX = event.clientX - left
     const pointerY = event.clientY - top
     const centerX = event.currentTarget.clientWidth / 2
     const centerY = event.currentTarget.clientHeight / 2
-    const worldX = (pointerX - centerX - view.offset.x) / view.scale
-    const worldY = (pointerY - centerY - view.offset.y) / view.scale
+    const worldX = (pointerX - centerX - offset.x) / scale
+    const worldY = (pointerY - centerY - offset.y) / scale
 
-    queueViewportUpdate(
-      {
-        x: pointerX - centerX - worldX * nextScale,
-        y: pointerY - centerY - worldY * nextScale,
+    setScale(nextScale)
+    setOffset({
+      x: pointerX - centerX - worldX * nextScale,
+      y: pointerY - centerY - worldY * nextScale,
+    })
+  }
+
+  async function saveSelectedName(nextValue: string) {
+    if (!selectedNode || !isGraphReady) return
+
+    const nextName = nextValue.trim()
+    if (nextName === selectedNode.name) return
+
+    await updatePerson({
+      id: selectedNode.id,
+      name: nextName,
+    })
+  }
+
+  async function handleTagSelection(nextTagId: string) {
+    if (!selectedNode || !isGraphReady) return
+
+    await updatePerson({
+      id: selectedNode.id,
+      tag_id: nextTagId || null,
+    })
+  }
+
+  async function handleCreateTag() {
+    if (!tagDraft.trim() || !selectedNode || !isGraphReady) return
+
+    const createdTag = await createTag(normalizeTagName(tagDraft))
+    setTagDraft('')
+    await updatePerson({
+      id: selectedNode.id,
+      tag_id: createdTag.id,
+    })
+  }
+
+  async function handleCreateNote() {
+    if (!selectedNode || !isGraphReady) return
+
+    const title = newNoteTitle.trim() || 'Untitled note'
+    const body = newNoteBody.trim()
+
+    if (!title && !body) return
+
+    await createNote(title, body, selectedNode.id)
+    setNewNoteTitle('')
+    setNewNoteBody('')
+  }
+
+  function updateNoteDraft(noteId: string, field: keyof NoteDraft, value: string) {
+    setNoteDrafts((currentDrafts) => ({
+      ...currentDrafts,
+      [noteId]: {
+        title: currentDrafts[noteId]?.title ?? selectedNodeNotes.find((note) => note.id === noteId)?.title ?? '',
+        body: currentDrafts[noteId]?.body ?? selectedNodeNotes.find((note) => note.id === noteId)?.body ?? '',
+        [field]: value,
       },
-      nextScale,
-    )
+    }))
+  }
+
+  async function persistNote(note: PersonNote) {
+    const draft = noteDrafts[note.id]
+    if (!draft) return
+
+    const nextTitle = draft.title.trim() || 'Untitled note'
+    const nextBody = draft.body
+
+    if (nextTitle === note.title && nextBody === note.body) return
+
+    const updated = await updateNote({
+      id: note.id,
+      title: nextTitle,
+      body: nextBody,
+    })
+    setNoteDrafts((currentDrafts) => ({
+      ...currentDrafts,
+      [note.id]: {
+        title: updated.title,
+        body: updated.body,
+      },
+    }))
+  }
+
+  async function handleDeletePerson() {
+    if (!selectedNode || !isGraphReady || selectedNode.is_root) return
+
+    await deletePerson(selectedNode.id)
+    setSelectedNodeId(null)
   }
 
   const gridStyle = {
@@ -388,29 +587,45 @@ function App() {
   }
 
   const boardStyle: BoardStyle = gridStyle
-
   const graphStyle = {
     transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
   } satisfies CSSProperties
 
   const previewPath = connectionDrag
-    ? getLineStyle(nodesById[connectionDrag.fromId], {
+    ? getLinkPath(nodesById[connectionDrag.fromId], {
         x: connectionDrag.worldX,
         y: connectionDrag.worldY,
       })
     : null
 
-  const inspectorStyle = useMemo(() => {
-    if (!inspectorNode || boardSize.width === 0 || boardSize.height === 0) return null
+  function getHighlightOpacity(spot: HighlightSpot) {
+    const age = highlightClock - spot.createdAt
+    const ageOpacity = Math.max(0, 1 - age / HIGHLIGHT_LIFETIME_MS)
 
-    const rawLeft = boardSize.width / 2 + offset.x + inspectorNode.x * scale + 22
-    const rawTop = boardSize.height / 2 + offset.y + inspectorNode.y * scale + 26
+    if (!pointerPosition) return ageOpacity
+
+    const distance = Math.hypot(spot.x - pointerPosition.x, spot.y - pointerPosition.y)
+    const distanceOpacity = Math.max(0, 1 - distance / HIGHLIGHT_RADIUS)
+
+    return Math.min(0.95, ageOpacity * distanceOpacity)
+  }
+
+  function getHighlightSpotStyle(spot: HighlightSpot): HighlightSpotStyle | null {
+    const opacity = getHighlightOpacity(spot)
+
+    if (opacity <= 0.03) return null
 
     return {
-      left: `${Math.min(boardSize.width - 176, Math.max(16, rawLeft))}px`,
-      top: `${Math.min(boardSize.height - 104, Math.max(90, rawTop))}px`,
+      ...gridStyle,
+      '--highlight-x': `${spot.x}px`,
+      '--highlight-y': `${spot.y}px`,
+      '--highlight-tail-x': `${spot.tailX}px`,
+      '--highlight-tail-y': `${spot.tailY}px`,
+      '--highlight-tail-core': `${spot.tailCore}px`,
+      '--highlight-tail-size': `${spot.tailSize}px`,
+      opacity,
     }
-  }, [boardSize.height, boardSize.width, inspectorNode, offset.x, offset.y, scale])
+  }
 
   return (
     <main className={`app-shell theme-${theme}`}>
@@ -431,7 +646,9 @@ function App() {
               )}
               <span className="account-panel__text">
                 <span className="account-panel__label">{session.user.email}</span>
-                <span className="account-panel__meta">{board?.title ?? 'Personal board'}</span>
+                <span className="account-panel__meta">
+                  {graphStatus === 'loading' ? 'Loading your graph' : board?.title ?? 'Personal board'}
+                </span>
               </span>
               <button type="button" className="account-panel__button" onClick={signOut}>
                 Sign out
@@ -475,114 +692,299 @@ function App() {
         </button>
       </div>
 
+      {selectedNode ? (
+        <aside className="inspector-panel">
+          <div className="inspector-panel__header">
+            <div>
+              <p className="inspector-panel__eyebrow">
+                {selectedNode.is_root ? 'Your node' : 'Selected person'}
+              </p>
+              <h2 className="inspector-panel__title">
+                {selectedNode.name.trim() || (selectedNode.is_root ? 'You' : 'Unnamed person')}
+              </h2>
+            </div>
+            <span className="inspector-panel__hint">
+              {selectedNode.is_root
+                ? 'Root stays at 0,0'
+                : isGraphReady
+                  ? 'Drag to connect. Hold Shift to move.'
+                  : 'Sign in to edit'}
+            </span>
+          </div>
+
+          <label className="field-group">
+            <span className="field-group__label">Name</span>
+            <input
+              key={`${selectedNode.id}-${selectedNode.updated_at}`}
+              className="field-group__input"
+              defaultValue={selectedNode.name}
+              onBlur={(event) => {
+                void saveSelectedName(event.currentTarget.value)
+              }}
+              disabled={!isGraphReady}
+              placeholder="Name"
+            />
+          </label>
+
+          <div className="field-group">
+            <span className="field-group__label">Tag</span>
+            <select
+              className="field-group__input"
+              value={selectedNode.tag_id ?? ''}
+              onChange={(event) => {
+                void handleTagSelection(event.target.value)
+              }}
+              disabled={!isGraphReady}
+            >
+              <option value="">No tag</option>
+              {tags.map((tag) => (
+                <option key={tag.id} value={tag.id}>
+                  {tag.name}
+                </option>
+              ))}
+            </select>
+            <div className="field-group__inline">
+              <input
+                className="field-group__input"
+                value={tagDraft}
+                onChange={(event) => setTagDraft(event.target.value)}
+                placeholder="New tag"
+                disabled={!isGraphReady}
+              />
+              <button
+                type="button"
+                className="field-group__button"
+                onClick={() => {
+                  void handleCreateTag()
+                }}
+                disabled={!isGraphReady || !tagDraft.trim()}
+              >
+                Add tag
+              </button>
+            </div>
+          </div>
+
+          <div className="field-group">
+            <span className="field-group__label">Position</span>
+            <p className="field-group__meta">
+              X {selectedNode.x.toFixed(0)}, Y {selectedNode.y.toFixed(0)}
+            </p>
+          </div>
+
+          <div className="field-group">
+            <div className="field-group__header">
+              <span className="field-group__label">Connections</span>
+              <span className="field-group__meta">{selectedNodeConnections.length}</span>
+            </div>
+            {selectedNodeConnections.length > 0 ? (
+              <div className="stack-list">
+                {selectedNodeConnections.map(({ connection, otherPerson }) => (
+                  <div key={connection.id} className="stack-list__item">
+                    <span className="stack-list__text">
+                      {otherPerson?.name.trim() || 'Unnamed person'}
+                    </span>
+                    {isGraphReady ? (
+                      <button
+                        type="button"
+                        className="stack-list__button"
+                        onClick={() => {
+                          void deleteConnection(connection.id)
+                        }}
+                      >
+                        Disconnect
+                      </button>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="field-group__meta">No connections yet.</p>
+            )}
+          </div>
+
+          <div className="field-group">
+            <div className="field-group__header">
+              <span className="field-group__label">Notes</span>
+              <span className="field-group__meta">{selectedNodeNotes.length}</span>
+            </div>
+
+            {selectedNodeNotes.length > 0 ? (
+              <div className="note-list">
+                {selectedNodeNotes.map((note) => {
+                  const draft = noteDrafts[note.id] ?? {
+                    title: note.title,
+                    body: note.body,
+                  }
+
+                  return (
+                    <article key={note.id} className="note-card">
+                      <input
+                        className="field-group__input"
+                        value={draft.title}
+                        onChange={(event) => updateNoteDraft(note.id, 'title', event.target.value)}
+                        onBlur={() => {
+                          void persistNote(note)
+                        }}
+                        disabled={!isGraphReady}
+                        placeholder="Title"
+                      />
+                      <textarea
+                        className="field-group__textarea"
+                        value={draft.body}
+                        onChange={(event) => updateNoteDraft(note.id, 'body', event.target.value)}
+                        onBlur={() => {
+                          void persistNote(note)
+                        }}
+                        disabled={!isGraphReady}
+                        placeholder="Write a note"
+                        rows={4}
+                      />
+                      {isGraphReady ? (
+                        <button
+                          type="button"
+                          className="stack-list__button stack-list__button--danger"
+                          onClick={() => {
+                            void deleteNote(note.id)
+                          }}
+                        >
+                          Delete note
+                        </button>
+                      ) : null}
+                    </article>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="field-group__meta">No notes yet.</p>
+            )}
+
+            <div className="note-card note-card--draft">
+              <input
+                className="field-group__input"
+                value={newNoteTitle}
+                onChange={(event) => setNewNoteTitle(event.target.value)}
+                placeholder="New note title"
+                disabled={!isGraphReady}
+              />
+              <textarea
+                className="field-group__textarea"
+                value={newNoteBody}
+                onChange={(event) => setNewNoteBody(event.target.value)}
+                placeholder="New note body"
+                rows={4}
+                disabled={!isGraphReady}
+              />
+              <button
+                type="button"
+                className="field-group__button"
+                onClick={() => {
+                  void handleCreateNote()
+                }}
+                disabled={!isGraphReady || (!newNoteTitle.trim() && !newNoteBody.trim())}
+              >
+                Add note
+              </button>
+            </div>
+          </div>
+
+          {!selectedNode.is_root && isGraphReady ? (
+            <button
+              type="button"
+              className="danger-button"
+              onClick={() => {
+                void handleDeletePerson()
+              }}
+            >
+              Delete person
+            </button>
+          ) : null}
+        </aside>
+      ) : null}
+
       <section
         ref={boardRef}
         className={`board-viewport${isDraggingBoard ? ' is-dragging' : ''}`}
         onMouseDown={startBoardDragging}
+        onMouseEnter={(event) => addHighlightSpot(event.clientX, event.clientY, true)}
+        onMouseMove={(event) => addHighlightSpot(event.clientX, event.clientY)}
+        onMouseLeave={() => {
+          lastHighlightSpotRef.current = null
+          setPointerPosition(null)
+        }}
         onWheel={moveWithWheel}
         aria-label="Social network graph canvas"
       >
         <div className="board-surface" style={boardStyle} />
+        <div className="board-highlights" aria-hidden="true">
+          {highlightSpots.map((spot) => {
+            const spotStyle = getHighlightSpotStyle(spot)
+            if (!spotStyle) return null
+            return <span key={spot.id} className="board-highlights__spot" style={spotStyle} />
+          })}
+        </div>
 
         <div className="graph-layer" style={graphStyle}>
-          <div className="graph-connections" aria-hidden="true">
-            {edges.map((edge) => {
-              const fromNode = nodesById[edge.from]
-              const toNode = nodesById[edge.to]
-              const lineStyle = getLineStyle(fromNode, toNode)
-              if (!lineStyle) return null
+          <svg
+            className="graph-connections"
+            viewBox="-2200 -2200 4400 4400"
+            aria-hidden="true"
+          >
+            {boardConnections.map((edge) => {
+              const fromNode = nodesById[edge.person_a_id]
+              const toNode = nodesById[edge.person_b_id]
+              const link = getLinkPath(fromNode, toNode)
+              if (!link) return null
 
-              return <span key={edge.id} className="graph-edge" style={lineStyle} />
+              return (
+                <path
+                  key={edge.id}
+                  className="graph-edge"
+                  d={`M ${link.start.x} ${link.start.y} C ${link.controlA.x} ${link.controlA.y}, ${link.controlB.x} ${link.controlB.y}, ${link.end.x} ${link.end.y}`}
+                />
+              )
             })}
 
-            {previewPath ? <span className="graph-edge graph-edge--preview" style={previewPath} /> : null}
-          </div>
+            {previewPath ? (
+              <path
+                className="graph-edge graph-edge--preview"
+                d={`M ${previewPath.start.x} ${previewPath.start.y} C ${previewPath.controlA.x} ${previewPath.controlA.y}, ${previewPath.controlB.x} ${previewPath.controlB.y}, ${previewPath.end.x} ${previewPath.end.y}`}
+              />
+            ) : null}
+          </svg>
 
-          {nodes.map((node) => {
-            const isSelected = node.id === selectedNodeId
-            const isEditing = node.id === editingNodeId
+          {boardNodes.map((node) => {
+            const isSelected = node.id === selectedNode?.id
 
             return (
               <div
                 key={node.id}
-                className={`graph-node${node.kind === 'root' ? ' graph-node--root' : ''}${isSelected ? ' is-selected' : ''}`}
+                className={`graph-node${node.is_root ? ' graph-node--root' : ''}${isSelected ? ' is-selected' : ''}`}
                 style={{ left: `${node.x}px`, top: `${node.y}px` }}
               >
-                {isEditing ? (
-                  <div
-                    className="graph-node__editor"
-                    onMouseDown={(event) => event.stopPropagation()}
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    <span className="graph-node__dot" />
-                    <input
-                      className="graph-node__input"
-                      value={node.label}
-                      placeholder="Name"
-                      autoFocus
-                      onChange={(event) => updateNodeLabel(node.id, event.target.value)}
-                      onBlur={() => setEditingNodeId(null)}
-                    />
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    className="graph-node__button"
-                    onMouseDown={(event) => startConnectionDrag(node.id, event)}
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      setSelectedNodeId(node.id)
-                      setInspectorNodeId(null)
-                    }}
-                    onDoubleClick={(event) => {
-                      event.stopPropagation()
-                      setSelectedNodeId(node.id)
-                      setInspectorNodeId(node.id)
-                    }}
-                  >
-                    <span className="graph-node__dot" />
-                    <span className="graph-node__label">{node.label}</span>
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className="graph-node__button"
+                  title={
+                    isGraphReady
+                      ? node.is_root
+                        ? 'Drag to connect'
+                        : 'Drag to connect. Hold Shift to move.'
+                      : 'Sign in with Google to edit'
+                  }
+                  onMouseDown={(event) => startNodeInteraction(node, event)}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setSelectedNodeId(node.id)
+                  }}
+                >
+                  <span className="graph-node__dot" />
+                  <span className="graph-node__label">
+                    {node.name.trim() || (node.is_root ? 'You' : 'Unnamed person')}
+                  </span>
+                </button>
               </div>
             )
           })}
-
-        </div>
-
-        {inspectorNode && inspectorStyle ? (
-          <div
-            className="node-inspector"
-            style={inspectorStyle}
-            onMouseDown={(event) => event.stopPropagation()}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="node-inspector__title">{inspectorNode.label || 'Untitled'}</div>
-            <div className="node-inspector__actions">
-              <button
-                type="button"
-                className="node-inspector__button"
-                onClick={() => {
-                  setInspectorNodeId(null)
-                  setEditingNodeId(inspectorNode.id)
-                }}
-              >
-                Rename
-              </button>
-              <button
-                type="button"
-                className="node-inspector__button node-inspector__button--danger"
-                onClick={() => deleteNode(inspectorNode.id)}
-                disabled={inspectorNode.kind === 'root'}
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        ) : null}
-
-        <div className="zoom-indicator" aria-live="polite">
-          {Math.round(scale * 100)}%
         </div>
       </section>
     </main>
@@ -605,22 +1007,34 @@ function screenToWorld(
   }
 }
 
-function getLineStyle(fromNode?: GraphNode, toNode?: Offset | null): EdgeStyle | null {
+function getLinkPath(fromNode?: PersonNode, toNode?: Offset | null) {
   if (!fromNode || !toNode) return null
 
   const dx = toNode.x - fromNode.x
   const dy = toNode.y - fromNode.y
-  const distance = Math.hypot(dx, dy)
-  if (distance < 1) return null
+  const distance = Math.hypot(dx, dy) || 1
+  const unitX = dx / distance
+  const unitY = dy / distance
+  const curve = Math.min(44, distance * 0.18)
 
   return {
-    width: `${distance}px`,
-    transform: `translate(${fromNode.x}px, ${fromNode.y}px) rotate(${Math.atan2(dy, dx)}rad)`,
+    start: {
+      x: fromNode.x + unitX * NODE_RADIUS,
+      y: fromNode.y + unitY * NODE_RADIUS,
+    },
+    end: {
+      x: toNode.x - unitX * NODE_RADIUS,
+      y: toNode.y - unitY * NODE_RADIUS,
+    },
+    controlA: {
+      x: fromNode.x + unitX * (NODE_RADIUS + curve),
+      y: fromNode.y + unitY * (NODE_RADIUS + curve),
+    },
+    controlB: {
+      x: toNode.x - unitX * (NODE_RADIUS + curve),
+      y: toNode.y - unitY * (NODE_RADIUS + curve),
+    },
   }
-}
-
-function clampScale(value: number) {
-  return Math.min(MAX_SCALE, Math.max(MIN_SCALE, value))
 }
 
 export default App

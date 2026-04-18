@@ -2,7 +2,7 @@
 
 ## Current State
 
-This repository contains a minimal React, Vite, and TypeScript infinite board app.
+This repository contains a React, Vite, and TypeScript social graph board app.
 
 The current product is intentionally narrow:
 
@@ -12,7 +12,9 @@ The current product is intentionally narrow:
 - a very dense CSS-rendered point grid with motion-triggered point highlights
 - Supabase-backed Google login
 - one personal board record per signed-in user
-- no drawing tools, side panels, board content persistence, or collaboration yet
+- persistent people nodes, reusable tags, notes, and undirected connections per signed-in user
+- a right-side inspector for editing the selected person
+- no collaboration yet
 
 ## Active Work
 
@@ -52,7 +54,10 @@ Completed tasks can remain listed here when they explain repository history. Liv
 - `src/App.tsx`: current board behavior.
 - `src/lib/supabase.ts`: browser Supabase client configuration.
 - `src/lib/useAuth.ts`: session and Google sign-in state.
-- `src/lib/userWorkspace.ts`: profile upsert and personal board bootstrap.
+- `src/lib/useBoardGraph.ts`: board graph loading and mutation state.
+- `src/lib/graphStorage.ts`: Supabase CRUD layer for people, tags, notes, and connections.
+- `src/lib/graphTypes.ts`: shared graph interfaces.
+- `src/lib/userWorkspace.ts`: profile, board, and root-person bootstrap.
 - `src/index.css`: current visual system.
 - `skills-lock.json`: lockfile for installed project agent skills.
 - `supabase/migrations/`: database schema and row-level security migrations.
@@ -63,8 +68,8 @@ Task ownership is tracked in Linear. Code ownership is not split by directory ye
 
 ## Next Steps
 
-- Keep the minimal board interaction stable while product scope is finalized.
+- Keep the persisted board interaction stable while product scope is finalized.
 - Link any implementation task or pull request back to the relevant Linear issue.
 - Update `docs/product-vision.md` when product scope changes.
 - Update `docs/project-structure.md` and `docs/ARCHITECTURE.md` when source structure or boundaries change.
-- Add focused verification before the first substantial pull request.
+- Keep Supabase Auth redirect URLs and Google OAuth origins aligned with every deployed frontend origin.

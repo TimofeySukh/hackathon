@@ -8,9 +8,9 @@ This first version is intentionally limited:
 
 - no drawing tools
 - no widgets
-- no sidebars
+- one compact details sidebar for the selected person
 - no collaboration features
-- no board content persistence
+- no multiplayer presence
 
 The core value right now is building and exploring relationship maps on a large visual surface.
 
@@ -26,6 +26,7 @@ Users should be able to open the page and immediately:
 4. move across the board with a trackpad, mouse drag, or mouse wheel
 5. switch between dark and light visual modes
 6. optionally sign in with Google to claim a personal board space
+7. save people, notes, tags, and connections to a private personal graph
 
 ## Visual Goal
 
@@ -54,23 +55,21 @@ Building the board ourselves keeps the interaction model simple and gives us com
 1. Smooth drag-based navigation
 2. Fast drag-to-create node growth
 3. A distinctive visual identity
-4. Minimal interface chrome
-5. A lightweight account foundation for personal board ownership
+4. Minimal interface chrome with one focused inspector
+5. A reliable account and persistence foundation for personal graph ownership
 
 ## What We Intentionally Avoid Right Now
 
 - drawing tools
 - sticky notes
-- comments
 - multiplayer
-- board object persistence
 - templates
 
 ## Possible Future Product Directions
 
 - Contact cards with richer metadata
 - Relationship types and strengths
-- Board persistence and saved camera positions
+- Saved camera positions
 - Multiplayer presence
 - Domain-specific networking workflows
 

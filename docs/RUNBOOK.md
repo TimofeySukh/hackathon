@@ -2,7 +2,7 @@
 
 ## Status
 
-The repository contains a minimal React, Vite, and TypeScript infinite board app.
+The repository contains a React, Vite, and TypeScript social graph board app.
 
 Current app behavior:
 
@@ -13,8 +13,11 @@ Current app behavior:
 - persist the selected theme in `localStorage`
 - optionally sign in with Google through Supabase
 - create one personal board record for each signed-in user
+- create one immutable root person at `0,0` for each signed-in user
+- persist people, tags, notes, and undirected connections in Supabase
+- edit the selected person in the right-side inspector
 
-There is no board object persistence, multiplayer, or drawing toolset yet.
+There is no multiplayer or drawing toolset yet.
 
 ## Local Setup
 
@@ -120,6 +123,7 @@ Configure Google as an auth provider in Supabase Auth. Add redirect URLs for eac
 - the deployed production URL
 
 The app redirects Google OAuth back to `window.location.origin`, so each origin must be allowlisted in Supabase.
+For a stable multi-device login flow, prefer one deployed frontend origin on your server instead of ad-hoc local ports.
 
 If a teammate runs Vite on a different port such as `5173`, `5174`, or `5175`, that exact origin must be in the Supabase Auth URL configuration.
 
@@ -204,14 +208,20 @@ Manual verification:
 6. Toggle the theme.
 7. Reload the page and confirm the selected theme is preserved.
 8. Sign in with Google and confirm the account state appears.
-9. Reload while signed in and confirm the same personal board label remains.
-10. Sign out and confirm the anonymous board state returns.
+9. Confirm the signed-in account gets a root node at `0,0`.
+10. Drag out from a node to create a new connected person and confirm it persists after reload.
+11. Hold `Shift` and drag a non-root person to a new position, then reload and confirm the coordinates persist.
+12. Assign a tag to a person, add a note, reload, and confirm both persist.
+13. Create a connection between two existing people and confirm reload preserves it.
+14. Sign out and confirm the anonymous board state returns.
 
 Supabase verification:
 
 1. Confirm a row exists in `profiles` for the signed-in user.
 2. Confirm a single row exists in `boards` for the signed-in user.
-3. Confirm row-level security prevents reading or updating another user's board.
+3. Confirm a single root row exists in `people` for the signed-in user with `is_root = true`, `x = 0`, and `y = 0`.
+4. Confirm `tags`, `notes`, and `connections` rows are created for user actions.
+5. Confirm row-level security prevents reading or updating another user's board data.
 
 ## Team Workflow
 
@@ -244,5 +254,5 @@ Supabase verification:
 
 - `npm run build`
 - `npm run lint`
-- Manual browser check of drag navigation, wheel and trackpad navigation, motion-triggered point highlights, and theme persistence
+- Manual browser check of drag navigation, wheel and trackpad navigation, motion-triggered point highlights, theme persistence, and persisted graph editing
 - Manual Supabase auth check when credentials and Google OAuth are configured

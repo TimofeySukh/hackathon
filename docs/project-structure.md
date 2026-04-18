@@ -32,7 +32,7 @@ Lockfile for project-scoped agent skills installed under `.agents/skills/`.
 
 ### `supabase/migrations/`
 
-Supabase database migrations for auth-adjacent product data, including profiles, personal boards, and row-level security policies.
+Supabase database migrations for profiles, personal boards, persisted graph data, and row-level security policies.
 
 ### `src/`
 
@@ -53,8 +53,10 @@ Contains the board experience:
 - mouse drag navigation state
 - board zoom state
 - motion-triggered point highlight state
-- social graph node and edge state
+- selected-person inspector state
+- persisted social graph node and connection rendering
 - drag-to-create node connections
+- shift-drag node repositioning
 - theme toggle
 - infinite board surface positioning
 
@@ -63,8 +65,11 @@ Contains the board experience:
 Shared low-level helpers.
 
 - `supabase.ts` creates the browser Supabase client from Vite environment variables.
-- `useAuth.ts` owns session loading, Google OAuth sign-in, sign-out, and workspace state.
-- `userWorkspace.ts` upserts profile data and ensures one personal board for the signed-in user.
+- `useAuth.ts` owns session loading, Google OAuth sign-in, and sign-out.
+- `useBoardGraph.ts` owns board graph loading and mutation state.
+- `graphStorage.ts` owns Supabase CRUD calls for persisted graph data.
+- `graphTypes.ts` defines shared profile, board, person, note, tag, and connection interfaces.
+- `userWorkspace.ts` upserts profile data and ensures one personal board plus root person for the signed-in user.
 
 Supabase browser configuration reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`. The older `VITE_SUPABASE_ANON_KEY` variable remains supported for compatibility.
 
@@ -98,18 +103,18 @@ It currently supports:
 
 - Google sign-in and sign-out when Supabase is configured
 - one personal board record per signed-in user
+- one immutable root node at `0,0` per signed-in user
 - mouse drag navigation across the canvas
 - trackpad and wheel-based navigation across the canvas
 - cursor-centered zoom with the mouse wheel
 - visual theme switching
 - compact motion-triggered point highlighting during mouse movement, drag, wheel pan, and zoom
-- social graph nodes connected by lines
+- persistent social graph nodes connected by lines
 - drag-to-connect two existing nodes by releasing on another node hit area
 - drag-to-create node growth from any existing node with an immediate connecting line
-- newly created nodes appearing immediately with an empty inline name field
-- selected-node detail cards with color controls, multi-note lists, and deletion
-- graph action undo through `Ctrl/Cmd+Z` for recent structural changes
-- in-place node renaming
+- selected-node detail cards with reusable tag selection, note editing, connection removal, and deletion
+- shift-drag repositioning for non-root nodes
+- persisted node renaming
 - grid movement through background offset changes
 
 The visual board is simulated by shifting layered CSS backgrounds based on the current camera offset.
@@ -120,7 +125,7 @@ The project should evolve in controlled layers:
 
 1. Preserve smooth navigation and visual clarity.
 2. Add simple board objects only when the base movement feels solid.
-3. Keep account persistence separate from board content persistence until the object model is clear.
+3. Keep all graph persistence behind the dedicated data layer instead of calling Supabase directly from the UI.
 4. Add advanced interactions only when they fit the clean-board principle.
 
 ## Future Folders We May Add

@@ -1,11 +1,11 @@
 import type { User } from '@supabase/supabase-js'
 
 import { supabase } from './supabase'
+import type { Board, PersonNode } from './graphTypes'
 
-export type UserBoard = {
-  id: string
-  user_id: string
-  title: string
+export type UserWorkspace = {
+  board: Board
+  rootPerson: PersonNode
 }
 
 const getDisplayName = (user: User) => {
@@ -19,8 +19,10 @@ const getDisplayName = (user: User) => {
   )
 }
 
-export async function ensureUserWorkspace(user: User): Promise<UserBoard | null> {
-  if (!supabase) return null
+export async function ensureUserWorkspace(user: User): Promise<UserWorkspace> {
+  if (!supabase) {
+    throw new Error('Supabase is not configured.')
+  }
 
   const metadata = user.user_metadata
   const profileResult = await supabase.from('profiles').upsert({
@@ -45,7 +47,7 @@ export async function ensureUserWorkspace(user: User): Promise<UserBoard | null>
 
   const { data, error } = await supabase
     .from('boards')
-    .select('id, user_id, title')
+    .select('*')
     .eq('user_id', user.id)
     .single()
 
@@ -53,5 +55,44 @@ export async function ensureUserWorkspace(user: User): Promise<UserBoard | null>
     throw error
   }
 
-  return data
+  const board = data as Board
+  const rootPersonResult = await supabase
+    .from('people')
+    .select('*')
+    .eq('board_id', board.id)
+    .eq('is_root', true)
+    .maybeSingle()
+
+  if (rootPersonResult.error) {
+    throw rootPersonResult.error
+  }
+
+  if (rootPersonResult.data) {
+    return {
+      board,
+      rootPerson: rootPersonResult.data as PersonNode,
+    }
+  }
+
+  const rootInsertResult = await supabase
+    .from('people')
+    .insert({
+      board_id: board.id,
+      owner_user_id: user.id,
+      name: getDisplayName(user) ?? 'You',
+      x: 0,
+      y: 0,
+      is_root: true,
+    })
+    .select('*')
+    .single()
+
+  if (rootInsertResult.error) {
+    throw rootInsertResult.error
+  }
+
+  return {
+    board,
+    rootPerson: rootInsertResult.data as PersonNode,
+  }
 }
