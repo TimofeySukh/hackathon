@@ -112,6 +112,7 @@ type TagPickerOption =
       type: 'tag'
       label: string
       tagId: string
+      color: string
     }
   | {
       id: 'create'
@@ -215,6 +216,7 @@ function App() {
   const [highlightClock, setHighlightClock] = useState(() => Date.now())
   const [isDraggingBoard, setIsDraggingBoard] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [aiSearchQuery, setAiSearchQuery] = useState('')
   const [aiSearchResults, setAiSearchResults] = useState<SearchResult[]>([])
   const [aiSearchStatus, setAiSearchStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
@@ -225,6 +227,9 @@ function App() {
   const boardRef = useRef<HTMLElement | null>(null)
   const boardSurfaceRef = useRef<HTMLDivElement | null>(null)
   const graphLayerRef = useRef<HTMLDivElement | null>(null)
+  const tagsMenuRef = useRef<HTMLDivElement | null>(null)
+  const searchPanelRef = useRef<HTMLDivElement | null>(null)
+  const accountPanelRef = useRef<HTMLDivElement | null>(null)
   const inspectorPanelRef = useRef<HTMLElement | null>(null)
   const zoomIndicatorRef = useRef<HTMLDivElement | null>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
@@ -350,6 +355,7 @@ function App() {
         type: 'tag' as const,
         label: tag.name,
         tagId: tag.id,
+        color: tagColorById[tag.id] ?? normalizeTagColor(tag.color ?? DEFAULT_TAG_COLOR),
       })),
     )
 
@@ -362,7 +368,7 @@ function App() {
     }
 
     return nextOptions
-  }, [canCreateInspectorTag, filteredInspectorTags, selectedInspectorTag, tagDraft])
+  }, [canCreateInspectorTag, filteredInspectorTags, selectedInspectorTag, tagColorById, tagDraft])
   const notesByPersonId = useMemo(() => {
     const nextNotesByPersonId: Record<string, PersonNote[]> = {}
 
@@ -439,9 +445,45 @@ function App() {
     return true
   }, [status])
 
+  const closeInspectorUi = useCallback(() => {
+    setInspectorNodeId(null)
+    setSelectedConnectionId(null)
+    setConnectionMenuPosition(null)
+    setIsTagPickerOpen(false)
+    setActiveTagOptionIndex(0)
+  }, [])
+
+  const closeTransientUi = useCallback(() => {
+    setIsTagsMenuOpen(false)
+    setIsAccountMenuOpen(false)
+    setIsSearchOpen(false)
+    setIsTagPickerOpen(false)
+    setActiveColorTagId(null)
+    setActiveTagOptionIndex(0)
+  }, [])
+
   useEffect(() => {
     window.localStorage.setItem(THEME_STORAGE_KEY, theme)
   }, [theme])
+
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target
+      if (!(target instanceof Node)) return
+
+      const isInsideTopBar =
+        tagsMenuRef.current?.contains(target) ||
+        searchPanelRef.current?.contains(target) ||
+        accountPanelRef.current?.contains(target)
+
+      if (!isInsideTopBar) {
+        closeTransientUi()
+      }
+    }
+
+    window.addEventListener('mousedown', handlePointerDown)
+    return () => window.removeEventListener('mousedown', handlePointerDown)
+  }, [closeTransientUi])
 
   useEffect(() => {
     if (!isTagPickerOpen) return
@@ -1005,6 +1047,12 @@ function App() {
     }
   }, [moveWithWheel, zoomAtClientPoint])
 
+  function getTagAccentStyle(color: string): CSSProperties {
+    return {
+      '--tag-color': color,
+    } as CSSProperties
+  }
+
   async function saveInspectorName() {
     if (!inspectorNode || !isGraphReady) return
 
@@ -1073,6 +1121,13 @@ function App() {
     }
     setActiveTagOptionIndex(0)
     setIsTagPickerOpen(true)
+  }
+
+  async function handleInspectorTagColorChange(tagId: string, color: string) {
+    if (!isGraphReady) return
+
+    previewTagColor(tagId, color)
+    await persistTagColor(tagId)
   }
 
   function chooseTagPickerOption(option: TagPickerOption) {
@@ -1322,6 +1377,13 @@ function App() {
   }
 
   function handleSearchKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      setIsSearchOpen(false)
+      event.currentTarget.blur()
+      return
+    }
+
     if (event.key !== 'Enter') return
 
     event.preventDefault()
@@ -1419,7 +1481,7 @@ function App() {
     setConnectionMenuPosition(null)
     setNameDraft(node.name)
     setTagDraft(node.tag_id ? tagsById[node.tag_id]?.name ?? '' : '')
-    setIsTagPickerOpen(false)
+    closeTransientUi()
   }
 
   function selectConnection(connectionId: string, event: ReactMouseEvent<SVGPathElement>) {
@@ -1428,6 +1490,7 @@ function App() {
     event.preventDefault()
     event.stopPropagation()
     const viewport = boardRef.current?.getBoundingClientRect()
+    closeTransientUi()
     setSelectedNodeId(null)
     setInspectorNodeId(null)
     setSelectedConnectionId(connectionId)
@@ -1528,15 +1591,40 @@ function App() {
 
       <div className="top-bar">
         <div className="top-bar__left">
-          <div className="tags-menu">
+          <div ref={tagsMenuRef} className="tags-menu">
             <button
               type="button"
               className="top-bar__icon-button tags-menu__toggle"
-              onClick={() => setIsTagsMenuOpen((isOpen) => !isOpen)}
+              onClick={() => {
+                const nextIsOpen = !isTagsMenuOpen
+                setIsTagsMenuOpen(nextIsOpen)
+                setIsAccountMenuOpen(false)
+                setIsSearchOpen(false)
+                setActiveColorTagId(null)
+                if (nextIsOpen) {
+                  closeInspectorUi()
+                }
+              }}
               aria-expanded={isTagsMenuOpen}
               aria-label="Tags menu"
             >
-              #
+              <svg
+                className="top-bar__icon-glyph"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="7" />
+                <path d="M12 3.5v2.5" />
+                <path d="M12 18v2.5" />
+                <path d="M3.5 12H6" />
+                <path d="M18 12h2.5" />
+                <path d="M9 15l2-6 4 2-6 4Z" />
+              </svg>
             </button>
 
             {isTagsMenuOpen ? (
@@ -1657,7 +1745,7 @@ function App() {
         </div>
 
         <div className="top-bar__right">
-          <div className="search-panel">
+          <div ref={searchPanelRef} className="search-panel">
             <div className="search-panel__bar">
               <input
                 ref={searchInputRef}
@@ -1665,23 +1753,28 @@ function App() {
                 value={searchQuery}
                 onFocus={() => {
                   requestLogin()
+                  setIsSearchOpen(true)
+                  setIsTagsMenuOpen(false)
+                  setIsAccountMenuOpen(false)
+                  setActiveColorTagId(null)
+                  closeInspectorUi()
                 }}
                 onChange={(event) => {
-                  setSearchQuery(event.target.value)
+                  const nextQuery = event.target.value
+                  setSearchQuery(nextQuery)
+                  setIsSearchOpen(true)
                   setAiSearchStatus('idle')
                   setAiSearchError(null)
                 }}
                 onKeyDown={handleSearchKeyDown}
                 placeholder="Search people"
                 aria-label="Search people"
-                aria-expanded={
-                  Boolean(searchQuery.trim()) || aiSearchStatus === 'loading' || Boolean(aiSearchError)
-                }
+                aria-expanded={isSearchOpen}
                 aria-controls="people-search-panel"
               />
             </div>
 
-            {searchQuery.trim() || aiSearchStatus === 'loading' || aiSearchError ? (
+            {isSearchOpen ? (
               <div id="people-search-panel" className="search-panel__dropdown">
               {isGraphReady ? (
                 <div className="search-panel__hint">
@@ -1739,11 +1832,20 @@ function App() {
             ) : null}
           </div>
 
-          <div className="account-panel" aria-live="polite">
+          <div ref={accountPanelRef} className="account-panel" aria-live="polite">
             <button
               type="button"
               className="top-bar__icon-button account-panel__trigger"
-              onClick={() => setIsAccountMenuOpen((isOpen) => !isOpen)}
+              onClick={() => {
+                const nextIsOpen = !isAccountMenuOpen
+                setIsAccountMenuOpen(nextIsOpen)
+                setIsTagsMenuOpen(false)
+                setIsSearchOpen(false)
+                setActiveColorTagId(null)
+                if (nextIsOpen) {
+                  closeInspectorUi()
+                }
+              }}
               aria-expanded={isAccountMenuOpen}
               aria-label={accountMenuLabel}
             >
@@ -1896,6 +1998,26 @@ function App() {
                         role="option"
                         aria-selected={optionIndex === activeTagOptionIndex}
                       >
+                        {option.type === 'tag' ? (
+                          <label
+                            className="tag-picker__color"
+                            style={getTagAccentStyle(option.color)}
+                            aria-label={`Change ${option.label} color`}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <input
+                              type="color"
+                              className="tag-picker__color-input"
+                              value={option.color}
+                              onChange={(event) => {
+                                void handleInspectorTagColorChange(option.tagId, event.target.value)
+                              }}
+                            />
+                          </label>
+                        ) : (
+                          <span className="tag-picker__spacer" aria-hidden="true" />
+                        )}
                         <button
                           type="button"
                           className="tag-picker__option"
@@ -1904,7 +2026,16 @@ function App() {
                             chooseTagPickerOption(option)
                           }}
                         >
-                          {option.label}
+                          {option.type === 'tag' ? (
+                            <span
+                              className="tag-picker__label"
+                              style={getTagAccentStyle(option.color)}
+                            >
+                              {option.label}
+                            </span>
+                          ) : (
+                            option.label
+                          )}
                         </button>
                         {option.type === 'tag' ? (
                           <button
@@ -1919,7 +2050,9 @@ function App() {
                           >
                             x
                           </button>
-                        ) : null}
+                        ) : (
+                          <span className="tag-picker__spacer" aria-hidden="true" />
+                        )}
                       </div>
                     )
                   })}

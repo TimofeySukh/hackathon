@@ -19,9 +19,9 @@ A persisted social graph board built with React, Vite, and TypeScript.
 - One personal board record for each signed-in user
 - One immutable root node at `0,0` for each signed-in user
 - Persistent people, colored tags, notes, and undirected connections in Supabase
-- Compact top bar with a rounded search field plus circular tags, account, and theme controls
+- Compact top bar with a rounded search field plus circular tags, account, and theme controls that close other overlays when opened
 - A login popup appears when signed-out users try to edit the board
-- Minimal selected-person inspector with a large name field, compact tag picker, and auto-saving notes
+- Minimal selected-person inspector with a large name field, a compact tag picker with inline tag color editing, and auto-saving notes
 - Single-click a person to open that inspector directly on the board
 - Opening the inspector pans the board enough to keep it visible and opens it at a consistent size before later zoom changes affect it
 - Click the widened connection-line target to delete it from the inline menu or with Backspace
