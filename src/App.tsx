@@ -233,6 +233,7 @@ function App() {
   const highlightIdRef = useRef(0)
   const lastHighlightSpotRef = useRef<Offset | null>(null)
   const inspectorWorldPositionRef = useRef<Offset | null>(null)
+  const inspectorOpenScaleRef = useRef(1)
   const suppressNodeClickRef = useRef(false)
   const viewportRef = useRef({ offset: { x: 0, y: 0 }, scale: 1 })
   const pendingViewportRef = useRef<{ offset: Offset; scale: number } | null>(null)
@@ -491,6 +492,7 @@ function App() {
     if (inspectorPanelRef.current && inspectorWorldPositionRef.current) {
       const viewportWidth = boardRef.current?.clientWidth ?? window.innerWidth
       const viewportHeight = boardRef.current?.clientHeight ?? window.innerHeight
+      const inspectorScale = nextScale / inspectorOpenScaleRef.current
       const inspectorX =
         viewportWidth / 2 + nextOffset.x + inspectorWorldPositionRef.current.x * nextScale
       const inspectorY =
@@ -498,7 +500,7 @@ function App() {
 
       inspectorPanelRef.current.style.left = `${inspectorX}px`
       inspectorPanelRef.current.style.top = `${inspectorY}px`
-      inspectorPanelRef.current.style.setProperty('--inspector-scale', '1')
+      inspectorPanelRef.current.style.setProperty('--inspector-scale', `${inspectorScale}`)
     }
 
     const nextZoomPercentage = Math.round(nextScale * 100)
@@ -598,8 +600,9 @@ function App() {
     const view = viewportRef.current
     const viewportWidth = boardElement.clientWidth
     const viewportHeight = boardElement.clientHeight
-    const panelWidth = inspectorElement.offsetWidth
-    const panelHeight = inspectorElement.offsetHeight
+    const panelBounds = inspectorElement.getBoundingClientRect()
+    const panelWidth = panelBounds.width
+    const panelHeight = panelBounds.height
     const currentAnchorX = viewportWidth / 2 + view.offset.x + inspectorPosition.x * view.scale
     const currentAnchorY = viewportHeight / 2 + view.offset.y + inspectorPosition.y * view.scale
     const minAnchorX = INSPECTOR_VIEWPORT_MARGIN + INSPECTOR_ANCHOR_GAP + panelWidth
@@ -1409,6 +1412,7 @@ function App() {
       nextScale,
     )
     setSelectedNodeId(node.id)
+    inspectorOpenScaleRef.current = nextScale
     setInspectorNodeId(node.id)
     setSelectedConnectionId(null)
     setConnectionMenuPosition(null)
@@ -2116,6 +2120,7 @@ function App() {
                       suppressNodeClickRef.current = false
                       return
                     }
+                    inspectorOpenScaleRef.current = viewportRef.current.scale
                     setInspectorNodeId(node.id)
                     setNameDraft(node.name)
                     setTagDraft(node.tag_id ? tagsById[node.tag_id]?.name ?? '' : '')

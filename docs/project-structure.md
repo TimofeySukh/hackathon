@@ -123,6 +123,7 @@ It currently supports:
 - selected-node detail cards with a large name field, searchable tag selection/creation/deletion, compact auto-saving notes, and person deletion
 - single-click opening for the node-anchored inspector
 - automatic board panning to keep the node-anchored inspector inside the viewport
+- inspector opening at a consistent size regardless of current zoom, then scaling with later zoom changes
 - continued trackpad panning over the inspector when the gesture starts on the board
 - connection line selection with a widened hit target, inline deletion, and Backspace deletion
 - local people search while typing plus natural-language AI search on Enter

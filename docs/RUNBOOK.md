@@ -274,7 +274,7 @@ Manual verification:
 9. Confirm the signed-in account gets a root node at `0,0`.
 10. Drag out from a node to create a new connected person and confirm it persists after reload.
 11. Drag a non-root person to a new position, confirm connected lines follow it, then reload and confirm the coordinates persist.
-12. Click a person near a viewport edge and confirm the board pans enough to keep the inspector visible without enlarging it at higher zoom.
+12. Click a person near a viewport edge and confirm the board pans enough to keep the inspector visible, and that the inspector opens at a consistent size regardless of the current zoom.
 13. Start trackpad panning on the board, pass over the inspector, and confirm panning continues; then start a trackpad gesture on the inspector and confirm it does not begin board panning.
 14. Confirm the inspector opens as a compact panel with only a large name field, the tag picker, notes, and the delete-person action.
 15. Assign an existing tag to a person from the inspector tag picker, use ArrowUp/ArrowDown plus Enter in that picker, create a new tag from the same field, delete an unused tag with the `x` confirmation flow, and confirm the selection persists after reload.

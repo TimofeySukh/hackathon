@@ -23,7 +23,7 @@ A persisted social graph board built with React, Vite, and TypeScript.
 - A login popup appears when signed-out users try to edit the board
 - Minimal selected-person inspector with a large name field, compact tag picker, and auto-saving notes
 - Single-click a person to open that inspector directly on the board
-- Opening the inspector pans the board enough to keep the inspector visible
+- Opening the inspector pans the board enough to keep it visible and opens it at a consistent size before later zoom changes affect it
 - Click the widened connection-line target to delete it from the inline menu or with Backspace
 - Drag a person to move them with their connected lines
 - Hold `Command` on macOS, or `Control` on other platforms, and drag a person to create a connection
