@@ -52,6 +52,11 @@ type EdgeStyle = CSSProperties & {
   transform: string
 }
 
+type ViewportState = {
+  offset: Offset
+  scale: number
+}
+
 const THEME_STORAGE_KEY = 'hackathon-theme'
 const MIN_SCALE = 0.2
 const MAX_SCALE = 2.5
@@ -61,6 +66,7 @@ const DOT_SIZE = 0.65
 const MAJOR_DOT_SIZE = 2
 const NODE_HIT_RADIUS = 31
 const CREATE_THRESHOLD = 18
+const WHEEL_ZOOM_INTENSITY = 0.0016
 
 const INITIAL_NODES: GraphNode[] = [{ id: 'root', label: 'You', x: 0, y: 0, kind: 'root' }]
 const INITIAL_EDGES: GraphEdge[] = []
@@ -82,6 +88,9 @@ function App() {
   const [isDraggingBoard, setIsDraggingBoard] = useState(false)
 
   const boardRef = useRef<HTMLElement | null>(null)
+  const viewportRef = useRef<ViewportState>({ offset: { x: 0, y: 0 }, scale: 1 })
+  const pendingViewportRef = useRef<ViewportState | null>(null)
+  const viewportFrameRef = useRef<number | null>(null)
   const boardDragRef = useRef({
     startX: 0,
     startY: 0,
@@ -93,6 +102,37 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem(THEME_STORAGE_KEY, theme)
   }, [theme])
+
+  useEffect(() => {
+    viewportRef.current = { offset, scale }
+  }, [offset, scale])
+
+  const queueViewportUpdate = useCallback((nextOffset: Offset, nextScale: number) => {
+    pendingViewportRef.current = { offset: nextOffset, scale: nextScale }
+
+    if (viewportFrameRef.current !== null) return
+
+    viewportFrameRef.current = window.requestAnimationFrame(() => {
+      viewportFrameRef.current = null
+
+      const pendingViewport = pendingViewportRef.current
+      if (!pendingViewport) return
+
+      pendingViewportRef.current = null
+      viewportRef.current = pendingViewport
+      setOffset(pendingViewport.offset)
+      setScale(pendingViewport.scale)
+    })
+  }, [])
+
+  useEffect(
+    () => () => {
+      if (viewportFrameRef.current !== null) {
+        window.cancelAnimationFrame(viewportFrameRef.current)
+      }
+    },
+    [],
+  )
 
   const nodesById = useMemo(
     () => Object.fromEntries(nodes.map((node) => [node.id, node])) as Record<string, GraphNode>,
@@ -176,7 +216,14 @@ function App() {
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
       if (connectionDrag) {
-        const worldPoint = screenToWorld(event.clientX, event.clientY, boardRef.current, offset, scale)
+        const view = viewportRef.current
+        const worldPoint = screenToWorld(
+          event.clientX,
+          event.clientY,
+          boardRef.current,
+          view.offset,
+          view.scale,
+        )
 
         setConnectionDrag((currentDrag) =>
           currentDrag
@@ -197,7 +244,7 @@ function App() {
       const nextX = boardDragRef.current.originX + event.clientX - boardDragRef.current.startX
       const nextY = boardDragRef.current.originY + event.clientY - boardDragRef.current.startY
 
-      setOffset({ x: nextX, y: nextY })
+      queueViewportUpdate({ x: nextX, y: nextY }, viewportRef.current.scale)
     }
 
     const handleMouseUp = (event: MouseEvent) => {
@@ -217,7 +264,7 @@ function App() {
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [connectionDrag, finishConnectionDrag, offset, scale])
+  }, [connectionDrag, finishConnectionDrag, queueViewportUpdate])
 
   const startBoardDragging = (event: ReactMouseEvent<HTMLElement>) => {
     if (event.button !== 0 || connectionDrag) return
@@ -244,7 +291,14 @@ function App() {
     setSelectedNodeId(nodeId)
     setInspectorNodeId(null)
     setEditingNodeId(null)
-    const worldPoint = screenToWorld(event.clientX, event.clientY, boardRef.current, offset, scale)
+    const view = viewportRef.current
+    const worldPoint = screenToWorld(
+      event.clientX,
+      event.clientY,
+      boardRef.current,
+      view.offset,
+      view.scale,
+    )
     setConnectionDrag({
       fromId: nodeId,
       startClientX: event.clientX,
@@ -278,36 +332,44 @@ function App() {
   const moveWithWheel = (event: ReactWheelEvent<HTMLElement>) => {
     event.preventDefault()
 
+    const view = viewportRef.current
     const isMouseWheel = event.deltaMode === 1
     const isTrackpadPinch = event.ctrlKey
     const prefersZoom = (isMouseWheel || isTrackpadPinch) && Math.abs(event.deltaX) < 1
 
     if (!prefersZoom) {
-      setOffset((currentOffset) => ({
-        x: currentOffset.x - event.deltaX,
-        y: currentOffset.y - event.deltaY,
-      }))
+      queueViewportUpdate(
+        {
+          x: view.offset.x - event.deltaX,
+          y: view.offset.y - event.deltaY,
+        },
+        view.scale,
+      )
       return
     }
 
-    const zoomIntensity = event.deltaY > 0 ? 0.88 : 1.12
-    const nextScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale * zoomIntensity))
+    const deltaMultiplier = event.deltaMode === 1 ? 16 : 1
+    const nextScale = clampScale(
+      view.scale * Math.exp(-event.deltaY * deltaMultiplier * WHEEL_ZOOM_INTENSITY),
+    )
 
-    if (nextScale === scale) return
+    if (nextScale === view.scale) return
 
     const { left, top } = event.currentTarget.getBoundingClientRect()
     const pointerX = event.clientX - left
     const pointerY = event.clientY - top
     const centerX = event.currentTarget.clientWidth / 2
     const centerY = event.currentTarget.clientHeight / 2
-    const worldX = (pointerX - centerX - offset.x) / scale
-    const worldY = (pointerY - centerY - offset.y) / scale
+    const worldX = (pointerX - centerX - view.offset.x) / view.scale
+    const worldY = (pointerY - centerY - view.offset.y) / view.scale
 
-    setScale(nextScale)
-    setOffset({
-      x: pointerX - centerX - worldX * nextScale,
-      y: pointerY - centerY - worldY * nextScale,
-    })
+    queueViewportUpdate(
+      {
+        x: pointerX - centerX - worldX * nextScale,
+        y: pointerY - centerY - worldY * nextScale,
+      },
+      nextScale,
+    )
   }
 
   const gridStyle = {
@@ -499,6 +561,10 @@ function App() {
             </div>
           ) : null}
         </div>
+
+        <div className="zoom-indicator" aria-live="polite">
+          {Math.round(scale * 100)}%
+        </div>
       </section>
     </main>
   )
@@ -532,6 +598,10 @@ function getLineStyle(fromNode?: GraphNode, toNode?: Offset | null): EdgeStyle |
     width: `${distance}px`,
     transform: `translate(${fromNode.x}px, ${fromNode.y}px) rotate(${Math.atan2(dy, dx)}rad)`,
   }
+}
+
+function clampScale(value: number) {
+  return Math.min(MAX_SCALE, Math.max(MIN_SCALE, value))
 }
 
 export default App
