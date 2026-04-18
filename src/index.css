@@ -282,60 +282,6 @@ select {
   pointer-events: none;
 }
 
-.board-highlights {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.board-highlights__spot {
-  position: absolute;
-  inset: 0;
-  background-image:
-    radial-gradient(circle, var(--grid-dot-hover) 0 calc(var(--dot-size) + 0.45px), transparent calc(var(--dot-size) + 0.65px)),
-    radial-gradient(circle, var(--grid-dot-major-hover) 0 calc(var(--major-dot-size) + 0.65px), transparent calc(var(--major-dot-size) + 0.85px));
-  background-size:
-    var(--dot-gap) var(--dot-gap),
-    var(--major-dot-gap) var(--major-dot-gap);
-  background-position:
-    var(--board-offset-x) var(--board-offset-y),
-    var(--board-offset-x) var(--board-offset-y);
-  mask-image: radial-gradient(
-    circle at var(--highlight-x) var(--highlight-y),
-    rgba(0, 0, 0, 1) 0,
-    rgba(0, 0, 0, 0.88) 14px,
-    rgba(0, 0, 0, 0.28) 25px,
-    transparent 38px
-  ),
-    radial-gradient(
-      circle at var(--highlight-tail-x) var(--highlight-tail-y),
-      rgba(0, 0, 0, 0.54) 0,
-      rgba(0, 0, 0, 0.26) var(--highlight-tail-core),
-      transparent var(--highlight-tail-size)
-    );
-  mask-repeat: no-repeat;
-  mask-composite: add;
-  -webkit-mask-composite: source-over;
-  -webkit-mask-image: radial-gradient(
-      circle at var(--highlight-x) var(--highlight-y),
-      rgba(0, 0, 0, 1) 0,
-      rgba(0, 0, 0, 0.88) 14px,
-      rgba(0, 0, 0, 0.28) 25px,
-      transparent 38px
-    ),
-    radial-gradient(
-      circle at var(--highlight-tail-x) var(--highlight-tail-y),
-      rgba(0, 0, 0, 0.54) 0,
-      rgba(0, 0, 0, 0.26) var(--highlight-tail-core),
-      transparent var(--highlight-tail-size)
-    );
-  -webkit-mask-repeat: no-repeat;
-  pointer-events: none;
-  transition: opacity 80ms linear;
-}
-
 .graph-layer {
   position: absolute;
   left: 50%;
@@ -348,34 +294,50 @@ select {
 
 .graph-connections {
   position: absolute;
+<<<<<<< HEAD
   left: -2200px;
   top: -2200px;
   width: 4400px;
   height: 4400px;
+=======
+  inset: 0;
+>>>>>>> c976632 (Speed up board rendering and fix graph links)
   overflow: visible;
   pointer-events: none;
 }
 
 .graph-edge {
-  fill: none;
-  stroke: rgba(214, 236, 226, 0.56);
-  stroke-width: 2.1;
-  stroke-linecap: round;
-  filter: drop-shadow(0 0 6px rgba(138, 255, 214, 0.08));
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 2px;
+  transform-origin: 0 50%;
+  border-radius: 999px;
+  background: rgba(214, 236, 226, 0.62);
+  box-shadow: 0 0 6px rgba(138, 255, 214, 0.08);
 }
 
 .graph-edge--preview {
-  stroke: rgba(138, 255, 214, 0.82);
-  stroke-dasharray: 7 6;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(138, 255, 214, 0.88) 0 10px,
+      transparent 10px 16px
+    );
 }
 
 .theme-light .graph-edge {
-  stroke: rgba(18, 77, 54, 0.42);
-  filter: none;
+  background: rgba(18, 77, 54, 0.44);
+  box-shadow: none;
 }
 
 .theme-light .graph-edge--preview {
-  stroke: rgba(18, 121, 79, 0.42);
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(18, 121, 79, 0.58) 0 10px,
+      transparent 10px 16px
+    );
 }
 
 .graph-node {
