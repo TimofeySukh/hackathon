@@ -121,6 +121,7 @@ It currently supports:
 - option-drag to connect two existing nodes by releasing on another node hit area
 - option-drag to create node growth from any existing node with an immediate connecting line
 - selected-node detail cards with reusable tag selection, note editing, connection removal, and deletion
+- single-click opening for the node-anchored inspector
 - local people search while typing plus natural-language AI search on Enter
 - drag repositioning for non-root nodes
 - persisted node renaming

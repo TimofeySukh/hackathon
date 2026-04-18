@@ -14,7 +14,7 @@ The current product is intentionally narrow:
 - one personal board record per signed-in user
 - persistent people nodes, reusable colored tags, notes, and undirected connections per signed-in user
 - a top-left Tags menu for creating tags and changing tag colors
-- a node-anchored inspector for editing the selected person
+- a node-anchored inspector for editing the selected person that opens on single click
 - a people search layer that matches locally while typing and can run AI search on Enter
 - no collaboration yet
 

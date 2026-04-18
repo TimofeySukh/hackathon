@@ -118,6 +118,7 @@ const MAJOR_DOT_SIZE = 2
 const HIGHLIGHT_LIFETIME_MS = 420
 const HIGHLIGHT_DISTANCE = 12
 const HIGHLIGHT_LIMIT = 28
+const NODE_CLICK_DRAG_THRESHOLD = 4
 const HIGHLIGHT_RADIUS = 56
 const HIGHLIGHT_TICK_MS = 50
 const HIGHLIGHT_TAIL_START = 18
@@ -206,6 +207,7 @@ function App() {
   const highlightIdRef = useRef(0)
   const lastHighlightSpotRef = useRef<Offset | null>(null)
   const inspectorWorldPositionRef = useRef<Offset | null>(null)
+  const suppressNodeClickRef = useRef(false)
   const viewportRef = useRef({ offset: { x: 0, y: 0 }, scale: 1 })
   const pendingViewportRef = useRef<{ offset: Offset; scale: number } | null>(null)
   const viewportFrameRef = useRef<number | null>(null)
@@ -670,6 +672,11 @@ function App() {
 
         if (nodeDrag) {
           const finalPosition = draggedPositions[nodeDrag.nodeId]
+          const movedDistance = Math.hypot(
+            event.clientX - nodeDrag.startClientX,
+            event.clientY - nodeDrag.startClientY,
+          )
+          suppressNodeClickRef.current = movedDistance > NODE_CLICK_DRAG_THRESHOLD
           setNodeDrag(null)
           setDraggedPositions((currentPositions) => {
             const nextPositions = { ...currentPositions }
@@ -1655,11 +1662,10 @@ function App() {
                   onClick={(event) => {
                     event.stopPropagation()
                     setSelectedNodeId(node.id)
-                    setInspectorNodeId(null)
-                  }}
-                  onDoubleClick={(event) => {
-                    event.stopPropagation()
-                    setSelectedNodeId(node.id)
+                    if (suppressNodeClickRef.current) {
+                      suppressNodeClickRef.current = false
+                      return
+                    }
                     setInspectorNodeId(node.id)
                     setNameDraft(node.name)
                   }}

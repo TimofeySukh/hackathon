@@ -20,7 +20,7 @@ Current app behavior:
 - allow one separate AI summary row per person in Supabase
 - debounce note create and note update events for 3 seconds before triggering AI enrichment
 - call a Supabase Edge Function that forwards person context to n8n and rewrites `person_ai_notes`
-- edit the selected person in the node-anchored inspector
+- edit the selected person in the node-anchored inspector that opens on single click
 - open a people search layer, match locally while typing, and run natural-language AI search on Enter
 
 There is no multiplayer or drawing toolset yet.
