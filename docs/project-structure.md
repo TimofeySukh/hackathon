@@ -38,6 +38,7 @@ Contains the board experience:
 
 - theme state
 - mouse drag navigation state
+- board zoom state
 - theme toggle
 - infinite board surface positioning
 
@@ -67,6 +68,7 @@ It currently supports:
 
 - mouse drag navigation across the canvas
 - trackpad and wheel-based navigation across the canvas
+- cursor-centered zoom with the mouse wheel
 - visual theme switching
 - grid movement through background offset changes
 

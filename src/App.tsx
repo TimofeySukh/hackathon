@@ -13,6 +13,12 @@ type Offset = {
 }
 
 const THEME_STORAGE_KEY = 'hackathon-theme'
+const MIN_SCALE = 0.5
+const MAX_SCALE = 2.5
+const GRID_GAP = 38
+const MAJOR_GRID_GAP = 152
+const DOT_SIZE = 1.5
+const MAJOR_DOT_SIZE = 3
 
 function App() {
   const [theme, setTheme] = useState<Theme>(() => {
@@ -20,6 +26,7 @@ function App() {
     return savedTheme === 'light' ? 'light' : 'dark'
   })
   const [offset, setOffset] = useState<Offset>({ x: 0, y: 0 })
+  const [scale, setScale] = useState(1)
   const [isDragging, setIsDragging] = useState(false)
 
   const dragStateRef = useRef({
@@ -75,15 +82,41 @@ function App() {
   const moveWithWheel = (event: ReactWheelEvent<HTMLElement>) => {
     event.preventDefault()
 
-    setOffset((currentOffset) => ({
-      x: currentOffset.x - event.deltaX,
-      y: currentOffset.y - event.deltaY,
-    }))
+    const prefersPan = Math.abs(event.deltaX) > 0 || Math.abs(event.deltaY) < 24
+
+    if (prefersPan) {
+      setOffset((currentOffset) => ({
+        x: currentOffset.x - event.deltaX,
+        y: currentOffset.y - event.deltaY,
+      }))
+      return
+    }
+
+    const zoomIntensity = event.deltaY > 0 ? 0.9 : 1.1
+    const nextScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale * zoomIntensity))
+
+    if (nextScale === scale) return
+
+    const { left, top } = event.currentTarget.getBoundingClientRect()
+    const pointerX = event.clientX - left
+    const pointerY = event.clientY - top
+    const worldX = (pointerX - offset.x) / scale
+    const worldY = (pointerY - offset.y) / scale
+
+    setScale(nextScale)
+    setOffset({
+      x: pointerX - worldX * nextScale,
+      y: pointerY - worldY * nextScale,
+    })
   }
 
   const boardStyle = {
+    '--dot-gap': `${GRID_GAP * scale}px`,
+    '--major-dot-gap': `${MAJOR_GRID_GAP * scale}px`,
+    '--dot-size': `${Math.max(1, DOT_SIZE * scale)}px`,
+    '--major-dot-size': `${Math.max(1.8, MAJOR_DOT_SIZE * scale)}px`,
     backgroundPosition: `${offset.x}px ${offset.y}px, ${offset.x}px ${offset.y}px, center, center`,
-  } satisfies CSSProperties
+  } satisfies CSSProperties & Record<string, string>
 
   return (
     <main className={`app-shell theme-${theme}`}>
