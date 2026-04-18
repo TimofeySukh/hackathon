@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react'
 
 import { useBoardGraph } from './features/board/useBoardGraph'
@@ -8,6 +8,22 @@ import { useAuth } from './lib/useAuth'
 
 type Theme = 'dark' | 'light'
 type InteractionMode = 'navigate' | 'connect' | 'move' | 'edit'
+
+type GraphSnapshot = {
+  nodes: GraphNode[]
+  edges: { id: string; boardId?: string; from: string; to: string }[]
+  selectedNodeId: string | null
+}
+
+type NodeInspectorNote = {
+  id: string
+  text: string
+}
+
+type NodeInspectorMeta = {
+  color: string
+  notes: NodeInspectorNote[]
+}
 
 type HighlightSpot = Offset & {
   id: number
@@ -118,6 +134,19 @@ const NODE_HIT_RADIUS = 31
 const DESKTOP_CREATE_THRESHOLD = 18
 const LONG_PRESS_MS = 420
 const TAP_MOVE_LIMIT = 10
+const HISTORY_LIMIT = 50
+const DEFAULT_NODE_COLOR = '#8affd6'
+const NODE_META_PREFIX = '__graph_meta__:'
+const NODE_COLOR_OPTIONS = [
+  '#8affd6',
+  '#5eead4',
+  '#7dd3fc',
+  '#c4b5fd',
+  '#f9a8d4',
+  '#fda4af',
+  '#fdba74',
+  '#fde68a',
+]
 const getNow = () => Date.now()
 
 function App() {
@@ -131,6 +160,7 @@ function App() {
     createConnectedNode,
     connectNodes,
     deleteNode,
+    replaceGraph,
   } = useBoardGraph(board?.id ?? null)
   const isMobileLayout = useIsMobileLayout()
 
@@ -139,17 +169,22 @@ function App() {
     return savedTheme === 'light' ? 'light' : 'dark'
   })
   const [offset, setOffset] = useState<Offset>({ x: 0, y: 0 })
+  const [boardSize, setBoardSize] = useState({ width: 0, height: 0 })
   const [scale, setScale] = useState(1)
   const [selectedNodeId, setSelectedNodeId] = useState('root')
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
   const [actionSheetNodeId, setActionSheetNodeId] = useState<string | null>(null)
   const [interactionMode, setInteractionMode] = useState<InteractionMode>('navigate')
   const [connectionDrag, setConnectionDrag] = useState<ConnectionDrag | null>(null)
+  const [history, setHistory] = useState<GraphSnapshot[]>([])
   const [highlightSpots, setHighlightSpots] = useState<HighlightSpot[]>([])
   const [pointerPosition, setPointerPosition] = useState<Offset | null>(null)
   const [highlightClock, setHighlightClock] = useState(() => Date.now())
 
   const boardRef = useRef<HTMLElement | null>(null)
+  const nodesRef = useRef(nodes)
+  const edgesRef = useRef(edges)
+  const selectedNodeIdRef = useRef<string | null>('root')
   const highlightIdRef = useRef(0)
   const lastHighlightSpotRef = useRef<Offset | null>(null)
   const activePointersRef = useRef(new Map<number, Offset>())
@@ -168,6 +203,37 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem(THEME_STORAGE_KEY, theme)
   }, [theme])
+
+  useEffect(() => {
+    const boardElement = boardRef.current
+    if (!boardElement) return undefined
+
+    const updateBoardSize = () => {
+      setBoardSize({
+        width: boardElement.clientWidth,
+        height: boardElement.clientHeight,
+      })
+    }
+
+    updateBoardSize()
+
+    const resizeObserver = new ResizeObserver(updateBoardSize)
+    resizeObserver.observe(boardElement)
+
+    return () => resizeObserver.disconnect()
+  }, [])
+
+  useEffect(() => {
+    nodesRef.current = nodes
+  }, [nodes])
+
+  useEffect(() => {
+    edgesRef.current = edges
+  }, [edges])
+
+  useEffect(() => {
+    selectedNodeIdRef.current = selectedNodeId
+  }, [selectedNodeId])
 
   useEffect(() => {
     if (highlightSpots.length === 0) return undefined
@@ -237,6 +303,59 @@ function App() {
   const activeSelectedNodeId = nodesById[selectedNodeId] ? selectedNodeId : (nodes[0]?.id ?? 'root')
   const activeInteractionMode = isMobileLayout ? interactionMode : 'navigate'
 
+  const pushHistory = useCallback(() => {
+    setHistory((currentHistory) => [
+      ...currentHistory.slice(-HISTORY_LIMIT + 1),
+      {
+        nodes: cloneGraphNodes(nodesRef.current),
+        edges: edgesRef.current.map((edge) => ({ ...edge })),
+        selectedNodeId: selectedNodeIdRef.current,
+      },
+    ])
+  }, [])
+
+  const undoLastGraphChange = useCallback(() => {
+    setHistory((currentHistory) => {
+      const previousSnapshot = currentHistory[currentHistory.length - 1]
+      if (!previousSnapshot) return currentHistory
+
+      void replaceGraph(
+        cloneGraphNodes(previousSnapshot.nodes),
+        previousSnapshot.edges.map((edge) => ({ ...edge })),
+      )
+      setSelectedNodeId(previousSnapshot.selectedNodeId ?? previousSnapshot.nodes[0]?.id ?? 'root')
+      setEditingNodeId(null)
+      setActionSheetNodeId(null)
+      setConnectionDrag(null)
+      setInteractionMode('navigate')
+
+      return currentHistory.slice(0, -1)
+    })
+  }, [replaceGraph])
+
+  useEffect(() => {
+    const handleUndo = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.shiftKey || event.key.toLowerCase() !== 'z') {
+        return
+      }
+
+      const target = event.target
+      const isTypingTarget =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        (target instanceof HTMLElement && target.isContentEditable)
+
+      if (isTypingTarget) return
+
+      event.preventDefault()
+      undoLastGraphChange()
+    }
+
+    window.addEventListener('keydown', handleUndo)
+
+    return () => window.removeEventListener('keydown', handleUndo)
+  }, [undoLastGraphChange])
+
   const setMobileMode = (nextMode: InteractionMode) => {
     clearLongPress()
     setActionSheetNodeId(null)
@@ -263,6 +382,7 @@ function App() {
       })
 
       if (targetNode) {
+        pushHistory()
         await connectNodes(connectionDrag.fromId, targetNode.id)
         setSelectedNodeId(targetNode.id)
         suppressNodeClickRef.current = true
@@ -270,6 +390,7 @@ function App() {
         return
       }
 
+      pushHistory()
       const nextNode = await createConnectedNode(
         connectionDrag.fromId,
         connectionDrag.worldX,
@@ -431,6 +552,7 @@ function App() {
     if (boardGestureRef.current?.kind === 'move-node' && boardGestureRef.current.pointerId === event.pointerId) {
       const movedNode = nodesById[boardGestureRef.current.nodeId]
       if (movedNode) {
+        pushHistory()
         await updateNode(boardGestureRef.current.nodeId, { x: movedNode.x, y: movedNode.y })
       }
       boardGestureRef.current = null
@@ -447,6 +569,7 @@ function App() {
       const worldPoint = screenToWorld(event.clientX, event.clientY, boardRef.current, offset, scale)
 
       if (worldPoint) {
+        pushHistory()
         const nextNode = await createConnectedNode(activeSelectedNodeId, worldPoint.x, worldPoint.y)
         if (nextNode) {
           setSelectedNodeId(nextNode.id)
@@ -567,6 +690,7 @@ function App() {
       }
 
       if (activeInteractionMode === 'connect' && activeSelectedNodeId && activeSelectedNodeId !== nodeId) {
+        pushHistory()
         await connectNodes(activeSelectedNodeId, nodeId)
       }
 
@@ -607,6 +731,13 @@ function App() {
     void updateNode(nodeId, { label: value })
   }
 
+  const updateNodeMeta = useCallback(
+    async (nodeId: string, nextMeta: NodeInspectorMeta) => {
+      await updateNode(nodeId, { note: serializeNodeMeta(nextMeta) })
+    },
+    [updateNode],
+  )
+
   const startEditingNode = (nodeId: string) => {
     setSelectedNodeId(nodeId)
     setEditingNodeId(nodeId)
@@ -616,6 +747,66 @@ function App() {
 
   const selectedNode = nodesById[activeSelectedNodeId]
   const actionSheetNode = actionSheetNodeId ? nodesById[actionSheetNodeId] : null
+  const selectedNodeMeta = selectedNode ? parseNodeMeta(selectedNode.note) : null
+  const actionSheetNodeMeta = actionSheetNode ? parseNodeMeta(actionSheetNode.note) : null
+
+  const setNodeColor = async (nodeId: string, color: string) => {
+    const node = nodesById[nodeId]
+    if (!node) return
+
+    const currentMeta = parseNodeMeta(node.note)
+    if (currentMeta.color === color) return
+
+    pushHistory()
+    await updateNodeMeta(nodeId, { ...currentMeta, color })
+  }
+
+  const addNoteToNode = async (nodeId: string) => {
+    const node = nodesById[nodeId]
+    if (!node) return
+
+    pushHistory()
+    const currentMeta = parseNodeMeta(node.note)
+    await updateNodeMeta(nodeId, {
+      ...currentMeta,
+      notes: [...currentMeta.notes, { id: `note-${crypto.randomUUID()}`, text: '' }],
+    })
+  }
+
+  const updateNodeNote = async (nodeId: string, noteId: string, text: string) => {
+    const node = nodesById[nodeId]
+    if (!node) return
+
+    const currentMeta = parseNodeMeta(node.note)
+    await updateNodeMeta(nodeId, {
+      ...currentMeta,
+      notes: currentMeta.notes.map((note) => (note.id === noteId ? { ...note, text } : note)),
+    })
+  }
+
+  const deleteNodeNote = async (nodeId: string, noteId: string) => {
+    const node = nodesById[nodeId]
+    if (!node) return
+
+    pushHistory()
+    const currentMeta = parseNodeMeta(node.note)
+    await updateNodeMeta(nodeId, {
+      ...currentMeta,
+      notes: currentMeta.notes.filter((note) => note.id !== noteId),
+    })
+  }
+
+  const deleteSelectedNode = async (nodeId: string) => {
+    const node = nodesById[nodeId]
+    if (!node || node.kind === 'root') return
+
+    pushHistory()
+    await deleteNode(nodeId)
+    setActionSheetNodeId(null)
+    setInteractionMode('navigate')
+    setSelectedNodeId(nodes.find((candidate) => candidate.id !== nodeId)?.id ?? 'root')
+    setEditingNodeId(null)
+  }
 
   const previewPath = connectionDrag
     ? getPreviewPath(nodesById[connectionDrag.fromId], {
@@ -637,6 +828,19 @@ function App() {
   const graphStyle = {
     transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
   } satisfies CSSProperties
+
+  const inspectorStyle = useMemo(() => {
+    if (!selectedNode || isMobileLayout || boardSize.width === 0 || boardSize.height === 0) return null
+
+    const { width, height } = boardSize
+    const rawLeft = width / 2 + offset.x + selectedNode.x * scale + 52
+    const rawTop = height / 2 + offset.y + selectedNode.y * scale - 28
+
+    return {
+      left: `${Math.min(width - 302, Math.max(18, rawLeft))}px`,
+      top: `${Math.min(height - 410, Math.max(90, rawTop))}px`,
+    }
+  }, [boardSize, isMobileLayout, offset.x, offset.y, scale, selectedNode])
 
   const getHighlightOpacity = (spot: HighlightSpot) => {
     const age = highlightClock - spot.createdAt
@@ -790,13 +994,20 @@ function App() {
           {nodes.map((node) => {
             const isSelected = node.id === activeSelectedNodeId
             const isEditing = node.id === editingNodeId
-            const hasMeta = Boolean(node.note || node.tag)
+            const nodeMeta = parseNodeMeta(node.note)
+            const hasMeta = Boolean(nodeMeta.notes.length || node.tag)
 
             return (
               <div
                 key={node.id}
                 className={`graph-node${node.kind === 'root' ? ' graph-node--root' : ''}${isSelected ? ' is-selected' : ''}${isMobileLayout ? ' graph-node--mobile' : ''}`}
-                style={{ left: `${node.x}px`, top: `${node.y}px` }}
+                style={
+                  {
+                    left: `${node.x}px`,
+                    top: `${node.y}px`,
+                    '--node-color': nodeMeta.color,
+                  } as CSSProperties
+                }
               >
                 {isEditing ? (
                   <div
@@ -851,7 +1062,9 @@ function App() {
                       {node.tag ? <span className="graph-node__tag">{node.tag}</span> : null}
                       {hasMeta ? (
                         <span className="graph-node__meta">
-                          {node.note ? 'Note attached' : 'Tagged node'}
+                          {nodeMeta.notes.length > 0
+                            ? `${nodeMeta.notes.length} note${nodeMeta.notes.length === 1 ? '' : 's'}`
+                            : 'Tagged node'}
                         </span>
                       ) : null}
                     </span>
@@ -874,6 +1087,117 @@ function App() {
               </div>
             )
           })}
+
+          {selectedNode && selectedNodeMeta && inspectorStyle ? (
+            <aside
+              className="node-inspector"
+              style={inspectorStyle}
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="node-inspector__header">
+                <div className="node-inspector__identity">
+                  <span
+                    className="node-inspector__swatch"
+                    style={{ backgroundColor: selectedNodeMeta.color }}
+                    aria-hidden="true"
+                  />
+                  <div>
+                    <div className="node-inspector__eyebrow">Node</div>
+                    <div className="node-inspector__title">
+                      {selectedNode.label.trim() || 'Untitled person'}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="node-inspector__undo"
+                  onClick={undoLastGraphChange}
+                  disabled={history.length === 0}
+                >
+                  Undo
+                </button>
+              </div>
+
+              <section className="node-inspector__section">
+                <div className="node-inspector__section-label">Color</div>
+                <div className="node-inspector__palette" aria-label="Node color palette">
+                  {NODE_COLOR_OPTIONS.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      className={`node-inspector__color${
+                        selectedNodeMeta.color === color ? ' is-active' : ''
+                      }`}
+                      style={{ backgroundColor: color }}
+                      onClick={() => void setNodeColor(selectedNode.id, color)}
+                      aria-label={`Use ${color} for this node`}
+                    />
+                  ))}
+                </div>
+              </section>
+
+              <section className="node-inspector__section">
+                <div className="node-inspector__section-row">
+                  <div className="node-inspector__section-label">Notes</div>
+                  <button
+                    type="button"
+                    className="node-inspector__add-note"
+                    onClick={() => void addNoteToNode(selectedNode.id)}
+                  >
+                    Add note
+                  </button>
+                </div>
+                <div className="node-inspector__notes">
+                  {selectedNodeMeta.notes.length === 0 ? (
+                    <div className="node-inspector__empty">No notes yet.</div>
+                  ) : (
+                    selectedNodeMeta.notes.map((note, index) => (
+                      <div key={note.id} className="node-inspector__note">
+                        <div className="node-inspector__note-header">
+                          <span className="node-inspector__note-label">Note {index + 1}</span>
+                          <button
+                            type="button"
+                            className="node-inspector__note-delete"
+                            onClick={() => void deleteNodeNote(selectedNode.id, note.id)}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                        <textarea
+                          className="node-inspector__note-input"
+                          value={note.text}
+                          placeholder="Write a note about this person"
+                          onChange={(event) =>
+                            void updateNodeNote(selectedNode.id, note.id, event.target.value)
+                          }
+                        />
+                      </div>
+                    ))
+                  )}
+                </div>
+              </section>
+
+              <button
+                type="button"
+                className="node-inspector__delete"
+                onClick={() => void deleteSelectedNode(selectedNode.id)}
+                disabled={selectedNode.kind === 'root'}
+              >
+                <svg
+                  className="node-inspector__delete-icon"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-2 6h2v8H7V9Zm4 0h2v8h-2V9Zm4 0h2v8h-2V9ZM6 9h12l-1 11a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 9Z"
+                    fill="currentColor"
+                  />
+                </svg>
+                Delete
+              </button>
+            </aside>
+          ) : null}
         </div>
 
         {isMobileLayout ? (
@@ -899,10 +1223,18 @@ function App() {
               onClick={() => {
                 if (!selectedNode) return
 
-                const noteValue = window.prompt('Edit note', selectedNode.note ?? '')
+                const noteValue = window.prompt(
+                  'Edit notes',
+                  parseNodeMeta(selectedNode.note).notes.map((note) => note.text).join('\n\n'),
+                )
                 if (noteValue === null) return
 
-                void updateNode(selectedNode.id, { note: noteValue.trim() || null })
+                void updateNode(selectedNode.id, {
+                  note: serializeNodeMeta({
+                    ...parseNodeMeta(selectedNode.note),
+                    notes: notesFromPromptValue(noteValue),
+                  }),
+                })
               }}
               disabled={!selectedNode}
             >
@@ -918,7 +1250,9 @@ function App() {
                 <div className="mobile-sheet__eyebrow">Selected node</div>
                 <div className="mobile-sheet__title">{actionSheetNode.label || 'Untitled'}</div>
                 <div className="mobile-sheet__meta">
-                  {actionSheetNode.note ? 'Note attached' : 'No note yet'}
+                  {actionSheetNodeMeta && actionSheetNodeMeta.notes.length > 0
+                    ? `${actionSheetNodeMeta.notes.length} note${actionSheetNodeMeta.notes.length === 1 ? '' : 's'}`
+                    : 'No notes yet'}
                   {actionSheetNode.tag ? ` · ${actionSheetNode.tag}` : ''}
                 </div>
               </div>
@@ -942,10 +1276,18 @@ function App() {
                 type="button"
                 className="mobile-sheet__button"
                 onClick={() => {
-                  const noteValue = window.prompt('Edit note', actionSheetNode.note ?? '')
+                  const noteValue = window.prompt(
+                    'Edit notes',
+                    (actionSheetNodeMeta?.notes ?? []).map((note) => note.text).join('\n\n'),
+                  )
                   if (noteValue === null) return
 
-                  void updateNode(actionSheetNode.id, { note: noteValue.trim() || null })
+                  void updateNode(actionSheetNode.id, {
+                    note: serializeNodeMeta({
+                      ...(actionSheetNodeMeta ?? { color: DEFAULT_NODE_COLOR, notes: [] }),
+                      notes: notesFromPromptValue(noteValue),
+                    }),
+                  })
                 }}
               >
                 Add note
@@ -971,9 +1313,7 @@ function App() {
 
                   if (!window.confirm('Delete this node and all of its connections?')) return
 
-                  void deleteNode(actionSheetNode.id)
-                  setActionSheetNodeId(null)
-                  setInteractionMode('navigate')
+                  void deleteSelectedNode(actionSheetNode.id)
                 }}
               >
                 Delete
@@ -1058,6 +1398,65 @@ function getNodeRadius(kind: GraphNode['kind'], isMobileLayout: boolean) {
   }
 
   return kind === 'root' ? 36 : 28
+}
+
+function parseNodeMeta(noteValue: string | null): NodeInspectorMeta {
+  if (!noteValue) {
+    return { color: DEFAULT_NODE_COLOR, notes: [] }
+  }
+
+  if (!noteValue.startsWith(NODE_META_PREFIX)) {
+    return {
+      color: DEFAULT_NODE_COLOR,
+      notes: noteValue.trim() ? [{ id: 'legacy-note', text: noteValue }] : [],
+    }
+  }
+
+  try {
+    const parsed = JSON.parse(noteValue.slice(NODE_META_PREFIX.length)) as {
+      color?: string
+      notes?: Array<{ id?: string; text?: string }>
+    }
+
+    return {
+      color: parsed.color || DEFAULT_NODE_COLOR,
+      notes: (parsed.notes ?? [])
+        .filter((note) => typeof note.text === 'string')
+        .map((note, index) => ({
+          id: note.id || `note-${index}`,
+          text: note.text ?? '',
+        })),
+    }
+  } catch {
+    return { color: DEFAULT_NODE_COLOR, notes: [] }
+  }
+}
+
+function serializeNodeMeta(meta: NodeInspectorMeta) {
+  const normalizedNotes = meta.notes
+    .map((note) => ({ ...note, text: note.text.trim() }))
+    .filter((note) => note.text.length > 0)
+
+  if (normalizedNotes.length === 0 && meta.color === DEFAULT_NODE_COLOR) {
+    return null
+  }
+
+  return `${NODE_META_PREFIX}${JSON.stringify({
+    color: meta.color,
+    notes: normalizedNotes,
+  })}`
+}
+
+function notesFromPromptValue(value: string) {
+  return value
+    .split(/\n\s*\n/g)
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((text) => ({ id: `note-${crypto.randomUUID()}`, text }))
+}
+
+function cloneGraphNodes(nodes: GraphNode[]) {
+  return nodes.map((node) => ({ ...node }))
 }
 
 export default App

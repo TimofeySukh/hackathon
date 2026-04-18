@@ -358,6 +358,48 @@ export function useBoardGraph(boardId: string | null) {
     [boardId, nodes, refreshGraph],
   )
 
+  const replaceGraph = useCallback(
+    async (nextNodes: GraphNode[], nextEdges: GraphEdge[]) => {
+      setNodes(nextNodes)
+      setEdges(nextEdges)
+
+      if (!boardId || !supabase) return
+
+      const nodeRows = nextNodes.map((node) => createNodeRow(boardId, node))
+      const edgeRows = nextEdges.map((edge) => createEdgeRow(boardId, edge))
+
+      try {
+        const { error: deleteEdgesError } = await supabase
+          .from('board_edges')
+          .delete()
+          .eq('board_id', boardId)
+
+        if (deleteEdgesError) throw deleteEdgesError
+
+        const { error: deleteNodesError } = await supabase
+          .from('board_nodes')
+          .delete()
+          .eq('board_id', boardId)
+
+        if (deleteNodesError) throw deleteNodesError
+
+        if (nodeRows.length > 0) {
+          const { error: insertNodesError } = await supabase.from('board_nodes').insert(nodeRows)
+          if (insertNodesError) throw insertNodesError
+        }
+
+        if (edgeRows.length > 0) {
+          const { error: insertEdgesError } = await supabase.from('board_edges').insert(edgeRows)
+          if (insertEdgesError) throw insertEdgesError
+        }
+      } catch (replaceError) {
+        setError(replaceError instanceof Error ? replaceError.message : 'Unable to restore graph.')
+        void refreshGraph()
+      }
+    },
+    [boardId, refreshGraph],
+  )
+
   return {
     nodes,
     edges,
@@ -368,5 +410,6 @@ export function useBoardGraph(boardId: string | null) {
     createConnectedNode,
     connectNodes,
     deleteNode,
+    replaceGraph,
   }
 }

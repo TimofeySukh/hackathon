@@ -12,6 +12,8 @@ A minimal social graph board built with React, Vite, and TypeScript.
 - New nodes appear immediately with an empty inline name field
 - Mobile-friendly oversized nodes with external labels and drag handles
 - Long-press a node on mobile to rename it, add a note, set a tag, or delete it
+- Desktop: selected nodes open a detail card with a square color palette, multi-note stack, and delete action
+- `Ctrl/Cmd+Z` restores recent graph actions such as delete, recolor, connect, and create
 - Infinite canvas-style navigation by dragging with the mouse
 - Infinite canvas-style navigation by one-finger pan on mobile
 - Infinite canvas-style navigation by scrolling on a trackpad or mouse wheel

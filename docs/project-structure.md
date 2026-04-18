@@ -123,6 +123,8 @@ It currently supports:
 - mobile tap-to-create relation mode from a selected node
 - mobile drag-handle node movement
 - newly created nodes appearing immediately with an empty inline name field
+- selected-node detail cards with color controls, multi-note lists, and deletion
+- graph action undo through `Ctrl/Cmd+Z` for recent structural changes
 - in-place node renaming
 - node notes and tags
 - mobile long-press node actions
