@@ -10,6 +10,10 @@ Project workflow rules and documentation update order.
 
 Top-level project overview, local setup instructions, and links to deeper documentation.
 
+### `.agents/skills/`
+
+Project-scoped agent skills. The current installed skills provide Supabase workflow guidance and Supabase Postgres best practices for agents working in this repository.
+
 ### `docs/`
 
 Detailed product and structure documentation.
@@ -21,6 +25,10 @@ The main HTML entry point used by Vite.
 ### `package.json`
 
 Project metadata, scripts, and dependencies.
+
+### `skills-lock.json`
+
+Lockfile for project-scoped agent skills installed under `.agents/skills/`.
 
 ### `supabase/migrations/`
 

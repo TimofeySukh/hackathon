@@ -41,6 +41,7 @@ Completed tasks can remain listed here when they explain repository history. Liv
 ## Important Files
 
 - `AGENTS.md`: short entrypoint for agent instructions.
+- `.agents/skills/`: project-scoped agent skills, currently Supabase and Supabase Postgres guidance.
 - `docs/PROJECT_MAP.md`: where the project structure is recorded.
 - `docs/RUNBOOK.md`: how to run or verify the repo.
 - `docs/ARCHITECTURE.md`: invariants and boundaries.
@@ -53,6 +54,7 @@ Completed tasks can remain listed here when they explain repository history. Liv
 - `src/lib/useAuth.ts`: session and Google sign-in state.
 - `src/lib/userWorkspace.ts`: profile upsert and personal board bootstrap.
 - `src/index.css`: current visual system.
+- `skills-lock.json`: lockfile for installed project agent skills.
 - `supabase/migrations/`: database schema and row-level security migrations.
 
 ## Ownership
