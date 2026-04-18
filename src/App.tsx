@@ -17,6 +17,15 @@ type Offset = {
   y: number
 }
 
+type HighlightSpot = Offset & {
+  id: number
+  createdAt: number
+  tailX: number
+  tailY: number
+  tailCore: number
+  tailSize: number
+}
+
 type ConnectionDrag = {
   fromId: string
   startClientX: number
@@ -49,6 +58,22 @@ type BoardStyle = CSSProperties & {
   '--major-dot-size': string
 }
 
+type HighlightSpotStyle = CSSProperties & {
+  '--highlight-x': string
+  '--highlight-y': string
+  '--board-offset-x': string
+  '--board-offset-y': string
+  '--dot-gap': string
+  '--major-dot-gap': string
+  '--dot-size': string
+  '--major-dot-size': string
+  '--highlight-tail-x': string
+  '--highlight-tail-y': string
+  '--highlight-tail-core': string
+  '--highlight-tail-size': string
+  opacity: number
+}
+
 const THEME_STORAGE_KEY = 'hackathon-theme'
 const MIN_SCALE = 0.2
 const MAX_SCALE = 2.5
@@ -56,6 +81,13 @@ const GRID_GAP = 12
 const MAJOR_GRID_GAP = 96
 const DOT_SIZE = 0.65
 const MAJOR_DOT_SIZE = 2
+const HIGHLIGHT_LIFETIME_MS = 420
+const HIGHLIGHT_DISTANCE = 12
+const HIGHLIGHT_LIMIT = 28
+const HIGHLIGHT_RADIUS = 56
+const HIGHLIGHT_TICK_MS = 50
+const HIGHLIGHT_TAIL_START = 18
+const HIGHLIGHT_TAIL_LIMIT = 48
 const NODE_RADIUS = 9
 const NODE_HIT_RADIUS = 31
 const CREATE_THRESHOLD = 18
@@ -100,23 +132,30 @@ function App() {
     const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY)
     return savedTheme === 'light' ? 'light' : 'dark'
   })
+  const [offset, setOffset] = useState<Offset>({ x: 0, y: 0 })
+  const [scale, setScale] = useState(1)
   const [zoomPercentage, setZoomPercentage] = useState(100)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [inspectorNodeId, setInspectorNodeId] = useState<string | null>(null)
   const [connectionDrag, setConnectionDrag] = useState<ConnectionDrag | null>(null)
   const [nodeDrag, setNodeDrag] = useState<NodeDrag | null>(null)
-const [draggedPositions, setDraggedPositions] = useState<Record<string, Offset>>({})
+  const [draggedPositions, setDraggedPositions] = useState<Record<string, Offset>>({})
   const [nameDraft, setNameDraft] = useState('')
   const [tagDraft, setTagDraft] = useState('')
   const [newNoteTitle, setNewNoteTitle] = useState('')
   const [newNoteBody, setNewNoteBody] = useState('')
   const [noteDrafts, setNoteDrafts] = useState<Record<string, NoteDraft>>({})
+  const [highlightSpots, setHighlightSpots] = useState<HighlightSpot[]>([])
+  const [pointerPosition, setPointerPosition] = useState<Offset | null>(null)
+  const [highlightClock, setHighlightClock] = useState(() => Date.now())
   const [isDraggingBoard, setIsDraggingBoard] = useState(false)
 
   const boardRef = useRef<HTMLElement | null>(null)
   const boardSurfaceRef = useRef<HTMLDivElement | null>(null)
   const graphLayerRef = useRef<HTMLDivElement | null>(null)
   const zoomIndicatorRef = useRef<HTMLDivElement | null>(null)
+  const highlightIdRef = useRef(0)
+  const lastHighlightSpotRef = useRef<Offset | null>(null)
   const viewportRef = useRef({ offset: { x: 0, y: 0 }, scale: 1 })
   const pendingViewportRef = useRef<{ offset: Offset; scale: number } | null>(null)
   const viewportFrameRef = useRef<number | null>(null)
@@ -196,6 +235,8 @@ const [draggedPositions, setDraggedPositions] = useState<Record<string, Offset>>
 
   const applyViewport = useCallback((nextOffset: Offset, nextScale: number) => {
     viewportRef.current = { offset: nextOffset, scale: nextScale }
+    setOffset(nextOffset)
+    setScale(nextScale)
 
     if (boardSurfaceRef.current) {
       boardSurfaceRef.current.style.setProperty('--dot-gap', `${GRID_GAP * nextScale}px`)
@@ -220,6 +261,66 @@ const [draggedPositions, setDraggedPositions] = useState<Record<string, Offset>>
     setZoomPercentage((currentZoomPercentage) =>
       currentZoomPercentage === nextZoomPercentage ? currentZoomPercentage : nextZoomPercentage,
     )
+  }, [])
+
+  useEffect(() => {
+    if (highlightSpots.length === 0) return undefined
+
+    const intervalId = window.setInterval(() => {
+      const now = Date.now()
+      setHighlightClock(now)
+      setHighlightSpots((currentSpots) =>
+        currentSpots.filter((spot) => now - spot.createdAt < HIGHLIGHT_LIFETIME_MS),
+      )
+    }, HIGHLIGHT_TICK_MS)
+
+    return () => window.clearInterval(intervalId)
+  }, [highlightSpots.length])
+
+  const addHighlightSpot = useCallback((clientX: number, clientY: number, force = false) => {
+    const viewport = boardRef.current?.getBoundingClientRect()
+    if (!viewport) return
+
+    const now = Date.now()
+    const nextSpot = {
+      x: clientX - viewport.left,
+      y: clientY - viewport.top,
+    }
+    const previousSpot = lastHighlightSpotRef.current
+    const distanceFromPrevious = previousSpot
+      ? Math.hypot(nextSpot.x - previousSpot.x, nextSpot.y - previousSpot.y)
+      : Number.POSITIVE_INFINITY
+
+    if (!force && distanceFromPrevious < HIGHLIGHT_DISTANCE) return
+
+    const hasTail = previousSpot && Number.isFinite(distanceFromPrevious)
+    const tailReach = hasTail
+      ? Math.min(HIGHLIGHT_TAIL_LIMIT, Math.max(0, distanceFromPrevious - HIGHLIGHT_TAIL_START))
+      : 0
+    const tailUnitX =
+      hasTail && distanceFromPrevious > 0 ? (nextSpot.x - previousSpot.x) / distanceFromPrevious : 0
+    const tailUnitY =
+      hasTail && distanceFromPrevious > 0 ? (nextSpot.y - previousSpot.y) / distanceFromPrevious : 0
+    const tailSize = tailReach * 0.75
+
+    const id = highlightIdRef.current + 1
+    highlightIdRef.current = id
+    lastHighlightSpotRef.current = nextSpot
+    setPointerPosition(nextSpot)
+    setHighlightClock(now)
+
+    setHighlightSpots((currentSpots) => [
+      ...currentSpots.slice(-HIGHLIGHT_LIMIT + 1),
+      {
+        id,
+        createdAt: now,
+        tailX: nextSpot.x - tailUnitX * tailReach,
+        tailY: nextSpot.y - tailUnitY * tailReach,
+        tailCore: tailSize * 0.36,
+        tailSize,
+        ...nextSpot,
+      },
+    ])
   }, [])
 
   const queueViewportUpdate = useCallback(
@@ -583,6 +684,40 @@ const [draggedPositions, setDraggedPositions] = useState<Record<string, Offset>>
       })
     : null
 
+  function getHighlightOpacity(spot: HighlightSpot) {
+    const age = highlightClock - spot.createdAt
+    const ageOpacity = Math.max(0, 1 - age / HIGHLIGHT_LIFETIME_MS)
+
+    if (!pointerPosition) return ageOpacity
+
+    const distance = Math.hypot(spot.x - pointerPosition.x, spot.y - pointerPosition.y)
+    const distanceOpacity = Math.max(0, 1 - distance / HIGHLIGHT_RADIUS)
+
+    return Math.min(0.95, ageOpacity * distanceOpacity)
+  }
+
+  function getHighlightSpotStyle(spot: HighlightSpot): HighlightSpotStyle | null {
+    const opacity = getHighlightOpacity(spot)
+
+    if (opacity <= 0.03) return null
+
+    return {
+      '--dot-gap': `${GRID_GAP * scale}px`,
+      '--major-dot-gap': `${MAJOR_GRID_GAP * scale}px`,
+      '--dot-size': `${Math.max(0.45, DOT_SIZE * scale)}px`,
+      '--major-dot-size': `${Math.max(1.5, MAJOR_DOT_SIZE * scale)}px`,
+      '--board-offset-x': `${offset.x}px`,
+      '--board-offset-y': `${offset.y}px`,
+      '--highlight-x': `${spot.x}px`,
+      '--highlight-y': `${spot.y}px`,
+      '--highlight-tail-x': `${spot.tailX}px`,
+      '--highlight-tail-y': `${spot.tailY}px`,
+      '--highlight-tail-core': `${spot.tailCore}px`,
+      '--highlight-tail-size': `${spot.tailSize}px`,
+      opacity,
+    }
+  }
+
   return (
     <main className={`app-shell theme-${theme}`}>
       <div className="app-actions">
@@ -861,6 +996,12 @@ const [draggedPositions, setDraggedPositions] = useState<Record<string, Offset>>
         ref={boardRef}
         className={`board-viewport${isDraggingBoard ? ' is-dragging' : ''}`}
         onMouseDown={startBoardDragging}
+        onMouseEnter={(event) => addHighlightSpot(event.clientX, event.clientY, true)}
+        onMouseMove={(event) => addHighlightSpot(event.clientX, event.clientY)}
+        onMouseLeave={() => {
+          lastHighlightSpotRef.current = null
+          setPointerPosition(null)
+        }}
         onWheel={moveWithWheel}
         aria-label="Social network graph canvas"
       >
@@ -878,6 +1019,13 @@ const [draggedPositions, setDraggedPositions] = useState<Record<string, Offset>>
             } as BoardStyle
           }
         />
+        <div className="board-highlights" aria-hidden="true">
+          {highlightSpots.map((spot) => {
+            const spotStyle = getHighlightSpotStyle(spot)
+            if (!spotStyle) return null
+            return <span key={spot.id} className="board-highlights__spot" style={spotStyle} />
+          })}
+        </div>
 
         <div ref={graphLayerRef} className="graph-layer">
           <svg
@@ -951,7 +1099,7 @@ const [draggedPositions, setDraggedPositions] = useState<Record<string, Offset>>
         </div>
       </section>
 
-      <div className="zoom-indicator" aria-live="polite">
+      <div ref={zoomIndicatorRef} className="zoom-indicator" aria-live="polite">
         {zoomPercentage}%
       </div>
     </main>
