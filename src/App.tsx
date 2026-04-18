@@ -497,20 +497,6 @@ function App() {
             viewBox="-2200 -2200 4400 4400"
             aria-hidden="true"
           >
-            <defs>
-              <marker
-                id="network-arrow"
-                viewBox="0 0 10 10"
-                refX="8"
-                refY="5"
-                markerWidth="8"
-                markerHeight="8"
-                orient="auto-start-reverse"
-              >
-                <path d="M 0 0 L 10 5 L 0 10 z" className="graph-arrow-head" />
-              </marker>
-            </defs>
-
             {edges.map((edge) => {
               const fromNode = nodesById[edge.from]
               const toNode = nodesById[edge.to]
@@ -524,7 +510,6 @@ function App() {
                   key={edge.id}
                   className="graph-edge"
                   d={`M ${link.start.x} ${link.start.y} C ${link.controlA.x} ${link.controlA.y}, ${link.controlB.x} ${link.controlB.y}, ${link.end.x} ${link.end.y}`}
-                  markerEnd="url(#network-arrow)"
                 />
               )
             })}
@@ -533,7 +518,6 @@ function App() {
               <path
                 className="graph-edge graph-edge--preview"
                 d={`M ${previewPath.start.x} ${previewPath.start.y} C ${previewPath.controlA.x} ${previewPath.controlA.y}, ${previewPath.controlB.x} ${previewPath.controlB.y}, ${previewPath.end.x} ${previewPath.end.y}`}
-                markerEnd="url(#network-arrow)"
               />
             ) : null}
           </svg>
