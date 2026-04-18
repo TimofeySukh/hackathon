@@ -714,11 +714,9 @@ select {
   backdrop-filter: blur(16px);
 }
 
-.tag-picker__option,
+.tag-picker__row,
 .tag-picker__empty {
   min-height: 36px;
-  padding: 8px 10px;
-  border: 0;
   border-radius: 6px;
   background: transparent;
   color: var(--panel-text);
@@ -727,13 +725,31 @@ select {
   text-align: left;
 }
 
-.tag-picker__option {
-  cursor: pointer;
+.tag-picker__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  align-items: center;
 }
 
-.tag-picker__option:hover,
-.tag-picker__option.is-active,
-.tag-picker__option.is-selected {
+.tag-picker__option {
+  min-width: 0;
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tag-picker__row:hover,
+.tag-picker__row.is-active,
+.tag-picker__row.is-selected {
   background: var(--button-bg);
 }
 
@@ -742,11 +758,35 @@ select {
   color: var(--panel-muted);
 }
 
+.tag-picker__empty {
+  padding: 8px 10px;
+}
+
 .tag-picker__option--create {
   margin-top: 6px;
   border-top: 1px solid var(--button-border);
   border-radius: 0 0 6px 6px;
   color: var(--panel-text);
+}
+
+.tag-picker__delete {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--panel-muted);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.tag-picker__delete:hover {
+  background: rgba(255, 130, 130, 0.12);
+  color: var(--panel-danger);
 }
 
 .field-group__button,
@@ -887,8 +927,22 @@ select {
   stroke-linecap: round;
   stroke-linejoin: round;
   filter: drop-shadow(0 0 6px rgba(138, 255, 214, 0.08));
+  pointer-events: none;
+}
+
+.graph-edge-hit {
+  fill: none;
+  stroke: rgba(0, 0, 0, 0.001);
+  stroke-width: 18;
+  stroke-linecap: round;
+  stroke-linejoin: round;
   cursor: pointer;
   pointer-events: stroke;
+}
+
+.graph-edge-hit:hover + .graph-edge {
+  stroke: rgba(138, 255, 214, 0.9);
+  stroke-width: 3;
 }
 
 .graph-edge.is-selected {
@@ -914,6 +968,10 @@ select {
 
 .theme-light .graph-edge.is-selected {
   stroke: rgba(18, 121, 79, 0.88);
+}
+
+.theme-light .graph-edge-hit:hover + .graph-edge {
+  stroke: rgba(18, 121, 79, 0.78);
 }
 
 .connection-menu {

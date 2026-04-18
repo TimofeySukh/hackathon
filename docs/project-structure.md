@@ -120,9 +120,9 @@ It currently supports:
 - one separate AI summary record per person in the database with `status`, plain-text `summary`, structured JSON data, and sync error state
 - modifier-drag to connect two existing nodes by releasing on another node hit area: `Command` on macOS, `Control` elsewhere
 - modifier-drag to create node growth from any existing node with an immediate connecting line: `Command` on macOS, `Control` elsewhere
-- selected-node detail cards with searchable tag selection/creation, note editing, and person deletion
+- selected-node detail cards with searchable tag selection/creation/deletion, note editing, and person deletion
 - single-click opening for the node-anchored inspector
-- connection line selection with inline deletion and Backspace deletion
+- connection line selection with a widened hit target, inline deletion, and Backspace deletion
 - local people search while typing plus natural-language AI search on Enter
 - drag repositioning for non-root nodes
 - persisted node renaming

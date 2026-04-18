@@ -229,7 +229,7 @@ function App() {
   const zoomIndicatorRef = useRef<HTMLDivElement | null>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const tagPickerMenuRef = useRef<HTMLDivElement | null>(null)
-  const tagPickerOptionRefs = useRef<Array<HTMLButtonElement | null>>([])
+  const tagPickerOptionRefs = useRef<Array<HTMLDivElement | null>>([])
   const highlightIdRef = useRef(0)
   const lastHighlightSpotRef = useRef<Offset | null>(null)
   const inspectorWorldPositionRef = useRef<Offset | null>(null)
@@ -970,6 +970,22 @@ function App() {
     setActiveTagOptionIndex(0)
   }
 
+  async function handleDeleteInspectorTag(tagId: string, tagName: string) {
+    if (!isGraphReady) return
+
+    const shouldDelete = window.confirm(
+      `Delete "${tagName}"? This removes the tag from every person using it.`,
+    )
+    if (!shouldDelete) return
+
+    await deleteTag(tagId)
+    if (inspectorNode?.tag_id === tagId || normalizeTagName(tagDraft) === normalizeTagName(tagName)) {
+      setTagDraft('')
+    }
+    setActiveTagOptionIndex(0)
+    setIsTagPickerOpen(true)
+  }
+
   function chooseTagPickerOption(option: TagPickerOption) {
     if (option.type === 'clear') {
       void handleClearTag()
@@ -1637,32 +1653,54 @@ function App() {
                   className="tag-picker__menu"
                   role="listbox"
                 >
-                  {tagPickerOptions.map((option, optionIndex) => (
-                    <button
-                      key={option.id}
-                      ref={(element) => {
-                        tagPickerOptionRefs.current[optionIndex] = element
-                      }}
-                      id={`inspector-tag-option-${option.id}`}
-                      type="button"
-                      className={[
-                        'tag-picker__option',
-                        option.type === 'clear' ? 'tag-picker__option--muted' : '',
-                        option.type === 'create' ? 'tag-picker__option--create' : '',
-                        option.type === 'tag' && option.tagId === inspectorNode.tag_id ? 'is-selected' : '',
-                        optionIndex === activeTagOptionIndex ? 'is-active' : '',
-                      ].filter(Boolean).join(' ')}
-                      onMouseDown={(event) => event.preventDefault()}
-                      onMouseEnter={() => setActiveTagOptionIndex(optionIndex)}
-                      onClick={() => {
-                        chooseTagPickerOption(option)
-                      }}
-                      role="option"
-                      aria-selected={optionIndex === activeTagOptionIndex}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
+                  {tagPickerOptions.map((option, optionIndex) => {
+                    const isTagSelected = option.type === 'tag' && option.tagId === inspectorNode.tag_id
+
+                    return (
+                      <div
+                        key={option.id}
+                        ref={(element) => {
+                          tagPickerOptionRefs.current[optionIndex] = element
+                        }}
+                        id={`inspector-tag-option-${option.id}`}
+                        className={[
+                          'tag-picker__row',
+                          option.type === 'clear' ? 'tag-picker__option--muted' : '',
+                          option.type === 'create' ? 'tag-picker__option--create' : '',
+                          isTagSelected ? 'is-selected' : '',
+                          optionIndex === activeTagOptionIndex ? 'is-active' : '',
+                        ].filter(Boolean).join(' ')}
+                        onMouseEnter={() => setActiveTagOptionIndex(optionIndex)}
+                        role="option"
+                        aria-selected={optionIndex === activeTagOptionIndex}
+                      >
+                        <button
+                          type="button"
+                          className="tag-picker__option"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => {
+                            chooseTagPickerOption(option)
+                          }}
+                        >
+                          {option.label}
+                        </button>
+                        {option.type === 'tag' ? (
+                          <button
+                            type="button"
+                            className="tag-picker__delete"
+                            aria-label={`Delete ${option.label} tag`}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              void handleDeleteInspectorTag(option.tagId, option.label)
+                            }}
+                          >
+                            x
+                          </button>
+                        ) : null}
+                      </div>
+                    )
+                  })}
                   {tagPickerOptions.length === 0 ? (
                     <span className="tag-picker__empty">No matching tags.</span>
                   ) : null}
@@ -1817,12 +1855,17 @@ function App() {
               if (!link) return null
 
               return (
-                <path
-                  key={edge.id}
-                  className={`graph-edge${edge.id === selectedConnectionId ? ' is-selected' : ''}`}
-                  d={`M ${link.start.x} ${link.start.y} C ${link.controlA.x} ${link.controlA.y}, ${link.controlB.x} ${link.controlB.y}, ${link.end.x} ${link.end.y}`}
-                  onMouseDown={(event) => selectConnection(edge.id, event)}
-                />
+                <g key={edge.id}>
+                  <path
+                    className="graph-edge-hit"
+                    d={`M ${link.start.x} ${link.start.y} C ${link.controlA.x} ${link.controlA.y}, ${link.controlB.x} ${link.controlB.y}, ${link.end.x} ${link.end.y}`}
+                    onMouseDown={(event) => selectConnection(edge.id, event)}
+                  />
+                  <path
+                    className={`graph-edge${edge.id === selectedConnectionId ? ' is-selected' : ''}`}
+                    d={`M ${link.start.x} ${link.start.y} C ${link.controlA.x} ${link.controlA.y}, ${link.controlB.x} ${link.controlB.y}, ${link.end.x} ${link.end.y}`}
+                  />
+                </g>
               )
             })}
 
