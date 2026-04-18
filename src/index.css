@@ -388,32 +388,37 @@ select {
   position: absolute;
   left: 0;
   top: 0;
-  transform: translate(-50%, -50%);
 }
 
 .graph-node__button,
 .graph-node__input {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
+  position: absolute;
+  left: 0;
+  top: 0;
   min-width: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
   color: var(--text-strong);
 }
 
 .graph-node__button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  transform: translate(-50%, -50%);
   cursor: crosshair;
 }
 
 .graph-node__dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
   width: 8px;
   height: 8px;
-  flex: 0 0 auto;
   border-radius: 50%;
   background: rgba(226, 255, 244, 0.82);
   box-shadow: 0 0 10px rgba(138, 255, 214, 0.2);
+  transform: translate(-50%, -50%);
 }
 
 .theme-light .graph-node__dot {
@@ -422,7 +427,10 @@ select {
 }
 
 .graph-node__label {
-  max-width: 116px;
+  position: absolute;
+  left: calc(100% - 2px);
+  top: 50%;
+  max-width: 132px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -430,6 +438,7 @@ select {
   font-size: 12px;
   font-weight: 500;
   line-height: 1;
+  transform: translateY(-50%);
 }
 
 .theme-light .graph-node__label {
@@ -466,6 +475,7 @@ select {
   border: 1px solid rgba(138, 255, 214, 0.24);
   border-radius: 999px;
   background: rgba(7, 28, 20, 0.88);
+  transform: translate(12px, -50%);
   color: var(--text-strong);
   font-size: 12px;
   outline: none;

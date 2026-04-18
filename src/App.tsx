@@ -341,13 +341,15 @@ function App() {
     const { left, top } = event.currentTarget.getBoundingClientRect()
     const pointerX = event.clientX - left
     const pointerY = event.clientY - top
-    const worldX = (pointerX - offset.x) / scale
-    const worldY = (pointerY - offset.y) / scale
+    const centerX = event.currentTarget.clientWidth / 2
+    const centerY = event.currentTarget.clientHeight / 2
+    const worldX = (pointerX - centerX - offset.x) / scale
+    const worldY = (pointerY - centerY - offset.y) / scale
 
     setScale(nextScale)
     setOffset({
-      x: pointerX - worldX * nextScale,
-      y: pointerY - worldY * nextScale,
+      x: pointerX - centerX - worldX * nextScale,
+      y: pointerY - centerY - worldY * nextScale,
     })
   }
 
@@ -527,6 +529,7 @@ function App() {
               <path
                 className="graph-edge graph-edge--preview"
                 d={`M ${previewPath.start.x} ${previewPath.start.y} C ${previewPath.controlA.x} ${previewPath.controlA.y}, ${previewPath.controlB.x} ${previewPath.controlB.y}, ${previewPath.end.x} ${previewPath.end.y}`}
+                markerEnd="url(#network-arrow)"
               />
             ) : null}
           </svg>
@@ -589,8 +592,8 @@ function screenToWorld(
   if (!viewport) return null
 
   return {
-    x: (clientX - viewport.left - offset.x) / scale,
-    y: (clientY - viewport.top - offset.y) / scale,
+    x: (clientX - viewport.left - viewport.width / 2 - offset.x) / scale,
+    y: (clientY - viewport.top - viewport.height / 2 - offset.y) / scale,
   }
 }
 
