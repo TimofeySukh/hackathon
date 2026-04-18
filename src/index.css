@@ -358,22 +358,24 @@ select {
 
 .graph-edge {
   fill: none;
-  stroke: rgba(214, 236, 226, 0.4);
-  stroke-width: 1.75;
+  stroke: rgba(214, 236, 226, 0.56);
+  stroke-width: 2.1;
   stroke-linecap: round;
+  filter: drop-shadow(0 0 6px rgba(138, 255, 214, 0.08));
 }
 
 .graph-edge--preview {
-  stroke: rgba(138, 255, 214, 0.6);
-  stroke-dasharray: 5 7;
+  stroke: rgba(138, 255, 214, 0.82);
+  stroke-dasharray: 7 6;
 }
 
 .graph-arrow-head {
-  fill: rgba(214, 236, 226, 0.48);
+  fill: rgba(214, 236, 226, 0.64);
 }
 
 .theme-light .graph-edge {
-  stroke: rgba(18, 77, 54, 0.28);
+  stroke: rgba(18, 77, 54, 0.42);
+  filter: none;
 }
 
 .theme-light .graph-edge--preview {
@@ -381,7 +383,7 @@ select {
 }
 
 .theme-light .graph-arrow-head {
-  fill: rgba(18, 77, 54, 0.34);
+  fill: rgba(18, 77, 54, 0.52);
 }
 
 .graph-node {
@@ -391,17 +393,18 @@ select {
 }
 
 .graph-node__button,
+.graph-node__editor,
 .graph-node__input {
-  position: absolute;
-  left: 0;
-  top: 0;
   min-width: 0;
   color: var(--text-strong);
 }
 
 .graph-node__button {
-  width: 32px;
-  height: 32px;
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 42px;
+  height: 42px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -409,16 +412,31 @@ select {
   cursor: crosshair;
 }
 
+.graph-node__editor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  transform: translate(-50%, -50%);
+}
+
 .graph-node__dot {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 8px;
-  height: 8px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: rgba(226, 255, 244, 0.82);
-  box-shadow: 0 0 10px rgba(138, 255, 214, 0.2);
+  box-shadow: 0 0 12px rgba(138, 255, 214, 0.24);
   transform: translate(-50%, -50%);
+}
+
+.graph-node__editor .graph-node__dot {
+  position: static;
+  transform: none;
 }
 
 .theme-light .graph-node__dot {
@@ -446,12 +464,12 @@ select {
 }
 
 .graph-node--root .graph-node__dot {
-  width: 11px;
-  height: 11px;
+  width: 17px;
+  height: 17px;
   background: #8affd6;
   box-shadow:
-    0 0 0 3px rgba(138, 255, 214, 0.12),
-    0 0 16px rgba(138, 255, 214, 0.36);
+    0 0 0 4px rgba(138, 255, 214, 0.12),
+    0 0 18px rgba(138, 255, 214, 0.36);
 }
 
 .theme-light .graph-node--root .graph-node__dot {
@@ -475,7 +493,7 @@ select {
   border: 1px solid rgba(138, 255, 214, 0.24);
   border-radius: 999px;
   background: rgba(7, 28, 20, 0.88);
-  transform: translate(12px, -50%);
+  transform: translateY(-1px);
   color: var(--text-strong);
   font-size: 12px;
   outline: none;

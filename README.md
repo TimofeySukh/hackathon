@@ -7,7 +7,7 @@ A minimal social graph board built with React, Vite, and TypeScript.
 - A single central node as the starting point of the graph
 - Create a new node by dragging a connection out from any existing node
 - Curved directional arrows between connected nodes
-- New nodes start empty so they can be named immediately
+- New nodes appear immediately with an empty inline name field
 - Compact obsidian-like nodes with labels
 - Infinite canvas-style navigation by dragging with the mouse
 - Infinite canvas-style navigation by scrolling on a trackpad or mouse wheel

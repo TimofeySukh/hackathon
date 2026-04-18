@@ -86,7 +86,7 @@ const HIGHLIGHT_RADIUS = 56
 const HIGHLIGHT_TICK_MS = 50
 const HIGHLIGHT_TAIL_START = 18
 const HIGHLIGHT_TAIL_LIMIT = 48
-const NODE_RADIUS = 7
+const NODE_RADIUS = 9
 const CREATE_THRESHOLD = 18
 
 const INITIAL_NODES: GraphNode[] = [{ id: 'root', label: 'You', x: 0, y: 0, kind: 'root' }]
@@ -545,16 +545,21 @@ function App() {
                 style={{ left: `${node.x}px`, top: `${node.y}px` }}
               >
                 {isEditing ? (
-                  <input
-                    className="graph-node__input"
-                    value={node.label}
-                    placeholder="Name"
-                    autoFocus
-                    onChange={(event) => updateNodeLabel(node.id, event.target.value)}
-                    onBlur={() => setEditingNodeId(null)}
+                  <div
+                    className="graph-node__editor"
                     onMouseDown={(event) => event.stopPropagation()}
                     onClick={(event) => event.stopPropagation()}
-                  />
+                  >
+                    <span className="graph-node__dot" />
+                    <input
+                      className="graph-node__input"
+                      value={node.label}
+                      placeholder="Name"
+                      autoFocus
+                      onChange={(event) => updateNodeLabel(node.id, event.target.value)}
+                      onBlur={() => setEditingNodeId(null)}
+                    />
+                  </div>
                 ) : (
                   <button
                     type="button"

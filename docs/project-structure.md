@@ -105,7 +105,7 @@ It currently supports:
 - compact motion-triggered point highlighting during mouse movement, drag, wheel pan, and zoom
 - social graph nodes connected by arrows
 - drag-to-create node growth from any existing node with an immediate connecting line
-- newly created nodes starting empty for immediate naming
+- newly created nodes appearing immediately with an empty inline name field
 - in-place node renaming
 - grid movement through background offset changes
 
