@@ -492,7 +492,11 @@ function App() {
         </div>
 
         <div className="graph-layer" style={graphStyle}>
-          <svg className="graph-connections" aria-hidden="true">
+          <svg
+            className="graph-connections"
+            viewBox="-2200 -2200 4400 4400"
+            aria-hidden="true"
+          >
             <defs>
               <marker
                 id="network-arrow"
