@@ -127,6 +127,7 @@ const NODE_RADIUS = 9
 const NODE_HIT_RADIUS = 31
 const CREATE_THRESHOLD = 18
 const WHEEL_ZOOM_INTENSITY = 0.0016
+const IS_MAC_PLATFORM = /Mac|iPhone|iPad|iPod/i.test(window.navigator.platform)
 
 const ANONYMOUS_ROOT: PersonNode = {
   id: 'anonymous-root',
@@ -197,6 +198,7 @@ function App() {
   const [aiSearchResults, setAiSearchResults] = useState<SearchResult[]>([])
   const [aiSearchStatus, setAiSearchStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [aiSearchError, setAiSearchError] = useState<string | null>(null)
+  const connectionModifierLabel = IS_MAC_PLATFORM ? 'Command' : 'Control'
 
   const boardRef = useRef<HTMLElement | null>(null)
   const boardSurfaceRef = useRef<HTMLDivElement | null>(null)
@@ -735,7 +737,9 @@ function App() {
 
     if (!isGraphReady) return
 
-    if (!event.ctrlKey && !node.is_root) {
+    const isConnectionModifierPressed = IS_MAC_PLATFORM ? event.metaKey : event.ctrlKey
+
+    if (!isConnectionModifierPressed && !node.is_root) {
       setNodeDrag({
         nodeId: node.id,
         startClientX: event.clientX,
@@ -746,7 +750,7 @@ function App() {
       return
     }
 
-    if (!event.ctrlKey) return
+    if (!isConnectionModifierPressed) return
 
     const view = viewportRef.current
     const worldPoint = screenToWorld(
@@ -1376,7 +1380,7 @@ function App() {
               {inspectorNode.is_root
                 ? 'Root stays at 0,0'
                 : isGraphReady
-                  ? 'Drag to move. Hold Control and drag to connect.'
+                  ? `Drag to move. Hold ${connectionModifierLabel} and drag to connect.`
                   : 'Sign in to edit'}
             </span>
           </div>
@@ -1654,8 +1658,8 @@ function App() {
                   title={
                     isGraphReady
                       ? node.is_root
-                        ? 'Hold Control and drag to connect'
-                        : 'Drag to move. Hold Control and drag to connect.'
+                        ? `Hold ${connectionModifierLabel} and drag to connect`
+                        : `Drag to move. Hold ${connectionModifierLabel} and drag to connect.`
                       : 'Sign in with Google to edit'
                   }
                   onMouseDown={(event) => startNodeInteraction(node, event)}

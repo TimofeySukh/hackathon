@@ -62,7 +62,7 @@ Contains the board experience:
 - people search overlay state
 - persisted social graph node and connection rendering
 - drag node repositioning
-- control-drag node connection creation
+- platform-native modifier drag for node connection creation: `Command` on macOS, `Control` elsewhere
 - theme toggle
 - infinite board surface positioning
 
@@ -118,8 +118,8 @@ It currently supports:
 - visual theme switching
 - persistent social graph nodes connected by lines
 - one separate AI summary record per person in the database with `status`, plain-text `summary`, structured JSON data, and sync error state
-- control-drag to connect two existing nodes by releasing on another node hit area
-- control-drag to create node growth from any existing node with an immediate connecting line
+- modifier-drag to connect two existing nodes by releasing on another node hit area: `Command` on macOS, `Control` elsewhere
+- modifier-drag to create node growth from any existing node with an immediate connecting line: `Command` on macOS, `Control` elsewhere
 - selected-node detail cards with reusable tag selection, note editing, connection removal, and deletion
 - single-click opening for the node-anchored inspector
 - local people search while typing plus natural-language AI search on Enter
