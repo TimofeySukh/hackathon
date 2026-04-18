@@ -66,7 +66,20 @@ Start the development server:
 npm run dev
 ```
 
-Vite prints a local URL in the terminal. Open that URL in a browser.
+Vite listens on all network interfaces in this repository, so it prints both a local URL and a network URL in the terminal. Open either URL in a browser.
+
+For other devices on the same local network, open the printed network URL, for example:
+
+```text
+http://10.29.0.117:5173
+```
+
+Other-device checklist:
+
+1. Keep the host machine and the other device on the same Wi-Fi or wired LAN.
+2. Start the app with `npm run dev` on the host machine.
+3. Open the network URL from the other device.
+4. If macOS shows a firewall prompt for Node.js, allow incoming connections.
 
 If the Supabase variables are missing, the app still opens as an anonymous board and disables Google sign-in.
 
@@ -121,16 +134,20 @@ Configure Google as an auth provider in Supabase Auth. Add redirect URLs for eac
 - `http://127.0.0.1:5173`
 - `http://127.0.0.1:5174`
 - `http://127.0.0.1:5175`
+- `http://10.29.0.117:5173`
+- `http://10.29.0.117:5174`
+- `http://10.29.0.117:5175`
 - the deployed production URL
 
 The app redirects Google OAuth back to `window.location.origin`, so each origin must be allowlisted in Supabase.
 For a stable multi-device login flow, prefer one deployed frontend origin on your server instead of ad-hoc local ports.
 
-If a teammate runs Vite on a different port such as `5173`, `5174`, or `5175`, that exact origin must be in the Supabase Auth URL configuration.
+If a teammate runs Vite on a different port such as `5173`, `5174`, or `5175`, or opens the app through a LAN IP instead of `localhost`, that exact origin must be in the Supabase Auth URL configuration.
 
 Google Cloud OAuth setup:
 
 - Add the same localhost and `127.0.0.1` origins to Authorized JavaScript origins.
+- Add the same LAN IP origins such as `http://10.29.0.117:5173` when testing Google login from other devices on the network.
 - Keep the Supabase callback as the Authorized redirect URI:
 
 ```text

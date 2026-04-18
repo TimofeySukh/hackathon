@@ -34,7 +34,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open the local Vite URL in your browser. Fill in the Supabase values in `.env.local` to enable Google login.
+Open the local or network Vite URL in your browser. Fill in the Supabase values in `.env.local` to enable Google login.
 
 Recommended local env format:
 
@@ -64,16 +64,16 @@ Teammates only need to:
 2. Create `.env.local` from `.env.example`.
 3. Fill in `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`.
 4. Run `npm run dev`.
-5. Open the local Vite URL shown in the terminal.
+5. Open the local Vite URL shown in the terminal, or the network URL from another device on the same LAN.
 
-If Vite starts on a different local port such as `5173`, `5174`, or `5175`, that origin must be added to the Supabase Auth redirect allow list and to Google Cloud Authorized JavaScript origins.
+If Vite starts on a different local port such as `5173`, `5174`, or `5175`, or the app is opened through a LAN IP such as `http://10.29.0.117:5173`, that exact origin must be added to the Supabase Auth redirect allow list and to Google Cloud Authorized JavaScript origins.
 For multi-device login, deploy the frontend on one stable server origin and add that exact origin to both configurations.
 
 ## Available Scripts
 
-- `npm run dev` starts the development server.
+- `npm run dev` starts the development server on all local network interfaces.
 - `npm run build` creates a production build.
-- `npm run preview` previews the production build locally.
+- `npm run preview` previews the production build on all local network interfaces.
 - `npm run lint` runs ESLint.
 
 ## Product Direction
