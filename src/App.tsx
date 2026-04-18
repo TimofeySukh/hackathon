@@ -1111,97 +1111,100 @@ function App() {
 
   return (
     <main className={`app-shell theme-${theme}`}>
-      <div className="tags-menu">
-        <button
-          type="button"
-          className="tags-menu__toggle"
-          onClick={() => setIsTagsMenuOpen((isOpen) => !isOpen)}
-          aria-expanded={isTagsMenuOpen}
-        >
-          Tags
-        </button>
-
-        {isTagsMenuOpen ? (
-          <section className="tags-menu__panel" aria-label="Tag colors">
-            <div className="tags-menu__list">
-              {tagMenuItems.map((tag) => {
-                const color = normalizeTagColor(tagColorDrafts[tag.id] ?? tag.color ?? DEFAULT_TAG_COLOR)
-                const palettePosition = getPalettePosition(color)
-                const isPaletteOpen = activeColorTagId === tag.id
-                const tagColorStyle = { '--tag-color': color } as TagColorStyle
-                const paletteStyle = {
-                  '--palette-color': `hsl(${palettePosition.hue} 100% 50%)`,
-                  '--palette-cursor-x': `${palettePosition.x}%`,
-                  '--palette-cursor-y': `${palettePosition.y}%`,
-                } as TagPaletteStyle
-
-                return (
-                  <div key={tag.id} className="tags-menu__item">
-                    <button
-                      type="button"
-                      className="tags-menu__swatch"
-                      style={tagColorStyle}
-                      onClick={() => setActiveColorTagId(isPaletteOpen ? null : tag.id)}
-                      disabled={!tag.isPersisted}
-                      aria-label={`Change ${tag.name} color`}
-                    />
-                    <span className="tags-menu__name">{tag.name}</span>
-                    {tag.isPersisted ? (
-                      <button
-                        type="button"
-                        className="tags-menu__delete"
-                        onClick={() => {
-                          void handleDeleteMenuTag(tag.id)
-                        }}
-                        aria-label={`Delete ${tag.name} tag`}
-                      >
-                        ×
-                      </button>
-                    ) : null}
-
-                    {isPaletteOpen ? (
-                      <div className="tags-menu__palette-wrap">
-                        <div
-                          className="tags-menu__palette"
-                          style={paletteStyle}
-                          onPointerDown={(event) => {
-                            event.currentTarget.setPointerCapture(event.pointerId)
-                            pickTagColor(tag, event)
-                          }}
-                          onPointerMove={(event) => {
-                            if (event.buttons !== 1) return
-                            pickTagColor(tag, event)
-                          }}
-                          onPointerUp={(event) => {
-                            event.currentTarget.releasePointerCapture(event.pointerId)
-                            void persistTagColor(tag.id)
-                          }}
-                        >
-                          <span className="tags-menu__palette-cursor" />
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                )
-              })}
-            </div>
-
+      <div className="top-bar">
+        <div className="top-bar__left">
+          <div className="tags-menu">
             <button
               type="button"
-              className="tags-menu__new"
-              onClick={() => {
-                void handleCreateMenuTag()
-              }}
-              disabled={!isGraphReady}
+              className="tags-menu__toggle"
+              onClick={() => setIsTagsMenuOpen((isOpen) => !isOpen)}
+              aria-expanded={isTagsMenuOpen}
             >
-              + New tag
+              Tags
             </button>
-          </section>
-        ) : null}
-      </div>
 
-      <div className="app-actions">
-        <div className={`search-panel${isSearchOpen ? ' is-open' : ''}`}>
+            {isTagsMenuOpen ? (
+              <section className="tags-menu__panel" aria-label="Tag colors">
+                <div className="tags-menu__list">
+                  {tagMenuItems.map((tag) => {
+                    const color = normalizeTagColor(tagColorDrafts[tag.id] ?? tag.color ?? DEFAULT_TAG_COLOR)
+                    const palettePosition = getPalettePosition(color)
+                    const isPaletteOpen = activeColorTagId === tag.id
+                    const tagColorStyle = { '--tag-color': color } as TagColorStyle
+                    const paletteStyle = {
+                      '--palette-color': `hsl(${palettePosition.hue} 100% 50%)`,
+                      '--palette-cursor-x': `${palettePosition.x}%`,
+                      '--palette-cursor-y': `${palettePosition.y}%`,
+                    } as TagPaletteStyle
+
+                    return (
+                      <div key={tag.id} className="tags-menu__item">
+                        <button
+                          type="button"
+                          className="tags-menu__swatch"
+                          style={tagColorStyle}
+                          onClick={() => setActiveColorTagId(isPaletteOpen ? null : tag.id)}
+                          disabled={!tag.isPersisted}
+                          aria-label={`Change ${tag.name} color`}
+                        />
+                        <span className="tags-menu__name">{tag.name}</span>
+                        {tag.isPersisted ? (
+                          <button
+                            type="button"
+                            className="tags-menu__delete"
+                            onClick={() => {
+                              void handleDeleteMenuTag(tag.id)
+                            }}
+                            aria-label={`Delete ${tag.name} tag`}
+                          >
+                            ×
+                          </button>
+                        ) : null}
+
+                        {isPaletteOpen ? (
+                          <div className="tags-menu__palette-wrap">
+                            <div
+                              className="tags-menu__palette"
+                              style={paletteStyle}
+                              onPointerDown={(event) => {
+                                event.currentTarget.setPointerCapture(event.pointerId)
+                                pickTagColor(tag, event)
+                              }}
+                              onPointerMove={(event) => {
+                                if (event.buttons !== 1) return
+                                pickTagColor(tag, event)
+                              }}
+                              onPointerUp={(event) => {
+                                event.currentTarget.releasePointerCapture(event.pointerId)
+                                void persistTagColor(tag.id)
+                              }}
+                            >
+                              <span className="tags-menu__palette-cursor" />
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <button
+                  type="button"
+                  className="tags-menu__new"
+                  onClick={() => {
+                    void handleCreateMenuTag()
+                  }}
+                  disabled={!isGraphReady}
+                >
+                  + New tag
+                </button>
+              </section>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="top-bar__right">
+          <div className={`search-panel${isSearchOpen ? ' is-open' : ''}`}>
           <div className="search-panel__header">
             <button
               type="button"
@@ -1298,68 +1301,69 @@ function App() {
               )}
             </div>
           ) : null}
-        </div>
+          </div>
 
-        <div className="account-panel" aria-live="polite">
-          {status === 'authenticated' && session?.user ? (
-            <>
-              {session.user.user_metadata.avatar_url ? (
-                <img
-                  className="account-panel__avatar"
-                  src={session.user.user_metadata.avatar_url}
-                  alt=""
-                />
-              ) : (
-                <span className="account-panel__avatar" aria-hidden="true">
-                  {(session.user.email ?? 'U').slice(0, 1).toUpperCase()}
+          <div className="account-panel" aria-live="polite">
+            {status === 'authenticated' && session?.user ? (
+              <>
+                {session.user.user_metadata.avatar_url ? (
+                  <img
+                    className="account-panel__avatar"
+                    src={session.user.user_metadata.avatar_url}
+                    alt=""
+                  />
+                ) : (
+                  <span className="account-panel__avatar" aria-hidden="true">
+                    {(session.user.email ?? 'U').slice(0, 1).toUpperCase()}
+                  </span>
+                )}
+                <span className="account-panel__text">
+                  <span className="account-panel__label">{session.user.email}</span>
+                  <span className="account-panel__meta">
+                    {graphStatus === 'loading' ? 'Loading your graph' : board?.title ?? 'Personal board'}
+                  </span>
                 </span>
-              )}
-              <span className="account-panel__text">
-                <span className="account-panel__label">{session.user.email}</span>
-                <span className="account-panel__meta">
-                  {graphStatus === 'loading' ? 'Loading your graph' : board?.title ?? 'Personal board'}
+                <button type="button" className="account-panel__button" onClick={signOut}>
+                  Sign out
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="account-panel__text">
+                  <span className="account-panel__label">
+                    {status === 'loading' ? 'Checking session' : 'Social graph'}
+                  </span>
+                  <span className="account-panel__meta">
+                    {status === 'unconfigured'
+                      ? 'Connect Supabase to enable Google login'
+                      : 'Sign in to save your network space'}
+                  </span>
                 </span>
-              </span>
-              <button type="button" className="account-panel__button" onClick={signOut}>
-                Sign out
-              </button>
-            </>
-          ) : (
-            <>
-              <span className="account-panel__text">
-                <span className="account-panel__label">
-                  {status === 'loading' ? 'Checking session' : 'Social graph'}
-                </span>
-                <span className="account-panel__meta">
-                  {status === 'unconfigured'
-                    ? 'Connect Supabase to enable Google login'
-                    : 'Sign in to save your network space'}
-                </span>
-              </span>
-              <button
-                type="button"
-                className="account-panel__button"
-                onClick={signInWithGoogle}
-                disabled={status === 'loading' || status === 'unconfigured'}
-              >
-                Sign in with Google
-              </button>
-            </>
-          )}
-          {error ? <span className="account-panel__error">{error}</span> : null}
-        </div>
+                <button
+                  type="button"
+                  className="account-panel__button"
+                  onClick={signInWithGoogle}
+                  disabled={status === 'loading' || status === 'unconfigured'}
+                >
+                  Sign in with Google
+                </button>
+              </>
+            )}
+            {error ? <span className="account-panel__error">{error}</span> : null}
+          </div>
 
-        <button
-          type="button"
-          className="theme-toggle"
-          onClick={() => setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))}
-          aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
-        >
-          <span className="theme-toggle__track">
-            <span className="theme-toggle__label">{theme === 'dark' ? 'Dark' : 'Light'}</span>
-            <span className="theme-toggle__thumb" />
-          </span>
-        </button>
+          <button
+            type="button"
+            className="theme-toggle"
+            onClick={() => setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))}
+            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+          >
+            <span className="theme-toggle__track">
+              <span className="theme-toggle__label">{theme === 'dark' ? 'Dark' : 'Light'}</span>
+              <span className="theme-toggle__thumb" />
+            </span>
+          </button>
+        </div>
       </div>
 
       {inspectorNode ? (
