@@ -435,7 +435,7 @@ function App() {
   const error = authError ?? graphError
 
   const requestLogin = useCallback(() => {
-    if (status === 'authenticated' || status === 'loading' || status === 'unconfigured') return false
+    if (status === 'authenticated' || status === 'loading') return false
 
     setIsLoginPromptOpen(true)
     return true
@@ -1404,10 +1404,12 @@ function App() {
           >
             <p className="login-prompt__eyebrow">Login Required</p>
             <h2 id="login-prompt-title" className="login-prompt__title">
-              Sign in to edit your board
+              {status === 'unconfigured' ? 'Connect Supabase to unlock editing' : 'Sign in to edit your board'}
             </h2>
             <p className="login-prompt__body">
-              You need an account to move nodes, create connections, edit notes, and save tags.
+              {status === 'unconfigured'
+                ? 'Google sign-in is not configured in this environment yet, so editing and saving are unavailable here.'
+                : 'You need an account to move nodes, create connections, edit notes, and save tags.'}
             </p>
             <div className="login-prompt__actions">
               <button
@@ -1426,7 +1428,7 @@ function App() {
                 }}
                 disabled={status === 'loading' || status === 'unconfigured'}
               >
-                Sign in with Google
+                {status === 'unconfigured' ? 'Sign-in unavailable' : 'Sign in with Google'}
               </button>
             </div>
           </section>

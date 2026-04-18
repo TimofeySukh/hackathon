@@ -561,7 +561,7 @@ select {
 }
 
 .login-prompt {
-  position: absolute;
+  position: fixed;
   inset: 0;
   z-index: 12;
   display: grid;
