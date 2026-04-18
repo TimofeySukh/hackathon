@@ -23,7 +23,7 @@ A persisted social graph board built with React, Vite, and TypeScript.
 - Selected-person inspector for names, tags, notes, and disconnect/delete actions
 - Single-click a person to open that inspector directly on the board
 - Drag a person to move them with their connected lines
-- Hold `Option` and drag a person to create a connection
+- Hold `Control` and drag a person to create a connection
 - Dark green-black theme inspired by the provided reference
 - Light theme designed to match the same visual language
 - High-contrast point grid across the board
