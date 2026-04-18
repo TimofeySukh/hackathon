@@ -7,14 +7,20 @@ The repository contains a minimal React, Vite, and TypeScript infinite board app
 Current app behavior:
 
 - open a full-window board
-- drag with the mouse to move across the point grid
+- drag with the mouse to move across the point grid on desktop
+- pan with one finger on mobile
+- zoom with a trackpad, mouse wheel, or two-finger pinch on mobile
 - show compact nearby point highlights while the mouse moves, wheel-pans, or zooms
 - switch between dark and light themes
 - persist the selected theme in `localStorage`
 - optionally sign in with Google through Supabase
 - create one personal board record for each signed-in user
+- persist nodes, edges, notes, tags, and node positions for signed-in users
+- on mobile, create relations through an explicit bottom action bar
+- on mobile, move nodes through a dedicated drag handle
+- on mobile, open node actions with a long press
 
-There is no board object persistence, multiplayer, or drawing toolset yet.
+There is no camera persistence, multiplayer, or drawing toolset yet.
 
 ## Local Setup
 
@@ -188,6 +194,12 @@ Run lint checks:
 npm run lint
 ```
 
+Run the mobile smoke test:
+
+```bash
+npm run test:e2e
+```
+
 Preview the production build locally:
 
 ```bash
@@ -197,21 +209,26 @@ npm run preview
 Manual verification:
 
 1. Open the app in a browser.
-2. Drag anywhere on the board and confirm the point grid moves smoothly.
-3. Move the mouse across the board and confirm only nearby grid points brighten in a compact area.
-4. Pan or zoom with a wheel or trackpad and confirm nearby grid points brighten.
-5. Stop moving the mouse and confirm the highlighted points fade out.
-6. Toggle the theme.
-7. Reload the page and confirm the selected theme is preserved.
-8. Sign in with Google and confirm the account state appears.
-9. Reload while signed in and confirm the same personal board label remains.
-10. Sign out and confirm the anonymous board state returns.
+2. On desktop, drag anywhere on the board and confirm the point grid moves smoothly.
+3. On desktop, drag out from a node and confirm a new connected node appears.
+4. On mobile viewport or a real phone, use one finger to pan the board.
+5. On mobile viewport or a real phone, use two fingers to zoom the board.
+6. On mobile, tap a node, switch to `Add relation`, tap empty space, and confirm a new connected node appears.
+7. On mobile, drag a node only by its handle and confirm the board does not pan while moving the node.
+8. On mobile, long-press a node and confirm the action sheet opens.
+9. Toggle the theme.
+10. Reload the page and confirm the selected theme is preserved.
+11. Sign in with Google and confirm the account state appears.
+12. Reload while signed in and confirm node positions, labels, notes, tags, and edges remain.
+13. Sign out and confirm the anonymous board state returns.
 
 Supabase verification:
 
 1. Confirm a row exists in `profiles` for the signed-in user.
 2. Confirm a single row exists in `boards` for the signed-in user.
-3. Confirm row-level security prevents reading or updating another user's board.
+3. Confirm rows exist in `board_nodes` and `board_edges` for the signed-in board.
+4. Confirm moving a node updates its `x` and `y` values.
+5. Confirm row-level security prevents reading or updating another user's board graph.
 
 ## Team Workflow
 
@@ -244,5 +261,6 @@ Supabase verification:
 
 - `npm run build`
 - `npm run lint`
-- Manual browser check of drag navigation, wheel and trackpad navigation, motion-triggered point highlights, and theme persistence
+- `npm run test:e2e`
+- Manual browser check of desktop drag navigation, mobile relation creation, mobile node move, long-press actions, and theme persistence
 - Manual Supabase auth check when credentials and Google OAuth are configured

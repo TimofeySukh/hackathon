@@ -5,18 +5,22 @@ A minimal social graph board built with React, Vite, and TypeScript.
 ## Current Experience
 
 - A single central node as the starting point of the graph
-- Create a new node by dragging a connection out from any existing node
-- If you drop on another node, the two existing nodes connect directly
-- Curved lines between connected nodes
+- Desktop: create a new node by dragging a connection out from any existing node
+- Desktop: drop on another existing node to connect the two nodes directly
+- Mobile: select a node, switch to `Add relation`, and tap empty space to create a connected node
+- Curved directional arrows between connected nodes
 - New nodes appear immediately with an empty inline name field
-- Compact obsidian-like nodes with labels
+- Mobile-friendly oversized nodes with external labels and drag handles
+- Long-press a node on mobile to rename it, add a note, set a tag, or delete it
 - Infinite canvas-style navigation by dragging with the mouse
+- Infinite canvas-style navigation by one-finger pan on mobile
 - Infinite canvas-style navigation by scrolling on a trackpad or mouse wheel
-- Zoom in and out with the mouse wheel
+- Zoom in and out with the mouse wheel or two-finger pinch on mobile
 - No drawing tools or side panels
 - Theme switcher in the top-right corner
 - Optional Google login through Supabase
 - One personal board record for each signed-in user
+- Persisted nodes, edges, positions, notes, and tags for signed-in users
 - Dark green-black theme inspired by the provided reference
 - Light theme designed to match the same visual language
 - High-contrast point grid across the board
@@ -70,6 +74,7 @@ If Vite starts on a different local port such as `5173`, `5174`, or `5175`, that
 - `npm run build` creates a production build.
 - `npm run preview` previews the production build locally.
 - `npm run lint` runs ESLint.
+- `npm run test:e2e` runs the Playwright mobile smoke test.
 
 ## Product Direction
 

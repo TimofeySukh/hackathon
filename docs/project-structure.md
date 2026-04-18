@@ -50,13 +50,23 @@ Contains the board experience:
 
 - Supabase-backed account controls
 - theme state
-- mouse drag navigation state
+- desktop drag navigation state
+- mobile interaction mode state
 - board zoom state
 - motion-triggered point highlight state
-- social graph node and edge state
-- drag-to-create node connections
+- shared social graph node and edge rendering
+- desktop drag-to-create node connections
+- mobile action sheet and bottom toolbar
 - theme toggle
 - infinite board surface positioning
+
+### `src/features/board/`
+
+Shared board modules.
+
+- `types.ts` defines graph node and edge types.
+- `useBoardGraph.ts` loads and syncs board graph records through Supabase.
+- `useIsMobileLayout.ts` switches the UI into the mobile interaction shell.
 
 ### `src/lib/`
 
@@ -76,8 +86,10 @@ Contains the complete visual system for:
 - account controls
 - very dense point-grid background
 - compact motion-triggered point highlight styling with directional tails for fast cursor movement
-- compact graph node styling
+- desktop graph node styling
+- mobile oversized graph node styling
 - graph edge styling and preview connection styling
+- mobile bottom toolbar and action sheet
 - responsive layout behavior
 
 ## Current Technical Shape
@@ -98,16 +110,22 @@ It currently supports:
 
 - Google sign-in and sign-out when Supabase is configured
 - one personal board record per signed-in user
-- mouse drag navigation across the canvas
+- persisted node and edge graph data when signed in
+- desktop mouse drag navigation across the canvas
 - trackpad and wheel-based navigation across the canvas
 - cursor-centered zoom with the mouse wheel
+- mobile one-finger pan and two-finger pinch zoom
 - visual theme switching
 - compact motion-triggered point highlighting during mouse movement, drag, wheel pan, and zoom
-- social graph nodes connected by lines
-- drag-to-connect two existing nodes by releasing on another node hit area
-- drag-to-create node growth from any existing node with an immediate connecting line
+- social graph nodes connected by arrows
+- desktop drag-to-connect two existing nodes by releasing on another node hit area
+- desktop drag-to-create node growth from any existing node with an immediate connecting line
+- mobile tap-to-create relation mode from a selected node
+- mobile drag-handle node movement
 - newly created nodes appearing immediately with an empty inline name field
 - in-place node renaming
+- node notes and tags
+- mobile long-press node actions
 - grid movement through background offset changes
 
 The visual board is simulated by shifting layered CSS backgrounds based on the current camera offset.
