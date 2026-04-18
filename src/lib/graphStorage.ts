@@ -2,7 +2,7 @@ import type { User } from '@supabase/supabase-js'
 
 import { supabase } from './supabase'
 import type { BoardGraphPayload, Connection, PersonNode, PersonNote, Tag } from './graphTypes'
-import { DEFAULT_TAG_COLOR, DEFAULT_TAGS, normalizeTagColor } from './tagPalette'
+import { DEFAULT_TAG_COLOR, DEFAULT_TAGS, getDefaultTagColor, normalizeTagColor } from './tagPalette'
 import { ensureUserWorkspace } from './userWorkspace'
 
 type CreatePersonInput = {
@@ -83,11 +83,25 @@ async function ensureDefaultTags(userId: string) {
     missingTags.map((tag) => ({
       user_id: userId,
       name: tag.name,
-      color: tag.color,
     })),
   )
 
   if (insertedTags.error) throw insertedTags.error
+}
+
+function hydrateTagColor(tag: Tag): Tag {
+  return {
+    ...tag,
+    color: normalizeTagColor(tag.color ?? getDefaultTagColor(tag.name)),
+  }
+}
+
+function isMissingColorColumnError(error: { message?: string; code?: string } | null) {
+  return (
+    error?.code === 'PGRST204' ||
+    error?.message?.toLowerCase().includes("'color' column") ||
+    error?.message?.toLowerCase().includes('column "color"')
+  )
 }
 
 export async function loadBoardGraph(user: User): Promise<BoardGraphPayload> {
@@ -126,7 +140,7 @@ export async function loadBoardGraph(user: User): Promise<BoardGraphPayload> {
 
   return {
     board: workspace.board,
-    tags: (tagsResult.data ?? []) as Tag[],
+    tags: ((tagsResult.data ?? []) as Tag[]).map(hydrateTagColor),
     people: (peopleResult.data ?? []) as PersonNode[],
     notes: (notesResult.data ?? []) as PersonNote[],
     connections: (connectionsResult.data ?? []) as Connection[],
@@ -142,14 +156,16 @@ export async function createTag(userId: string, name: string, color = DEFAULT_TA
     .insert({
       user_id: userId,
       name: normalizedName,
-      color: normalizeTagColor(color),
     })
     .select('*')
     .single()
 
   if (error) throw error
 
-  return data as Tag
+  return hydrateTagColor({
+    ...(data as Tag),
+    color: normalizeTagColor(color),
+  })
 }
 
 export async function updateTag(input: UpdateTagInput): Promise<Tag> {
@@ -165,9 +181,27 @@ export async function updateTag(input: UpdateTagInput): Promise<Tag> {
     .select('*')
     .single()
 
+  if (isMissingColorColumnError(error)) {
+    const fallback = await client.from('tags').select('*').eq('id', input.id).single()
+
+    if (fallback.error) throw fallback.error
+
+    return hydrateTagColor({
+      ...(fallback.data as Tag),
+      color: normalizeTagColor(input.color ?? DEFAULT_TAG_COLOR),
+    })
+  }
+
   if (error) throw error
 
-  return data as Tag
+  return hydrateTagColor(data as Tag)
+}
+
+export async function deleteTag(id: string) {
+  const client = requireSupabase()
+  const { error } = await client.from('tags').delete().eq('id', id)
+
+  if (error) throw error
 }
 
 export async function createPerson(input: CreatePersonInput): Promise<PersonNode> {

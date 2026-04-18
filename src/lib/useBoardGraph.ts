@@ -10,6 +10,7 @@ import {
   deleteConnection,
   deleteNote,
   deletePerson,
+  deleteTag,
   loadBoardGraph,
   movePerson,
   updateNote,
@@ -163,6 +164,22 @@ export function useBoardGraph(user: User | null) {
           error: null,
         }))
         return tag
+      } catch (error) {
+        setError(error)
+        throw error
+      }
+    },
+    async deleteTag(id: string) {
+      try {
+        await deleteTag(id)
+        setGraphState((currentState) => ({
+          ...currentState,
+          tags: currentState.tags.filter((tag) => tag.id !== id),
+          people: currentState.people.map((person) =>
+            person.tag_id === id ? { ...person, tag_id: null } : person,
+          ),
+          error: null,
+        }))
       } catch (error) {
         setError(error)
         throw error

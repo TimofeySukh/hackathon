@@ -13,3 +13,9 @@ export function isHexColor(value: string) {
 export function normalizeTagColor(color: string) {
   return isHexColor(color) ? color.toLowerCase() : DEFAULT_TAG_COLOR
 }
+
+export function getDefaultTagColor(name: string) {
+  const defaultTag = DEFAULT_TAGS.find((tag) => tag.name.toLowerCase() === name.trim().toLowerCase())
+
+  return defaultTag?.color ?? DEFAULT_TAG_COLOR
+}

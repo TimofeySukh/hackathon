@@ -8,7 +8,7 @@ import type {
 import { useAuth } from './lib/useAuth'
 import { normalizeTagName } from './lib/graphStorage'
 import type { PersonNode, PersonNote, Tag } from './lib/graphTypes'
-import { DEFAULT_TAGS, normalizeTagColor } from './lib/tagPalette'
+import { DEFAULT_TAG_COLOR, DEFAULT_TAGS, normalizeTagColor } from './lib/tagPalette'
 import { useBoardGraph } from './lib/useBoardGraph'
 
 type Theme = 'dark' | 'light'
@@ -96,6 +96,7 @@ type TagMenuItem = Pick<Tag, 'id' | 'name' | 'color'> & {
 }
 
 const THEME_STORAGE_KEY = 'hackathon-theme'
+const TAG_COLOR_STORAGE_KEY = 'hackathon-tag-colors'
 const MIN_SCALE = 0.2
 const MAX_SCALE = 2.5
 const GRID_GAP = 12
@@ -144,6 +145,7 @@ function App() {
     createConnection,
     deleteConnection,
     createTag,
+    deleteTag,
     updateTag,
     createNote,
     updateNote,
@@ -166,7 +168,9 @@ function App() {
   const [tagDraft, setTagDraft] = useState('')
   const [isTagsMenuOpen, setIsTagsMenuOpen] = useState(false)
   const [activeColorTagId, setActiveColorTagId] = useState<string | null>(null)
-  const [tagColorDrafts, setTagColorDrafts] = useState<Record<string, string>>({})
+  const [tagColorDrafts, setTagColorDrafts] = useState<Record<string, string>>(() =>
+    loadTagColorDrafts(),
+  )
   const [newNoteTitle, setNewNoteTitle] = useState('')
   const [newNoteBody, setNewNoteBody] = useState('')
   const [noteDrafts, setNoteDrafts] = useState<Record<string, NoteDraft>>({})
@@ -219,7 +223,7 @@ function App() {
         ? tags.map((tag) => ({
             id: tag.id,
             name: tag.name,
-            color: normalizeTagColor(tagColorDrafts[tag.id] ?? tag.color),
+            color: normalizeTagColor(tagColorDrafts[tag.id] ?? tag.color ?? DEFAULT_TAG_COLOR),
             isPersisted: true,
           }))
         : DEFAULT_TAGS.map((tag) => ({
@@ -770,19 +774,38 @@ function App() {
   }
 
   function previewTagColor(tagId: string, color: string) {
+    const nextColor = normalizeTagColor(color)
     setTagColorDrafts((currentDrafts) => ({
       ...currentDrafts,
-      [tagId]: normalizeTagColor(color),
+      [tagId]: nextColor,
     }))
+    saveTagColorDraft(tagId, nextColor)
   }
 
   async function persistTagColor(tagId: string) {
     const color = tagColorDrafts[tagId]
     if (!color || !isGraphReady) return
 
-    await updateTag({
-      id: tagId,
-      color,
+    try {
+      await updateTag({
+        id: tagId,
+        color,
+      })
+    } catch {
+      saveTagColorDraft(tagId, color)
+    }
+  }
+
+  async function handleDeleteMenuTag(tagId: string) {
+    if (!isGraphReady) return
+
+    await deleteTag(tagId)
+    setActiveColorTagId((currentTagId) => (currentTagId === tagId ? null : currentTagId))
+    setTagColorDrafts((currentDrafts) => {
+      const nextDrafts = { ...currentDrafts }
+      delete nextDrafts[tagId]
+      window.localStorage.setItem(TAG_COLOR_STORAGE_KEY, JSON.stringify(nextDrafts))
+      return nextDrafts
     })
   }
 
@@ -909,7 +932,7 @@ function App() {
           <section className="tags-menu__panel" aria-label="Tag colors">
             <div className="tags-menu__list">
               {tagMenuItems.map((tag) => {
-                const color = normalizeTagColor(tagColorDrafts[tag.id] ?? tag.color)
+                const color = normalizeTagColor(tagColorDrafts[tag.id] ?? tag.color ?? DEFAULT_TAG_COLOR)
                 const palettePosition = getPalettePosition(color)
                 const isPaletteOpen = activeColorTagId === tag.id
                 const tagColorStyle = { '--tag-color': color } as TagColorStyle
@@ -930,6 +953,18 @@ function App() {
                       aria-label={`Change ${tag.name} color`}
                     />
                     <span className="tags-menu__name">{tag.name}</span>
+                    {tag.isPersisted ? (
+                      <button
+                        type="button"
+                        className="tags-menu__delete"
+                        onClick={() => {
+                          void handleDeleteMenuTag(tag.id)
+                        }}
+                        aria-label={`Delete ${tag.name} tag`}
+                      >
+                        ×
+                      </button>
+                    ) : null}
 
                     {isPaletteOpen ? (
                       <div className="tags-menu__palette-wrap">
@@ -1415,6 +1450,43 @@ function clampScale(value: number) {
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value))
+}
+
+function loadTagColorDrafts() {
+  const savedDrafts = window.localStorage.getItem(TAG_COLOR_STORAGE_KEY)
+  if (!savedDrafts) return {}
+
+  try {
+    const parsedDrafts = JSON.parse(savedDrafts) as Record<string, string>
+
+    return Object.fromEntries(
+      Object.entries(parsedDrafts).map(([tagId, color]) => [tagId, normalizeTagColor(color)]),
+    )
+  } catch {
+    window.localStorage.removeItem(TAG_COLOR_STORAGE_KEY)
+    return {}
+  }
+}
+
+function saveTagColorDraft(tagId: string, color: string) {
+  let currentDrafts: Record<string, string> = {}
+  const savedDrafts = window.localStorage.getItem(TAG_COLOR_STORAGE_KEY)
+
+  if (savedDrafts) {
+    try {
+      currentDrafts = JSON.parse(savedDrafts) as Record<string, string>
+    } catch {
+      currentDrafts = {}
+    }
+  }
+
+  window.localStorage.setItem(
+    TAG_COLOR_STORAGE_KEY,
+    JSON.stringify({
+      ...currentDrafts,
+      [tagId]: normalizeTagColor(color),
+    }),
+  )
 }
 
 function hexToRgb(hex: string) {
