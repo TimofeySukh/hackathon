@@ -17,15 +17,6 @@ type Offset = {
   y: number
 }
 
-type HighlightSpot = Offset & {
-  id: number
-  createdAt: number
-  tailX: number
-  tailY: number
-  tailCore: number
-  tailSize: number
-}
-
 type ConnectionDrag = {
   fromId: string
   startClientX: number
@@ -58,22 +49,6 @@ type BoardStyle = CSSProperties & {
   '--major-dot-size': string
 }
 
-type HighlightSpotStyle = CSSProperties & {
-  '--highlight-x': string
-  '--highlight-y': string
-  '--board-offset-x': string
-  '--board-offset-y': string
-  '--dot-gap': string
-  '--major-dot-gap': string
-  '--dot-size': string
-  '--major-dot-size': string
-  '--highlight-tail-x': string
-  '--highlight-tail-y': string
-  '--highlight-tail-core': string
-  '--highlight-tail-size': string
-  opacity: number
-}
-
 const THEME_STORAGE_KEY = 'hackathon-theme'
 const MIN_SCALE = 0.2
 const MAX_SCALE = 2.5
@@ -81,16 +56,10 @@ const GRID_GAP = 12
 const MAJOR_GRID_GAP = 96
 const DOT_SIZE = 0.65
 const MAJOR_DOT_SIZE = 2
-const HIGHLIGHT_LIFETIME_MS = 420
-const HIGHLIGHT_DISTANCE = 12
-const HIGHLIGHT_LIMIT = 28
-const HIGHLIGHT_RADIUS = 56
-const HIGHLIGHT_TICK_MS = 50
-const HIGHLIGHT_TAIL_START = 18
-const HIGHLIGHT_TAIL_LIMIT = 48
 const NODE_RADIUS = 9
 const NODE_HIT_RADIUS = 31
 const CREATE_THRESHOLD = 18
+const WHEEL_ZOOM_INTENSITY = 0.0016
 
 const ANONYMOUS_ROOT: PersonNode = {
   id: 'anonymous-root',
@@ -136,7 +105,7 @@ function App() {
   const [inspectorNodeId, setInspectorNodeId] = useState<string | null>(null)
   const [connectionDrag, setConnectionDrag] = useState<ConnectionDrag | null>(null)
   const [nodeDrag, setNodeDrag] = useState<NodeDrag | null>(null)
-  const [draggedPositions, setDraggedPositions] = useState<Record<string, Offset>>({})
+const [draggedPositions, setDraggedPositions] = useState<Record<string, Offset>>({})
   const [nameDraft, setNameDraft] = useState('')
   const [tagDraft, setTagDraft] = useState('')
   const [newNoteTitle, setNewNoteTitle] = useState('')
@@ -225,35 +194,54 @@ function App() {
     window.localStorage.setItem(THEME_STORAGE_KEY, theme)
   }, [theme])
 
-  useEffect(() => {
-    const applyViewport = (nextOffset: Offset, nextScale: number) => {
-      viewportRef.current = { offset: nextOffset, scale: nextScale }
+  const applyViewport = useCallback((nextOffset: Offset, nextScale: number) => {
+    viewportRef.current = { offset: nextOffset, scale: nextScale }
 
-      if (boardSurfaceRef.current) {
-        boardSurfaceRef.current.style.setProperty('--dot-gap', `${GRID_GAP * nextScale}px`)
-        boardSurfaceRef.current.style.setProperty('--major-dot-gap', `${MAJOR_GRID_GAP * nextScale}px`)
-        boardSurfaceRef.current.style.setProperty('--dot-size', `${Math.max(0.45, DOT_SIZE * nextScale)}px`)
-        boardSurfaceRef.current.style.setProperty(
-          '--major-dot-size',
-          `${Math.max(1.5, MAJOR_DOT_SIZE * nextScale)}px`,
-        )
-        boardSurfaceRef.current.style.setProperty('--board-offset-x', `${nextOffset.x}px`)
-        boardSurfaceRef.current.style.setProperty('--board-offset-y', `${nextOffset.y}px`)
-      }
-
-      if (graphLayerRef.current) {
-        graphLayerRef.current.style.transform = `translate(${nextOffset.x}px, ${nextOffset.y}px) scale(${nextScale})`
-      }
-
-      const nextZoomPercentage = Math.round(nextScale * 100)
-      if (zoomIndicatorRef.current) {
-        zoomIndicatorRef.current.textContent = `${nextZoomPercentage}%`
-      }
-      setZoomPercentage((currentZoomPercentage) =>
-        currentZoomPercentage === nextZoomPercentage ? currentZoomPercentage : nextZoomPercentage,
+    if (boardSurfaceRef.current) {
+      boardSurfaceRef.current.style.setProperty('--dot-gap', `${GRID_GAP * nextScale}px`)
+      boardSurfaceRef.current.style.setProperty('--major-dot-gap', `${MAJOR_GRID_GAP * nextScale}px`)
+      boardSurfaceRef.current.style.setProperty('--dot-size', `${Math.max(0.45, DOT_SIZE * nextScale)}px`)
+      boardSurfaceRef.current.style.setProperty(
+        '--major-dot-size',
+        `${Math.max(1.5, MAJOR_DOT_SIZE * nextScale)}px`,
       )
+      boardSurfaceRef.current.style.setProperty('--board-offset-x', `${nextOffset.x}px`)
+      boardSurfaceRef.current.style.setProperty('--board-offset-y', `${nextOffset.y}px`)
     }
 
+    if (graphLayerRef.current) {
+      graphLayerRef.current.style.transform = `translate(${nextOffset.x}px, ${nextOffset.y}px) scale(${nextScale})`
+    }
+
+    const nextZoomPercentage = Math.round(nextScale * 100)
+    if (zoomIndicatorRef.current) {
+      zoomIndicatorRef.current.textContent = `${nextZoomPercentage}%`
+    }
+    setZoomPercentage((currentZoomPercentage) =>
+      currentZoomPercentage === nextZoomPercentage ? currentZoomPercentage : nextZoomPercentage,
+    )
+  }, [])
+
+  const queueViewportUpdate = useCallback(
+    (nextOffset: Offset, nextScale: number) => {
+      pendingViewportRef.current = { offset: nextOffset, scale: nextScale }
+
+      if (viewportFrameRef.current !== null) return
+
+      viewportFrameRef.current = window.requestAnimationFrame(() => {
+        viewportFrameRef.current = null
+
+        const pendingViewport = pendingViewportRef.current
+        if (!pendingViewport) return
+
+        pendingViewportRef.current = null
+        applyViewport(pendingViewport.offset, pendingViewport.scale)
+      })
+    },
+    [applyViewport],
+  )
+
+  useEffect(() => {
     applyViewport(viewportRef.current.offset, viewportRef.current.scale)
 
     return () => {
@@ -261,50 +249,7 @@ function App() {
         window.cancelAnimationFrame(viewportFrameRef.current)
       }
     }
-  }, [])
-
-  const queueViewportUpdate = useCallback((nextOffset: Offset, nextScale: number) => {
-    pendingViewportRef.current = { offset: nextOffset, scale: nextScale }
-
-    if (viewportFrameRef.current !== null) return
-
-    viewportFrameRef.current = window.requestAnimationFrame(() => {
-      viewportFrameRef.current = null
-
-      const pendingViewport = pendingViewportRef.current
-      if (!pendingViewport) return
-
-      pendingViewportRef.current = null
-      viewportRef.current = pendingViewport
-
-      if (boardSurfaceRef.current) {
-        boardSurfaceRef.current.style.setProperty('--dot-gap', `${GRID_GAP * pendingViewport.scale}px`)
-        boardSurfaceRef.current.style.setProperty('--major-dot-gap', `${MAJOR_GRID_GAP * pendingViewport.scale}px`)
-        boardSurfaceRef.current.style.setProperty(
-          '--dot-size',
-          `${Math.max(0.45, DOT_SIZE * pendingViewport.scale)}px`,
-        )
-        boardSurfaceRef.current.style.setProperty(
-          '--major-dot-size',
-          `${Math.max(1.5, MAJOR_DOT_SIZE * pendingViewport.scale)}px`,
-        )
-        boardSurfaceRef.current.style.setProperty('--board-offset-x', `${pendingViewport.offset.x}px`)
-        boardSurfaceRef.current.style.setProperty('--board-offset-y', `${pendingViewport.offset.y}px`)
-      }
-
-      if (graphLayerRef.current) {
-        graphLayerRef.current.style.transform = `translate(${pendingViewport.offset.x}px, ${pendingViewport.offset.y}px) scale(${pendingViewport.scale})`
-      }
-
-      const nextZoomPercentage = Math.round(pendingViewport.scale * 100)
-      if (zoomIndicatorRef.current) {
-        zoomIndicatorRef.current.textContent = `${nextZoomPercentage}%`
-      }
-      setZoomPercentage((currentZoomPercentage) =>
-        currentZoomPercentage === nextZoomPercentage ? currentZoomPercentage : nextZoomPercentage,
-      )
-    })
-  }, [])
+  }, [applyViewport])
 
   const finishConnectionDrag = useCallback(
     async (clientX: number, clientY: number) => {
@@ -330,7 +275,7 @@ function App() {
           node.x - connectionDrag.worldX,
           node.y - connectionDrag.worldY,
         )
-        return distanceToNode <= NODE_HIT_RADIUS / scale
+        return distanceToNode <= NODE_HIT_RADIUS / viewportRef.current.scale
       })
 
       try {
@@ -355,13 +300,20 @@ function App() {
         setConnectionDrag(null)
       }
     },
-    [boardNodes, connectionDrag, createConnection, createPerson, isGraphReady, scale],
+    [boardNodes, connectionDrag, createConnection, createPerson, isGraphReady],
   )
 
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
       if (connectionDrag) {
-        const worldPoint = screenToWorld(event.clientX, event.clientY, boardRef.current, offset, scale)
+        const view = viewportRef.current
+        const worldPoint = screenToWorld(
+          event.clientX,
+          event.clientY,
+          boardRef.current,
+          view.offset,
+          view.scale,
+        )
 
         setConnectionDrag((currentDrag) =>
           currentDrag
@@ -381,8 +333,8 @@ function App() {
         setDraggedPositions((currentPositions) => ({
           ...currentPositions,
           [nodeDrag.nodeId]: {
-            x: nodeDrag.originX + (event.clientX - nodeDrag.startClientX) / scale,
-            y: nodeDrag.originY + (event.clientY - nodeDrag.startClientY) / scale,
+            x: nodeDrag.originX + (event.clientX - nodeDrag.startClientX) / viewportRef.current.scale,
+            y: nodeDrag.originY + (event.clientY - nodeDrag.startClientY) / viewportRef.current.scale,
           },
         }))
         return
@@ -393,8 +345,7 @@ function App() {
       const nextX = boardDragRef.current.originX + event.clientX - boardDragRef.current.startX
       const nextY = boardDragRef.current.originY + event.clientY - boardDragRef.current.startY
 
-      setOffset({ x: nextX, y: nextY })
-      addHighlightSpot(event.clientX, event.clientY)
+      queueViewportUpdate({ x: nextX, y: nextY }, viewportRef.current.scale)
     }
 
     const handleMouseUp = (event: MouseEvent) => {
@@ -425,7 +376,6 @@ function App() {
         }
 
         boardDragRef.current.active = false
-        lastHighlightSpotRef.current = null
         setIsDraggingBoard(false)
       })()
     }
@@ -437,7 +387,7 @@ function App() {
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [addHighlightSpot, connectionDrag, draggedPositions, finishConnectionDrag, movePerson, nodeDrag, offset, scale])
+  }, [connectionDrag, draggedPositions, finishConnectionDrag, movePerson, nodeDrag, queueViewportUpdate])
 
   function startBoardDragging(event: ReactMouseEvent<HTMLElement>) {
     if (event.button !== 0 || connectionDrag || nodeDrag) return
@@ -445,12 +395,11 @@ function App() {
     boardDragRef.current = {
       startX: event.clientX,
       startY: event.clientY,
-      originX: offset.x,
-      originY: offset.y,
+      originX: viewportRef.current.offset.x,
+      originY: viewportRef.current.offset.y,
       active: true,
     }
 
-    addHighlightSpot(event.clientX, event.clientY, true)
     setIsDraggingBoard(true)
     setInspectorNodeId(null)
   }
@@ -477,7 +426,14 @@ function App() {
       return
     }
 
-    const worldPoint = screenToWorld(event.clientX, event.clientY, boardRef.current, offset, scale)
+    const view = viewportRef.current
+    const worldPoint = screenToWorld(
+      event.clientX,
+      event.clientY,
+      boardRef.current,
+      view.offset,
+      view.scale,
+    )
     setConnectionDrag({
       fromId: node.id,
       startClientX: event.clientX,
@@ -491,36 +447,45 @@ function App() {
 
   function moveWithWheel(event: ReactWheelEvent<HTMLElement>) {
     event.preventDefault()
-    addHighlightSpot(event.clientX, event.clientY, true)
+    const view = viewportRef.current
+    const deltaMultiplier = event.deltaMode === 1 ? 16 : 1
+    const deltaX = event.deltaX * deltaMultiplier
+    const deltaY = event.deltaY * deltaMultiplier
+    const isTrackpadPan =
+      event.ctrlKey === false &&
+      (Math.abs(deltaX) > 0.01 || Math.abs(deltaY) < 16 || !Number.isInteger(event.deltaY))
 
-    const prefersPan = Math.abs(event.deltaX) > 0 || Math.abs(event.deltaY) < 24
-
-    if (prefersPan) {
-      setOffset((currentOffset) => ({
-        x: currentOffset.x - event.deltaX,
-        y: currentOffset.y - event.deltaY,
-      }))
+    if (isTrackpadPan) {
+      queueViewportUpdate(
+        {
+          x: view.offset.x - deltaX,
+          y: view.offset.y - deltaY,
+        },
+        view.scale,
+      )
       return
     }
 
-    const zoomIntensity = event.deltaY > 0 ? 0.88 : 1.12
-    const nextScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale * zoomIntensity))
+    const normalizedDelta = Math.max(-120, Math.min(120, deltaY))
+    const nextScale = clampScale(view.scale * Math.exp(-normalizedDelta * WHEEL_ZOOM_INTENSITY))
 
-    if (nextScale === scale) return
+    if (nextScale === view.scale) return
 
     const { left, top } = event.currentTarget.getBoundingClientRect()
     const pointerX = event.clientX - left
     const pointerY = event.clientY - top
     const centerX = event.currentTarget.clientWidth / 2
     const centerY = event.currentTarget.clientHeight / 2
-    const worldX = (pointerX - centerX - offset.x) / scale
-    const worldY = (pointerY - centerY - offset.y) / scale
+    const worldX = (pointerX - centerX - view.offset.x) / view.scale
+    const worldY = (pointerY - centerY - view.offset.y) / view.scale
 
-    setScale(nextScale)
-    setOffset({
-      x: pointerX - centerX - worldX * nextScale,
-      y: pointerY - centerY - worldY * nextScale,
-    })
+    queueViewportUpdate(
+      {
+        x: pointerX - centerX - worldX * nextScale,
+        y: pointerY - centerY - worldY * nextScale,
+      },
+      nextScale,
+    )
   }
 
   async function saveInspectorName() {
@@ -611,55 +576,12 @@ function App() {
     setSelectedNodeId(null)
   }
 
-  const gridStyle = {
-    '--dot-gap': `${GRID_GAP * scale}px`,
-    '--major-dot-gap': `${MAJOR_GRID_GAP * scale}px`,
-    '--dot-size': `${Math.max(0.45, DOT_SIZE * scale)}px`,
-    '--major-dot-size': `${Math.max(1.5, MAJOR_DOT_SIZE * scale)}px`,
-    '--board-offset-x': `${offset.x}px`,
-    '--board-offset-y': `${offset.y}px`,
-  }
-
-  const boardStyle: BoardStyle = gridStyle
-  const graphStyle = {
-    transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
-  } satisfies CSSProperties
-
   const previewPath = connectionDrag
     ? getLinkPath(nodesById[connectionDrag.fromId], {
         x: connectionDrag.worldX,
         y: connectionDrag.worldY,
       })
     : null
-
-  function getHighlightOpacity(spot: HighlightSpot) {
-    const age = highlightClock - spot.createdAt
-    const ageOpacity = Math.max(0, 1 - age / HIGHLIGHT_LIFETIME_MS)
-
-    if (!pointerPosition) return ageOpacity
-
-    const distance = Math.hypot(spot.x - pointerPosition.x, spot.y - pointerPosition.y)
-    const distanceOpacity = Math.max(0, 1 - distance / HIGHLIGHT_RADIUS)
-
-    return Math.min(0.95, ageOpacity * distanceOpacity)
-  }
-
-  function getHighlightSpotStyle(spot: HighlightSpot): HighlightSpotStyle | null {
-    const opacity = getHighlightOpacity(spot)
-
-    if (opacity <= 0.03) return null
-
-    return {
-      ...gridStyle,
-      '--highlight-x': `${spot.x}px`,
-      '--highlight-y': `${spot.y}px`,
-      '--highlight-tail-x': `${spot.tailX}px`,
-      '--highlight-tail-y': `${spot.tailY}px`,
-      '--highlight-tail-core': `${spot.tailCore}px`,
-      '--highlight-tail-size': `${spot.tailSize}px`,
-      opacity,
-    }
-  }
 
   return (
     <main className={`app-shell theme-${theme}`}>
@@ -727,13 +649,7 @@ function App() {
       </div>
 
       {inspectorNode ? (
-        <aside
-          className="inspector-panel inspector-panel--floating"
-          style={{
-            left: `calc(50% + ${offset.x + inspectorNode.x * scale + 42}px)`,
-            top: `calc(50% + ${offset.y + inspectorNode.y * scale}px)`,
-          }}
-        >
+        <aside className="inspector-panel">
           <div className="inspector-panel__header">
             <div>
               <p className="inspector-panel__eyebrow">
@@ -945,25 +861,25 @@ function App() {
         ref={boardRef}
         className={`board-viewport${isDraggingBoard ? ' is-dragging' : ''}`}
         onMouseDown={startBoardDragging}
-        onMouseEnter={(event) => addHighlightSpot(event.clientX, event.clientY, true)}
-        onMouseMove={(event) => addHighlightSpot(event.clientX, event.clientY)}
-        onMouseLeave={() => {
-          lastHighlightSpotRef.current = null
-          setPointerPosition(null)
-        }}
         onWheel={moveWithWheel}
         aria-label="Social network graph canvas"
       >
-        <div className="board-surface" style={boardStyle} />
-        <div className="board-highlights" aria-hidden="true">
-          {highlightSpots.map((spot) => {
-            const spotStyle = getHighlightSpotStyle(spot)
-            if (!spotStyle) return null
-            return <span key={spot.id} className="board-highlights__spot" style={spotStyle} />
-          })}
-        </div>
+        <div
+          ref={boardSurfaceRef}
+          className="board-surface"
+          style={
+            {
+              '--dot-gap': `${GRID_GAP}px`,
+              '--major-dot-gap': `${MAJOR_GRID_GAP}px`,
+              '--dot-size': `${DOT_SIZE}px`,
+              '--major-dot-size': `${MAJOR_DOT_SIZE}px`,
+              '--board-offset-x': '0px',
+              '--board-offset-y': '0px',
+            } as BoardStyle
+          }
+        />
 
-        <div className="graph-layer" style={graphStyle}>
+        <div ref={graphLayerRef} className="graph-layer">
           <svg
             className="graph-connections"
             viewBox="-2200 -2200 4400 4400"
@@ -1034,6 +950,10 @@ function App() {
           })}
         </div>
       </section>
+
+      <div className="zoom-indicator" aria-live="polite">
+        {zoomPercentage}%
+      </div>
     </main>
   )
 }
@@ -1082,6 +1002,10 @@ function getLinkPath(fromNode?: PersonNode, toNode?: Offset | null) {
       y: toNode.y - unitY * (NODE_RADIUS + curve),
     },
   }
+}
+
+function clampScale(value: number) {
+  return Math.max(MIN_SCALE, Math.min(MAX_SCALE, value))
 }
 
 export default App

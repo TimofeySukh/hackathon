@@ -8,7 +8,8 @@ Current app behavior:
 
 - open a full-window board
 - drag with the mouse to move across the point grid
-- show compact nearby point highlights while the mouse moves, wheel-pans, or zooms
+- scroll on a trackpad to pan the board
+- zoom toward the cursor with the mouse wheel
 - switch between dark and light themes
 - persist the selected theme in `localStorage`
 - optionally sign in with Google through Supabase
@@ -220,9 +221,9 @@ Manual verification:
 
 1. Open the app in a browser.
 2. Drag anywhere on the board and confirm the point grid moves smoothly.
-3. Move the mouse across the board and confirm only nearby grid points brighten in a compact area.
-4. Pan or zoom with a wheel or trackpad and confirm nearby grid points brighten.
-5. Stop moving the mouse and confirm the highlighted points fade out.
+3. Scroll on a trackpad and confirm the board pans without triggering zoom.
+4. Use the mouse wheel and confirm zoom centers around the cursor.
+5. Confirm the zoom indicator in the bottom-right updates smoothly.
 6. Toggle the theme.
 7. Reload the page and confirm the selected theme is preserved.
 8. Sign in with Google and confirm the account state appears.

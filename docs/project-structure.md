@@ -105,10 +105,9 @@ It currently supports:
 - one personal board record per signed-in user
 - one immutable root node at `0,0` per signed-in user
 - mouse drag navigation across the canvas
-- trackpad and wheel-based navigation across the canvas
+- trackpad scroll panning across the canvas
 - cursor-centered zoom with the mouse wheel
 - visual theme switching
-- compact motion-triggered point highlighting during mouse movement, drag, wheel pan, and zoom
 - persistent social graph nodes connected by lines
 - one separate AI summary record per person in the database
 - drag-to-connect two existing nodes by releasing on another node hit area

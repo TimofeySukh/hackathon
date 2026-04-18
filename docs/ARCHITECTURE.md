@@ -36,9 +36,10 @@ The product is a navigable board foundation, not a whiteboard editor.
 Current scope:
 
 - mouse drag navigation
+- trackpad scroll panning
+- cursor-centered mouse-wheel zoom
 - dark/light theme switching
 - very dense point-grid spatial reference
-- compact motion-triggered point highlighting during mouse movement, drag, wheel pan, and zoom
 - Google sign-in through Supabase
 - one private personal board record per signed-in user
 - one immutable root person at `0,0` for each signed-in user
