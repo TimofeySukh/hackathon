@@ -20,8 +20,9 @@ A persisted social graph board built with React, Vite, and TypeScript.
 - One immutable root node at `0,0` for each signed-in user
 - Persistent people, colored tags, notes, and undirected connections in Supabase
 - Top-left Tags menu with default Work, Friends, and Family tags plus color editing
-- Selected-person inspector for names, tags, notes, and disconnect/delete actions
+- Selected-person inspector for names, searchable tag selection/creation, notes, and delete actions
 - Single-click a person to open that inspector directly on the board
+- Click a connection line to delete it from the inline menu or with Backspace
 - Drag a person to move them with their connected lines
 - Hold `Command` on macOS, or `Control` on other platforms, and drag a person to create a connection
 - Dark green-black theme inspired by the provided reference

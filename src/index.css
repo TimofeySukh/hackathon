@@ -689,6 +689,65 @@ select {
   opacity: 0.6;
 }
 
+.tag-picker {
+  position: relative;
+}
+
+.tag-picker__input {
+  padding-right: 36px;
+}
+
+.tag-picker__menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 8;
+  display: grid;
+  max-height: 220px;
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid var(--button-border);
+  border-radius: 8px;
+  background: var(--panel-bg);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(16px);
+}
+
+.tag-picker__option,
+.tag-picker__empty {
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--panel-text);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.tag-picker__option {
+  cursor: pointer;
+}
+
+.tag-picker__option:hover,
+.tag-picker__option.is-selected {
+  background: var(--button-bg);
+}
+
+.tag-picker__option--muted,
+.tag-picker__empty {
+  color: var(--panel-muted);
+}
+
+.tag-picker__option--create {
+  margin-top: 6px;
+  border-top: 1px solid var(--button-border);
+  border-radius: 0 0 6px 6px;
+  color: var(--panel-text);
+}
+
 .field-group__button,
 .stack-list__button,
 .danger-button {
@@ -827,11 +886,20 @@ select {
   stroke-linecap: round;
   stroke-linejoin: round;
   filter: drop-shadow(0 0 6px rgba(138, 255, 214, 0.08));
+  cursor: pointer;
+  pointer-events: stroke;
+}
+
+.graph-edge.is-selected {
+  stroke: rgba(138, 255, 214, 0.98);
+  stroke-width: 3;
 }
 
 .graph-edge--preview {
   stroke: rgba(138, 255, 214, 0.88);
   stroke-dasharray: 10 8;
+  cursor: default;
+  pointer-events: none;
 }
 
 .theme-light .graph-edge {
@@ -841,6 +909,31 @@ select {
 
 .theme-light .graph-edge--preview {
   stroke: rgba(18, 121, 79, 0.58);
+}
+
+.theme-light .graph-edge.is-selected {
+  stroke: rgba(18, 121, 79, 0.88);
+}
+
+.connection-menu {
+  position: absolute;
+  z-index: 6;
+  transform: translate(-50%, calc(-100% - 14px));
+}
+
+.connection-menu__button {
+  min-height: 34px;
+  padding: 8px 10px;
+  border: 1px solid var(--button-border);
+  border-radius: 8px;
+  background: var(--panel-bg);
+  color: var(--panel-text);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(14px);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .graph-node {

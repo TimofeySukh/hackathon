@@ -175,11 +175,14 @@ function App() {
   const [zoomPercentage, setZoomPercentage] = useState(100)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [inspectorNodeId, setInspectorNodeId] = useState<string | null>(null)
+  const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null)
+  const [connectionMenuPosition, setConnectionMenuPosition] = useState<Offset | null>(null)
   const [connectionDrag, setConnectionDrag] = useState<ConnectionDrag | null>(null)
   const [nodeDrag, setNodeDrag] = useState<NodeDrag | null>(null)
   const [draggedPositions, setDraggedPositions] = useState<Record<string, Offset>>({})
   const [nameDraft, setNameDraft] = useState('')
   const [tagDraft, setTagDraft] = useState('')
+  const [isTagPickerOpen, setIsTagPickerOpen] = useState(false)
   const [isTagsMenuOpen, setIsTagsMenuOpen] = useState(false)
   const [activeColorTagId, setActiveColorTagId] = useState<string | null>(null)
   const [tagColorDrafts, setTagColorDrafts] = useState<Record<string, string>>(() =>
@@ -290,6 +293,19 @@ function App() {
     () => Object.fromEntries(tags.map((tag) => [tag.id, tag])) as Record<string, Tag>,
     [tags],
   )
+  const selectedInspectorTag = inspectorNode?.tag_id ? tagsById[inspectorNode.tag_id] ?? null : null
+  const filteredInspectorTags = useMemo(() => {
+    const normalizedDraft = tagDraft.trim().toLowerCase()
+    if (!normalizedDraft) return tags
+
+    return tags.filter((tag) => tag.name.toLowerCase().includes(normalizedDraft))
+  }, [tagDraft, tags])
+  const canCreateInspectorTag = useMemo(() => {
+    const normalizedDraft = normalizeTagName(tagDraft)
+    if (!normalizedDraft || !isGraphReady) return false
+
+    return !tags.some((tag) => normalizeTagName(tag.name).toLowerCase() === normalizedDraft.toLowerCase())
+  }, [isGraphReady, tagDraft, tags])
   const notesByPersonId = useMemo(() => {
     const nextNotesByPersonId: Record<string, PersonNote[]> = {}
 
@@ -356,28 +372,6 @@ function App() {
       .slice(0, 8)
   }, [boardNodes, notesByPersonId, searchQuery, tagsById])
   const visibleSearchResults = aiSearchQuery === searchQuery.trim() ? aiSearchResults : searchResults
-
-  const inspectorNodeConnections = useMemo(() => {
-    if (!inspectorNode) return []
-
-    return boardConnections
-      .filter(
-        (connection) =>
-          connection.person_a_id === inspectorNode.id || connection.person_b_id === inspectorNode.id,
-      )
-      .map((connection) => {
-        const otherPersonId =
-          connection.person_a_id === inspectorNode.id
-            ? connection.person_b_id
-            : connection.person_a_id
-
-        return {
-          connection,
-          otherPerson: nodesById[otherPersonId] ?? null,
-        }
-      })
-      .filter((entry) => entry.otherPerson)
-  }, [boardConnections, inspectorNode, nodesById])
 
   const error = authError ?? graphError
 
@@ -717,6 +711,8 @@ function App() {
   function startBoardDragging(event: ReactMouseEvent<HTMLElement>) {
     if (event.button !== 0 || connectionDrag || nodeDrag) return
 
+    setSelectedConnectionId(null)
+    setConnectionMenuPosition(null)
     boardDragRef.current = {
       startX: event.clientX,
       startY: event.clientY,
@@ -737,6 +733,8 @@ function App() {
     setIsDraggingBoard(false)
     setSelectedNodeId(node.id)
     setInspectorNodeId(null)
+    setSelectedConnectionId(null)
+    setConnectionMenuPosition(null)
 
     if (!isGraphReady) return
 
@@ -865,17 +863,58 @@ function App() {
       id: inspectorNode.id,
       tag_id: nextTagId || null,
     })
+    setTagDraft(nextTagId ? tagsById[nextTagId]?.name ?? '' : '')
+    setIsTagPickerOpen(false)
   }
 
   async function handleCreateTag() {
-    if (!tagDraft.trim() || !inspectorNode || !isGraphReady) return
+    const nextName = normalizeTagName(tagDraft)
+    if (!nextName || !inspectorNode || !isGraphReady) return
 
-    const createdTag = await createTag(normalizeTagName(tagDraft))
-    setTagDraft('')
+    const existingTag = tags.find(
+      (tag) => normalizeTagName(tag.name).toLowerCase() === nextName.toLowerCase(),
+    )
+    const createdTag = existingTag ?? (await createTag(nextName))
+    setTagDraft(createdTag.name)
+    setIsTagPickerOpen(false)
     await updatePerson({
       id: inspectorNode.id,
       tag_id: createdTag.id,
     })
+  }
+
+  async function handleClearTag() {
+    if (!inspectorNode || !isGraphReady) return
+
+    await updatePerson({
+      id: inspectorNode.id,
+      tag_id: null,
+    })
+    setTagDraft('')
+    setIsTagPickerOpen(false)
+  }
+
+  function handleTagKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      setTagDraft(selectedInspectorTag?.name ?? '')
+      setIsTagPickerOpen(false)
+      event.currentTarget.blur()
+      return
+    }
+
+    if (event.key !== 'Enter') return
+
+    event.preventDefault()
+    const firstTag = filteredInspectorTags[0]
+    if (firstTag) {
+      void handleTagSelection(firstTag.id)
+      return
+    }
+
+    if (canCreateInspectorTag) {
+      void handleCreateTag()
+    }
   }
 
   async function handleCreateMenuTag() {
@@ -936,10 +975,28 @@ function App() {
     setSelectedNodeId(null)
   }, [deletePerson])
 
+  const handleDeleteSelectedConnection = useCallback(async (connectionId?: string | null) => {
+    const targetConnectionId = connectionId ?? selectedConnectionId
+    if (!targetConnectionId) return
+
+    await deleteConnection(targetConnectionId)
+    setSelectedConnectionId((currentConnectionId) =>
+      currentConnectionId === targetConnectionId ? null : currentConnectionId,
+    )
+    setConnectionMenuPosition(null)
+  }, [deleteConnection, selectedConnectionId])
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Backspace' || !isGraphReady || !selectedNode) return
-      if (selectedNode.is_root || isEditableElement(event.target)) return
+      if (event.key !== 'Backspace' || !isGraphReady || isEditableElement(event.target)) return
+
+      if (selectedConnectionId) {
+        event.preventDefault()
+        void handleDeleteSelectedConnection()
+        return
+      }
+
+      if (!selectedNode || selectedNode.is_root) return
 
       event.preventDefault()
       void handleDeleteSelectedNode(selectedNode.id)
@@ -948,7 +1005,13 @@ function App() {
     window.addEventListener('keydown', handleKeyDown)
 
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleDeleteSelectedNode, isGraphReady, selectedNode])
+  }, [
+    handleDeleteSelectedConnection,
+    handleDeleteSelectedNode,
+    isGraphReady,
+    selectedConnectionId,
+    selectedNode,
+  ])
 
   function pickTagColor(tag: TagMenuItem, event: ReactPointerEvent<HTMLDivElement>) {
     if (!tag.isPersisted) return
@@ -1073,8 +1136,27 @@ function App() {
     )
     setSelectedNodeId(node.id)
     setInspectorNodeId(node.id)
+    setSelectedConnectionId(null)
+    setConnectionMenuPosition(null)
     setNameDraft(node.name)
+    setTagDraft(node.tag_id ? tagsById[node.tag_id]?.name ?? '' : '')
+    setIsTagPickerOpen(false)
     setIsSearchOpen(false)
+  }
+
+  function selectConnection(connectionId: string, event: ReactMouseEvent<SVGPathElement>) {
+    if (!isGraphReady) return
+
+    event.preventDefault()
+    event.stopPropagation()
+    const viewport = boardRef.current?.getBoundingClientRect()
+    setSelectedNodeId(null)
+    setInspectorNodeId(null)
+    setSelectedConnectionId(connectionId)
+    setConnectionMenuPosition({
+      x: event.clientX - (viewport?.left ?? 0),
+      y: event.clientY - (viewport?.top ?? 0),
+    })
   }
 
   const previewPath = connectionDrag
@@ -1417,78 +1499,75 @@ function App() {
 
           <div className="field-group">
             <span className="field-group__label">Tag</span>
-            <select
-              className="field-group__input"
-              value={inspectorNode.tag_id ?? ''}
-              onChange={(event) => {
-                void handleTagSelection(event.target.value)
-              }}
-              disabled={!isGraphReady}
-            >
-              <option value="">No tag</option>
-              {tags.map((tag) => (
-                <option key={tag.id} value={tag.id}>
-                  {tag.name}
-                </option>
-              ))}
-            </select>
-            <div className="field-group__inline">
+            <div className="tag-picker">
               <input
-                className="field-group__input"
+                className="field-group__input tag-picker__input"
                 value={tagDraft}
-                onChange={(event) => setTagDraft(event.target.value)}
-                placeholder="New tag"
-                disabled={!isGraphReady}
-              />
-              <button
-                type="button"
-                className="field-group__button"
-                onClick={() => {
-                  void handleCreateTag()
+                onFocus={() => setIsTagPickerOpen(true)}
+                onChange={(event) => {
+                  setTagDraft(event.target.value)
+                  setIsTagPickerOpen(true)
                 }}
-                disabled={!isGraphReady || !tagDraft.trim()}
-              >
-                Add tag
-              </button>
+                onKeyDown={handleTagKeyDown}
+                onBlur={() => {
+                  window.setTimeout(() => {
+                    setIsTagPickerOpen(false)
+                    setTagDraft(selectedInspectorTag?.name ?? '')
+                  }, 120)
+                }}
+                placeholder="Choose or create a tag"
+                disabled={!isGraphReady}
+                role="combobox"
+                aria-expanded={isTagPickerOpen}
+                aria-controls="inspector-tag-options"
+              />
+              {isTagPickerOpen ? (
+                <div id="inspector-tag-options" className="tag-picker__menu" role="listbox">
+                  {selectedInspectorTag ? (
+                    <button
+                      type="button"
+                      className="tag-picker__option tag-picker__option--muted"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => {
+                        void handleClearTag()
+                      }}
+                    >
+                      No tag
+                    </button>
+                  ) : null}
+                  {filteredInspectorTags.map((tag) => (
+                    <button
+                      key={tag.id}
+                      type="button"
+                      className={`tag-picker__option${tag.id === inspectorNode.tag_id ? ' is-selected' : ''}`}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => {
+                        void handleTagSelection(tag.id)
+                      }}
+                      role="option"
+                      aria-selected={tag.id === inspectorNode.tag_id}
+                    >
+                      {tag.name}
+                    </button>
+                  ))}
+                  {filteredInspectorTags.length === 0 && !canCreateInspectorTag ? (
+                    <span className="tag-picker__empty">No matching tags.</span>
+                  ) : null}
+                  {canCreateInspectorTag ? (
+                    <button
+                      type="button"
+                      className="tag-picker__option tag-picker__option--create"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => {
+                        void handleCreateTag()
+                      }}
+                    >
+                      Create "{normalizeTagName(tagDraft)}"
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
-          </div>
-
-          <div className="field-group">
-            <span className="field-group__label">Position</span>
-            <p className="field-group__meta">
-              X {inspectorNode.x.toFixed(0)}, Y {inspectorNode.y.toFixed(0)}
-            </p>
-          </div>
-
-          <div className="field-group">
-            <div className="field-group__header">
-              <span className="field-group__label">Connections</span>
-              <span className="field-group__meta">{inspectorNodeConnections.length}</span>
-            </div>
-            {inspectorNodeConnections.length > 0 ? (
-              <div className="stack-list">
-                {inspectorNodeConnections.map(({ connection, otherPerson }) => (
-                  <div key={connection.id} className="stack-list__item">
-                    <span className="stack-list__text">
-                      {otherPerson?.name.trim() || 'Unnamed person'}
-                    </span>
-                    {isGraphReady ? (
-                      <button
-                        type="button"
-                        className="stack-list__button"
-                        onClick={() => {
-                          void deleteConnection(connection.id)
-                        }}
-                      >
-                        Disconnect
-                      </button>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="field-group__meta">No connections yet.</p>
-            )}
           </div>
 
           <div className="field-group">
@@ -1639,8 +1718,9 @@ function App() {
               return (
                 <path
                   key={edge.id}
-                  className="graph-edge"
+                  className={`graph-edge${edge.id === selectedConnectionId ? ' is-selected' : ''}`}
                   d={`M ${link.start.x} ${link.start.y} C ${link.controlA.x} ${link.controlA.y}, ${link.controlB.x} ${link.controlB.y}, ${link.end.x} ${link.end.y}`}
+                  onMouseDown={(event) => selectConnection(edge.id, event)}
                 />
               )
             })}
@@ -1687,6 +1767,8 @@ function App() {
                     }
                     setInspectorNodeId(node.id)
                     setNameDraft(node.name)
+                    setTagDraft(node.tag_id ? tagsById[node.tag_id]?.name ?? '' : '')
+                    setIsTagPickerOpen(false)
                   }}
                 >
                   <span className="graph-node__dot" />
@@ -1698,6 +1780,27 @@ function App() {
             )
           })}
         </div>
+
+        {selectedConnectionId && connectionMenuPosition ? (
+          <div
+            className="connection-menu"
+            style={{
+              left: `${connectionMenuPosition.x}px`,
+              top: `${connectionMenuPosition.y}px`,
+            }}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="connection-menu__button"
+              onClick={() => {
+                void handleDeleteSelectedConnection()
+              }}
+            >
+              Delete connection
+            </button>
+          </div>
+        ) : null}
       </section>
 
       <div ref={zoomIndicatorRef} className="zoom-indicator" aria-live="polite">
