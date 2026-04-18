@@ -1,16 +1,16 @@
 # AGENTS.md
 
-## Project Rules
+This repo follows the harness guidance in `docs/`.
 
-1. Always create a commit after making changes.
-2. Only push to GitHub when the user explicitly asks for it.
-3. All comments, buttons, and documentation must be written in English.
-4. The full project structure and all project ideas must be documented in detail inside the `docs/` folder.
+## Start Here
 
-## Documentation Update Order
+- [Project map](docs/PROJECT_MAP.md)
+- [Runbook](docs/RUNBOOK.md)
+- [Architecture](docs/ARCHITECTURE.md)
 
-After every change, review whether the documentation also needs to be updated in this order:
+## Rules
 
-1. `AGENTS.md`
-2. `README.md`
-3. `docs/`
+- Keep all user-facing text, comments, and documentation in English.
+- Treat `docs/` as the source of truth for project knowledge.
+- Update the relevant doc when behavior, structure, or commands change.
+- Keep this file short. Add project detail to `docs/`, not here.
