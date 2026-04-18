@@ -589,13 +589,8 @@ function App() {
     const deltaMultiplier = event.deltaMode === 1 ? 16 : 1
     const deltaX = event.deltaX * deltaMultiplier
     const deltaY = event.deltaY * deltaMultiplier
-    const isPinchZoom = event.ctrlKey
-    const looksLikeTrackpadScroll =
-      event.deltaMode === 0 &&
-      (Math.abs(deltaX) > 0.01 || Math.abs(deltaY) < 40 || !Number.isInteger(event.deltaY))
-    const shouldPanViewport = !isPinchZoom && looksLikeTrackpadScroll
 
-    if (shouldPanViewport) {
+    if (!event.ctrlKey) {
       queueViewportUpdate(
         {
           x: view.offset.x - deltaX,
