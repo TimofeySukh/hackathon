@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 
-import type { BoardGraphPayload, Connection, PersonNode, PersonNote, Tag } from './graphTypes'
+import type { BoardGraphPayload, Connection, PersonAiNote, PersonNode, PersonNote, Tag } from './graphTypes'
 import {
   createConnection,
   createNote,
@@ -10,8 +10,11 @@ import {
   deleteConnection,
   deleteNote,
   deletePerson,
+  getPersonAiNote,
+  invokePersonAiNoteSync,
   loadBoardGraph,
   movePerson,
+  upsertPersonAiNoteStatus,
   updateNote,
   updatePerson,
 } from './graphStorage'
@@ -23,6 +26,7 @@ type GraphState = {
   people: PersonNode[]
   tags: Tag[]
   notes: PersonNote[]
+  personAiNotes: PersonAiNote[]
   connections: Connection[]
   status: GraphStatus
   error: string | null
@@ -33,16 +37,44 @@ const EMPTY_GRAPH_STATE: GraphState = {
   people: [],
   tags: [],
   notes: [],
+  personAiNotes: [],
   connections: [],
   status: 'idle',
   error: null,
 }
 
+const PERSON_AI_SYNC_DEBOUNCE_MS = 3000
+
 export function useBoardGraph(user: User | null) {
   const [graphState, setGraphState] = useState<GraphState>(EMPTY_GRAPH_STATE)
+  const personAiSyncTimersRef = useRef(new Map<string, number>())
+  const personAiSyncInFlightRef = useRef(new Set<string>())
+  const personAiSyncQueuedRef = useRef(new Set<string>())
+
+  const clearScheduledPersonAiSync = useCallback((personId?: string) => {
+    if (personId) {
+      const timerId = personAiSyncTimersRef.current.get(personId)
+      if (timerId !== undefined) {
+        window.clearTimeout(timerId)
+        personAiSyncTimersRef.current.delete(personId)
+      }
+      return
+    }
+
+    for (const timerId of personAiSyncTimersRef.current.values()) {
+      window.clearTimeout(timerId)
+    }
+    personAiSyncTimersRef.current.clear()
+  }, [])
 
   useEffect(() => {
+    const personAiSyncInFlight = personAiSyncInFlightRef.current
+    const personAiSyncQueued = personAiSyncQueuedRef.current
+
     if (!user) {
+      clearScheduledPersonAiSync()
+      personAiSyncInFlight.clear()
+      personAiSyncQueued.clear()
       return
     }
 
@@ -66,6 +98,7 @@ export function useBoardGraph(user: User | null) {
           people: payload.people,
           tags: payload.tags,
           notes: payload.notes,
+          personAiNotes: payload.personAiNotes,
           connections: payload.connections,
           status: 'ready',
           error: null,
@@ -83,8 +116,11 @@ export function useBoardGraph(user: User | null) {
 
     return () => {
       isMounted = false
+      clearScheduledPersonAiSync()
+      personAiSyncInFlight.clear()
+      personAiSyncQueued.clear()
     }
-  }, [user])
+  }, [clearScheduledPersonAiSync, user])
 
   const visibleState = user ? graphState : EMPTY_GRAPH_STATE
 
@@ -119,6 +155,16 @@ export function useBoardGraph(user: User | null) {
     }))
   }
 
+  const applyPersonAiNote = (personAiNote: PersonAiNote) => {
+    setGraphState((currentState) => ({
+      ...currentState,
+      personAiNotes: currentState.personAiNotes.some((entry) => entry.id === personAiNote.id)
+        ? currentState.personAiNotes.map((entry) => (entry.id === personAiNote.id ? personAiNote : entry))
+        : [...currentState.personAiNotes, personAiNote],
+      error: null,
+    }))
+  }
+
   const applyConnection = (connection: Connection) => {
     setGraphState((currentState) => ({
       ...currentState,
@@ -134,6 +180,68 @@ export function useBoardGraph(user: User | null) {
       ...currentState,
       error: error instanceof Error ? error.message : 'Board update failed.',
     }))
+  }
+
+  const syncPersonAiNote = async (personId: string) => {
+    if (personAiSyncInFlightRef.current.has(personId)) {
+      personAiSyncQueuedRef.current.add(personId)
+      return
+    }
+
+    personAiSyncInFlightRef.current.add(personId)
+
+    try {
+      const { userId } = ensureUserAndBoard()
+      const pendingAiNote = await upsertPersonAiNoteStatus({
+        personId,
+        ownerUserId: userId,
+        status: 'pending',
+      })
+      applyPersonAiNote(pendingAiNote)
+
+      try {
+        await invokePersonAiNoteSync(personId)
+        const refreshedAiNote = await getPersonAiNote(personId)
+
+        if (refreshedAiNote) {
+          applyPersonAiNote(refreshedAiNote)
+        }
+      } catch (error) {
+        const existingAiNote = await getPersonAiNote(personId).catch(() => null)
+
+        if (existingAiNote?.status === 'error') {
+          applyPersonAiNote(existingAiNote)
+          return
+        }
+
+        const fallbackErrorAiNote = await upsertPersonAiNoteStatus({
+          personId,
+          ownerUserId: userId,
+          status: 'error',
+          errorMessage: error instanceof Error ? error.message : 'Unable to refresh AI note.',
+        }).catch(() => null)
+
+        if (fallbackErrorAiNote) {
+          applyPersonAiNote(fallbackErrorAiNote)
+        }
+      }
+    } finally {
+      personAiSyncInFlightRef.current.delete(personId)
+      if (personAiSyncQueuedRef.current.has(personId)) {
+        personAiSyncQueuedRef.current.delete(personId)
+        schedulePersonAiSync(personId)
+      }
+    }
+  }
+
+  const schedulePersonAiSync = (personId: string) => {
+    clearScheduledPersonAiSync(personId)
+    const timerId = window.setTimeout(() => {
+      personAiSyncTimersRef.current.delete(personId)
+      void syncPersonAiNote(personId)
+    }, PERSON_AI_SYNC_DEBOUNCE_MS)
+
+    personAiSyncTimersRef.current.set(personId, timerId)
   }
 
   return {
@@ -190,11 +298,15 @@ export function useBoardGraph(user: User | null) {
     },
     async deletePerson(id: string) {
       try {
+        clearScheduledPersonAiSync(id)
+        personAiSyncInFlightRef.current.delete(id)
+        personAiSyncQueuedRef.current.delete(id)
         await deletePerson(id)
         setGraphState((currentState) => ({
           ...currentState,
           people: currentState.people.filter((person) => person.id !== id),
           notes: currentState.notes.filter((note) => note.person_id !== id),
+          personAiNotes: currentState.personAiNotes.filter((note) => note.person_id !== id),
           connections: currentState.connections.filter(
             (connection) => connection.person_a_id !== id && connection.person_b_id !== id,
           ),
@@ -244,6 +356,7 @@ export function useBoardGraph(user: User | null) {
           body,
         })
         applyNote(note)
+        schedulePersonAiSync(note.person_id)
         return note
       } catch (error) {
         setError(error)
@@ -254,6 +367,7 @@ export function useBoardGraph(user: User | null) {
       try {
         const note = await updateNote(input)
         applyNote(note)
+        schedulePersonAiSync(note.person_id)
         return note
       } catch (error) {
         setError(error)

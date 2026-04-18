@@ -1,7 +1,16 @@
 import type { User } from '@supabase/supabase-js'
 
 import { supabase } from './supabase'
-import type { BoardGraphPayload, Connection, PersonNode, PersonNote, Tag } from './graphTypes'
+import type {
+  BoardGraphPayload,
+  Connection,
+  PersonAiNote,
+  PersonAiNoteStatus,
+  PersonAiStructuredSummary,
+  PersonNode,
+  PersonNote,
+  Tag,
+} from './graphTypes'
 import { ensureUserWorkspace } from './userWorkspace'
 
 type CreatePersonInput = {
@@ -39,6 +48,21 @@ type UpdateNoteInput = {
   body?: string
 }
 
+type UpsertPersonAiNoteStatusInput = {
+  personId: string
+  ownerUserId: string
+  status: PersonAiNoteStatus
+  errorMessage?: string | null
+}
+
+const EMPTY_PERSON_AI_STRUCTURED_SUMMARY: PersonAiStructuredSummary = {
+  summary: '',
+  traits: [],
+  interests: [],
+  relationship_context: [],
+  open_questions: [],
+}
+
 function requireSupabase() {
   if (!supabase) {
     throw new Error('Supabase is not configured.')
@@ -57,11 +81,50 @@ export function normalizeTagName(name: string) {
   return name.trim().replace(/\s+/g, ' ')
 }
 
+function normalizeStringArray(value: unknown) {
+  if (!Array.isArray(value)) return []
+
+  return value
+    .filter((entry): entry is string => typeof entry === 'string')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+}
+
+function normalizePersonAiStructuredSummary(value: unknown): PersonAiStructuredSummary {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return EMPTY_PERSON_AI_STRUCTURED_SUMMARY
+  }
+
+  const candidate = value as Record<string, unknown>
+
+  return {
+    summary: typeof candidate.summary === 'string' ? candidate.summary : '',
+    traits: normalizeStringArray(candidate.traits),
+    interests: normalizeStringArray(candidate.interests),
+    relationship_context: normalizeStringArray(candidate.relationship_context),
+    open_questions: normalizeStringArray(candidate.open_questions),
+  }
+}
+
+function mapPersonAiNote(row: Record<string, unknown>): PersonAiNote {
+  return {
+    id: String(row.id),
+    person_id: String(row.person_id),
+    owner_user_id: String(row.owner_user_id),
+    status: row.status as PersonAiNoteStatus,
+    summary: typeof row.summary === 'string' ? row.summary : null,
+    structured_summary: normalizePersonAiStructuredSummary(row.structured_summary),
+    error_message: typeof row.error_message === 'string' ? row.error_message : null,
+    created_at: String(row.created_at),
+    updated_at: String(row.updated_at),
+  }
+}
+
 export async function loadBoardGraph(user: User): Promise<BoardGraphPayload> {
   const client = requireSupabase()
   const workspace = await ensureUserWorkspace(user)
 
-  const [tagsResult, peopleResult, notesResult, connectionsResult] = await Promise.all([
+  const [tagsResult, peopleResult, notesResult, personAiNotesResult, connectionsResult] = await Promise.all([
     client
       .from('tags')
       .select('*')
@@ -79,6 +142,11 @@ export async function loadBoardGraph(user: User): Promise<BoardGraphPayload> {
       .eq('owner_user_id', user.id)
       .order('created_at', { ascending: true }),
     client
+      .from('person_ai_notes')
+      .select('*')
+      .eq('owner_user_id', user.id)
+      .order('created_at', { ascending: true }),
+    client
       .from('connections')
       .select('*')
       .eq('board_id', workspace.board.id)
@@ -88,6 +156,7 @@ export async function loadBoardGraph(user: User): Promise<BoardGraphPayload> {
   if (tagsResult.error) throw tagsResult.error
   if (peopleResult.error) throw peopleResult.error
   if (notesResult.error) throw notesResult.error
+  if (personAiNotesResult.error) throw personAiNotesResult.error
   if (connectionsResult.error) throw connectionsResult.error
 
   return {
@@ -95,6 +164,7 @@ export async function loadBoardGraph(user: User): Promise<BoardGraphPayload> {
     tags: (tagsResult.data ?? []) as Tag[],
     people: (peopleResult.data ?? []) as PersonNode[],
     notes: (notesResult.data ?? []) as PersonNote[],
+    personAiNotes: (personAiNotesResult.data ?? []).map((row) => mapPersonAiNote(row as Record<string, unknown>)),
     connections: (connectionsResult.data ?? []) as Connection[],
   }
 }
@@ -258,6 +328,50 @@ export async function updateNote(input: UpdateNoteInput): Promise<PersonNote> {
 export async function deleteNote(id: string) {
   const client = requireSupabase()
   const { error } = await client.from('notes').delete().eq('id', id)
+
+  if (error) throw error
+}
+
+export async function getPersonAiNote(personId: string) {
+  const client = requireSupabase()
+  const { data, error } = await client.from('person_ai_notes').select('*').eq('person_id', personId).maybeSingle()
+
+  if (error) throw error
+  if (!data) return null
+
+  return mapPersonAiNote(data as Record<string, unknown>)
+}
+
+export async function upsertPersonAiNoteStatus(input: UpsertPersonAiNoteStatusInput) {
+  const client = requireSupabase()
+  const { data, error } = await client
+    .from('person_ai_notes')
+    .upsert(
+      {
+        person_id: input.personId,
+        owner_user_id: input.ownerUserId,
+        status: input.status,
+        error_message: input.errorMessage ?? null,
+      },
+      {
+        onConflict: 'person_id',
+      },
+    )
+    .select('*')
+    .single()
+
+  if (error) throw error
+
+  return mapPersonAiNote(data as Record<string, unknown>)
+}
+
+export async function invokePersonAiNoteSync(personId: string) {
+  const client = requireSupabase()
+  const { error } = await client.functions.invoke('sync-person-ai-note', {
+    body: {
+      person_id: personId,
+    },
+  })
 
   if (error) throw error
 }

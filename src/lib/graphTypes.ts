@@ -47,6 +47,28 @@ export type PersonNote = {
   updated_at: string
 }
 
+export type PersonAiNoteStatus = 'not_created' | 'pending' | 'created' | 'error'
+
+export type PersonAiStructuredSummary = {
+  summary: string
+  traits: string[]
+  interests: string[]
+  relationship_context: string[]
+  open_questions: string[]
+}
+
+export type PersonAiNote = {
+  id: string
+  person_id: string
+  owner_user_id: string
+  status: PersonAiNoteStatus
+  summary: string | null
+  structured_summary: PersonAiStructuredSummary
+  error_message: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type Connection = {
   id: string
   board_id: string
@@ -61,5 +83,6 @@ export type BoardGraphPayload = {
   tags: Tag[]
   people: PersonNode[]
   notes: PersonNote[]
+  personAiNotes: PersonAiNote[]
   connections: Connection[]
 }

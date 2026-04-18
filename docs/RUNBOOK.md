@@ -17,6 +17,8 @@ Current app behavior:
 - create one immutable root person at `0,0` for each signed-in user
 - persist people, tags, notes, and undirected connections in Supabase
 - allow one separate AI summary row per person in Supabase
+- debounce note create and note update events for 3 seconds before triggering AI enrichment
+- call a Supabase Edge Function that forwards person context to n8n and rewrites `person_ai_notes`
 - edit the selected person in the right-side inspector
 - open a temporary people search layer and match by name, tag, or note content
 
@@ -130,6 +132,22 @@ supabase db push
 
 For hosted dashboard workflows, paste and run the migration SQL in the Supabase SQL editor.
 
+This repository now also includes its first Supabase Edge Function in `supabase/functions/sync-person-ai-note/`.
+
+Deploy the function before testing AI note sync:
+
+```bash
+supabase functions deploy sync-person-ai-note
+```
+
+Required function secret:
+
+```bash
+supabase secrets set N8N_PERSON_AI_WEBHOOK_URL=https://your-n8n-webhook-url
+```
+
+The browser never calls n8n directly. It invokes `sync-person-ai-note`, and that function authenticates the user, loads the current person plus notes, calls n8n, and upserts `person_ai_notes`.
+
 Configure Google as an auth provider in Supabase Auth. Add redirect URLs for each app URL used by the team, including:
 
 - `http://localhost:5173`
@@ -236,8 +254,10 @@ Manual verification:
 12. Drag out from a node to create a new connected person and confirm it persists after reload.
 13. Hold `Shift` and drag a non-root person to a new position, then reload and confirm the coordinates persist.
 14. Assign a tag to a person, add a note, reload, and confirm both persist.
-15. Create a connection between two existing people and confirm reload preserves it.
-16. Sign out and confirm the anonymous board state returns.
+15. After creating a note, wait at least 3 seconds and confirm a `person_ai_notes` row for that person reaches `status = 'created'`.
+16. Edit an existing note, blur the input, wait at least 3 seconds, and confirm the same `person_ai_notes` row updates its `updated_at`, `summary`, and `structured_summary`.
+17. Create a connection between two existing people and confirm reload preserves it.
+18. Sign out and confirm the anonymous board state returns.
 
 Supabase verification:
 
@@ -245,7 +265,9 @@ Supabase verification:
 2. Confirm a single row exists in `boards` for the signed-in user.
 3. Confirm a single root row exists in `people` for the signed-in user with `is_root = true`, `x = 0`, and `y = 0`.
 4. Confirm `tags`, `notes`, `person_ai_notes`, and `connections` rows are created for user actions.
-5. Confirm row-level security prevents reading or updating another user's board data.
+5. Confirm `person_ai_notes.status` moves through `pending` and then `created` after note create or update.
+6. Confirm `person_ai_notes.structured_summary` contains the keys `summary`, `traits`, `interests`, `relationship_context`, and `open_questions`.
+7. Confirm row-level security prevents reading or updating another user's board data.
 
 ## Team Workflow
 
@@ -278,5 +300,5 @@ Supabase verification:
 
 - `npm run build`
 - `npm run lint`
-- Manual browser check of drag navigation, wheel and trackpad navigation, motion-triggered point highlights, theme persistence, and persisted graph editing
+- Manual browser check of drag navigation, wheel and trackpad navigation, motion-triggered point highlights, theme persistence, persisted graph editing, and debounced AI note sync
 - Manual Supabase auth check when credentials and Google OAuth are configured
