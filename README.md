@@ -22,7 +22,8 @@ A minimal social graph board built with React, Vite, and TypeScript.
 ## Local Development
 
 ```bash
-npm install
+git pull --ff-only
+npm ci
 cp .env.example .env.local
 npm run dev
 ```
@@ -38,6 +39,28 @@ VITE_SUPABASE_ANON_KEY=
 ```
 
 `VITE_SUPABASE_ANON_KEY` can stay empty when the publishable key is used.
+
+## Teammate Setup
+
+Everything needed for a teammate is already in the repository:
+
+- application code
+- the Supabase migration
+- `.env.example`
+- project documentation
+- project-scoped Supabase MCP skills
+
+The Google OAuth client secret is not needed in the app. It stays in the Supabase Dashboard.
+
+Teammates only need to:
+
+1. Pull the latest `main` and install dependencies with `npm ci`.
+2. Create `.env.local` from `.env.example`.
+3. Fill in `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`.
+4. Run `npm run dev`.
+5. Open the local Vite URL shown in the terminal.
+
+If Vite starts on a different local port such as `5173`, `5174`, or `5175`, that origin must be added to the Supabase Auth redirect allow list and to Google Cloud Authorized JavaScript origins.
 
 ## Available Scripts
 

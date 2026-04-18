@@ -33,7 +33,6 @@ cp .env.example .env.local
 Required Vite variables:
 
 - `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_PUBLISHABLE_KEY`
 - `VITE_SUPABASE_PUBLISHABLE_KEY` or `VITE_SUPABASE_ANON_KEY`
 
 Recommended teammate setup:
@@ -47,6 +46,16 @@ VITE_SUPABASE_ANON_KEY=
 If `VITE_SUPABASE_PUBLISHABLE_KEY` is present, `VITE_SUPABASE_ANON_KEY` may stay empty.
 `VITE_SUPABASE_ANON_KEY` is still supported for older local setups, but new local environments should use the Supabase publishable key.
 
+Everything else the teammate needs is already in the repository:
+
+- application code
+- the Supabase migration
+- `.env.example`
+- project documentation
+- project-scoped Supabase MCP skills
+
+The Google OAuth client secret is not needed in the app because it stays in the Supabase Dashboard.
+
 Start the development server:
 
 ```bash
@@ -56,6 +65,37 @@ npm run dev
 Vite prints a local URL in the terminal. Open that URL in a browser.
 
 If the Supabase variables are missing, the app still opens as an anonymous board and disables Google sign-in.
+
+Teammate quick-start:
+
+1. Pull the latest `main`:
+
+   ```bash
+   git pull --ff-only
+   npm ci
+   ```
+
+2. Create `.env.local`:
+
+   ```bash
+   cp .env.example .env.local
+   ```
+
+3. Fill in `.env.local`:
+
+   ```bash
+   VITE_SUPABASE_URL=https://lycfoukfoesobeuumuad.supabase.co
+   VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_l_x_y5rxdhL8Sd1ZE3QXag_lOCtr_M9
+   VITE_SUPABASE_ANON_KEY=
+   ```
+
+4. Run the project:
+
+   ```bash
+   npm run dev
+   ```
+
+5. Open the URL printed by Vite.
 
 ## Supabase Setup
 
@@ -80,6 +120,8 @@ Configure Google as an auth provider in Supabase Auth. Add redirect URLs for eac
 - the deployed production URL
 
 The app redirects Google OAuth back to `window.location.origin`, so each origin must be allowlisted in Supabase.
+
+If a teammate runs Vite on a different port such as `5173`, `5174`, or `5175`, that exact origin must be in the Supabase Auth URL configuration.
 
 Google Cloud OAuth setup:
 
