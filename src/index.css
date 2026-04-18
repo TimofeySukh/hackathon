@@ -210,6 +210,24 @@ select {
   font-weight: 700;
 }
 
+.tags-menu__name-input {
+  min-width: 0;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--panel-text);
+  font-size: 15px;
+  font-weight: 700;
+  outline: none;
+}
+
+.tags-menu__name-input:focus {
+  border-color: var(--button-border);
+  background: rgba(138, 255, 214, 0.08);
+}
+
 .tags-menu__delete {
   display: inline-flex;
   width: 32px;

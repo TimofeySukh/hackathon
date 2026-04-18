@@ -205,6 +205,7 @@ function App() {
   const [tagColorDrafts, setTagColorDrafts] = useState<Record<string, string>>(() =>
     loadTagColorDrafts(),
   )
+  const [tagNameDrafts, setTagNameDrafts] = useState<Record<string, string>>({})
   const [newNoteTitle, setNewNoteTitle] = useState('')
   const [newNoteBody, setNewNoteBody] = useState('')
   const [noteDrafts, setNoteDrafts] = useState<Record<string, NoteDraft>>({})
@@ -1164,6 +1165,50 @@ function App() {
     })
   }
 
+  async function persistMenuTagName(tagId: string, fallbackName: string) {
+    if (!isGraphReady) return
+
+    const rawDraft = tagNameDrafts[tagId] ?? fallbackName
+    const nextName = normalizeTagName(rawDraft)
+    if (!nextName || nextName === fallbackName) {
+      setTagNameDrafts((currentDrafts) => {
+        const nextDrafts = { ...currentDrafts }
+        delete nextDrafts[tagId]
+        return nextDrafts
+      })
+      return
+    }
+
+    const duplicateExists = tags.some(
+      (tag) => tag.id !== tagId && normalizeTagName(tag.name).toLowerCase() === nextName.toLowerCase(),
+    )
+
+    if (duplicateExists) {
+      setTagNameDrafts((currentDrafts) => ({
+        ...currentDrafts,
+        [tagId]: fallbackName,
+      }))
+      return
+    }
+
+    try {
+      await updateTag({
+        id: tagId,
+        name: nextName,
+      })
+      setTagNameDrafts((currentDrafts) => {
+        const nextDrafts = { ...currentDrafts }
+        delete nextDrafts[tagId]
+        return nextDrafts
+      })
+    } catch {
+      setTagNameDrafts((currentDrafts) => ({
+        ...currentDrafts,
+        [tagId]: fallbackName,
+      }))
+    }
+  }
+
   const handleDeleteSelectedNode = useCallback(async (nodeId: string) => {
     await deletePerson(nodeId)
     setInspectorNodeId((currentNodeId) => (currentNodeId === nodeId ? null : currentNodeId))
@@ -1448,7 +1493,36 @@ function App() {
                           disabled={!tag.isPersisted}
                           aria-label={`Change ${tag.name} color`}
                         />
-                        <span className="tags-menu__name">{tag.name}</span>
+                        <input
+                          className="tags-menu__name-input"
+                          value={tagNameDrafts[tag.id] ?? tag.name}
+                          onChange={(event) => {
+                            setTagNameDrafts((currentDrafts) => ({
+                              ...currentDrafts,
+                              [tag.id]: event.target.value,
+                            }))
+                          }}
+                          onBlur={() => {
+                            void persistMenuTagName(tag.id, tag.name)
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              event.preventDefault()
+                              void persistMenuTagName(tag.id, tag.name)
+                              event.currentTarget.blur()
+                            }
+
+                            if (event.key === 'Escape') {
+                              setTagNameDrafts((currentDrafts) => ({
+                                ...currentDrafts,
+                                [tag.id]: tag.name,
+                              }))
+                              event.currentTarget.blur()
+                            }
+                          }}
+                          disabled={!tag.isPersisted}
+                          aria-label={`Rename ${tag.name} tag`}
+                        />
                         {tag.isPersisted ? (
                           <button
                             type="button"

@@ -51,6 +51,7 @@ type UpdateNoteInput = {
 
 type UpdateTagInput = {
   id: string
+  name?: string
   color?: string
 }
 
@@ -249,6 +250,7 @@ export async function updateTag(input: UpdateTagInput): Promise<Tag> {
   const client = requireSupabase()
   const updates: Record<string, string> = {}
 
+  if (input.name !== undefined) updates.name = normalizeTagName(input.name)
   if (input.color !== undefined) updates.color = normalizeTagColor(input.color)
 
   const { data, error } = await client
