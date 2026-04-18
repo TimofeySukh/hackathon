@@ -8,9 +8,9 @@ Runtime boundaries:
 
 - React owns UI state and rendering.
 - Vite owns local development and production bundling.
-- CSS owns the visual board surface, theme tokens, responsive layout, and mobile action chrome.
+- CSS owns the visual board surface, theme tokens, and responsive layout.
 - The browser owns theme persistence through `localStorage`.
-- Supabase owns Google authentication and user-owned profile, board, node, and edge records.
+- Supabase owns Google authentication and user-owned profile and board records.
 - Linear owns task state, status, ownership, priority, and blockers.
 - `docs/` owns durable product and repository knowledge.
 
@@ -19,10 +19,7 @@ The backend boundary is intentionally narrow: Supabase Auth provides identity, a
 ## Current Frontend Shape
 
 - `src/main.tsx` mounts the React app.
-- `src/App.tsx` composes the auth chrome, theme controls, desktop board interactions, and mobile board interactions.
-- `src/features/board/types.ts` defines the shared graph domain model.
-- `src/features/board/useBoardGraph.ts` owns graph loading, local mutation, and Supabase synchronization.
-- `src/features/board/useIsMobileLayout.ts` switches the app into the phone-focused interaction shell.
+- `src/App.tsx` contains the current board interaction model.
 - `src/lib/supabase.ts` creates the browser Supabase client from Vite environment variables.
 - `src/lib/useAuth.ts` owns session loading, Google sign-in, sign-out, and workspace bootstrapping.
 - `src/lib/userWorkspace.ts` upserts the user profile and ensures a single personal board.
@@ -36,22 +33,19 @@ The product is a navigable board foundation, not a whiteboard editor.
 
 Current scope:
 
-- desktop mouse drag navigation
-- mobile one-finger board pan and two-finger zoom
+- mouse drag navigation
 - dark/light theme switching
 - very dense point-grid spatial reference
 - compact motion-triggered point highlighting during mouse movement, drag, wheel pan, and zoom
 - Google sign-in through Supabase
 - one private personal board record per signed-in user
-- persisted nodes, edges, notes, tags, and node positions for signed-in users
-- dedicated mobile controls for node move, relation creation, and node actions
 
 Out of scope for the current version:
 
 - drawing tools
-- floating notes or cards
+- sticky notes or cards
 - side panels
-- persistence of camera state
+- persistence of board content or camera state
 - multiplayer collaboration
 
 ## Invariants
