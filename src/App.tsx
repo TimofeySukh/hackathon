@@ -226,63 +226,84 @@ function App() {
   }, [theme])
 
   useEffect(() => {
-    if (highlightSpots.length === 0) return undefined
+    const applyViewport = (nextOffset: Offset, nextScale: number) => {
+      viewportRef.current = { offset: nextOffset, scale: nextScale }
 
-    const intervalId = window.setInterval(() => {
-      const now = Date.now()
-      setHighlightClock(now)
-      setHighlightSpots((currentSpots) =>
-        currentSpots.filter((spot) => now - spot.createdAt < HIGHLIGHT_LIFETIME_MS),
+      if (boardSurfaceRef.current) {
+        boardSurfaceRef.current.style.setProperty('--dot-gap', `${GRID_GAP * nextScale}px`)
+        boardSurfaceRef.current.style.setProperty('--major-dot-gap', `${MAJOR_GRID_GAP * nextScale}px`)
+        boardSurfaceRef.current.style.setProperty('--dot-size', `${Math.max(0.45, DOT_SIZE * nextScale)}px`)
+        boardSurfaceRef.current.style.setProperty(
+          '--major-dot-size',
+          `${Math.max(1.5, MAJOR_DOT_SIZE * nextScale)}px`,
+        )
+        boardSurfaceRef.current.style.setProperty('--board-offset-x', `${nextOffset.x}px`)
+        boardSurfaceRef.current.style.setProperty('--board-offset-y', `${nextOffset.y}px`)
+      }
+
+      if (graphLayerRef.current) {
+        graphLayerRef.current.style.transform = `translate(${nextOffset.x}px, ${nextOffset.y}px) scale(${nextScale})`
+      }
+
+      const nextZoomPercentage = Math.round(nextScale * 100)
+      if (zoomIndicatorRef.current) {
+        zoomIndicatorRef.current.textContent = `${nextZoomPercentage}%`
+      }
+      setZoomPercentage((currentZoomPercentage) =>
+        currentZoomPercentage === nextZoomPercentage ? currentZoomPercentage : nextZoomPercentage,
       )
-    }, HIGHLIGHT_TICK_MS)
-
-    return () => window.clearInterval(intervalId)
-  }, [highlightSpots.length])
-
-  const addHighlightSpot = useCallback((clientX: number, clientY: number, force = false) => {
-    const viewport = boardRef.current?.getBoundingClientRect()
-    if (!viewport) return
-
-    const now = Date.now()
-    const nextSpot = {
-      x: clientX - viewport.left,
-      y: clientY - viewport.top,
     }
-    const previousSpot = lastHighlightSpotRef.current
-    const distanceFromPrevious = previousSpot
-      ? Math.hypot(nextSpot.x - previousSpot.x, nextSpot.y - previousSpot.y)
-      : Number.POSITIVE_INFINITY
 
-    if (!force && distanceFromPrevious < HIGHLIGHT_DISTANCE) return
+    applyViewport(viewportRef.current.offset, viewportRef.current.scale)
 
-    const hasTail = previousSpot && Number.isFinite(distanceFromPrevious)
-    const tailReach = hasTail
-      ? Math.min(HIGHLIGHT_TAIL_LIMIT, Math.max(0, distanceFromPrevious - HIGHLIGHT_TAIL_START))
-      : 0
-    const tailUnitX =
-      hasTail && distanceFromPrevious > 0 ? (nextSpot.x - previousSpot.x) / distanceFromPrevious : 0
-    const tailUnitY =
-      hasTail && distanceFromPrevious > 0 ? (nextSpot.y - previousSpot.y) / distanceFromPrevious : 0
-    const tailSize = tailReach * 0.75
+    return () => {
+      if (viewportFrameRef.current !== null) {
+        window.cancelAnimationFrame(viewportFrameRef.current)
+      }
+    }
+  }, [])
 
-    const id = highlightIdRef.current + 1
-    highlightIdRef.current = id
-    lastHighlightSpotRef.current = nextSpot
-    setPointerPosition(nextSpot)
-    setHighlightClock(now)
+  const queueViewportUpdate = useCallback((nextOffset: Offset, nextScale: number) => {
+    pendingViewportRef.current = { offset: nextOffset, scale: nextScale }
 
-    setHighlightSpots((currentSpots) => [
-      ...currentSpots.slice(-HIGHLIGHT_LIMIT + 1),
-      {
-        id,
-        createdAt: now,
-        tailX: nextSpot.x - tailUnitX * tailReach,
-        tailY: nextSpot.y - tailUnitY * tailReach,
-        tailCore: tailSize * 0.36,
-        tailSize,
-        ...nextSpot,
-      },
-    ])
+    if (viewportFrameRef.current !== null) return
+
+    viewportFrameRef.current = window.requestAnimationFrame(() => {
+      viewportFrameRef.current = null
+
+      const pendingViewport = pendingViewportRef.current
+      if (!pendingViewport) return
+
+      pendingViewportRef.current = null
+      viewportRef.current = pendingViewport
+
+      if (boardSurfaceRef.current) {
+        boardSurfaceRef.current.style.setProperty('--dot-gap', `${GRID_GAP * pendingViewport.scale}px`)
+        boardSurfaceRef.current.style.setProperty('--major-dot-gap', `${MAJOR_GRID_GAP * pendingViewport.scale}px`)
+        boardSurfaceRef.current.style.setProperty(
+          '--dot-size',
+          `${Math.max(0.45, DOT_SIZE * pendingViewport.scale)}px`,
+        )
+        boardSurfaceRef.current.style.setProperty(
+          '--major-dot-size',
+          `${Math.max(1.5, MAJOR_DOT_SIZE * pendingViewport.scale)}px`,
+        )
+        boardSurfaceRef.current.style.setProperty('--board-offset-x', `${pendingViewport.offset.x}px`)
+        boardSurfaceRef.current.style.setProperty('--board-offset-y', `${pendingViewport.offset.y}px`)
+      }
+
+      if (graphLayerRef.current) {
+        graphLayerRef.current.style.transform = `translate(${pendingViewport.offset.x}px, ${pendingViewport.offset.y}px) scale(${pendingViewport.scale})`
+      }
+
+      const nextZoomPercentage = Math.round(pendingViewport.scale * 100)
+      if (zoomIndicatorRef.current) {
+        zoomIndicatorRef.current.textContent = `${nextZoomPercentage}%`
+      }
+      setZoomPercentage((currentZoomPercentage) =>
+        currentZoomPercentage === nextZoomPercentage ? currentZoomPercentage : nextZoomPercentage,
+      )
+    })
   }, [])
 
   const finishConnectionDrag = useCallback(
