@@ -229,39 +229,77 @@ select {
 
 .tags-menu__palette-wrap {
   grid-column: 1 / -1;
-  padding: 6px 0 2px;
+  display: grid;
+  gap: 12px;
+  padding: 8px 0 2px;
 }
 
-.tags-menu__palette {
-  position: relative;
+.tags-menu__palette-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tags-menu__palette-label,
+.tags-menu__palette-value,
+.tags-menu__native-picker-label {
+  color: var(--panel-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tags-menu__palette-value {
+  color: var(--panel-text);
+}
+
+.tags-menu__preset-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tags-menu__preset {
   width: 100%;
-  height: 230px;
-  border: 1px solid var(--panel-border);
-  border-radius: 20px;
-  background:
-    linear-gradient(to top, rgba(0, 0, 0, 0.92), transparent),
-    linear-gradient(to right, #ffffff, var(--palette-color));
+  aspect-ratio: 1;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 14px;
+  background: var(--tag-color);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.25),
-    0 16px 30px rgba(0, 0, 0, 0.12);
-  cursor: crosshair;
-  touch-action: none;
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 10px 22px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
 }
 
-.tags-menu__palette-cursor {
-  position: absolute;
-  left: var(--palette-cursor-x);
-  top: var(--palette-cursor-y);
-  width: 18px;
-  height: 18px;
-  border: 2px solid #8affd6;
-  border-radius: 50%;
-  background: #071c14;
+.tags-menu__preset.is-selected {
+  border-color: #8affd6;
   box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.24),
-    0 0 18px rgba(138, 255, 214, 0.38);
-  transform: translate(-50%, -50%);
-  pointer-events: none;
+    0 0 0 2px rgba(138, 255, 214, 0.24),
+    0 10px 22px rgba(0, 0, 0, 0.12);
+}
+
+.tags-menu__native-picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--button-border);
+  border-radius: 16px;
+  background: rgba(4, 18, 13, 0.22);
+}
+
+.tags-menu__native-picker-input {
+  width: 56px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  cursor: pointer;
 }
 
 .tags-menu__new {

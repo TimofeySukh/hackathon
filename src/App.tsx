@@ -3,7 +3,6 @@ import type {
   CSSProperties,
   KeyboardEvent as ReactKeyboardEvent,
   MouseEvent as ReactMouseEvent,
-  PointerEvent as ReactPointerEvent,
   WheelEvent as ReactWheelEvent,
 } from 'react'
 
@@ -88,12 +87,6 @@ type TagColorStyle = CSSProperties & {
   '--tag-color': string
 }
 
-type TagPaletteStyle = CSSProperties & {
-  '--palette-color': string
-  '--palette-cursor-x': string
-  '--palette-cursor-y': string
-}
-
 type GraphNodeStyle = CSSProperties & {
   '--node-color'?: string
 }
@@ -134,6 +127,7 @@ const GRID_GAP = 12
 const MAJOR_GRID_GAP = 96
 const DOT_SIZE = 0.65
 const MAJOR_DOT_SIZE = 2
+const TAG_PRESET_COLORS = ['#ff6b6b', '#ff9f43', '#ffd93d', '#4cd137', '#2ed573', '#1e90ff', '#3742fa', '#a55eea', '#ff7eb6', '#8affd6']
 const HIGHLIGHT_LIFETIME_MS = 420
 const HIGHLIGHT_DISTANCE = 12
 const HIGHLIGHT_LIMIT = 28
@@ -1214,17 +1208,6 @@ function App() {
     selectedNode,
   ])
 
-  function pickTagColor(tag: TagMenuItem, event: ReactPointerEvent<HTMLDivElement>) {
-    if (!tag.isPersisted) return
-
-    const bounds = event.currentTarget.getBoundingClientRect()
-    const x = clamp((event.clientX - bounds.left) / bounds.width, 0, 1)
-    const y = clamp((event.clientY - bounds.top) / bounds.height, 0, 1)
-    const color = hsvToHex(x * 360, (1 - y) * 100, 100)
-
-    previewTagColor(tag.id, color)
-  }
-
   async function handleCreateNote() {
     if (!inspectorNode || !isGraphReady) return
 
@@ -1452,14 +1435,8 @@ function App() {
                 <div className="tags-menu__list">
                   {tagMenuItems.map((tag) => {
                     const color = normalizeTagColor(tagColorDrafts[tag.id] ?? tag.color ?? DEFAULT_TAG_COLOR)
-                    const palettePosition = getPalettePosition(color)
                     const isPaletteOpen = activeColorTagId === tag.id
                     const tagColorStyle = { '--tag-color': color } as TagColorStyle
-                    const paletteStyle = {
-                      '--palette-color': `hsl(${palettePosition.hue} 100% 50%)`,
-                      '--palette-cursor-x': `${palettePosition.x}%`,
-                      '--palette-cursor-y': `${palettePosition.y}%`,
-                    } as TagPaletteStyle
 
                     return (
                       <div key={tag.id} className="tags-menu__item">
@@ -1487,24 +1464,37 @@ function App() {
 
                         {isPaletteOpen ? (
                           <div className="tags-menu__palette-wrap">
-                            <div
-                              className="tags-menu__palette"
-                              style={paletteStyle}
-                              onPointerDown={(event) => {
-                                event.currentTarget.setPointerCapture(event.pointerId)
-                                pickTagColor(tag, event)
-                              }}
-                              onPointerMove={(event) => {
-                                if (event.buttons !== 1) return
-                                pickTagColor(tag, event)
-                              }}
-                              onPointerUp={(event) => {
-                                event.currentTarget.releasePointerCapture(event.pointerId)
-                                void persistTagColor(tag.id)
-                              }}
-                            >
-                              <span className="tags-menu__palette-cursor" />
+                            <div className="tags-menu__palette-header">
+                              <span className="tags-menu__palette-label">Choose a color</span>
+                              <span className="tags-menu__palette-value">{color.toUpperCase()}</span>
                             </div>
+                            <div className="tags-menu__preset-grid">
+                              {TAG_PRESET_COLORS.map((presetColor) => (
+                                <button
+                                  key={presetColor}
+                                  type="button"
+                                  className={`tags-menu__preset${presetColor === color ? ' is-selected' : ''}`}
+                                  style={{ '--tag-color': presetColor } as TagColorStyle}
+                                  onClick={() => {
+                                    previewTagColor(tag.id, presetColor)
+                                    void persistTagColor(tag.id)
+                                  }}
+                                  aria-label={`Set ${tag.name} color to ${presetColor}`}
+                                />
+                              ))}
+                            </div>
+                            <label className="tags-menu__native-picker">
+                              <span className="tags-menu__native-picker-label">Custom color</span>
+                              <input
+                                className="tags-menu__native-picker-input"
+                                type="color"
+                                value={color}
+                                onChange={(event) => {
+                                  previewTagColor(tag.id, event.target.value)
+                                  void persistTagColor(tag.id)
+                                }}
+                              />
+                            </label>
                           </div>
                         ) : null}
                       </div>
@@ -2146,74 +2136,6 @@ function saveTagColorDraft(tagId: string, color: string) {
       [tagId]: normalizeTagColor(color),
     }),
   )
-}
-
-function hexToRgb(hex: string) {
-  const normalizedHex = normalizeTagColor(hex).slice(1)
-
-  return {
-    r: Number.parseInt(normalizedHex.slice(0, 2), 16),
-    g: Number.parseInt(normalizedHex.slice(2, 4), 16),
-    b: Number.parseInt(normalizedHex.slice(4, 6), 16),
-  }
-}
-
-function rgbToHex(red: number, green: number, blue: number) {
-  return `#${[red, green, blue]
-    .map((channel) => Math.round(channel).toString(16).padStart(2, '0'))
-    .join('')}`
-}
-
-function hexToHsv(hex: string) {
-  const { r, g, b } = hexToRgb(hex)
-  const red = r / 255
-  const green = g / 255
-  const blue = b / 255
-  const max = Math.max(red, green, blue)
-  const min = Math.min(red, green, blue)
-  const delta = max - min
-  let hue = 0
-
-  if (delta !== 0) {
-    if (max === red) hue = ((green - blue) / delta) % 6
-    else if (max === green) hue = (blue - red) / delta + 2
-    else hue = (red - green) / delta + 4
-  }
-
-  return {
-    hue: Math.round((hue * 60 + 360) % 360),
-    saturation: max === 0 ? 0 : (delta / max) * 100,
-    value: max * 100,
-  }
-}
-
-function hsvToHex(hue: number, saturation: number, value: number) {
-  const chroma = (value / 100) * (saturation / 100)
-  const huePrime = hue / 60
-  const x = chroma * (1 - Math.abs((huePrime % 2) - 1))
-  const match = value / 100 - chroma
-  let red = 0
-  let green = 0
-  let blue = 0
-
-  if (huePrime >= 0 && huePrime < 1) [red, green, blue] = [chroma, x, 0]
-  else if (huePrime < 2) [red, green, blue] = [x, chroma, 0]
-  else if (huePrime < 3) [red, green, blue] = [0, chroma, x]
-  else if (huePrime < 4) [red, green, blue] = [0, x, chroma]
-  else if (huePrime < 5) [red, green, blue] = [x, 0, chroma]
-  else [red, green, blue] = [chroma, 0, x]
-
-  return rgbToHex((red + match) * 255, (green + match) * 255, (blue + match) * 255)
-}
-
-function getPalettePosition(color: string) {
-  const hsv = hexToHsv(color)
-
-  return {
-    hue: hsv.hue,
-    x: (hsv.hue / 360) * 100,
-    y: 100 - hsv.saturation,
-  }
 }
 
 function isEditableElement(target: EventTarget | null) {
