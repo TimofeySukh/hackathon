@@ -122,6 +122,8 @@ It currently supports:
 - modifier-drag to create node growth from any existing node with an immediate connecting line: `Command` on macOS, `Control` elsewhere
 - selected-node detail cards with searchable tag selection/creation/deletion, note editing, and person deletion
 - single-click opening for the node-anchored inspector
+- automatic board panning to keep the node-anchored inspector inside the viewport
+- continued trackpad panning over the inspector when the gesture starts on the board
 - connection line selection with a widened hit target, inline deletion, and Backspace deletion
 - local people search while typing plus natural-language AI search on Enter
 - drag repositioning for non-root nodes

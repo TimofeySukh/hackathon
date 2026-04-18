@@ -564,7 +564,8 @@ select {
   position: absolute;
   z-index: 5;
   display: grid;
-  width: 560px;
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
   align-content: start;
   gap: 18px;
   padding: 18px;
@@ -576,7 +577,8 @@ select {
     inset 0 1px 0 rgba(255, 255, 255, 0.28),
     0 22px 54px rgba(0, 0, 0, 0.12);
   backdrop-filter: blur(18px);
-  overflow: visible;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   transform: translate(calc(-100% - 40px), -50%) scale(var(--inspector-scale, 1));
   transform-origin: right center;
 }
@@ -1223,6 +1225,6 @@ select {
   }
 
   .inspector-panel {
-    width: 520px;
+    width: calc(100vw - 32px);
   }
 }

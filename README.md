@@ -22,6 +22,7 @@ A persisted social graph board built with React, Vite, and TypeScript.
 - Top-left Tags menu with default Work, Friends, and Family tags plus color editing
 - Selected-person inspector for names, searchable tag selection/creation/deletion, notes, and delete actions
 - Single-click a person to open that inspector directly on the board
+- Opening the inspector pans the board enough to keep the inspector visible
 - Click the widened connection-line target to delete it from the inline menu or with Backspace
 - Drag a person to move them with their connected lines
 - Hold `Command` on macOS, or `Control` on other platforms, and drag a person to create a connection

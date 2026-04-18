@@ -4,6 +4,7 @@ import type {
   KeyboardEvent as ReactKeyboardEvent,
   MouseEvent as ReactMouseEvent,
   PointerEvent as ReactPointerEvent,
+  WheelEvent as ReactWheelEvent,
 } from 'react'
 
 import { useAuth } from './lib/useAuth'
@@ -145,6 +146,9 @@ const NODE_RADIUS = 9
 const NODE_HIT_RADIUS = 31
 const CREATE_THRESHOLD = 18
 const WHEEL_ZOOM_INTENSITY = 0.0016
+const INSPECTOR_ANCHOR_GAP = 40
+const INSPECTOR_VIEWPORT_MARGIN = 16
+const TRACKPAD_PAN_IDLE_MS = 320
 const IS_MAC_PLATFORM = /Mac|iPhone|iPad|iPod/i.test(window.navigator.platform)
 
 const ANONYMOUS_ROOT: PersonNode = {
@@ -237,6 +241,10 @@ function App() {
   const pendingViewportRef = useRef<{ offset: Offset; scale: number } | null>(null)
   const viewportFrameRef = useRef<number | null>(null)
   const gestureScaleRef = useRef(1)
+  const trackpadPanRef = useRef<{ active: boolean; timeoutId: number | null }>({
+    active: false,
+    timeoutId: null,
+  })
   const boardDragRef = useRef({
     startX: 0,
     startY: 0,
@@ -486,7 +494,7 @@ function App() {
 
       inspectorPanelRef.current.style.left = `${inspectorX}px`
       inspectorPanelRef.current.style.top = `${inspectorY}px`
-      inspectorPanelRef.current.style.setProperty('--inspector-scale', `${nextScale}`)
+      inspectorPanelRef.current.style.setProperty('--inspector-scale', '1')
     }
 
     const nextZoomPercentage = Math.round(nextScale * 100)
@@ -577,12 +585,53 @@ function App() {
     [applyViewport],
   )
 
+  const keepInspectorInView = useCallback(() => {
+    const boardElement = boardRef.current
+    const inspectorElement = inspectorPanelRef.current
+    const inspectorPosition = inspectorWorldPositionRef.current
+    if (!boardElement || !inspectorElement || !inspectorPosition) return
+
+    const view = viewportRef.current
+    const viewportWidth = boardElement.clientWidth
+    const viewportHeight = boardElement.clientHeight
+    const panelWidth = inspectorElement.offsetWidth
+    const panelHeight = inspectorElement.offsetHeight
+    const currentAnchorX = viewportWidth / 2 + view.offset.x + inspectorPosition.x * view.scale
+    const currentAnchorY = viewportHeight / 2 + view.offset.y + inspectorPosition.y * view.scale
+    const minAnchorX = INSPECTOR_VIEWPORT_MARGIN + INSPECTOR_ANCHOR_GAP + panelWidth
+    const maxAnchorX = viewportWidth - INSPECTOR_VIEWPORT_MARGIN + INSPECTOR_ANCHOR_GAP
+    const minAnchorY = INSPECTOR_VIEWPORT_MARGIN + panelHeight / 2
+    const maxAnchorY = viewportHeight - INSPECTOR_VIEWPORT_MARGIN - panelHeight / 2
+    const nextAnchorX =
+      minAnchorX > maxAnchorX
+        ? viewportWidth - INSPECTOR_VIEWPORT_MARGIN + INSPECTOR_ANCHOR_GAP
+        : clamp(currentAnchorX, minAnchorX, maxAnchorX)
+    const nextAnchorY =
+      minAnchorY > maxAnchorY ? viewportHeight / 2 : clamp(currentAnchorY, minAnchorY, maxAnchorY)
+    const deltaX = nextAnchorX - currentAnchorX
+    const deltaY = nextAnchorY - currentAnchorY
+
+    if (Math.abs(deltaX) < 0.5 && Math.abs(deltaY) < 0.5) return
+
+    queueViewportUpdate(
+      {
+        x: view.offset.x + deltaX,
+        y: view.offset.y + deltaY,
+      },
+      view.scale,
+    )
+  }, [queueViewportUpdate])
+
   useEffect(() => {
     applyViewport(viewportRef.current.offset, viewportRef.current.scale)
+    const trackpadPan = trackpadPanRef.current
 
     return () => {
       if (viewportFrameRef.current !== null) {
         window.cancelAnimationFrame(viewportFrameRef.current)
+      }
+      if (trackpadPan.timeoutId !== null) {
+        window.clearTimeout(trackpadPan.timeoutId)
       }
     }
   }, [applyViewport])
@@ -596,7 +645,15 @@ function App() {
       : null
 
     applyViewport(viewportRef.current.offset, viewportRef.current.scale)
-  }, [applyViewport, inspectorNode])
+
+    if (!inspectorNode) return undefined
+
+    const frameId = window.requestAnimationFrame(() => {
+      keepInspectorInView()
+    })
+
+    return () => window.cancelAnimationFrame(frameId)
+  }, [applyViewport, inspectorNode, keepInspectorInView])
 
   const zoomAtClientPoint = useCallback(
     (clientX: number, clientY: number, nextScale: number) => {
@@ -837,6 +894,19 @@ function App() {
     })
   }
 
+  const markTrackpadPanActive = useCallback(() => {
+    trackpadPanRef.current.active = true
+
+    if (trackpadPanRef.current.timeoutId !== null) {
+      window.clearTimeout(trackpadPanRef.current.timeoutId)
+    }
+
+    trackpadPanRef.current.timeoutId = window.setTimeout(() => {
+      trackpadPanRef.current.active = false
+      trackpadPanRef.current.timeoutId = null
+    }, TRACKPAD_PAN_IDLE_MS)
+  }, [])
+
   const moveWithWheel = useCallback((event: WheelEvent) => {
     event.preventDefault()
     const view = viewportRef.current
@@ -845,6 +915,7 @@ function App() {
     const deltaY = event.deltaY * deltaMultiplier
 
     if (!event.ctrlKey) {
+      markTrackpadPanActive()
       queueViewportUpdate(
         {
           x: view.offset.x - deltaX,
@@ -858,7 +929,20 @@ function App() {
     const normalizedDelta = Math.max(-120, Math.min(120, deltaY))
     const nextScale = view.scale * Math.exp(-normalizedDelta * WHEEL_ZOOM_INTENSITY)
     zoomAtClientPoint(event.clientX, event.clientY, nextScale)
-  }, [queueViewportUpdate, zoomAtClientPoint])
+  }, [markTrackpadPanActive, queueViewportUpdate, zoomAtClientPoint])
+
+  function handleInspectorWheel(event: ReactWheelEvent<HTMLElement>) {
+    if (!event.ctrlKey && trackpadPanRef.current.active) {
+      event.stopPropagation()
+      moveWithWheel(event.nativeEvent)
+      return
+    }
+
+    if (event.ctrlKey) {
+      event.preventDefault()
+    }
+    event.stopPropagation()
+  }
 
   useEffect(() => {
     const viewport = boardRef.current
@@ -1539,7 +1623,7 @@ function App() {
           className="inspector-panel"
           aria-label="Selected person inspector"
           onMouseDown={(event) => event.stopPropagation()}
-          onWheel={(event) => event.stopPropagation()}
+          onWheel={handleInspectorWheel}
         >
           <div className="inspector-panel__header">
             <div>
