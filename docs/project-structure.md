@@ -103,7 +103,8 @@ It currently supports:
 - cursor-centered zoom with the mouse wheel
 - visual theme switching
 - compact motion-triggered point highlighting during mouse movement, drag, wheel pan, and zoom
-- social graph nodes connected by arrows
+- social graph nodes connected by lines
+- drag-to-connect two existing nodes by releasing on another node hit area
 - drag-to-create node growth from any existing node with an immediate connecting line
 - newly created nodes appearing immediately with an empty inline name field
 - in-place node renaming

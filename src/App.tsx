@@ -87,6 +87,7 @@ const HIGHLIGHT_TICK_MS = 50
 const HIGHLIGHT_TAIL_START = 18
 const HIGHLIGHT_TAIL_LIMIT = 48
 const NODE_RADIUS = 9
+const NODE_HIT_RADIUS = 31
 const CREATE_THRESHOLD = 18
 
 const INITIAL_NODES: GraphNode[] = [{ id: 'root', label: 'You', x: 0, y: 0, kind: 'root' }]
@@ -205,6 +206,39 @@ function App() {
         return
       }
 
+      const targetNode = nodes.find((node) => {
+        if (node.id === connectionDrag.fromId) return false
+
+        const distanceToNode = Math.hypot(
+          node.x - connectionDrag.worldX,
+          node.y - connectionDrag.worldY,
+        )
+
+        return distanceToNode <= NODE_HIT_RADIUS / scale
+      })
+
+      if (targetNode) {
+        setEdges((currentEdges) => {
+          const alreadyConnected = currentEdges.some(
+            (edge) => edge.from === connectionDrag.fromId && edge.to === targetNode.id,
+          )
+
+          if (alreadyConnected) return currentEdges
+
+          return [
+            ...currentEdges,
+            {
+              id: `edge-${connectionDrag.fromId}-${targetNode.id}`,
+              from: connectionDrag.fromId,
+              to: targetNode.id,
+            },
+          ]
+        })
+        setSelectedNodeId(targetNode.id)
+        setConnectionDrag(null)
+        return
+      }
+
       const nextId = `node-${crypto.randomUUID()}`
       const nextNode: GraphNode = {
         id: nextId,
@@ -226,7 +260,7 @@ function App() {
       setEditingNodeId(nextId)
       setConnectionDrag(null)
     },
-    [connectionDrag],
+    [connectionDrag, nodes, scale],
   )
 
   useEffect(() => {
