@@ -86,6 +86,7 @@ function App() {
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
   const [connectionDrag, setConnectionDrag] = useState<ConnectionDrag | null>(null)
   const [isDraggingBoard, setIsDraggingBoard] = useState(false)
+  const [boardSize, setBoardSize] = useState({ width: 0, height: 0 })
 
   const boardRef = useRef<HTMLElement | null>(null)
   const viewportRef = useRef<ViewportState>({ offset: { x: 0, y: 0 }, scale: 1 })
@@ -106,6 +107,25 @@ function App() {
   useEffect(() => {
     viewportRef.current = { offset, scale }
   }, [offset, scale])
+
+  useEffect(() => {
+    const boardElement = boardRef.current
+    if (!boardElement) return undefined
+
+    const updateBoardSize = () => {
+      setBoardSize({
+        width: boardElement.clientWidth,
+        height: boardElement.clientHeight,
+      })
+    }
+
+    updateBoardSize()
+
+    const resizeObserver = new ResizeObserver(updateBoardSize)
+    resizeObserver.observe(boardElement)
+
+    return () => resizeObserver.disconnect()
+  }, [])
 
   const queueViewportUpdate = useCallback((nextOffset: Offset, nextScale: number) => {
     pendingViewportRef.current = { offset: nextOffset, scale: nextScale }
@@ -333,24 +353,10 @@ function App() {
     event.preventDefault()
 
     const view = viewportRef.current
-    const isMouseWheel = event.deltaMode === 1
-    const isTrackpadPinch = event.ctrlKey
-    const prefersZoom = (isMouseWheel || isTrackpadPinch) && Math.abs(event.deltaX) < 1
-
-    if (!prefersZoom) {
-      queueViewportUpdate(
-        {
-          x: view.offset.x - event.deltaX,
-          y: view.offset.y - event.deltaY,
-        },
-        view.scale,
-      )
-      return
-    }
-
     const deltaMultiplier = event.deltaMode === 1 ? 16 : 1
+    const normalizedDelta = Math.max(-120, Math.min(120, event.deltaY * deltaMultiplier))
     const nextScale = clampScale(
-      view.scale * Math.exp(-event.deltaY * deltaMultiplier * WHEEL_ZOOM_INTENSITY),
+      view.scale * Math.exp(-normalizedDelta * WHEEL_ZOOM_INTENSITY),
     )
 
     if (nextScale === view.scale) return
@@ -393,6 +399,18 @@ function App() {
         y: connectionDrag.worldY,
       })
     : null
+
+  const inspectorStyle = useMemo(() => {
+    if (!inspectorNode || boardSize.width === 0 || boardSize.height === 0) return null
+
+    const rawLeft = boardSize.width / 2 + offset.x + inspectorNode.x * scale + 22
+    const rawTop = boardSize.height / 2 + offset.y + inspectorNode.y * scale + 26
+
+    return {
+      left: `${Math.min(boardSize.width - 176, Math.max(16, rawLeft))}px`,
+      top: `${Math.min(boardSize.height - 104, Math.max(90, rawTop))}px`,
+    }
+  }, [boardSize.height, boardSize.width, inspectorNode, offset.x, offset.y, scale])
 
   return (
     <main className={`app-shell theme-${theme}`}>
@@ -530,37 +548,38 @@ function App() {
             )
           })}
 
-          {inspectorNode ? (
-            <div
-              className="node-inspector"
-              style={{ left: `${inspectorNode.x}px`, top: `${inspectorNode.y + 34}px` }}
-              onMouseDown={(event) => event.stopPropagation()}
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className="node-inspector__title">{inspectorNode.label || 'Untitled'}</div>
-              <div className="node-inspector__actions">
-                <button
-                  type="button"
-                  className="node-inspector__button"
-                  onClick={() => {
-                    setInspectorNodeId(null)
-                    setEditingNodeId(inspectorNode.id)
-                  }}
-                >
-                  Rename
-                </button>
-                <button
-                  type="button"
-                  className="node-inspector__button node-inspector__button--danger"
-                  onClick={() => deleteNode(inspectorNode.id)}
-                  disabled={inspectorNode.kind === 'root'}
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          ) : null}
         </div>
+
+        {inspectorNode && inspectorStyle ? (
+          <div
+            className="node-inspector"
+            style={inspectorStyle}
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="node-inspector__title">{inspectorNode.label || 'Untitled'}</div>
+            <div className="node-inspector__actions">
+              <button
+                type="button"
+                className="node-inspector__button"
+                onClick={() => {
+                  setInspectorNodeId(null)
+                  setEditingNodeId(inspectorNode.id)
+                }}
+              >
+                Rename
+              </button>
+              <button
+                type="button"
+                className="node-inspector__button node-inspector__button--danger"
+                onClick={() => deleteNode(inspectorNode.id)}
+                disabled={inspectorNode.kind === 'root'}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         <div className="zoom-indicator" aria-live="polite">
           {Math.round(scale * 100)}%
