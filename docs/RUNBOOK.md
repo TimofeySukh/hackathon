@@ -15,7 +15,8 @@ Current app behavior:
 - optionally sign in with Google through Supabase
 - create one personal board record for each signed-in user
 - create one immutable root person at `0,0` for each signed-in user
-- persist people, tags, notes, and undirected connections in Supabase
+- persist people, colored tags, notes, and undirected connections in Supabase
+- open the top-left Tags menu to create tags and adjust tag colors
 - allow one separate AI summary row per person in Supabase
 - edit the selected person in the node-anchored inspector
 

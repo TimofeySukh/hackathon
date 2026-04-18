@@ -14,6 +14,7 @@ import {
   movePerson,
   updateNote,
   updatePerson,
+  updateTag,
 } from './graphStorage'
 
 type GraphStatus = 'idle' | 'loading' | 'ready'
@@ -145,6 +146,20 @@ export function useBoardGraph(user: User | null) {
         setGraphState((currentState) => ({
           ...currentState,
           tags: [...currentState.tags, tag].sort((left, right) => left.name.localeCompare(right.name)),
+          error: null,
+        }))
+        return tag
+      } catch (error) {
+        setError(error)
+        throw error
+      }
+    },
+    async updateTag(input: Parameters<typeof updateTag>[0]) {
+      try {
+        const tag = await updateTag(input)
+        setGraphState((currentState) => ({
+          ...currentState,
+          tags: currentState.tags.map((entry) => (entry.id === tag.id ? tag : entry)),
           error: null,
         }))
         return tag

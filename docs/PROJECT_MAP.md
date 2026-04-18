@@ -12,7 +12,8 @@ The current product is intentionally narrow:
 - a very dense CSS-rendered point grid with motion-triggered point highlights
 - Supabase-backed Google login
 - one personal board record per signed-in user
-- persistent people nodes, reusable tags, notes, and undirected connections per signed-in user
+- persistent people nodes, reusable colored tags, notes, and undirected connections per signed-in user
+- a top-left Tags menu for creating tags and changing tag colors
 - a node-anchored inspector for editing the selected person
 - no collaboration yet
 

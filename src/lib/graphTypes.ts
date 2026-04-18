@@ -20,6 +20,7 @@ export type Tag = {
   user_id: string
   name: string
   normalized_name: string
+  color: string
   created_at: string
   updated_at: string
 }

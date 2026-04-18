@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
+import type {
+  CSSProperties,
+  MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
+} from 'react'
 
 import { useAuth } from './lib/useAuth'
 import { normalizeTagName } from './lib/graphStorage'
-import type { PersonNode, PersonNote } from './lib/graphTypes'
+import type { PersonNode, PersonNote, Tag } from './lib/graphTypes'
+import { DEFAULT_TAGS, normalizeTagColor } from './lib/tagPalette'
 import { useBoardGraph } from './lib/useBoardGraph'
 
 type Theme = 'dark' | 'light'
@@ -70,10 +75,24 @@ type HighlightSpotStyle = CSSProperties & {
   opacity: number
 }
 
+type TagColorStyle = CSSProperties & {
+  '--tag-color': string
+}
+
+type TagPaletteStyle = CSSProperties & {
+  '--palette-color': string
+  '--palette-cursor-x': string
+  '--palette-cursor-y': string
+}
+
 type GestureEventLike = Event & {
   clientX: number
   clientY: number
   scale: number
+}
+
+type TagMenuItem = Pick<Tag, 'id' | 'name' | 'color'> & {
+  isPersisted: boolean
 }
 
 const THEME_STORAGE_KEY = 'hackathon-theme'
@@ -125,6 +144,7 @@ function App() {
     createConnection,
     deleteConnection,
     createTag,
+    updateTag,
     createNote,
     updateNote,
     deleteNote,
@@ -144,6 +164,9 @@ function App() {
   const [draggedPositions, setDraggedPositions] = useState<Record<string, Offset>>({})
   const [nameDraft, setNameDraft] = useState('')
   const [tagDraft, setTagDraft] = useState('')
+  const [isTagsMenuOpen, setIsTagsMenuOpen] = useState(false)
+  const [activeColorTagId, setActiveColorTagId] = useState<string | null>(null)
+  const [tagColorDrafts, setTagColorDrafts] = useState<Record<string, string>>({})
   const [newNoteTitle, setNewNoteTitle] = useState('')
   const [newNoteBody, setNewNoteBody] = useState('')
   const [noteDrafts, setNoteDrafts] = useState<Record<string, NoteDraft>>({})
@@ -189,6 +212,23 @@ function App() {
   const nodesById = useMemo(
     () => Object.fromEntries(boardNodes.map((node) => [node.id, node])) as Record<string, PersonNode>,
     [boardNodes],
+  )
+  const tagMenuItems = useMemo<TagMenuItem[]>(
+    () =>
+      isGraphReady
+        ? tags.map((tag) => ({
+            id: tag.id,
+            name: tag.name,
+            color: normalizeTagColor(tagColorDrafts[tag.id] ?? tag.color),
+            isPersisted: true,
+          }))
+        : DEFAULT_TAGS.map((tag) => ({
+            id: `default-${tag.name}`,
+            name: tag.name,
+            color: tag.color,
+            isPersisted: false,
+          })),
+    [isGraphReady, tagColorDrafts, tags],
   )
   const defaultSelectedNodeId = boardNodes.find((node) => node.is_root)?.id ?? boardNodes[0]?.id ?? null
   const activeSelectedNodeId =
@@ -713,6 +753,50 @@ function App() {
     })
   }
 
+  async function handleCreateMenuTag() {
+    if (!isGraphReady) return
+
+    const existingNames = new Set(tags.map((tag) => normalizeTagName(tag.name).toLowerCase()))
+    let nextName = 'New tag'
+    let suffix = 2
+
+    while (existingNames.has(normalizeTagName(nextName).toLowerCase())) {
+      nextName = `New tag ${suffix}`
+      suffix += 1
+    }
+
+    const createdTag = await createTag(nextName)
+    setActiveColorTagId(createdTag.id)
+  }
+
+  function previewTagColor(tagId: string, color: string) {
+    setTagColorDrafts((currentDrafts) => ({
+      ...currentDrafts,
+      [tagId]: normalizeTagColor(color),
+    }))
+  }
+
+  async function persistTagColor(tagId: string) {
+    const color = tagColorDrafts[tagId]
+    if (!color || !isGraphReady) return
+
+    await updateTag({
+      id: tagId,
+      color,
+    })
+  }
+
+  function pickTagColor(tag: TagMenuItem, event: ReactPointerEvent<HTMLDivElement>) {
+    if (!tag.isPersisted) return
+
+    const bounds = event.currentTarget.getBoundingClientRect()
+    const x = clamp((event.clientX - bounds.left) / bounds.width, 0, 1)
+    const y = clamp((event.clientY - bounds.top) / bounds.height, 0, 1)
+    const color = hsvToHex(x * 360, (1 - y) * 100, 100)
+
+    previewTagColor(tag.id, color)
+  }
+
   async function handleCreateNote() {
     if (!inspectorNode || !isGraphReady) return
 
@@ -811,6 +895,83 @@ function App() {
 
   return (
     <main className={`app-shell theme-${theme}`}>
+      <div className="tags-menu">
+        <button
+          type="button"
+          className="tags-menu__toggle"
+          onClick={() => setIsTagsMenuOpen((isOpen) => !isOpen)}
+          aria-expanded={isTagsMenuOpen}
+        >
+          Tags
+        </button>
+
+        {isTagsMenuOpen ? (
+          <section className="tags-menu__panel" aria-label="Tag colors">
+            <div className="tags-menu__list">
+              {tagMenuItems.map((tag) => {
+                const color = normalizeTagColor(tagColorDrafts[tag.id] ?? tag.color)
+                const palettePosition = getPalettePosition(color)
+                const isPaletteOpen = activeColorTagId === tag.id
+                const tagColorStyle = { '--tag-color': color } as TagColorStyle
+                const paletteStyle = {
+                  '--palette-color': `hsl(${palettePosition.hue} 100% 50%)`,
+                  '--palette-cursor-x': `${palettePosition.x}%`,
+                  '--palette-cursor-y': `${palettePosition.y}%`,
+                } as TagPaletteStyle
+
+                return (
+                  <div key={tag.id} className="tags-menu__item">
+                    <button
+                      type="button"
+                      className="tags-menu__swatch"
+                      style={tagColorStyle}
+                      onClick={() => setActiveColorTagId(isPaletteOpen ? null : tag.id)}
+                      disabled={!tag.isPersisted}
+                      aria-label={`Change ${tag.name} color`}
+                    />
+                    <span className="tags-menu__name">{tag.name}</span>
+
+                    {isPaletteOpen ? (
+                      <div className="tags-menu__palette-wrap">
+                        <div
+                          className="tags-menu__palette"
+                          style={paletteStyle}
+                          onPointerDown={(event) => {
+                            event.currentTarget.setPointerCapture(event.pointerId)
+                            pickTagColor(tag, event)
+                          }}
+                          onPointerMove={(event) => {
+                            if (event.buttons !== 1) return
+                            pickTagColor(tag, event)
+                          }}
+                          onPointerUp={(event) => {
+                            event.currentTarget.releasePointerCapture(event.pointerId)
+                            void persistTagColor(tag.id)
+                          }}
+                        >
+                          <span className="tags-menu__palette-cursor" />
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                )
+              })}
+            </div>
+
+            <button
+              type="button"
+              className="tags-menu__new"
+              onClick={() => {
+                void handleCreateMenuTag()
+              }}
+              disabled={!isGraphReady}
+            >
+              + New tag
+            </button>
+          </section>
+        ) : null}
+      </div>
+
       <div className="app-actions">
         <div className="account-panel" aria-live="polite">
           {status === 'authenticated' && session?.user ? (
@@ -1250,6 +1411,78 @@ function getLinkPath(fromNode?: PersonNode, toNode?: Offset | null) {
 
 function clampScale(value: number) {
   return Math.max(MIN_SCALE, Math.min(MAX_SCALE, value))
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value))
+}
+
+function hexToRgb(hex: string) {
+  const normalizedHex = normalizeTagColor(hex).slice(1)
+
+  return {
+    r: Number.parseInt(normalizedHex.slice(0, 2), 16),
+    g: Number.parseInt(normalizedHex.slice(2, 4), 16),
+    b: Number.parseInt(normalizedHex.slice(4, 6), 16),
+  }
+}
+
+function rgbToHex(red: number, green: number, blue: number) {
+  return `#${[red, green, blue]
+    .map((channel) => Math.round(channel).toString(16).padStart(2, '0'))
+    .join('')}`
+}
+
+function hexToHsv(hex: string) {
+  const { r, g, b } = hexToRgb(hex)
+  const red = r / 255
+  const green = g / 255
+  const blue = b / 255
+  const max = Math.max(red, green, blue)
+  const min = Math.min(red, green, blue)
+  const delta = max - min
+  let hue = 0
+
+  if (delta !== 0) {
+    if (max === red) hue = ((green - blue) / delta) % 6
+    else if (max === green) hue = (blue - red) / delta + 2
+    else hue = (red - green) / delta + 4
+  }
+
+  return {
+    hue: Math.round((hue * 60 + 360) % 360),
+    saturation: max === 0 ? 0 : (delta / max) * 100,
+    value: max * 100,
+  }
+}
+
+function hsvToHex(hue: number, saturation: number, value: number) {
+  const chroma = (value / 100) * (saturation / 100)
+  const huePrime = hue / 60
+  const x = chroma * (1 - Math.abs((huePrime % 2) - 1))
+  const match = value / 100 - chroma
+  let red = 0
+  let green = 0
+  let blue = 0
+
+  if (huePrime >= 0 && huePrime < 1) [red, green, blue] = [chroma, x, 0]
+  else if (huePrime < 2) [red, green, blue] = [x, chroma, 0]
+  else if (huePrime < 3) [red, green, blue] = [0, chroma, x]
+  else if (huePrime < 4) [red, green, blue] = [0, x, chroma]
+  else if (huePrime < 5) [red, green, blue] = [x, 0, chroma]
+  else [red, green, blue] = [chroma, 0, x]
+
+  return rgbToHex((red + match) * 255, (green + match) * 255, (blue + match) * 255)
+}
+
+function getPalettePosition(color: string) {
+  const hsv = hexToHsv(color)
+
+  return {
+    hue: hsv.hue,
+    x: (hsv.hue / 360) * 100,
+    y: 100 - hsv.saturation,
+  }
 }
 
 export default App

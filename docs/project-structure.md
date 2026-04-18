@@ -52,6 +52,7 @@ Contains the board experience:
 - theme state
 - mouse drag navigation state
 - board zoom state
+- top-left tag menu state
 - motion-triggered point highlight state
 - selected-person inspector state
 - persisted social graph node and connection rendering
@@ -82,6 +83,7 @@ Contains the complete visual system for:
 - very dense point-grid background
 - compact motion-triggered point highlight styling with directional tails for fast cursor movement
 - compact graph node styling
+- top-left tag menu and color palette styling
 - graph edge styling and preview connection styling
 - responsive layout behavior
 

@@ -2,6 +2,7 @@ import type { User } from '@supabase/supabase-js'
 
 import { supabase } from './supabase'
 import type { BoardGraphPayload, Connection, PersonNode, PersonNote, Tag } from './graphTypes'
+import { DEFAULT_TAG_COLOR, DEFAULT_TAGS, normalizeTagColor } from './tagPalette'
 import { ensureUserWorkspace } from './userWorkspace'
 
 type CreatePersonInput = {
@@ -39,6 +40,11 @@ type UpdateNoteInput = {
   body?: string
 }
 
+type UpdateTagInput = {
+  id: string
+  color?: string
+}
+
 function requireSupabase() {
   if (!supabase) {
     throw new Error('Supabase is not configured.')
@@ -57,9 +63,37 @@ export function normalizeTagName(name: string) {
   return name.trim().replace(/\s+/g, ' ')
 }
 
+async function ensureDefaultTags(userId: string) {
+  const client = requireSupabase()
+  const existingTags = await client
+    .from('tags')
+    .select('normalized_name')
+    .eq('user_id', userId)
+
+  if (existingTags.error) throw existingTags.error
+
+  const existingNames = new Set((existingTags.data ?? []).map((tag) => tag.normalized_name))
+  const missingTags = DEFAULT_TAGS.filter(
+    (tag) => !existingNames.has(normalizeTagName(tag.name).toLowerCase()),
+  )
+
+  if (missingTags.length === 0) return
+
+  const insertedTags = await client.from('tags').insert(
+    missingTags.map((tag) => ({
+      user_id: userId,
+      name: tag.name,
+      color: tag.color,
+    })),
+  )
+
+  if (insertedTags.error) throw insertedTags.error
+}
+
 export async function loadBoardGraph(user: User): Promise<BoardGraphPayload> {
   const client = requireSupabase()
   const workspace = await ensureUserWorkspace(user)
+  await ensureDefaultTags(user.id)
 
   const [tagsResult, peopleResult, notesResult, connectionsResult] = await Promise.all([
     client
@@ -99,7 +133,7 @@ export async function loadBoardGraph(user: User): Promise<BoardGraphPayload> {
   }
 }
 
-export async function createTag(userId: string, name: string): Promise<Tag> {
+export async function createTag(userId: string, name: string, color = DEFAULT_TAG_COLOR): Promise<Tag> {
   const client = requireSupabase()
   const normalizedName = normalizeTagName(name)
 
@@ -108,7 +142,26 @@ export async function createTag(userId: string, name: string): Promise<Tag> {
     .insert({
       user_id: userId,
       name: normalizedName,
+      color: normalizeTagColor(color),
     })
+    .select('*')
+    .single()
+
+  if (error) throw error
+
+  return data as Tag
+}
+
+export async function updateTag(input: UpdateTagInput): Promise<Tag> {
+  const client = requireSupabase()
+  const updates: Record<string, string> = {}
+
+  if (input.color !== undefined) updates.color = normalizeTagColor(input.color)
+
+  const { data, error } = await client
+    .from('tags')
+    .update(updates)
+    .eq('id', input.id)
     .select('*')
     .single()
 
