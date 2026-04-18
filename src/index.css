@@ -46,6 +46,11 @@ select {
   --app-bg: #262a33;
   --panel-bg: rgba(25, 28, 35, 0.92);
   --panel-border: rgba(255, 255, 255, 0.05);
+  --panel-text: #dce2ee;
+  --panel-muted: #97a0b2;
+  --panel-error: #ffb6a8;
+  --button-bg: rgba(76, 176, 255, 0.14);
+  --button-border: rgba(76, 176, 255, 0.24);
   --text-strong: #dce2ee;
   --text-soft: #97a0b2;
   --text-dim: #6d7484;
@@ -57,6 +62,8 @@ select {
   --toggle-label: #d6deea;
   --grid-dot: rgba(255, 255, 255, 0.05);
   --grid-dot-major: rgba(255, 255, 255, 0.08);
+  --grid-dot-hover: rgba(149, 212, 255, 0.76);
+  --grid-dot-major-hover: rgba(214, 232, 255, 0.9);
   --grid-glow-a: rgba(30, 36, 48, 0.18);
   --grid-glow-b: rgba(30, 34, 43, 0);
   --edge: rgba(209, 217, 232, 0.2);
@@ -75,6 +82,11 @@ select {
   --app-bg: #eef3f7;
   --panel-bg: rgba(247, 250, 252, 0.95);
   --panel-border: rgba(26, 39, 57, 0.08);
+  --panel-text: #1f2b3d;
+  --panel-muted: #556176;
+  --panel-error: #9d2f22;
+  --button-bg: rgba(25, 132, 255, 0.1);
+  --button-border: rgba(25, 132, 255, 0.18);
   --text-strong: #1f2b3d;
   --text-soft: #556176;
   --text-dim: #7b879a;
@@ -86,6 +98,8 @@ select {
   --toggle-label: #24344b;
   --grid-dot: rgba(49, 61, 80, 0.08);
   --grid-dot-major: rgba(49, 61, 80, 0.12);
+  --grid-dot-hover: rgba(25, 132, 255, 0.58);
+  --grid-dot-major-hover: rgba(28, 78, 150, 0.78);
   --grid-glow-a: rgba(107, 142, 191, 0.1);
   --grid-glow-b: rgba(255, 255, 255, 0);
   --edge: rgba(78, 91, 114, 0.18);
@@ -139,6 +153,89 @@ select {
   border: 0;
   background: transparent;
   cursor: pointer;
+}
+
+.account-panel {
+  display: inline-flex;
+  width: 100%;
+  max-width: 100%;
+  min-height: 48px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--panel-bg);
+  color: var(--panel-text);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.32),
+    0 10px 30px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(14px);
+}
+
+.account-panel__avatar {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--button-bg);
+  color: var(--panel-text);
+  font-size: 14px;
+  font-weight: 700;
+  object-fit: cover;
+}
+
+.account-panel__text {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.account-panel__label,
+.account-panel__meta,
+.account-panel__error {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-panel__label {
+  color: var(--panel-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.account-panel__meta {
+  color: var(--panel-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.account-panel__error {
+  max-width: 160px;
+  color: var(--panel-error);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.account-panel__button {
+  flex: 0 0 auto;
+  padding: 8px 10px;
+  border: 1px solid var(--button-border);
+  border-radius: 8px;
+  background: var(--button-bg);
+  color: var(--panel-text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.account-panel__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
 }
 
 .theme-toggle__track {
@@ -266,6 +363,8 @@ select {
 .board-surface {
   position: absolute;
   inset: 0;
+  z-index: 0;
+  overflow: hidden;
   background-image:
     radial-gradient(circle, var(--grid-dot) 0 var(--dot-size), transparent calc(var(--dot-size) + 0.2px)),
     radial-gradient(circle, var(--grid-dot-major) 0 var(--major-dot-size), transparent calc(var(--major-dot-size) + 0.2px)),
@@ -274,12 +373,18 @@ select {
     var(--dot-gap) var(--dot-gap),
     var(--major-dot-gap) var(--major-dot-gap),
     100% 100%;
+  background-position:
+    var(--board-offset-x) var(--board-offset-y),
+    var(--board-offset-x) var(--board-offset-y),
+    center,
+    center;
 }
 
 .graph-layer {
   position: absolute;
   left: 50%;
   top: 50%;
+  z-index: 2;
   width: 0;
   height: 0;
   transform-origin: 0 0;
@@ -354,6 +459,60 @@ select {
   font-weight: 700;
 }
 
+.board-highlights {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.board-highlights__spot {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle, var(--grid-dot-hover) 0 calc(var(--dot-size) + 0.45px), transparent calc(var(--dot-size) + 0.65px)),
+    radial-gradient(circle, var(--grid-dot-major-hover) 0 calc(var(--major-dot-size) + 0.65px), transparent calc(var(--major-dot-size) + 0.85px));
+  background-size:
+    var(--dot-gap) var(--dot-gap),
+    var(--major-dot-gap) var(--major-dot-gap);
+  background-position:
+    var(--board-offset-x) var(--board-offset-y),
+    var(--board-offset-x) var(--board-offset-y);
+  mask-image: radial-gradient(
+    circle at var(--highlight-x) var(--highlight-y),
+    rgba(0, 0, 0, 1) 0,
+    rgba(0, 0, 0, 0.88) 14px,
+    rgba(0, 0, 0, 0.28) 25px,
+    transparent 38px
+  ),
+    radial-gradient(
+      circle at var(--highlight-tail-x) var(--highlight-tail-y),
+      rgba(0, 0, 0, 0.54) 0,
+      rgba(0, 0, 0, 0.26) var(--highlight-tail-core),
+      transparent var(--highlight-tail-size)
+    );
+  mask-repeat: no-repeat;
+  mask-composite: add;
+  -webkit-mask-composite: source-over;
+  -webkit-mask-image: radial-gradient(
+      circle at var(--highlight-x) var(--highlight-y),
+      rgba(0, 0, 0, 1) 0,
+      rgba(0, 0, 0, 0.88) 14px,
+      rgba(0, 0, 0, 0.28) 25px,
+      transparent 38px
+    ),
+    radial-gradient(
+      circle at var(--highlight-tail-x) var(--highlight-tail-y),
+      rgba(0, 0, 0, 0.54) 0,
+      rgba(0, 0, 0, 0.26) var(--highlight-tail-core),
+      transparent var(--highlight-tail-size)
+    );
+  -webkit-mask-repeat: no-repeat;
+  pointer-events: none;
+  transition: opacity 80ms linear;
+}
+
 @media (max-width: 980px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -376,5 +535,27 @@ select {
     right: 16px;
     top: 16px;
     max-width: calc(100vw - 340px);
+  }
+
+  .theme-toggle__track {
+    min-width: 108px;
+    gap: 10px;
+    padding: 7px 8px 7px 12px;
+  }
+
+  .account-panel__error {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .sidebar {
+    right: 12px;
+    width: auto;
+  }
+
+  .theme-toggle__thumb {
+    width: 26px;
+    height: 26px;
   }
 }

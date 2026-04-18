@@ -2,7 +2,145 @@
 
 ## Status
 
-There is no application code yet, so there are no build or test commands. Current work is coordination and scoping in Linear.
+The repository contains a minimal React, Vite, and TypeScript folder graph viewer.
+
+Current app behavior:
+
+- open a folder graph from the sidebar
+- drag with the mouse to move across the graph surface
+- show compact nearby point highlights while the mouse moves, wheel-pans, or zooms
+- switch between dark and light themes
+- persist the selected theme in `localStorage`
+- optionally sign in with Google through Supabase
+- create one personal graph-space board record for each signed-in user
+
+There is no graph content persistence, multiplayer, or graph editing toolset yet.
+
+## Local Setup
+
+Install dependencies from the lockfile:
+
+```bash
+npm ci
+```
+
+Copy the local environment example and fill in the Supabase project values:
+
+```bash
+cp .env.example .env.local
+```
+
+Required Vite variables:
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+
+Start the development server:
+
+```bash
+npm run dev
+```
+
+Vite prints a local URL in the terminal. Open that URL in a browser.
+
+If the Supabase variables are missing, the app still opens as an anonymous graph viewer and disables Google sign-in.
+
+## Supabase Setup
+
+Apply the database migration in `supabase/migrations/` to the target Supabase project.
+
+For local Supabase CLI workflows:
+
+```bash
+supabase db push
+```
+
+For hosted dashboard workflows, paste and run the migration SQL in the Supabase SQL editor.
+
+Configure Google as an auth provider in Supabase Auth. Add redirect URLs for each app URL used by the team, including:
+
+- `http://localhost:5173`
+- the deployed production URL
+
+The app redirects Google OAuth back to `window.location.origin`, so each origin must be allowlisted in Supabase.
+
+## Dependency Workflow
+
+Use npm for this repository.
+
+For a clean, reproducible install, use:
+
+```bash
+npm ci
+```
+
+This is the closest npm equivalent to a lockfile sync command. It installs exactly what is recorded in `package-lock.json`.
+
+Use `npm install` only when intentionally adding, removing, or changing dependencies:
+
+```bash
+npm install <package>
+npm install -D <package>
+```
+
+To update installed packages within the semver ranges already declared in `package.json`, use:
+
+```bash
+npm update
+```
+
+To inspect available updates before changing anything, use:
+
+```bash
+npm outdated
+```
+
+After any dependency change:
+
+1. Review `package.json` and `package-lock.json`.
+2. Run `npm run build`.
+3. Run `npm run lint`.
+4. Do not keep lockfile churn that is unrelated to the intended dependency change.
+
+## Build And Verification
+
+Create a production build:
+
+```bash
+npm run build
+```
+
+Run lint checks:
+
+```bash
+npm run lint
+```
+
+Preview the production build locally:
+
+```bash
+npm run preview
+```
+
+Manual verification:
+
+1. Open the app in a browser.
+2. Choose a folder from the sidebar and confirm the graph changes.
+3. Drag anywhere on the graph surface and confirm the graph and point grid move smoothly.
+4. Move the mouse across the graph surface and confirm only nearby grid points brighten in a compact area.
+5. Pan or zoom with a wheel or trackpad and confirm nearby grid points brighten.
+6. Stop moving the mouse and confirm the highlighted points fade out.
+7. Toggle the theme.
+8. Reload the page and confirm the selected theme is preserved.
+9. Sign in with Google and confirm the account state appears in the sidebar.
+10. Reload while signed in and confirm the same personal board label remains.
+11. Sign out and confirm the anonymous graph viewer state returns.
+
+Supabase verification:
+
+1. Confirm a row exists in `profiles` for the signed-in user.
+2. Confirm a single row exists in `boards` for the signed-in user.
+3. Confirm row-level security prevents reading or updating another user's board.
 
 ## Team Workflow
 
@@ -18,20 +156,22 @@ There is no application code yet, so there are no build or test commands. Curren
 
 ## Current Priorities
 
-1. Finalize the project idea and scope.
-2. Collect all links and access paths the team needs.
-3. Define presentation and demo roles.
-4. Prepare the final presentation deck.
+1. Keep the demo path stable.
+2. Finalize the project idea and scope in Linear.
+3. Collect all links and access paths the team needs.
+4. Define presentation and demo roles.
+5. Prepare the final presentation deck.
 
-## What To Do When Code Is Added
+## What To Do When Code Changes
 
-- Document the main install, run, test, and verification commands here.
-- Include the expected output for successful runs.
+- Keep the commands above current.
+- Add test commands when automated tests are introduced.
 - Note common failures and the next action to take.
-- Add one obvious local verification command before the first substantial pull request.
+- Add one obvious local verification command before each substantial pull request.
 
 ## Current Verification
 
-- Confirm the repo clones correctly.
-- Confirm the Linear Hackathon project exists.
-- Confirm active tasks are linked from `docs/PROJECT_MAP.md`.
+- `npm run build`
+- `npm run lint`
+- Manual browser check of folder switching, drag navigation, wheel and trackpad navigation, motion-triggered point highlights, and theme persistence
+- Manual Supabase auth check when credentials and Google OAuth are configured

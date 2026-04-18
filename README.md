@@ -10,7 +10,10 @@ An Obsidian-inspired folder graph viewer built with React, Vite, and TypeScript.
 - Mouse drag panning across the graph canvas
 - Trackpad or wheel panning
 - Mouse wheel zoom around the cursor
+- Motion-triggered point highlights while moving, panning, or zooming
 - Theme switcher in the sidebar
+- Optional Google login through Supabase
+- One personal board record for each signed-in user
 - Dark and light themes using the same visual language
 - Point-grid background for spatial reference
 
@@ -18,10 +21,11 @@ An Obsidian-inspired folder graph viewer built with React, Vite, and TypeScript.
 
 ```bash
 npm install
+cp .env.example .env.local
 npm run dev
 ```
 
-Open the local Vite URL in your browser.
+Open the local Vite URL in your browser. Fill in the Supabase values in `.env.local` to enable Google login.
 
 ## Available Scripts
 

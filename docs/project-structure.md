@@ -22,6 +22,10 @@ The main HTML entry point used by Vite.
 
 Project metadata, scripts, and dependencies.
 
+### `supabase/migrations/`
+
+Supabase database migrations for auth-adjacent product data, including profiles, personal boards, and row-level security policies.
+
 ### `src/`
 
 Application source code.
@@ -36,13 +40,25 @@ The React entry point. It mounts the app into the root DOM node.
 
 Contains the full graph viewer behavior:
 
+- Supabase-backed account controls
 - theme state
 - active folder state
 - graph dataset definitions
 - board pan state
 - board zoom state
+- motion-triggered point highlight state
 - sidebar folder switching
 - graph rendering for nodes and links
+- theme toggle
+- graph surface positioning
+
+### `src/lib/`
+
+Shared low-level helpers.
+
+- `supabase.ts` creates the browser Supabase client from Vite environment variables.
+- `useAuth.ts` owns session loading, Google OAuth sign-in, sign-out, and workspace state.
+- `userWorkspace.ts` upserts profile data and ensures one personal board for the signed-in user.
 
 ### `src/index.css`
 
@@ -50,9 +66,12 @@ Contains the full visual system for:
 
 - sidebar layout
 - dark and light themes
+- account controls
 - point-grid background
+- compact motion-triggered point highlight styling with directional tails for fast cursor movement
 - compact graph node styling
 - edge styling
+- board overlay styling
 - responsive layout behavior
 
 ## Current Technical Shape
@@ -62,6 +81,7 @@ The application is intentionally minimal:
 - React for state and rendering
 - Vite for development and builds
 - TypeScript for maintainability
+- Supabase for Google auth and private user-owned records
 - Custom CSS and SVG rendering for the graph view
 
 ## Interaction Model
@@ -73,6 +93,11 @@ The application currently supports:
 - panning across the graph canvas
 - zooming around the cursor
 - switching between dark and light themes
+- Google sign-in and sign-out when Supabase is configured
+- one personal board record per signed-in user
+- trackpad and wheel-based navigation across the canvas
+- compact motion-triggered point highlighting during mouse movement, drag, wheel pan, and zoom
+- grid movement through background offset changes
 
 The graph content is rendered in a transformed world layer, while the background grid tracks the camera position independently.
 
@@ -97,7 +122,8 @@ The project should evolve in controlled layers:
 1. Preserve visual clarity and smooth navigation.
 2. Add richer graph interactions around the existing folder datasets.
 3. Replace demo datasets with real folder ingestion later.
-4. Add search, filtering, and previews only when the base graph experience feels solid.
+4. Keep account persistence separate from graph content persistence until the real graph model is clear.
+5. Add search, filtering, and previews only when the base graph experience feels solid.
 
 ## Future Folders We May Add
 

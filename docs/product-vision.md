@@ -17,6 +17,7 @@ Users should be able to:
 3. pan through the graph smoothly
 4. zoom around the cursor
 5. recognize clusters, hubs, and related notes visually
+6. optionally sign in with Google to claim a personal graph space
 
 ## Visual Goal
 
@@ -45,13 +46,13 @@ That makes the product easier to understand and easier to evolve later.
 3. Smooth panning and zooming
 4. A convincing Obsidian-like visual style
 5. Test data that is rich enough to validate the graph experience
+6. A lightweight account foundation for personal graph ownership
 
 ## What We Intentionally Avoid Right Now
 
 - graph editing tools
 - note creation UI
-- persistence
-- backend storage
+- graph content persistence
 - collaboration
 - filters and search
 - graph physics simulation
