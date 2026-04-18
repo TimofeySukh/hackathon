@@ -1,0 +1,2 @@
+[functions.sync-person-ai-note]
+verify_jwt = false

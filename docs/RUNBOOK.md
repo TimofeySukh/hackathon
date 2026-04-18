@@ -140,6 +140,8 @@ Deploy the function before testing AI note sync:
 supabase functions deploy sync-person-ai-note
 ```
 
+`supabase/config.toml` sets `sync-person-ai-note` to `verify_jwt = false` at the Supabase gateway because the function performs its own user-token validation with `supabase.auth.getUser()`. Do not remove the in-function authorization check.
+
 Required function secret:
 
 ```bash
