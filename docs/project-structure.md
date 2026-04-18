@@ -126,6 +126,7 @@ It currently supports:
 - inspector opening at a consistent size regardless of current zoom, then scaling with later zoom changes
 - continued trackpad panning over the inspector when the gesture starts on the board
 - connection line selection with a widened hit target, inline deletion, and Backspace deletion
+- a compact top bar with a capped-width search field and circular tags, account, and theme controls
 - local people search while typing plus natural-language AI search on Enter
 - drag repositioning for non-root nodes
 - persisted node renaming

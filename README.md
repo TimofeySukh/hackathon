@@ -19,7 +19,7 @@ A persisted social graph board built with React, Vite, and TypeScript.
 - One personal board record for each signed-in user
 - One immutable root node at `0,0` for each signed-in user
 - Persistent people, colored tags, notes, and undirected connections in Supabase
-- Top-left Tags menu with tag renaming plus preset and custom color picking
+- Compact top bar with a rounded search field plus circular tags, account, and theme controls
 - A login popup appears when signed-out users try to edit the board
 - Minimal selected-person inspector with a large name field, compact tag picker, and auto-saving notes
 - Single-click a person to open that inspector directly on the board

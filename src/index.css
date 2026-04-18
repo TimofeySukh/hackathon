@@ -86,14 +86,13 @@ input[type='search']::-webkit-search-results-decoration {
 }
 
 .top-bar {
-  --top-bar-control-height: 72px;
+  --top-bar-control-height: 60px;
   position: absolute;
   inset: 16px 16px auto;
   z-index: 4;
-  display: grid;
-  grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
-  align-items: start;
-  gap: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   pointer-events: none;
 }
 
@@ -103,12 +102,37 @@ input[type='search']::-webkit-search-results-decoration {
   pointer-events: auto;
 }
 
+.top-bar__left {
+  flex: 0 0 auto;
+}
+
 .top-bar__right {
+  flex: 1 1 auto;
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: center;
   justify-content: flex-end;
   gap: 12px;
+}
+
+.top-bar__icon-button {
+  width: var(--top-bar-control-height);
+  height: var(--top-bar-control-height);
+  min-width: var(--top-bar-control-height);
+  padding: 0;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  background: var(--panel-bg);
+  color: var(--panel-text);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 12px 28px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(14px);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 800;
 }
 
 .theme-dark {
@@ -167,9 +191,10 @@ input[type='search']::-webkit-search-results-decoration {
 }
 
 .tags-menu {
+  position: relative;
   display: grid;
-  gap: 14px;
-  width: min(320px, 100%);
+  gap: 12px;
+  width: var(--top-bar-control-height);
 }
 
 .tags-menu__toggle,
@@ -192,12 +217,14 @@ input[type='search']::-webkit-search-results-decoration {
 }
 
 .tags-menu__toggle {
-  width: fit-content;
-  min-width: 124px;
-  text-align: center;
+  border-radius: 999px;
 }
 
 .tags-menu__panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  width: 320px;
   display: grid;
   gap: 16px;
   padding: 16px;
@@ -365,13 +392,14 @@ input[type='search']::-webkit-search-results-decoration {
 .tags-menu__new {
   width: 100%;
   background: rgba(138, 255, 214, 0.14);
+  border-radius: 999px;
 }
 
 .search-panel {
   position: relative;
-  flex: 0 1 300px;
-  width: min(300px, 100%);
-  min-width: min(220px, 100%);
+  flex: 0 1 380px;
+  width: min(380px, 100%);
+  min-width: 220px;
   color: var(--panel-text);
 }
 
@@ -381,7 +409,7 @@ input[type='search']::-webkit-search-results-decoration {
   min-height: var(--top-bar-control-height);
   padding: 8px 10px;
   border: 1px solid var(--panel-border);
-  border-radius: 22px;
+  border-radius: 999px;
   background: var(--panel-bg);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.28),
@@ -409,7 +437,7 @@ input[type='search']::-webkit-search-results-decoration {
   z-index: 8;
   padding: 12px;
   border: 1px solid var(--panel-border);
-  border-radius: 18px;
+  border-radius: 20px;
   background: var(--panel-bg);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.24),
@@ -483,7 +511,7 @@ input[type='search']::-webkit-search-results-decoration {
   gap: 6px;
   width: 100%;
   padding: 12px;
-  border-radius: 14px;
+  border-radius: 20px;
   cursor: pointer;
   text-align: left;
   transition:
@@ -513,43 +541,54 @@ input[type='search']::-webkit-search-results-decoration {
   align-items: center;
   justify-content: center;
   padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
+}
+
+.theme-toggle__glyph {
+  font-size: 22px;
+  line-height: 1;
 }
 
 .account-panel {
-  display: inline-flex;
-  flex: 1 1 320px;
-  width: min(100%, 520px);
-  max-width: 520px;
-  min-height: var(--top-bar-control-height);
-  align-items: center;
+  position: relative;
+  display: grid;
   gap: 10px;
-  padding: 12px 14px;
-  border: 1px solid var(--panel-border);
-  border-radius: 22px;
-  background: var(--panel-bg);
-  color: var(--panel-text);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.32),
-    0 10px 30px rgba(0, 0, 0, 0.08);
-  backdrop-filter: blur(14px);
 }
 
 .account-panel__avatar {
   display: inline-flex;
-  width: 32px;
-  height: 32px;
-  flex: 0 0 auto;
+  width: calc(var(--top-bar-control-height) - 8px);
+  height: calc(var(--top-bar-control-height) - 8px);
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: var(--button-bg);
+  background: transparent;
   color: var(--panel-text);
   font-size: 14px;
   font-weight: 700;
   object-fit: cover;
+}
+
+.account-panel__trigger {
+  overflow: hidden;
+}
+
+.account-panel__popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 8;
+  display: grid;
+  gap: 10px;
+  width: min(280px, calc(100vw - 32px));
+  padding: 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 20px;
+  background: var(--panel-bg);
+  color: var(--panel-text);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    0 18px 42px rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(18px);
 }
 
 .account-panel__text {
@@ -569,13 +608,13 @@ input[type='search']::-webkit-search-results-decoration {
 
 .account-panel__label {
   color: var(--panel-text);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
 }
 
 .account-panel__meta {
   color: var(--panel-muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
 }
 
@@ -588,9 +627,9 @@ input[type='search']::-webkit-search-results-decoration {
 
 .account-panel__button {
   flex: 0 0 auto;
-  padding: 8px 10px;
+  padding: 9px 12px;
   border: 1px solid var(--button-border);
-  border-radius: 8px;
+  border-radius: 999px;
   background: var(--button-bg);
   color: var(--panel-text);
   cursor: pointer;
@@ -618,44 +657,6 @@ input[type='search']::-webkit-search-results-decoration {
 .stack-list__button:hover,
 .danger-button:hover {
   transform: translateY(-1px);
-}
-
-.theme-toggle__track {
-  display: inline-flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-width: 120px;
-  min-height: var(--top-bar-control-height);
-  padding: 12px 14px 12px 18px;
-  border-radius: 999px;
-  border: 1px solid var(--toggle-border);
-  background: var(--toggle-bg);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.4),
-    0 10px 30px rgba(0, 0, 0, 0.08);
-  backdrop-filter: blur(14px);
-}
-
-.theme-toggle__label {
-  color: var(--toggle-label);
-  font-size: 13px;
-  font-weight: 600;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.theme-toggle__thumb {
-  position: relative;
-  width: 30px;
-  height: 30px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: var(--toggle-thumb);
-  box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.35),
-    0 4px 14px rgba(0, 0, 0, 0.12);
 }
 
 .login-prompt {
@@ -1407,27 +1408,24 @@ input[type='search']::-webkit-search-results-decoration {
 @media (max-width: 720px) {
   .top-bar {
     inset: 12px 12px auto;
+    display: grid;
     grid-template-columns: 1fr;
     gap: 10px;
     --top-bar-control-height: 64px;
   }
 
   .top-bar__right {
-    justify-content: stretch;
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
     gap: 8px;
   }
 
   .tags-menu,
   .search-panel,
-  .account-panel,
-  .theme-toggle {
-    width: 100%;
+  .account-panel {
+    width: auto;
     max-width: none;
-  }
-
-  .search-panel {
-    flex-basis: auto;
-    min-width: 0;
   }
 
   .search-panel__dropdown {
@@ -1435,8 +1433,9 @@ input[type='search']::-webkit-search-results-decoration {
     margin-top: 8px;
   }
 
-  .account-panel {
-    flex: 1 1 auto;
+  .tags-menu__panel {
+    position: static;
+    width: 100%;
   }
 
   .zoom-indicator {
@@ -1446,12 +1445,8 @@ input[type='search']::-webkit-search-results-decoration {
     padding: 9px 12px;
   }
 
-  .account-panel__avatar {
-    display: none;
-  }
-
   .account-panel__button {
-    padding: 7px 8px;
+    padding: 8px 10px;
   }
 
   .account-panel__error {
@@ -1460,19 +1455,6 @@ input[type='search']::-webkit-search-results-decoration {
 
   .account-panel__text {
     min-width: 0;
-  }
-
-  .theme-toggle__track {
-    width: 100%;
-    justify-content: space-between;
-    gap: 10px;
-    min-width: 108px;
-    padding: 10px 12px 10px 14px;
-  }
-
-  .theme-toggle__thumb {
-    width: 26px;
-    height: 26px;
   }
 
   .inspector-panel {

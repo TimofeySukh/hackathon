@@ -201,6 +201,7 @@ function App() {
   const [isTagPickerOpen, setIsTagPickerOpen] = useState(false)
   const [activeTagOptionIndex, setActiveTagOptionIndex] = useState(0)
   const [isTagsMenuOpen, setIsTagsMenuOpen] = useState(false)
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
   const [activeColorTagId, setActiveColorTagId] = useState<string | null>(null)
   const [tagColorDrafts, setTagColorDrafts] = useState<Record<string, string>>(() =>
     loadTagColorDrafts(),
@@ -1477,6 +1478,10 @@ function App() {
     }
   }
 
+  const themeIconLabel = theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'
+  const accountMenuLabel =
+    status === 'authenticated' && session?.user ? 'Account menu' : 'Sign in menu'
+
   return (
     <main className={`app-shell theme-${theme}`}>
       {isLoginPromptOpen ? (
@@ -1526,11 +1531,12 @@ function App() {
           <div className="tags-menu">
             <button
               type="button"
-              className="tags-menu__toggle"
+              className="top-bar__icon-button tags-menu__toggle"
               onClick={() => setIsTagsMenuOpen((isOpen) => !isOpen)}
               aria-expanded={isTagsMenuOpen}
+              aria-label="Tags menu"
             >
-              Tags
+              #
             </button>
 
             {isTagsMenuOpen ? (
@@ -1734,63 +1740,77 @@ function App() {
           </div>
 
           <div className="account-panel" aria-live="polite">
-            {status === 'authenticated' && session?.user ? (
-              <>
-                {session.user.user_metadata.avatar_url ? (
-                  <img
-                    className="account-panel__avatar"
-                    src={session.user.user_metadata.avatar_url}
-                    alt=""
-                  />
+            <button
+              type="button"
+              className="top-bar__icon-button account-panel__trigger"
+              onClick={() => setIsAccountMenuOpen((isOpen) => !isOpen)}
+              aria-expanded={isAccountMenuOpen}
+              aria-label={accountMenuLabel}
+            >
+              {status === 'authenticated' && session?.user?.user_metadata.avatar_url ? (
+                <img
+                  className="account-panel__avatar"
+                  src={session.user.user_metadata.avatar_url}
+                  alt=""
+                />
+              ) : (
+                <span className="account-panel__avatar" aria-hidden="true">
+                  {status === 'authenticated' && session?.user
+                    ? (session.user.email ?? 'U').slice(0, 1).toUpperCase()
+                    : '@'}
+                </span>
+              )}
+            </button>
+
+            {isAccountMenuOpen ? (
+              <div className="account-panel__popover">
+                {status === 'authenticated' && session?.user ? (
+                  <>
+                    <div className="account-panel__text">
+                      <span className="account-panel__label">{session.user.email}</span>
+                      <span className="account-panel__meta">
+                        {graphStatus === 'loading' ? 'Loading your graph' : board?.title ?? 'Personal board'}
+                      </span>
+                    </div>
+                    <button type="button" className="account-panel__button" onClick={signOut}>
+                      Sign out
+                    </button>
+                  </>
                 ) : (
-                  <span className="account-panel__avatar" aria-hidden="true">
-                    {(session.user.email ?? 'U').slice(0, 1).toUpperCase()}
-                  </span>
+                  <>
+                    <div className="account-panel__text">
+                      <span className="account-panel__label">
+                        {status === 'loading' ? 'Checking session' : 'Social graph'}
+                      </span>
+                      <span className="account-panel__meta">
+                        {status === 'unconfigured'
+                          ? 'Connect Supabase to enable Google login'
+                          : 'Sign in to save your network space'}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="account-panel__button"
+                      onClick={signInWithGoogle}
+                      disabled={status === 'loading' || status === 'unconfigured'}
+                    >
+                      Sign in with Google
+                    </button>
+                  </>
                 )}
-                <span className="account-panel__text">
-                  <span className="account-panel__label">{session.user.email}</span>
-                  <span className="account-panel__meta">
-                    {graphStatus === 'loading' ? 'Loading your graph' : board?.title ?? 'Personal board'}
-                  </span>
-                </span>
-                <button type="button" className="account-panel__button" onClick={signOut}>
-                  Sign out
-                </button>
-              </>
-            ) : (
-              <>
-                <span className="account-panel__text">
-                  <span className="account-panel__label">
-                    {status === 'loading' ? 'Checking session' : 'Social graph'}
-                  </span>
-                  <span className="account-panel__meta">
-                    {status === 'unconfigured'
-                      ? 'Connect Supabase to enable Google login'
-                      : 'Sign in to save your network space'}
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  className="account-panel__button"
-                  onClick={signInWithGoogle}
-                  disabled={status === 'loading' || status === 'unconfigured'}
-                >
-                  Sign in with Google
-                </button>
-              </>
-            )}
-            {error ? <span className="account-panel__error">{error}</span> : null}
+                {error ? <span className="account-panel__error">{error}</span> : null}
+              </div>
+            ) : null}
           </div>
 
           <button
             type="button"
-            className="theme-toggle"
+            className="top-bar__icon-button theme-toggle"
             onClick={() => setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))}
-            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+            aria-label={themeIconLabel}
           >
-            <span className="theme-toggle__track">
-              <span className="theme-toggle__label">{theme === 'dark' ? 'Dark' : 'Light'}</span>
-              <span className="theme-toggle__thumb" />
+            <span className="theme-toggle__glyph" aria-hidden="true">
+              {theme === 'dark' ? '☀' : '☾'}
             </span>
           </button>
         </div>
