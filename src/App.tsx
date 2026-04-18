@@ -228,6 +228,8 @@ function App() {
   const inspectorPanelRef = useRef<HTMLElement | null>(null)
   const zoomIndicatorRef = useRef<HTMLDivElement | null>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
+  const tagPickerMenuRef = useRef<HTMLDivElement | null>(null)
+  const tagPickerOptionRefs = useRef<Array<HTMLButtonElement | null>>([])
   const highlightIdRef = useRef(0)
   const lastHighlightSpotRef = useRef<Offset | null>(null)
   const inspectorWorldPositionRef = useRef<Offset | null>(null)
@@ -433,6 +435,28 @@ function App() {
 
     searchInputRef.current?.focus()
   }, [isSearchOpen])
+
+  useEffect(() => {
+    if (!isTagPickerOpen) return
+
+    const menu = tagPickerMenuRef.current
+    const activeOption = tagPickerOptionRefs.current[activeTagOptionIndex]
+    if (!menu || !activeOption) return
+
+    const optionTop = activeOption.offsetTop
+    const optionBottom = optionTop + activeOption.offsetHeight
+    const visibleTop = menu.scrollTop
+    const visibleBottom = visibleTop + menu.clientHeight
+
+    if (optionTop < visibleTop) {
+      menu.scrollTop = optionTop
+      return
+    }
+
+    if (optionBottom > visibleBottom) {
+      menu.scrollTop = optionBottom - menu.clientHeight
+    }
+  }, [activeTagOptionIndex, isTagPickerOpen, tagPickerOptions.length])
 
   const applyViewport = useCallback((nextOffset: Offset, nextScale: number) => {
     viewportRef.current = { offset: nextOffset, scale: nextScale }
@@ -1607,10 +1631,18 @@ function App() {
                 }
               />
               {isTagPickerOpen ? (
-                <div id="inspector-tag-options" className="tag-picker__menu" role="listbox">
+                <div
+                  ref={tagPickerMenuRef}
+                  id="inspector-tag-options"
+                  className="tag-picker__menu"
+                  role="listbox"
+                >
                   {tagPickerOptions.map((option, optionIndex) => (
                     <button
                       key={option.id}
+                      ref={(element) => {
+                        tagPickerOptionRefs.current[optionIndex] = element
+                      }}
                       id={`inspector-tag-option-${option.id}`}
                       type="button"
                       className={[
