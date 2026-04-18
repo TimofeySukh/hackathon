@@ -36,6 +36,8 @@ Copy the local environment example and fill in the Supabase project values:
 cp .env.example .env.local
 ```
 
+Project MCP configuration lives in `.mcp.json`. The repository currently includes the shared `n8n-mcp` HTTP server configuration for `https://velizard.app.n8n.cloud/mcp-server/http`.
+
 Required Vite variables:
 
 - `VITE_SUPABASE_URL`
