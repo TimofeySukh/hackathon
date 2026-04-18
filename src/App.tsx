@@ -131,24 +131,26 @@ function App() {
     const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY)
     return savedTheme === 'light' ? 'light' : 'dark'
   })
-  const [offset, setOffset] = useState<Offset>({ x: 0, y: 0 })
-  const [scale, setScale] = useState(1)
+  const [zoomPercentage, setZoomPercentage] = useState(100)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+  const [inspectorNodeId, setInspectorNodeId] = useState<string | null>(null)
   const [connectionDrag, setConnectionDrag] = useState<ConnectionDrag | null>(null)
   const [nodeDrag, setNodeDrag] = useState<NodeDrag | null>(null)
   const [draggedPositions, setDraggedPositions] = useState<Record<string, Offset>>({})
+  const [nameDraft, setNameDraft] = useState('')
   const [tagDraft, setTagDraft] = useState('')
   const [newNoteTitle, setNewNoteTitle] = useState('')
   const [newNoteBody, setNewNoteBody] = useState('')
   const [noteDrafts, setNoteDrafts] = useState<Record<string, NoteDraft>>({})
-  const [highlightSpots, setHighlightSpots] = useState<HighlightSpot[]>([])
-  const [pointerPosition, setPointerPosition] = useState<Offset | null>(null)
-  const [highlightClock, setHighlightClock] = useState(() => Date.now())
   const [isDraggingBoard, setIsDraggingBoard] = useState(false)
 
   const boardRef = useRef<HTMLElement | null>(null)
-  const highlightIdRef = useRef(0)
-  const lastHighlightSpotRef = useRef<Offset | null>(null)
+  const boardSurfaceRef = useRef<HTMLDivElement | null>(null)
+  const graphLayerRef = useRef<HTMLDivElement | null>(null)
+  const zoomIndicatorRef = useRef<HTMLDivElement | null>(null)
+  const viewportRef = useRef({ offset: { x: 0, y: 0 }, scale: 1 })
+  const pendingViewportRef = useRef<{ offset: Offset; scale: number } | null>(null)
+  const viewportFrameRef = useRef<number | null>(null)
   const boardDragRef = useRef({
     startX: 0,
     startY: 0,
@@ -185,22 +187,27 @@ function App() {
     return null
   }, [activeSelectedNodeId, boardNodes.length, nodesById])
 
-  const selectedNodeNotes = useMemo(
-    () => notes.filter((note) => note.person_id === selectedNode?.id),
-    [notes, selectedNode?.id],
+  const inspectorNode = useMemo(() => {
+    if (!inspectorNodeId) return null
+    return nodesById[inspectorNodeId] ?? null
+  }, [inspectorNodeId, nodesById])
+
+  const inspectorNodeNotes = useMemo(
+    () => notes.filter((note) => note.person_id === inspectorNode?.id),
+    [inspectorNode?.id, notes],
   )
 
-  const selectedNodeConnections = useMemo(() => {
-    if (!selectedNode) return []
+  const inspectorNodeConnections = useMemo(() => {
+    if (!inspectorNode) return []
 
     return boardConnections
       .filter(
         (connection) =>
-          connection.person_a_id === selectedNode.id || connection.person_b_id === selectedNode.id,
+          connection.person_a_id === inspectorNode.id || connection.person_b_id === inspectorNode.id,
       )
       .map((connection) => {
         const otherPersonId =
-          connection.person_a_id === selectedNode.id
+          connection.person_a_id === inspectorNode.id
             ? connection.person_b_id
             : connection.person_a_id
 
@@ -210,7 +217,7 @@ function App() {
         }
       })
       .filter((entry) => entry.otherPerson)
-  }, [boardConnections, nodesById, selectedNode])
+  }, [boardConnections, inspectorNode, nodesById])
 
   const error = authError ?? graphError
 
@@ -309,6 +316,7 @@ function App() {
         if (targetNode) {
           await createConnection(connectionDrag.fromId, targetNode.id)
           setSelectedNodeId(targetNode.id)
+          setInspectorNodeId(null)
           setConnectionDrag(null)
           return
         }
@@ -321,6 +329,7 @@ function App() {
         })
         await createConnection(connectionDrag.fromId, createdNode.id)
         setSelectedNodeId(createdNode.id)
+        setInspectorNodeId(null)
       } finally {
         setConnectionDrag(null)
       }
@@ -422,6 +431,7 @@ function App() {
 
     addHighlightSpot(event.clientX, event.clientY, true)
     setIsDraggingBoard(true)
+    setInspectorNodeId(null)
   }
 
   function startNodeInteraction(node: PersonNode, event: ReactMouseEvent<HTMLButtonElement>) {
@@ -431,6 +441,7 @@ function App() {
     boardDragRef.current.active = false
     setIsDraggingBoard(false)
     setSelectedNodeId(node.id)
+    setInspectorNodeId(null)
 
     if (!isGraphReady) return
 
@@ -491,47 +502,48 @@ function App() {
     })
   }
 
-  async function saveSelectedName(nextValue: string) {
-    if (!selectedNode || !isGraphReady) return
+  async function saveInspectorName() {
+    if (!inspectorNode || !isGraphReady) return
 
+    const nextValue = nameDraft
     const nextName = nextValue.trim()
-    if (nextName === selectedNode.name) return
+    if (nextName === inspectorNode.name) return
 
     await updatePerson({
-      id: selectedNode.id,
+      id: inspectorNode.id,
       name: nextName,
     })
   }
 
   async function handleTagSelection(nextTagId: string) {
-    if (!selectedNode || !isGraphReady) return
+    if (!inspectorNode || !isGraphReady) return
 
     await updatePerson({
-      id: selectedNode.id,
+      id: inspectorNode.id,
       tag_id: nextTagId || null,
     })
   }
 
   async function handleCreateTag() {
-    if (!tagDraft.trim() || !selectedNode || !isGraphReady) return
+    if (!tagDraft.trim() || !inspectorNode || !isGraphReady) return
 
     const createdTag = await createTag(normalizeTagName(tagDraft))
     setTagDraft('')
     await updatePerson({
-      id: selectedNode.id,
+      id: inspectorNode.id,
       tag_id: createdTag.id,
     })
   }
 
   async function handleCreateNote() {
-    if (!selectedNode || !isGraphReady) return
+    if (!inspectorNode || !isGraphReady) return
 
     const title = newNoteTitle.trim() || 'Untitled note'
     const body = newNoteBody.trim()
 
     if (!title && !body) return
 
-    await createNote(title, body, selectedNode.id)
+    await createNote(title, body, inspectorNode.id)
     setNewNoteTitle('')
     setNewNoteBody('')
   }
@@ -540,8 +552,8 @@ function App() {
     setNoteDrafts((currentDrafts) => ({
       ...currentDrafts,
       [noteId]: {
-        title: currentDrafts[noteId]?.title ?? selectedNodeNotes.find((note) => note.id === noteId)?.title ?? '',
-        body: currentDrafts[noteId]?.body ?? selectedNodeNotes.find((note) => note.id === noteId)?.body ?? '',
+        title: currentDrafts[noteId]?.title ?? inspectorNodeNotes.find((note) => note.id === noteId)?.title ?? '',
+        body: currentDrafts[noteId]?.body ?? inspectorNodeNotes.find((note) => note.id === noteId)?.body ?? '',
         [field]: value,
       },
     }))
@@ -571,9 +583,10 @@ function App() {
   }
 
   async function handleDeletePerson() {
-    if (!selectedNode || !isGraphReady || selectedNode.is_root) return
+    if (!inspectorNode || !isGraphReady || inspectorNode.is_root) return
 
-    await deletePerson(selectedNode.id)
+    await deletePerson(inspectorNode.id)
+    setInspectorNodeId(null)
     setSelectedNodeId(null)
   }
 
@@ -692,19 +705,25 @@ function App() {
         </button>
       </div>
 
-      {selectedNode ? (
-        <aside className="inspector-panel">
+      {inspectorNode ? (
+        <aside
+          className="inspector-panel inspector-panel--floating"
+          style={{
+            left: `calc(50% + ${offset.x + inspectorNode.x * scale + 42}px)`,
+            top: `calc(50% + ${offset.y + inspectorNode.y * scale}px)`,
+          }}
+        >
           <div className="inspector-panel__header">
             <div>
               <p className="inspector-panel__eyebrow">
-                {selectedNode.is_root ? 'Your node' : 'Selected person'}
+                {inspectorNode.is_root ? 'Your node' : 'Selected person'}
               </p>
               <h2 className="inspector-panel__title">
-                {selectedNode.name.trim() || (selectedNode.is_root ? 'You' : 'Unnamed person')}
+                {inspectorNode.name.trim() || (inspectorNode.is_root ? 'You' : 'Unnamed person')}
               </h2>
             </div>
             <span className="inspector-panel__hint">
-              {selectedNode.is_root
+              {inspectorNode.is_root
                 ? 'Root stays at 0,0'
                 : isGraphReady
                   ? 'Drag to connect. Hold Shift to move.'
@@ -715,11 +734,11 @@ function App() {
           <label className="field-group">
             <span className="field-group__label">Name</span>
             <input
-              key={`${selectedNode.id}-${selectedNode.updated_at}`}
               className="field-group__input"
-              defaultValue={selectedNode.name}
-              onBlur={(event) => {
-                void saveSelectedName(event.currentTarget.value)
+              value={nameDraft}
+              onChange={(event) => setNameDraft(event.target.value)}
+              onBlur={() => {
+                void saveInspectorName()
               }}
               disabled={!isGraphReady}
               placeholder="Name"
@@ -730,7 +749,7 @@ function App() {
             <span className="field-group__label">Tag</span>
             <select
               className="field-group__input"
-              value={selectedNode.tag_id ?? ''}
+              value={inspectorNode.tag_id ?? ''}
               onChange={(event) => {
                 void handleTagSelection(event.target.value)
               }}
@@ -767,18 +786,18 @@ function App() {
           <div className="field-group">
             <span className="field-group__label">Position</span>
             <p className="field-group__meta">
-              X {selectedNode.x.toFixed(0)}, Y {selectedNode.y.toFixed(0)}
+              X {inspectorNode.x.toFixed(0)}, Y {inspectorNode.y.toFixed(0)}
             </p>
           </div>
 
           <div className="field-group">
             <div className="field-group__header">
               <span className="field-group__label">Connections</span>
-              <span className="field-group__meta">{selectedNodeConnections.length}</span>
+              <span className="field-group__meta">{inspectorNodeConnections.length}</span>
             </div>
-            {selectedNodeConnections.length > 0 ? (
+            {inspectorNodeConnections.length > 0 ? (
               <div className="stack-list">
-                {selectedNodeConnections.map(({ connection, otherPerson }) => (
+                {inspectorNodeConnections.map(({ connection, otherPerson }) => (
                   <div key={connection.id} className="stack-list__item">
                     <span className="stack-list__text">
                       {otherPerson?.name.trim() || 'Unnamed person'}
@@ -805,12 +824,12 @@ function App() {
           <div className="field-group">
             <div className="field-group__header">
               <span className="field-group__label">Notes</span>
-              <span className="field-group__meta">{selectedNodeNotes.length}</span>
+              <span className="field-group__meta">{inspectorNodeNotes.length}</span>
             </div>
 
-            {selectedNodeNotes.length > 0 ? (
+            {inspectorNodeNotes.length > 0 ? (
               <div className="note-list">
-                {selectedNodeNotes.map((note) => {
+                {inspectorNodeNotes.map((note) => {
                   const draft = noteDrafts[note.id] ?? {
                     title: note.title,
                     body: note.body,
@@ -887,7 +906,7 @@ function App() {
             </div>
           </div>
 
-          {!selectedNode.is_root && isGraphReady ? (
+          {!inspectorNode.is_root && isGraphReady ? (
             <button
               type="button"
               className="danger-button"
@@ -975,6 +994,13 @@ function App() {
                   onClick={(event) => {
                     event.stopPropagation()
                     setSelectedNodeId(node.id)
+                    setInspectorNodeId(null)
+                  }}
+                  onDoubleClick={(event) => {
+                    event.stopPropagation()
+                    setSelectedNodeId(node.id)
+                    setInspectorNodeId(node.id)
+                    setNameDraft(node.name)
                   }}
                 >
                   <span className="graph-node__dot" />

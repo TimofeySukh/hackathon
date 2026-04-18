@@ -276,6 +276,14 @@ select {
   overflow-y: auto;
 }
 
+.inspector-panel--floating {
+  top: auto;
+  right: auto;
+  bottom: auto;
+  max-height: min(70vh, 720px);
+  transform: translateY(-50%);
+}
+
 .inspector-panel__header {
   display: grid;
   gap: 10px;
