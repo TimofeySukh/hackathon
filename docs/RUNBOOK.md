@@ -197,6 +197,22 @@ After any dependency change:
 3. Run `npm run lint`.
 4. Do not keep lockfile churn that is unrelated to the intended dependency change.
 
+## MCP Tooling
+
+Codex can use the official Remotion documentation MCP server when the project needs video-generation guidance or Remotion API lookup.
+
+The shared Codex setup uses the official package:
+
+```bash
+npx -y @remotion/mcp@latest
+```
+
+Reference documentation:
+
+- [Remotion MCP docs](https://www.remotion.dev/docs/ai/mcp)
+
+If the MCP server does not appear in a fresh Codex session, restart Codex so it reloads the local MCP configuration.
+
 ## Build And Verification
 
 Create a production build:
