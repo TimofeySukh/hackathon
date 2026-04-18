@@ -114,7 +114,7 @@ export async function loadBoardGraph(user: User): Promise<BoardGraphPayload> {
       .from('tags')
       .select('*')
       .eq('user_id', user.id)
-      .order('name', { ascending: true }),
+      .order('created_at', { ascending: true }),
     client
       .from('people')
       .select('*')

@@ -146,7 +146,7 @@ export function useBoardGraph(user: User | null) {
         const tag = await createTag(userId, name)
         setGraphState((currentState) => ({
           ...currentState,
-          tags: [...currentState.tags, tag].sort((left, right) => left.name.localeCompare(right.name)),
+          tags: [...currentState.tags, tag],
           error: null,
         }))
         return tag
