@@ -417,16 +417,32 @@ select {
   touch-action: none;
 }
 
+.board-viewport::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 20%),
+    radial-gradient(circle at center, transparent 56%, rgba(0, 0, 0, 0.08) 100%);
+  pointer-events: none;
+}
+
 .board-viewport.is-dragging {
   cursor: grabbing;
 }
 
 .board-surface {
   position: absolute;
-  inset: 0;
+  left: 50%;
+  top: 50%;
   z-index: 0;
+  width: 12000px;
+  height: 12000px;
   overflow: hidden;
-  will-change: background-position;
+  transform: translate(-50%, -50%);
+  transform-origin: center;
+  will-change: transform;
   background-image:
     radial-gradient(circle, var(--grid-dot) 0 var(--dot-size), transparent calc(var(--dot-size) + 0.2px)),
     radial-gradient(circle, var(--grid-dot-major) 0 var(--major-dot-size), transparent calc(var(--major-dot-size) + 0.2px)),
@@ -438,20 +454,14 @@ select {
     100% 100%,
     100% 100%;
   background-position:
-    var(--board-offset-x) var(--board-offset-y),
-    var(--board-offset-x) var(--board-offset-y),
+    center,
+    center,
     center,
     center;
 }
 
 .board-surface::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 20%),
-    radial-gradient(circle at center, transparent 56%, rgba(0, 0, 0, 0.08) 100%);
-  pointer-events: none;
+  content: none;
 }
 
 .graph-layer {
