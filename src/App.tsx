@@ -85,6 +85,10 @@ type TagPaletteStyle = CSSProperties & {
   '--palette-cursor-y': string
 }
 
+type GraphNodeStyle = CSSProperties & {
+  '--node-color'?: string
+}
+
 type GestureEventLike = Event & {
   clientX: number
   clientY: number
@@ -233,6 +237,16 @@ function App() {
             isPersisted: false,
           })),
     [isGraphReady, tagColorDrafts, tags],
+  )
+  const tagColorById = useMemo(
+    () =>
+      Object.fromEntries(
+        tags.map((tag) => [
+          tag.id,
+          normalizeTagColor(tagColorDrafts[tag.id] ?? tag.color ?? DEFAULT_TAG_COLOR),
+        ]),
+      ) as Record<string, string>,
+    [tagColorDrafts, tags],
   )
   const defaultSelectedNodeId = boardNodes.find((node) => node.is_root)?.id ?? boardNodes[0]?.id ?? null
   const activeSelectedNodeId =
@@ -1350,12 +1364,18 @@ function App() {
 
           {boardNodes.map((node) => {
             const isSelected = node.id === selectedNode?.id
+            const tagColor = node.tag_id ? tagColorById[node.tag_id] : null
+            const nodeStyle = {
+              left: `${node.x}px`,
+              top: `${node.y}px`,
+              ...(tagColor ? { '--node-color': tagColor } : {}),
+            } as GraphNodeStyle
 
             return (
               <div
                 key={node.id}
                 className={`graph-node${node.is_root ? ' graph-node--root' : ''}${isSelected ? ' is-selected' : ''}`}
-                style={{ left: `${node.x}px`, top: `${node.y}px` }}
+                style={nodeStyle}
               >
                 <button
                   type="button"

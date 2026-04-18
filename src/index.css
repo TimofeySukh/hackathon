@@ -692,8 +692,8 @@ select {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: rgba(226, 255, 244, 0.82);
-  box-shadow: 0 0 18px rgba(138, 255, 214, 0.28);
+  background: var(--node-color, rgba(226, 255, 244, 0.82));
+  box-shadow: 0 0 18px color-mix(in srgb, var(--node-color, #8affd6) 34%, transparent);
   transform: translate(-50%, -50%);
 }
 
@@ -703,8 +703,8 @@ select {
 }
 
 .theme-light .graph-node__dot {
-  background: rgba(44, 150, 112, 0.8);
-  box-shadow: 0 0 14px rgba(64, 189, 145, 0.16);
+  background: var(--node-color, rgba(44, 150, 112, 0.8));
+  box-shadow: 0 0 14px color-mix(in srgb, var(--node-color, #40bd91) 24%, transparent);
 }
 
 .graph-node__label {
