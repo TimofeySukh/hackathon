@@ -203,6 +203,7 @@ function App() {
   const [activeTagOptionIndex, setActiveTagOptionIndex] = useState(0)
   const [isTagsMenuOpen, setIsTagsMenuOpen] = useState(false)
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
+  const [activeColorTagId, setActiveColorTagId] = useState<string | null>(null)
   const [tagColorDrafts, setTagColorDrafts] = useState<Record<string, string>>(() =>
     loadTagColorDrafts(),
   )
@@ -457,6 +458,7 @@ function App() {
     setIsAccountMenuOpen(false)
     setIsSearchOpen(false)
     setIsTagPickerOpen(false)
+    setActiveColorTagId(null)
     setActiveTagOptionIndex(0)
   }, [])
 
@@ -1540,6 +1542,9 @@ function App() {
   const themeIconLabel = theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'
   const accountMenuLabel =
     status === 'authenticated' && session?.user ? 'Account menu' : 'Sign in menu'
+  const selectedTagColor = selectedInspectorTag
+    ? tagColorById[selectedInspectorTag.id] ?? normalizeTagColor(selectedInspectorTag.color ?? DEFAULT_TAG_COLOR)
+    : null
 
   return (
     <main className={`app-shell theme-${theme}`}>
@@ -1596,6 +1601,7 @@ function App() {
                 setIsTagsMenuOpen(nextIsOpen)
                 setIsAccountMenuOpen(false)
                 setIsSearchOpen(false)
+                setActiveColorTagId(null)
                 if (nextIsOpen) {
                   closeInspectorUi()
                 }
@@ -1627,26 +1633,21 @@ function App() {
                 <div className="tags-menu__list">
                   {tagMenuItems.map((tag) => {
                     const color = normalizeTagColor(tagColorDrafts[tag.id] ?? tag.color ?? DEFAULT_TAG_COLOR)
+                    const isPaletteOpen = activeColorTagId === tag.id
                     const tagColorStyle = { '--tag-color': color } as TagColorStyle
 
                     return (
                       <div key={tag.id} className="tags-menu__item">
-                        <label
+                        <button
+                          type="button"
                           className="tags-menu__swatch"
                           style={tagColorStyle}
+                          onClick={() => setActiveColorTagId(isPaletteOpen ? null : tag.id)}
+                          disabled={!tag.isPersisted}
                           aria-label={`Change ${tag.name} color`}
                         >
-                          <input
-                            className="tags-menu__swatch-input"
-                            type="color"
-                            value={color}
-                            onChange={(event) => {
-                              previewTagColor(tag.id, event.target.value)
-                              void persistTagColor(tag.id)
-                            }}
-                            disabled={!tag.isPersisted}
-                          />
-                        </label>
+                          <span className="tags-menu__swatch-core" aria-hidden="true" />
+                        </button>
                         <input
                           className="tags-menu__name-input"
                           value={tagNameDrafts[tag.id] ?? tag.name}
@@ -1690,27 +1691,41 @@ function App() {
                           </button>
                         ) : null}
 
-                        <div className="tags-menu__palette-wrap">
-                          <div className="tags-menu__palette-header">
-                            <span className="tags-menu__palette-label">Color</span>
-                            <span className="tags-menu__palette-value">{color.toUpperCase()}</span>
-                          </div>
-                          <div className="tags-menu__preset-grid">
-                            {TAG_PRESET_COLORS.map((presetColor) => (
-                              <button
-                                key={presetColor}
-                                type="button"
-                                className={`tags-menu__preset${presetColor === color ? ' is-selected' : ''}`}
-                                style={{ '--tag-color': presetColor } as TagColorStyle}
-                                onClick={() => {
-                                  previewTagColor(tag.id, presetColor)
+                        {isPaletteOpen ? (
+                          <div className="tags-menu__palette-wrap">
+                            <div className="tags-menu__palette-header">
+                              <span className="tags-menu__palette-label">Color</span>
+                              <span className="tags-menu__palette-value">{color.toUpperCase()}</span>
+                            </div>
+                            <div className="tags-menu__preset-grid">
+                              {TAG_PRESET_COLORS.map((presetColor) => (
+                                <button
+                                  key={presetColor}
+                                  type="button"
+                                  className={`tags-menu__preset${presetColor === color ? ' is-selected' : ''}`}
+                                  style={{ '--tag-color': presetColor } as TagColorStyle}
+                                  onClick={() => {
+                                    previewTagColor(tag.id, presetColor)
+                                    void persistTagColor(tag.id)
+                                  }}
+                                  aria-label={`Set ${tag.name} color to ${presetColor}`}
+                                />
+                              ))}
+                            </div>
+                            <label className="tags-menu__native-picker">
+                              <span className="tags-menu__native-picker-label">Custom color</span>
+                              <input
+                                className="tags-menu__native-picker-input"
+                                type="color"
+                                value={color}
+                                onChange={(event) => {
+                                  previewTagColor(tag.id, event.target.value)
                                   void persistTagColor(tag.id)
                                 }}
-                                aria-label={`Set ${tag.name} color to ${presetColor}`}
                               />
-                            ))}
+                            </label>
                           </div>
-                        </div>
+                        ) : null}
                       </div>
                     )
                   })}
@@ -1744,6 +1759,7 @@ function App() {
                   setIsSearchOpen(true)
                   setIsTagsMenuOpen(false)
                   setIsAccountMenuOpen(false)
+                  setActiveColorTagId(null)
                   closeInspectorUi()
                 }}
                 onChange={(event) => {
@@ -1926,7 +1942,8 @@ function App() {
           <div className="field-group field-group--compact">
             <div className="tag-picker">
               <input
-                className="field-group__input tag-picker__input"
+                className={`field-group__input tag-picker__input${selectedTagColor ? ' is-tagged' : ''}`}
+                style={selectedTagColor ? ({ '--tag-color': selectedTagColor } as TagColorStyle) : undefined}
                 value={tagDraft}
                 onFocus={() => {
                   setIsTagPickerOpen(true)
