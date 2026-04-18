@@ -98,28 +98,29 @@ select {
 }
 
 .theme-light {
-  --app-bg: #f4fbf7;
-  --text-strong: #0c241a;
-  --toggle-bg: rgba(255, 255, 255, 0.96);
-  --toggle-border: rgba(22, 81, 58, 0.22);
-  --toggle-thumb: linear-gradient(135deg, #9ce7c4 0%, #62c898 100%);
-  --toggle-label: #174c37;
-  --panel-bg: rgba(255, 255, 255, 0.96);
-  --panel-border: rgba(22, 81, 58, 0.2);
-  --panel-text: #0c241a;
-  --panel-muted: rgba(23, 76, 55, 0.7);
+  --app-bg: #f7f6ef;
+  --text-strong: #163427;
+  --toggle-bg: rgba(255, 251, 244, 0.92);
+  --toggle-border: rgba(48, 109, 84, 0.18);
+  --toggle-thumb: linear-gradient(135deg, #a8e2bf 0%, #62bf91 100%);
+  --toggle-label: #1f5a43;
+  --panel-bg: rgba(255, 252, 247, 0.9);
+  --panel-border: rgba(48, 109, 84, 0.16);
+  --panel-text: #163427;
+  --panel-muted: rgba(31, 90, 67, 0.68);
   --panel-error: #9d2f22;
-  --button-bg: rgba(98, 200, 152, 0.18);
-  --button-border: rgba(22, 81, 58, 0.22);
-  --grid-dot: rgba(24, 79, 58, 0.12);
-  --grid-dot-major: rgba(24, 101, 70, 0.26);
-  --grid-dot-hover: rgba(14, 132, 89, 0.78);
-  --grid-dot-major-hover: rgba(5, 84, 54, 0.9);
-  --grid-glow-a: rgba(69, 181, 135, 0.1);
-  --grid-glow-b: rgba(255, 255, 255, 0);
+  --button-bg: rgba(137, 212, 170, 0.14);
+  --button-border: rgba(48, 109, 84, 0.18);
+  --grid-dot: rgba(36, 92, 68, 0.1);
+  --grid-dot-major: rgba(43, 112, 84, 0.2);
+  --grid-dot-hover: rgba(29, 145, 102, 0.66);
+  --grid-dot-major-hover: rgba(20, 102, 71, 0.82);
+  --grid-glow-a: rgba(133, 211, 172, 0.16);
+  --grid-glow-b: rgba(255, 247, 235, 0);
   background:
-    radial-gradient(circle at top left, rgba(132, 230, 190, 0.2), transparent 36%),
-    radial-gradient(circle at right center, rgba(236, 248, 229, 0.8), transparent 30%),
+    radial-gradient(circle at top left, rgba(158, 223, 186, 0.34), transparent 34%),
+    radial-gradient(circle at right center, rgba(255, 225, 188, 0.26), transparent 28%),
+    radial-gradient(circle at 50% 100%, rgba(255, 244, 213, 0.3), transparent 30%),
     var(--app-bg);
   color: var(--text-strong);
 }
@@ -771,7 +772,7 @@ select {
 
 .theme-light .field-group__input,
 .theme-light .field-group__textarea {
-  background: rgba(244, 251, 247, 0.78);
+  background: rgba(251, 247, 240, 0.86);
 }
 
 .field-group__input:disabled,
@@ -913,7 +914,7 @@ select {
 
 .theme-light .stack-list__item,
 .theme-light .note-card {
-  background: rgba(255, 255, 255, 0.74);
+  background: rgba(255, 250, 244, 0.82);
 }
 
 .stack-list__text {
@@ -1048,20 +1049,20 @@ select {
 }
 
 .theme-light .graph-edge {
-  stroke: rgba(18, 77, 54, 0.44);
+  stroke: rgba(33, 98, 73, 0.34);
   filter: none;
 }
 
 .theme-light .graph-edge--preview {
-  stroke: rgba(18, 121, 79, 0.58);
+  stroke: rgba(38, 140, 97, 0.52);
 }
 
 .theme-light .graph-edge.is-selected {
-  stroke: rgba(18, 121, 79, 0.88);
+  stroke: rgba(38, 140, 97, 0.82);
 }
 
 .theme-light .graph-edge-hit:hover + .graph-edge {
-  stroke: rgba(18, 121, 79, 0.78);
+  stroke: rgba(38, 140, 97, 0.72);
 }
 
 .connection-menu {
@@ -1140,8 +1141,8 @@ select {
 }
 
 .theme-light .graph-node__dot {
-  background: var(--node-color, rgba(44, 150, 112, 0.8));
-  box-shadow: 0 0 14px color-mix(in srgb, var(--node-color, #40bd91) 24%, transparent);
+  background: var(--node-color, rgba(62, 158, 118, 0.74));
+  box-shadow: 0 0 18px color-mix(in srgb, var(--node-color, #58bf91) 22%, transparent);
 }
 
 .graph-node__label {
@@ -1160,7 +1161,7 @@ select {
 }
 
 .theme-light .graph-node__label {
-  color: rgba(12, 36, 26, 0.86);
+  color: rgba(22, 52, 39, 0.78);
 }
 
 .graph-node--root .graph-node__dot {
@@ -1173,10 +1174,10 @@ select {
 }
 
 .theme-light .graph-node--root .graph-node__dot {
-  background: #2ea97e;
+  background: #3aaa7e;
   box-shadow:
-    0 0 0 5px rgba(46, 169, 126, 0.1),
-    0 0 18px rgba(46, 169, 126, 0.2);
+    0 0 0 5px rgba(58, 170, 126, 0.12),
+    0 0 22px rgba(58, 170, 126, 0.18);
 }
 
 .graph-node.is-selected .graph-node__label {
@@ -1184,7 +1185,7 @@ select {
 }
 
 .theme-light .graph-node.is-selected .graph-node__label {
-  color: #0f3626;
+  color: #184432;
 }
 
 .graph-node__input {
