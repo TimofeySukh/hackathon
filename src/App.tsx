@@ -208,7 +208,7 @@ function App() {
       const nextId = `node-${crypto.randomUUID()}`
       const nextNode: GraphNode = {
         id: nextId,
-        label: 'New person',
+        label: '',
         x: connectionDrag.worldX,
         y: connectionDrag.worldY,
       }
@@ -548,6 +548,7 @@ function App() {
                   <input
                     className="graph-node__input"
                     value={node.label}
+                    placeholder="Name"
                     autoFocus
                     onChange={(event) => updateNodeLabel(node.id, event.target.value)}
                     onBlur={() => setEditingNodeId(null)}

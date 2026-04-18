@@ -358,8 +358,8 @@ select {
 
 .graph-edge {
   fill: none;
-  stroke: rgba(214, 236, 226, 0.24);
-  stroke-width: 1.45;
+  stroke: rgba(214, 236, 226, 0.4);
+  stroke-width: 1.75;
   stroke-linecap: round;
 }
 
@@ -369,11 +369,11 @@ select {
 }
 
 .graph-arrow-head {
-  fill: rgba(214, 236, 226, 0.32);
+  fill: rgba(214, 236, 226, 0.48);
 }
 
 .theme-light .graph-edge {
-  stroke: rgba(18, 77, 54, 0.16);
+  stroke: rgba(18, 77, 54, 0.28);
 }
 
 .theme-light .graph-edge--preview {
@@ -381,7 +381,7 @@ select {
 }
 
 .theme-light .graph-arrow-head {
-  fill: rgba(18, 77, 54, 0.22);
+  fill: rgba(18, 77, 54, 0.34);
 }
 
 .graph-node {
