@@ -13,7 +13,7 @@ The current product is intentionally narrow:
 - Supabase-backed Google login
 - one personal board record per signed-in user
 - persistent people nodes, reusable tags, notes, and undirected connections per signed-in user
-- a right-side inspector for editing the selected person
+- a node-anchored inspector for editing the selected person
 - no collaboration yet
 
 ## Active Work

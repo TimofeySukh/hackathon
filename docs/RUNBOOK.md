@@ -17,7 +17,7 @@ Current app behavior:
 - create one immutable root person at `0,0` for each signed-in user
 - persist people, tags, notes, and undirected connections in Supabase
 - allow one separate AI summary row per person in Supabase
-- edit the selected person in the right-side inspector
+- edit the selected person in the node-anchored inspector
 
 There is no multiplayer or drawing toolset yet.
 

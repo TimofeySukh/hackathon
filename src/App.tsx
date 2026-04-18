@@ -70,6 +70,10 @@ type HighlightSpotStyle = CSSProperties & {
   opacity: number
 }
 
+type InspectorPanelStyle = CSSProperties & {
+  '--inspector-scale': string
+}
+
 type GestureEventLike = Event & {
   clientX: number
   clientY: number
@@ -151,6 +155,10 @@ function App() {
   const [pointerPosition, setPointerPosition] = useState<Offset | null>(null)
   const [highlightClock, setHighlightClock] = useState(() => Date.now())
   const [isDraggingBoard, setIsDraggingBoard] = useState(false)
+  const [viewportSize, setViewportSize] = useState(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }))
 
   const boardRef = useRef<HTMLElement | null>(null)
   const boardSurfaceRef = useRef<HTMLDivElement | null>(null)
@@ -359,6 +367,20 @@ function App() {
       }
     }
   }, [applyViewport])
+
+  useEffect(() => {
+    const syncViewportSize = () => {
+      setViewportSize({
+        width: boardRef.current?.clientWidth ?? window.innerWidth,
+        height: boardRef.current?.clientHeight ?? window.innerHeight,
+      })
+    }
+
+    syncViewportSize()
+    window.addEventListener('resize', syncViewportSize)
+
+    return () => window.removeEventListener('resize', syncViewportSize)
+  }, [])
 
   const zoomAtClientPoint = useCallback(
     (clientX: number, clientY: number, nextScale: number) => {
@@ -783,6 +805,14 @@ function App() {
     }
   }
 
+  const inspectorPanelStyle = inspectorNode
+    ? ({
+        left: `${viewportSize.width / 2 + offset.x + inspectorNode.x * scale}px`,
+        top: `${viewportSize.height / 2 + offset.y + inspectorNode.y * scale}px`,
+        '--inspector-scale': `${scale}`,
+      } as InspectorPanelStyle)
+    : undefined
+
   return (
     <main className={`app-shell theme-${theme}`}>
       <div className="app-actions">
@@ -849,7 +879,13 @@ function App() {
       </div>
 
       {inspectorNode ? (
-        <aside className="inspector-panel">
+        <aside
+          className="inspector-panel"
+          aria-label="Selected person inspector"
+          onMouseDown={(event) => event.stopPropagation()}
+          onWheel={(event) => event.stopPropagation()}
+          style={inspectorPanelStyle}
+        >
           <div className="inspector-panel__header">
             <div>
               <p className="inspector-panel__eyebrow">

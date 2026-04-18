@@ -256,12 +256,9 @@ select {
 
 .inspector-panel {
   position: absolute;
-  top: 96px;
-  right: 24px;
-  bottom: 24px;
-  z-index: 3;
+  z-index: 5;
   display: grid;
-  width: min(360px, calc(100vw - 48px));
+  width: 560px;
   align-content: start;
   gap: 18px;
   padding: 18px;
@@ -273,15 +270,9 @@ select {
     inset 0 1px 0 rgba(255, 255, 255, 0.28),
     0 22px 54px rgba(0, 0, 0, 0.12);
   backdrop-filter: blur(18px);
-  overflow-y: auto;
-}
-
-.inspector-panel--floating {
-  top: auto;
-  right: auto;
-  bottom: auto;
-  max-height: min(70vh, 720px);
-  transform: translateY(-50%);
+  overflow: visible;
+  transform: translate(calc(-100% - 40px), -50%) scale(var(--inspector-scale));
+  transform-origin: right center;
 }
 
 .inspector-panel__header {
@@ -747,11 +738,6 @@ select {
   }
 
   .inspector-panel {
-    top: auto;
-    right: 16px;
-    bottom: 16px;
-    left: 16px;
-    width: auto;
-    max-height: min(52vh, 420px);
+    width: 520px;
   }
 }
