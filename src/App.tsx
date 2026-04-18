@@ -823,6 +823,26 @@ function App() {
     })
   }
 
+  const handleDeleteSelectedNode = useCallback(async (nodeId: string) => {
+    await deletePerson(nodeId)
+    setInspectorNodeId((currentNodeId) => (currentNodeId === nodeId ? null : currentNodeId))
+    setSelectedNodeId(null)
+  }, [deletePerson])
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Backspace' || !isGraphReady || !selectedNode) return
+      if (selectedNode.is_root || isEditableElement(event.target)) return
+
+      event.preventDefault()
+      void handleDeleteSelectedNode(selectedNode.id)
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleDeleteSelectedNode, isGraphReady, selectedNode])
+
   function pickTagColor(tag: TagMenuItem, event: ReactPointerEvent<HTMLDivElement>) {
     if (!tag.isPersisted) return
 
@@ -884,9 +904,7 @@ function App() {
   async function handleDeletePerson() {
     if (!inspectorNode || !isGraphReady || inspectorNode.is_root) return
 
-    await deletePerson(inspectorNode.id)
-    setInspectorNodeId(null)
-    setSelectedNodeId(null)
+    await handleDeleteSelectedNode(inspectorNode.id)
   }
 
   const previewPath = connectionDrag
@@ -1575,6 +1593,17 @@ function getPalettePosition(color: string) {
     x: (hsv.hue / 360) * 100,
     y: 100 - hsv.saturation,
   }
+}
+
+function isEditableElement(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false
+
+  return (
+    target.isContentEditable ||
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement
+  )
 }
 
 export default App
