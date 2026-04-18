@@ -214,7 +214,6 @@ function App() {
   const [pointerPosition, setPointerPosition] = useState<Offset | null>(null)
   const [highlightClock, setHighlightClock] = useState(() => Date.now())
   const [isDraggingBoard, setIsDraggingBoard] = useState(false)
-  const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [aiSearchQuery, setAiSearchQuery] = useState('')
   const [aiSearchResults, setAiSearchResults] = useState<SearchResult[]>([])
@@ -431,12 +430,6 @@ function App() {
   }, [theme])
 
   useEffect(() => {
-    if (!isSearchOpen) return
-
-    searchInputRef.current?.focus()
-  }, [isSearchOpen])
-
-  useEffect(() => {
     if (!isTagPickerOpen) return
 
     const menu = tagPickerMenuRef.current
@@ -457,7 +450,6 @@ function App() {
       menu.scrollTop = optionBottom - menu.clientHeight
     }
   }, [activeTagOptionIndex, isTagPickerOpen, tagPickerOptions.length])
-
   const applyViewport = useCallback((nextOffset: Offset, nextScale: number) => {
     viewportRef.current = { offset: nextOffset, scale: nextScale }
     setOffset(nextOffset)
@@ -1191,15 +1183,6 @@ function App() {
     void handleAiSearch()
   }
 
-  function closeSearchPanel() {
-    setSearchQuery('')
-    setAiSearchQuery('')
-    setAiSearchResults([])
-    setAiSearchStatus('idle')
-    setAiSearchError(null)
-    setIsSearchOpen(false)
-  }
-
   function updateNoteDraft(noteId: string, field: keyof NoteDraft, value: string) {
     setNoteDrafts((currentDrafts) => ({
       ...currentDrafts,
@@ -1256,7 +1239,6 @@ function App() {
     setNameDraft(node.name)
     setTagDraft(node.tag_id ? tagsById[node.tag_id]?.name ?? '' : '')
     setIsTagPickerOpen(false)
-    setIsSearchOpen(false)
   }
 
   function selectConnection(connectionId: string, event: ReactMouseEvent<SVGPathElement>) {
@@ -1410,50 +1392,29 @@ function App() {
         </div>
 
         <div className="top-bar__right">
-          <div className={`search-panel${isSearchOpen ? ' is-open' : ''}`}>
+          <div className="search-panel">
             <div className="search-panel__bar">
-              {isSearchOpen ? (
-                <input
-                  ref={searchInputRef}
-                  className="search-panel__input"
-                  value={searchQuery}
-                  onChange={(event) => {
-                    setSearchQuery(event.target.value)
-                    setAiSearchStatus('idle')
-                    setAiSearchError(null)
-                  }}
-                  onKeyDown={handleSearchKeyDown}
-                  placeholder="Search people"
-                  aria-label="Search people"
-                />
-              ) : (
-                <button
-                  type="button"
-                  className="search-panel__trigger"
-                  onClick={() => {
-                    setIsSearchOpen(true)
-                  }}
-                  aria-expanded={isSearchOpen}
-                  aria-controls="people-search-panel"
-                >
-                  Search people
-                </button>
-              )}
-
-              <button
-                type="button"
-                className={`search-panel__close${isSearchOpen ? ' is-visible' : ''}`}
-                onClick={() => {
-                  closeSearchPanel()
+              <input
+                ref={searchInputRef}
+                className="search-panel__input"
+                value={searchQuery}
+                onChange={(event) => {
+                  setSearchQuery(event.target.value)
+                  setAiSearchStatus('idle')
+                  setAiSearchError(null)
                 }}
-                aria-label="Close search"
-              >
-                ×
-              </button>
+                onKeyDown={handleSearchKeyDown}
+                placeholder="Search people"
+                aria-label="Search people"
+                aria-expanded={
+                  Boolean(searchQuery.trim()) || aiSearchStatus === 'loading' || Boolean(aiSearchError)
+                }
+                aria-controls="people-search-panel"
+              />
             </div>
 
-            {isSearchOpen ? (
-            <div id="people-search-panel" className="search-panel__dropdown">
+            {searchQuery.trim() || aiSearchStatus === 'loading' || aiSearchError ? (
+              <div id="people-search-panel" className="search-panel__dropdown">
               {isGraphReady ? (
                 <div className="search-panel__hint">
                   <span>{aiSearchStatus === 'loading' ? 'Asking AI...' : 'Press Enter for AI search.'}</span>
@@ -1505,7 +1466,7 @@ function App() {
                   Type naturally, for example: "someone who can help with n8n automation".
                 </p>
               )}
-            </div>
+              </div>
             ) : null}
           </div>
 
