@@ -3,12 +3,13 @@ import type {
   CSSProperties,
   KeyboardEvent as ReactKeyboardEvent,
   MouseEvent as ReactMouseEvent,
-  WheelEvent as ReactWheelEvent,
+  PointerEvent as ReactPointerEvent,
 } from 'react'
 
 import { useAuth } from './lib/useAuth'
 import { normalizeTagName, searchPeopleWithAi } from './lib/graphStorage'
 import type { PersonNode, PersonNote, Tag } from './lib/graphTypes'
+import { DEFAULT_TAG_COLOR, DEFAULT_TAGS, normalizeTagColor } from './lib/tagPalette'
 import { useBoardGraph } from './lib/useBoardGraph'
 
 type Theme = 'dark' | 'light'
@@ -82,7 +83,32 @@ type HighlightSpotStyle = CSSProperties & {
   opacity: number
 }
 
+type TagColorStyle = CSSProperties & {
+  '--tag-color': string
+}
+
+type TagPaletteStyle = CSSProperties & {
+  '--palette-color': string
+  '--palette-cursor-x': string
+  '--palette-cursor-y': string
+}
+
+type GraphNodeStyle = CSSProperties & {
+  '--node-color'?: string
+}
+
+type GestureEventLike = Event & {
+  clientX: number
+  clientY: number
+  scale: number
+}
+
+type TagMenuItem = Pick<Tag, 'id' | 'name' | 'color'> & {
+  isPersisted: boolean
+}
+
 const THEME_STORAGE_KEY = 'hackathon-theme'
+const TAG_COLOR_STORAGE_KEY = 'hackathon-tag-colors'
 const MIN_SCALE = 0.2
 const MAX_SCALE = 2.5
 const GRID_GAP = 12
@@ -131,6 +157,8 @@ function App() {
     createConnection,
     deleteConnection,
     createTag,
+    deleteTag,
+    updateTag,
     createNote,
     updateNote,
     deleteNote,
@@ -150,6 +178,11 @@ function App() {
   const [draggedPositions, setDraggedPositions] = useState<Record<string, Offset>>({})
   const [nameDraft, setNameDraft] = useState('')
   const [tagDraft, setTagDraft] = useState('')
+  const [isTagsMenuOpen, setIsTagsMenuOpen] = useState(false)
+  const [activeColorTagId, setActiveColorTagId] = useState<string | null>(null)
+  const [tagColorDrafts, setTagColorDrafts] = useState<Record<string, string>>(() =>
+    loadTagColorDrafts(),
+  )
   const [newNoteTitle, setNewNoteTitle] = useState('')
   const [newNoteBody, setNewNoteBody] = useState('')
   const [noteDrafts, setNoteDrafts] = useState<Record<string, NoteDraft>>({})
@@ -167,13 +200,16 @@ function App() {
   const boardRef = useRef<HTMLElement | null>(null)
   const boardSurfaceRef = useRef<HTMLDivElement | null>(null)
   const graphLayerRef = useRef<HTMLDivElement | null>(null)
+  const inspectorPanelRef = useRef<HTMLElement | null>(null)
   const zoomIndicatorRef = useRef<HTMLDivElement | null>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const highlightIdRef = useRef(0)
   const lastHighlightSpotRef = useRef<Offset | null>(null)
+  const inspectorWorldPositionRef = useRef<Offset | null>(null)
   const viewportRef = useRef({ offset: { x: 0, y: 0 }, scale: 1 })
   const pendingViewportRef = useRef<{ offset: Offset; scale: number } | null>(null)
   const viewportFrameRef = useRef<number | null>(null)
+  const gestureScaleRef = useRef(1)
   const boardDragRef = useRef({
     startX: 0,
     startY: 0,
@@ -199,6 +235,33 @@ function App() {
   const nodesById = useMemo(
     () => Object.fromEntries(boardNodes.map((node) => [node.id, node])) as Record<string, PersonNode>,
     [boardNodes],
+  )
+  const tagMenuItems = useMemo<TagMenuItem[]>(
+    () =>
+      isGraphReady
+        ? tags.map((tag) => ({
+            id: tag.id,
+            name: tag.name,
+            color: normalizeTagColor(tagColorDrafts[tag.id] ?? tag.color ?? DEFAULT_TAG_COLOR),
+            isPersisted: true,
+          }))
+        : DEFAULT_TAGS.map((tag) => ({
+            id: `default-${tag.name}`,
+            name: tag.name,
+            color: tag.color,
+            isPersisted: false,
+          })),
+    [isGraphReady, tagColorDrafts, tags],
+  )
+  const tagColorById = useMemo(
+    () =>
+      Object.fromEntries(
+        tags.map((tag) => [
+          tag.id,
+          normalizeTagColor(tagColorDrafts[tag.id] ?? tag.color ?? DEFAULT_TAG_COLOR),
+        ]),
+      ) as Record<string, string>,
+    [tagColorDrafts, tags],
   )
   const defaultSelectedNodeId = boardNodes.find((node) => node.is_root)?.id ?? boardNodes[0]?.id ?? null
   const activeSelectedNodeId =
@@ -330,6 +393,11 @@ function App() {
     setScale(nextScale)
 
     if (boardSurfaceRef.current) {
+      const viewportWidth = boardRef.current?.clientWidth ?? 0
+      const viewportHeight = boardRef.current?.clientHeight ?? 0
+      const gridOriginX = viewportWidth / 2 + nextOffset.x
+      const gridOriginY = viewportHeight / 2 + nextOffset.y
+
       boardSurfaceRef.current.style.setProperty('--dot-gap', `${GRID_GAP * nextScale}px`)
       boardSurfaceRef.current.style.setProperty('--major-dot-gap', `${MAJOR_GRID_GAP * nextScale}px`)
       boardSurfaceRef.current.style.setProperty('--dot-size', `${Math.max(0.45, DOT_SIZE * nextScale)}px`)
@@ -337,12 +405,25 @@ function App() {
         '--major-dot-size',
         `${Math.max(1.5, MAJOR_DOT_SIZE * nextScale)}px`,
       )
-      boardSurfaceRef.current.style.setProperty('--board-offset-x', `${nextOffset.x}px`)
-      boardSurfaceRef.current.style.setProperty('--board-offset-y', `${nextOffset.y}px`)
+      boardSurfaceRef.current.style.setProperty('--board-offset-x', `${gridOriginX}px`)
+      boardSurfaceRef.current.style.setProperty('--board-offset-y', `${gridOriginY}px`)
     }
 
     if (graphLayerRef.current) {
       graphLayerRef.current.style.transform = `translate(${nextOffset.x}px, ${nextOffset.y}px) scale(${nextScale})`
+    }
+
+    if (inspectorPanelRef.current && inspectorWorldPositionRef.current) {
+      const viewportWidth = boardRef.current?.clientWidth ?? window.innerWidth
+      const viewportHeight = boardRef.current?.clientHeight ?? window.innerHeight
+      const inspectorX =
+        viewportWidth / 2 + nextOffset.x + inspectorWorldPositionRef.current.x * nextScale
+      const inspectorY =
+        viewportHeight / 2 + nextOffset.y + inspectorWorldPositionRef.current.y * nextScale
+
+      inspectorPanelRef.current.style.left = `${inspectorX}px`
+      inspectorPanelRef.current.style.top = `${inspectorY}px`
+      inspectorPanelRef.current.style.setProperty('--inspector-scale', `${nextScale}`)
     }
 
     const nextZoomPercentage = Math.round(nextScale * 100)
@@ -442,6 +523,46 @@ function App() {
       }
     }
   }, [applyViewport])
+
+  useEffect(() => {
+    inspectorWorldPositionRef.current = inspectorNode
+      ? {
+          x: inspectorNode.x,
+          y: inspectorNode.y,
+        }
+      : null
+
+    applyViewport(viewportRef.current.offset, viewportRef.current.scale)
+  }, [applyViewport, inspectorNode])
+
+  const zoomAtClientPoint = useCallback(
+    (clientX: number, clientY: number, nextScale: number) => {
+      const viewport = boardRef.current
+      if (!viewport) return
+
+      const view = viewportRef.current
+      const clampedScale = clampScale(nextScale)
+
+      if (clampedScale === view.scale) return
+
+      const { left, top } = viewport.getBoundingClientRect()
+      const pointerX = clientX - left
+      const pointerY = clientY - top
+      const centerX = viewport.clientWidth / 2
+      const centerY = viewport.clientHeight / 2
+      const worldX = (pointerX - centerX - view.offset.x) / view.scale
+      const worldY = (pointerY - centerY - view.offset.y) / view.scale
+
+      queueViewportUpdate(
+        {
+          x: pointerX - centerX - worldX * clampedScale,
+          y: pointerY - centerY - worldY * clampedScale,
+        },
+        clampedScale,
+      )
+    },
+    [queueViewportUpdate],
+  )
 
   const finishConnectionDrag = useCallback(
     async (clientX: number, clientY: number) => {
@@ -607,7 +728,7 @@ function App() {
 
     if (!isGraphReady) return
 
-    if (event.shiftKey && !node.is_root) {
+    if (!event.altKey && !node.is_root) {
       setNodeDrag({
         nodeId: node.id,
         startClientX: event.clientX,
@@ -617,6 +738,8 @@ function App() {
       })
       return
     }
+
+    if (!event.altKey) return
 
     const view = viewportRef.current
     const worldPoint = screenToWorld(
@@ -637,17 +760,14 @@ function App() {
     })
   }
 
-  function moveWithWheel(event: ReactWheelEvent<HTMLElement>) {
+  const moveWithWheel = useCallback((event: WheelEvent) => {
     event.preventDefault()
     const view = viewportRef.current
     const deltaMultiplier = event.deltaMode === 1 ? 16 : 1
     const deltaX = event.deltaX * deltaMultiplier
     const deltaY = event.deltaY * deltaMultiplier
-    const isTrackpadPan =
-      event.ctrlKey === false &&
-      (Math.abs(deltaX) > 0.01 || Math.abs(deltaY) < 16 || !Number.isInteger(event.deltaY))
 
-    if (isTrackpadPan) {
+    if (!event.ctrlKey) {
       queueViewportUpdate(
         {
           x: view.offset.x - deltaX,
@@ -659,26 +779,57 @@ function App() {
     }
 
     const normalizedDelta = Math.max(-120, Math.min(120, deltaY))
-    const nextScale = clampScale(view.scale * Math.exp(-normalizedDelta * WHEEL_ZOOM_INTENSITY))
+    const nextScale = view.scale * Math.exp(-normalizedDelta * WHEEL_ZOOM_INTENSITY)
+    zoomAtClientPoint(event.clientX, event.clientY, nextScale)
+  }, [queueViewportUpdate, zoomAtClientPoint])
 
-    if (nextScale === view.scale) return
+  useEffect(() => {
+    const viewport = boardRef.current
+    if (!viewport) return undefined
 
-    const { left, top } = event.currentTarget.getBoundingClientRect()
-    const pointerX = event.clientX - left
-    const pointerY = event.clientY - top
-    const centerX = event.currentTarget.clientWidth / 2
-    const centerY = event.currentTarget.clientHeight / 2
-    const worldX = (pointerX - centerX - view.offset.x) / view.scale
-    const worldY = (pointerY - centerY - view.offset.y) / view.scale
+    const handleWheel = (event: WheelEvent) => {
+      moveWithWheel(event)
+    }
 
-    queueViewportUpdate(
-      {
-        x: pointerX - centerX - worldX * nextScale,
-        y: pointerY - centerY - worldY * nextScale,
-      },
-      nextScale,
-    )
-  }
+    const handleGestureStart = (event: Event) => {
+      event.preventDefault()
+      gestureScaleRef.current = 1
+    }
+
+    const handleGestureChange = (event: Event) => {
+      event.preventDefault()
+
+      const gestureEvent = event as GestureEventLike
+      const scaleDelta = gestureEvent.scale / gestureScaleRef.current
+      gestureScaleRef.current = gestureEvent.scale
+
+      if (!Number.isFinite(scaleDelta) || scaleDelta === 1) return
+
+      const view = viewportRef.current
+      zoomAtClientPoint(
+        gestureEvent.clientX,
+        gestureEvent.clientY,
+        view.scale * scaleDelta,
+      )
+    }
+
+    const handleGestureEnd = (event: Event) => {
+      event.preventDefault()
+      gestureScaleRef.current = 1
+    }
+
+    viewport.addEventListener('wheel', handleWheel, { passive: false })
+    viewport.addEventListener('gesturestart', handleGestureStart, { passive: false })
+    viewport.addEventListener('gesturechange', handleGestureChange, { passive: false })
+    viewport.addEventListener('gestureend', handleGestureEnd, { passive: false })
+
+    return () => {
+      viewport.removeEventListener('wheel', handleWheel)
+      viewport.removeEventListener('gesturestart', handleGestureStart)
+      viewport.removeEventListener('gesturechange', handleGestureChange)
+      viewport.removeEventListener('gestureend', handleGestureEnd)
+    }
+  }, [moveWithWheel, zoomAtClientPoint])
 
   async function saveInspectorName() {
     if (!inspectorNode || !isGraphReady) return
@@ -711,6 +862,89 @@ function App() {
       id: inspectorNode.id,
       tag_id: createdTag.id,
     })
+  }
+
+  async function handleCreateMenuTag() {
+    if (!isGraphReady) return
+
+    const existingNames = new Set(tags.map((tag) => normalizeTagName(tag.name).toLowerCase()))
+    let nextName = 'New tag'
+    let suffix = 2
+
+    while (existingNames.has(normalizeTagName(nextName).toLowerCase())) {
+      nextName = `New tag ${suffix}`
+      suffix += 1
+    }
+
+    const createdTag = await createTag(nextName)
+    setActiveColorTagId(createdTag.id)
+  }
+
+  function previewTagColor(tagId: string, color: string) {
+    const nextColor = normalizeTagColor(color)
+    setTagColorDrafts((currentDrafts) => ({
+      ...currentDrafts,
+      [tagId]: nextColor,
+    }))
+    saveTagColorDraft(tagId, nextColor)
+  }
+
+  async function persistTagColor(tagId: string) {
+    const color = tagColorDrafts[tagId]
+    if (!color || !isGraphReady) return
+
+    try {
+      await updateTag({
+        id: tagId,
+        color,
+      })
+    } catch {
+      saveTagColorDraft(tagId, color)
+    }
+  }
+
+  async function handleDeleteMenuTag(tagId: string) {
+    if (!isGraphReady) return
+
+    await deleteTag(tagId)
+    setActiveColorTagId((currentTagId) => (currentTagId === tagId ? null : currentTagId))
+    setTagColorDrafts((currentDrafts) => {
+      const nextDrafts = { ...currentDrafts }
+      delete nextDrafts[tagId]
+      window.localStorage.setItem(TAG_COLOR_STORAGE_KEY, JSON.stringify(nextDrafts))
+      return nextDrafts
+    })
+  }
+
+  const handleDeleteSelectedNode = useCallback(async (nodeId: string) => {
+    await deletePerson(nodeId)
+    setInspectorNodeId((currentNodeId) => (currentNodeId === nodeId ? null : currentNodeId))
+    setSelectedNodeId(null)
+  }, [deletePerson])
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Backspace' || !isGraphReady || !selectedNode) return
+      if (selectedNode.is_root || isEditableElement(event.target)) return
+
+      event.preventDefault()
+      void handleDeleteSelectedNode(selectedNode.id)
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleDeleteSelectedNode, isGraphReady, selectedNode])
+
+  function pickTagColor(tag: TagMenuItem, event: ReactPointerEvent<HTMLDivElement>) {
+    if (!tag.isPersisted) return
+
+    const bounds = event.currentTarget.getBoundingClientRect()
+    const x = clamp((event.clientX - bounds.left) / bounds.width, 0, 1)
+    const y = clamp((event.clientY - bounds.top) / bounds.height, 0, 1)
+    const color = hsvToHex(x * 360, (1 - y) * 100, 100)
+
+    previewTagColor(tag.id, color)
   }
 
   async function handleCreateNote() {
@@ -802,9 +1036,7 @@ function App() {
   async function handleDeletePerson() {
     if (!inspectorNode || !isGraphReady || inspectorNode.is_root) return
 
-    await deletePerson(inspectorNode.id)
-    setInspectorNodeId(null)
-    setSelectedNodeId(null)
+    await handleDeleteSelectedNode(inspectorNode.id)
   }
 
   function focusNode(node: PersonNode) {
@@ -865,6 +1097,95 @@ function App() {
 
   return (
     <main className={`app-shell theme-${theme}`}>
+      <div className="tags-menu">
+        <button
+          type="button"
+          className="tags-menu__toggle"
+          onClick={() => setIsTagsMenuOpen((isOpen) => !isOpen)}
+          aria-expanded={isTagsMenuOpen}
+        >
+          Tags
+        </button>
+
+        {isTagsMenuOpen ? (
+          <section className="tags-menu__panel" aria-label="Tag colors">
+            <div className="tags-menu__list">
+              {tagMenuItems.map((tag) => {
+                const color = normalizeTagColor(tagColorDrafts[tag.id] ?? tag.color ?? DEFAULT_TAG_COLOR)
+                const palettePosition = getPalettePosition(color)
+                const isPaletteOpen = activeColorTagId === tag.id
+                const tagColorStyle = { '--tag-color': color } as TagColorStyle
+                const paletteStyle = {
+                  '--palette-color': `hsl(${palettePosition.hue} 100% 50%)`,
+                  '--palette-cursor-x': `${palettePosition.x}%`,
+                  '--palette-cursor-y': `${palettePosition.y}%`,
+                } as TagPaletteStyle
+
+                return (
+                  <div key={tag.id} className="tags-menu__item">
+                    <button
+                      type="button"
+                      className="tags-menu__swatch"
+                      style={tagColorStyle}
+                      onClick={() => setActiveColorTagId(isPaletteOpen ? null : tag.id)}
+                      disabled={!tag.isPersisted}
+                      aria-label={`Change ${tag.name} color`}
+                    />
+                    <span className="tags-menu__name">{tag.name}</span>
+                    {tag.isPersisted ? (
+                      <button
+                        type="button"
+                        className="tags-menu__delete"
+                        onClick={() => {
+                          void handleDeleteMenuTag(tag.id)
+                        }}
+                        aria-label={`Delete ${tag.name} tag`}
+                      >
+                        ×
+                      </button>
+                    ) : null}
+
+                    {isPaletteOpen ? (
+                      <div className="tags-menu__palette-wrap">
+                        <div
+                          className="tags-menu__palette"
+                          style={paletteStyle}
+                          onPointerDown={(event) => {
+                            event.currentTarget.setPointerCapture(event.pointerId)
+                            pickTagColor(tag, event)
+                          }}
+                          onPointerMove={(event) => {
+                            if (event.buttons !== 1) return
+                            pickTagColor(tag, event)
+                          }}
+                          onPointerUp={(event) => {
+                            event.currentTarget.releasePointerCapture(event.pointerId)
+                            void persistTagColor(tag.id)
+                          }}
+                        >
+                          <span className="tags-menu__palette-cursor" />
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                )
+              })}
+            </div>
+
+            <button
+              type="button"
+              className="tags-menu__new"
+              onClick={() => {
+                void handleCreateMenuTag()
+              }}
+              disabled={!isGraphReady}
+            >
+              + New tag
+            </button>
+          </section>
+        ) : null}
+      </div>
+
       <div className="app-actions">
         <div className={`search-panel${isSearchOpen ? ' is-open' : ''}`}>
           <div className="search-panel__header">
@@ -1028,7 +1349,13 @@ function App() {
       </div>
 
       {inspectorNode ? (
-        <aside className="inspector-panel">
+        <aside
+          ref={inspectorPanelRef}
+          className="inspector-panel"
+          aria-label="Selected person inspector"
+          onMouseDown={(event) => event.stopPropagation()}
+          onWheel={(event) => event.stopPropagation()}
+        >
           <div className="inspector-panel__header">
             <div>
               <p className="inspector-panel__eyebrow">
@@ -1042,7 +1369,7 @@ function App() {
               {inspectorNode.is_root
                 ? 'Root stays at 0,0'
                 : isGraphReady
-                  ? 'Drag to connect. Hold Shift to move.'
+                  ? 'Drag to move. Hold Option and drag to connect.'
                   : 'Sign in to edit'}
             </span>
           </div>
@@ -1246,7 +1573,6 @@ function App() {
           lastHighlightSpotRef.current = null
           setPointerPosition(null)
         }}
-        onWheel={moveWithWheel}
         aria-label="Social network graph canvas"
       >
         <div
@@ -1302,12 +1628,18 @@ function App() {
 
           {boardNodes.map((node) => {
             const isSelected = node.id === selectedNode?.id
+            const tagColor = node.tag_id ? tagColorById[node.tag_id] : null
+            const nodeStyle = {
+              left: `${node.x}px`,
+              top: `${node.y}px`,
+              ...(tagColor ? { '--node-color': tagColor } : {}),
+            } as GraphNodeStyle
 
             return (
               <div
                 key={node.id}
                 className={`graph-node${node.is_root ? ' graph-node--root' : ''}${isSelected ? ' is-selected' : ''}`}
-                style={{ left: `${node.x}px`, top: `${node.y}px` }}
+                style={nodeStyle}
               >
                 <button
                   type="button"
@@ -1315,8 +1647,8 @@ function App() {
                   title={
                     isGraphReady
                       ? node.is_root
-                        ? 'Drag to connect'
-                        : 'Drag to connect. Hold Shift to move.'
+                        ? 'Hold Option and drag to connect'
+                        : 'Drag to move. Hold Option and drag to connect.'
                       : 'Sign in with Google to edit'
                   }
                   onMouseDown={(event) => startNodeInteraction(node, event)}
@@ -1398,6 +1730,126 @@ function getLinkPath(fromNode?: PersonNode, toNode?: Offset | null) {
 
 function clampScale(value: number) {
   return Math.max(MIN_SCALE, Math.min(MAX_SCALE, value))
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value))
+}
+
+function loadTagColorDrafts() {
+  const savedDrafts = window.localStorage.getItem(TAG_COLOR_STORAGE_KEY)
+  if (!savedDrafts) return {}
+
+  try {
+    const parsedDrafts = JSON.parse(savedDrafts) as Record<string, string>
+
+    return Object.fromEntries(
+      Object.entries(parsedDrafts).map(([tagId, color]) => [tagId, normalizeTagColor(color)]),
+    )
+  } catch {
+    window.localStorage.removeItem(TAG_COLOR_STORAGE_KEY)
+    return {}
+  }
+}
+
+function saveTagColorDraft(tagId: string, color: string) {
+  let currentDrafts: Record<string, string> = {}
+  const savedDrafts = window.localStorage.getItem(TAG_COLOR_STORAGE_KEY)
+
+  if (savedDrafts) {
+    try {
+      currentDrafts = JSON.parse(savedDrafts) as Record<string, string>
+    } catch {
+      currentDrafts = {}
+    }
+  }
+
+  window.localStorage.setItem(
+    TAG_COLOR_STORAGE_KEY,
+    JSON.stringify({
+      ...currentDrafts,
+      [tagId]: normalizeTagColor(color),
+    }),
+  )
+}
+
+function hexToRgb(hex: string) {
+  const normalizedHex = normalizeTagColor(hex).slice(1)
+
+  return {
+    r: Number.parseInt(normalizedHex.slice(0, 2), 16),
+    g: Number.parseInt(normalizedHex.slice(2, 4), 16),
+    b: Number.parseInt(normalizedHex.slice(4, 6), 16),
+  }
+}
+
+function rgbToHex(red: number, green: number, blue: number) {
+  return `#${[red, green, blue]
+    .map((channel) => Math.round(channel).toString(16).padStart(2, '0'))
+    .join('')}`
+}
+
+function hexToHsv(hex: string) {
+  const { r, g, b } = hexToRgb(hex)
+  const red = r / 255
+  const green = g / 255
+  const blue = b / 255
+  const max = Math.max(red, green, blue)
+  const min = Math.min(red, green, blue)
+  const delta = max - min
+  let hue = 0
+
+  if (delta !== 0) {
+    if (max === red) hue = ((green - blue) / delta) % 6
+    else if (max === green) hue = (blue - red) / delta + 2
+    else hue = (red - green) / delta + 4
+  }
+
+  return {
+    hue: Math.round((hue * 60 + 360) % 360),
+    saturation: max === 0 ? 0 : (delta / max) * 100,
+    value: max * 100,
+  }
+}
+
+function hsvToHex(hue: number, saturation: number, value: number) {
+  const chroma = (value / 100) * (saturation / 100)
+  const huePrime = hue / 60
+  const x = chroma * (1 - Math.abs((huePrime % 2) - 1))
+  const match = value / 100 - chroma
+  let red = 0
+  let green = 0
+  let blue = 0
+
+  if (huePrime >= 0 && huePrime < 1) [red, green, blue] = [chroma, x, 0]
+  else if (huePrime < 2) [red, green, blue] = [x, chroma, 0]
+  else if (huePrime < 3) [red, green, blue] = [0, chroma, x]
+  else if (huePrime < 4) [red, green, blue] = [0, x, chroma]
+  else if (huePrime < 5) [red, green, blue] = [x, 0, chroma]
+  else [red, green, blue] = [chroma, 0, x]
+
+  return rgbToHex((red + match) * 255, (green + match) * 255, (blue + match) * 255)
+}
+
+function getPalettePosition(color: string) {
+  const hsv = hexToHsv(color)
+
+  return {
+    hue: hsv.hue,
+    x: (hsv.hue / 360) * 100,
+    y: 100 - hsv.saturation,
+  }
+}
+
+function isEditableElement(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false
+
+  return (
+    target.isContentEditable ||
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement
+  )
 }
 
 export default App

@@ -10,6 +10,7 @@ import {
   deleteConnection,
   deleteNote,
   deletePerson,
+  deleteTag,
   getPersonAiNote,
   invokePersonAiNoteSync,
   loadBoardGraph,
@@ -17,6 +18,7 @@ import {
   upsertPersonAiNoteStatus,
   updateNote,
   updatePerson,
+  updateTag,
 } from './graphStorage'
 
 type GraphStatus = 'idle' | 'loading' | 'ready'
@@ -252,10 +254,40 @@ export function useBoardGraph(user: User | null) {
         const tag = await createTag(userId, name)
         setGraphState((currentState) => ({
           ...currentState,
-          tags: [...currentState.tags, tag].sort((left, right) => left.name.localeCompare(right.name)),
+          tags: [...currentState.tags, tag],
           error: null,
         }))
         return tag
+      } catch (error) {
+        setError(error)
+        throw error
+      }
+    },
+    async updateTag(input: Parameters<typeof updateTag>[0]) {
+      try {
+        const tag = await updateTag(input)
+        setGraphState((currentState) => ({
+          ...currentState,
+          tags: currentState.tags.map((entry) => (entry.id === tag.id ? tag : entry)),
+          error: null,
+        }))
+        return tag
+      } catch (error) {
+        setError(error)
+        throw error
+      }
+    },
+    async deleteTag(id: string) {
+      try {
+        await deleteTag(id)
+        setGraphState((currentState) => ({
+          ...currentState,
+          tags: currentState.tags.filter((tag) => tag.id !== id),
+          people: currentState.people.map((person) =>
+            person.tag_id === id ? { ...person, tag_id: null } : person,
+          ),
+          error: null,
+        }))
       } catch (error) {
         setError(error)
         throw error

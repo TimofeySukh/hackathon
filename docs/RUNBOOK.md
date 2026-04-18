@@ -15,11 +15,12 @@ Current app behavior:
 - optionally sign in with Google through Supabase
 - create one personal board record for each signed-in user
 - create one immutable root person at `0,0` for each signed-in user
-- persist people, tags, notes, and undirected connections in Supabase
+- persist people, colored tags, notes, and undirected connections in Supabase
+- open the top-left Tags menu to create tags and adjust tag colors
 - allow one separate AI summary row per person in Supabase
 - debounce note create and note update events for 3 seconds before triggering AI enrichment
 - call a Supabase Edge Function that forwards person context to n8n and rewrites `person_ai_notes`
-- edit the selected person in the right-side inspector
+- edit the selected person in the node-anchored inspector
 - open a people search layer, match locally while typing, and run natural-language AI search on Enter
 
 There is no multiplayer or drawing toolset yet.
@@ -261,25 +262,26 @@ npm run preview
 
 Manual verification:
 
-1. Open the board and confirm the `Search people` control appears in the top action area.
-2. Open the search layer and verify that typing a person name, tag, or note text returns local matching people.
-3. Press Enter with a natural-language query and verify AI search returns ranked people with reasons.
-4. Click a search result and verify the board recenters on that person and opens the inspector.
-5. Drag anywhere on the board and confirm the point grid moves smoothly.
-6. Scroll on a trackpad and confirm the board pans without triggering zoom.
-7. Use the mouse wheel and confirm zoom centers around the cursor.
-8. Confirm the zoom indicator in the bottom-right updates smoothly.
-9. Toggle the theme.
-10. Reload the page and confirm the selected theme is preserved.
-11. Sign in with Google and confirm the account state appears.
-12. Confirm the signed-in account gets a root node at `0,0`.
-13. Drag out from a node to create a new connected person and confirm it persists after reload.
-14. Hold `Shift` and drag a non-root person to a new position, then reload and confirm the coordinates persist.
-15. Assign a tag to a person, add a note, reload, and confirm both persist.
-16. After creating a note, wait at least 3 seconds and confirm a `person_ai_notes` row for that person reaches `status = 'created'`.
-17. Edit an existing note, blur the input, wait at least 3 seconds, and confirm the same `person_ai_notes` row updates its `updated_at`, `summary`, and `structured_summary`.
-18. Create a connection between two existing people and confirm reload preserves it.
-19. Sign out and confirm the anonymous board state returns.
+1. Open the app in a browser.
+2. Drag anywhere on the board and confirm the point grid moves smoothly.
+3. Scroll on a trackpad and confirm the board pans without triggering zoom.
+4. Use the mouse wheel and confirm zoom centers around the cursor.
+5. Confirm the zoom indicator in the bottom-right updates smoothly.
+6. Toggle the theme.
+7. Reload the page and confirm the selected theme is preserved.
+8. Sign in with Google and confirm the account state appears.
+9. Confirm the signed-in account gets a root node at `0,0`.
+10. Drag out from a node to create a new connected person and confirm it persists after reload.
+11. Drag a non-root person to a new position, confirm connected lines follow it, then reload and confirm the coordinates persist.
+12. Assign a tag to a person, add a note, reload, and confirm both persist.
+13. Create a connection between two existing people and confirm reload preserves it.
+14. Open the top-left Tags menu, create a tag, adjust its color, and confirm tagged nodes use that color.
+15. Open the search layer and verify that typing a person name, tag, or note text returns local matching people.
+16. Press Enter with a natural-language query and verify AI search returns ranked people with reasons.
+17. Click a search result and verify the board recenters on that person and opens the inspector.
+18. After creating a note, wait at least 3 seconds and confirm a `person_ai_notes` row for that person reaches `status = 'created'`.
+19. Edit an existing note, blur the input, wait at least 3 seconds, and confirm the same `person_ai_notes` row updates its `updated_at`, `summary`, and `structured_summary`.
+20. Sign out and confirm the anonymous board state returns.
 
 Supabase verification:
 
