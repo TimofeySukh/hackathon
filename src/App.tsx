@@ -59,6 +59,13 @@ type HighlightSpotStyle = CSSProperties & {
   opacity: number
 }
 
+type NodeStyle = CSSProperties & {
+  '--node-color': string
+  '--node-dot-size': string
+  '--node-hit-size': string
+  '--node-label-gap': string
+}
+
 type ConnectionDrag = {
   fromId: string
   pointerId: number
@@ -129,8 +136,6 @@ const HIGHLIGHT_RADIUS = 56
 const HIGHLIGHT_TICK_MS = 50
 const HIGHLIGHT_TAIL_START = 18
 const HIGHLIGHT_TAIL_LIMIT = 48
-const NODE_RADIUS = 9
-const NODE_HIT_RADIUS = 31
 const DESKTOP_CREATE_THRESHOLD = 18
 const LONG_PRESS_MS = 420
 const TAP_MOVE_LIMIT = 10
@@ -378,7 +383,7 @@ function App() {
 
         const distanceToNode = Math.hypot(node.x - connectionDrag.worldX, node.y - connectionDrag.worldY)
 
-        return distanceToNode <= NODE_HIT_RADIUS / scale
+        return distanceToNode <= getNodeHitRadius(node.kind, isMobileLayout) / scale
       })
 
       if (targetNode) {
@@ -629,7 +634,7 @@ function App() {
     if (isMobileLayout || event.pointerType !== 'mouse' || event.button !== 0) return
 
     event.stopPropagation()
-    const worldPoint = screenToWorld(event.clientX, event.clientY, boardRef.current, offset, scale)
+    const node = nodesById[nodeId]
 
     setSelectedNodeId(nodeId)
     setEditingNodeId(null)
@@ -640,8 +645,8 @@ function App() {
       startClientY: event.clientY,
       clientX: event.clientX,
       clientY: event.clientY,
-      worldX: worldPoint?.x ?? nodesById[nodeId]?.x ?? 0,
-      worldY: worldPoint?.y ?? nodesById[nodeId]?.y ?? 0,
+      worldX: node?.x ?? 0,
+      worldY: node?.y ?? 0,
     })
 
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -812,7 +817,7 @@ function App() {
     ? getPreviewPath(nodesById[connectionDrag.fromId], {
         x: connectionDrag.worldX,
         y: connectionDrag.worldY,
-      })
+      }, isMobileLayout)
     : null
 
   const gridStyle = {
@@ -996,26 +1001,24 @@ function App() {
             const isEditing = node.id === editingNodeId
             const nodeMeta = parseNodeMeta(node.note)
             const hasMeta = Boolean(nodeMeta.notes.length || node.tag)
+            const nodeStyle: NodeStyle = {
+              left: `${node.x}px`,
+              top: `${node.y}px`,
+              '--node-color': nodeMeta.color,
+              '--node-dot-size': `${getNodeDiameter(node.kind, isMobileLayout)}px`,
+              '--node-hit-size': `${getNodeHitDiameter(node.kind, isMobileLayout)}px`,
+              '--node-label-gap': `${isMobileLayout ? 16 : 12}px`,
+            }
 
             return (
               <div
                 key={node.id}
                 className={`graph-node${node.kind === 'root' ? ' graph-node--root' : ''}${isSelected ? ' is-selected' : ''}${isMobileLayout ? ' graph-node--mobile' : ''}`}
-                style={
-                  {
-                    left: `${node.x}px`,
-                    top: `${node.y}px`,
-                    '--node-color': nodeMeta.color,
-                  } as CSSProperties
-                }
+                style={nodeStyle}
               >
                 {isEditing ? (
-                  <div
-                    className="graph-node__editor"
-                    data-node-interactive="true"
-                    onPointerDown={(event) => event.stopPropagation()}
-                  >
-                    <span className="graph-node__dot" />
+                  <div className="graph-node__editor" data-node-interactive="true">
+                    <span className="graph-node__dot" aria-hidden="true" />
                     <input
                       className="graph-node__input"
                       value={node.label}
@@ -1029,35 +1032,38 @@ function App() {
                     />
                   </div>
                 ) : (
-                  <button
-                    type="button"
-                    className="graph-node__button"
-                    data-node-interactive="true"
-                    data-selected={isSelected}
-                    onPointerDown={(event) => {
-                      startDesktopConnectionDrag(node.id, event)
-                      startNodeLongPress(node.id, event)
-                    }}
-                    onPointerUp={() => {
-                      void handleNodePress(node.id)
-                    }}
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      if (suppressNodeClickRef.current) {
-                        suppressNodeClickRef.current = false
-                        return
-                      }
-                      setSelectedNodeId(node.id)
-                    }}
-                    onDoubleClick={(event) => {
-                      event.stopPropagation()
-                      if (!isMobileLayout) {
-                        startEditingNode(node.id)
-                      }
-                    }}
-                  >
-                    <span className="graph-node__dot" />
-                    <span className="graph-node__labelWrap">
+                  <>
+                    <button
+                      type="button"
+                      className="graph-node__button"
+                      data-node-interactive="true"
+                      data-selected={isSelected}
+                      aria-label={node.label.trim() || 'Untitled node'}
+                      onPointerDown={(event) => {
+                        startDesktopConnectionDrag(node.id, event)
+                        startNodeLongPress(node.id, event)
+                      }}
+                      onPointerUp={() => {
+                        void handleNodePress(node.id)
+                      }}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        if (suppressNodeClickRef.current) {
+                          suppressNodeClickRef.current = false
+                          return
+                        }
+                        setSelectedNodeId(node.id)
+                      }}
+                      onDoubleClick={(event) => {
+                        event.stopPropagation()
+                        if (!isMobileLayout) {
+                          startEditingNode(node.id)
+                        }
+                      }}
+                    >
+                      <span className="graph-node__dot" aria-hidden="true" />
+                    </button>
+                    <span className="graph-node__labelWrap" aria-hidden="true">
                       <span className="graph-node__label">{node.label || 'Untitled'}</span>
                       {node.tag ? <span className="graph-node__tag">{node.tag}</span> : null}
                       {hasMeta ? (
@@ -1068,7 +1074,7 @@ function App() {
                         </span>
                       ) : null}
                     </span>
-                  </button>
+                  </>
                 )}
 
                 {isMobileLayout ? (
@@ -1088,117 +1094,118 @@ function App() {
             )
           })}
 
-          {selectedNode && selectedNodeMeta && inspectorStyle ? (
-            <aside
-              className="node-inspector"
-              style={inspectorStyle}
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className="node-inspector__header">
-                <div className="node-inspector__identity">
-                  <span
-                    className="node-inspector__swatch"
-                    style={{ backgroundColor: selectedNodeMeta.color }}
-                    aria-hidden="true"
-                  />
-                  <div>
-                    <div className="node-inspector__eyebrow">Node</div>
-                    <div className="node-inspector__title">
-                      {selectedNode.label.trim() || 'Untitled person'}
-                    </div>
+        </div>
+
+        {selectedNode && selectedNodeMeta && inspectorStyle && !isMobileLayout ? (
+          <aside
+            className="node-inspector"
+            style={inspectorStyle}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="node-inspector__header">
+              <div className="node-inspector__identity">
+                <span
+                  className="node-inspector__swatch"
+                  style={{ backgroundColor: selectedNodeMeta.color }}
+                  aria-hidden="true"
+                />
+                <div>
+                  <div className="node-inspector__eyebrow">Node</div>
+                  <div className="node-inspector__title">
+                    {selectedNode.label.trim() || 'Untitled person'}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className="node-inspector__undo"
-                  onClick={undoLastGraphChange}
-                  disabled={history.length === 0}
-                >
-                  Undo
-                </button>
               </div>
-
-              <section className="node-inspector__section">
-                <div className="node-inspector__section-label">Color</div>
-                <div className="node-inspector__palette" aria-label="Node color palette">
-                  {NODE_COLOR_OPTIONS.map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      className={`node-inspector__color${
-                        selectedNodeMeta.color === color ? ' is-active' : ''
-                      }`}
-                      style={{ backgroundColor: color }}
-                      onClick={() => void setNodeColor(selectedNode.id, color)}
-                      aria-label={`Use ${color} for this node`}
-                    />
-                  ))}
-                </div>
-              </section>
-
-              <section className="node-inspector__section">
-                <div className="node-inspector__section-row">
-                  <div className="node-inspector__section-label">Notes</div>
-                  <button
-                    type="button"
-                    className="node-inspector__add-note"
-                    onClick={() => void addNoteToNode(selectedNode.id)}
-                  >
-                    Add note
-                  </button>
-                </div>
-                <div className="node-inspector__notes">
-                  {selectedNodeMeta.notes.length === 0 ? (
-                    <div className="node-inspector__empty">No notes yet.</div>
-                  ) : (
-                    selectedNodeMeta.notes.map((note, index) => (
-                      <div key={note.id} className="node-inspector__note">
-                        <div className="node-inspector__note-header">
-                          <span className="node-inspector__note-label">Note {index + 1}</span>
-                          <button
-                            type="button"
-                            className="node-inspector__note-delete"
-                            onClick={() => void deleteNodeNote(selectedNode.id, note.id)}
-                          >
-                            Remove
-                          </button>
-                        </div>
-                        <textarea
-                          className="node-inspector__note-input"
-                          value={note.text}
-                          placeholder="Write a note about this person"
-                          onChange={(event) =>
-                            void updateNodeNote(selectedNode.id, note.id, event.target.value)
-                          }
-                        />
-                      </div>
-                    ))
-                  )}
-                </div>
-              </section>
-
               <button
                 type="button"
-                className="node-inspector__delete"
-                onClick={() => void deleteSelectedNode(selectedNode.id)}
-                disabled={selectedNode.kind === 'root'}
+                className="node-inspector__undo"
+                onClick={undoLastGraphChange}
+                disabled={history.length === 0}
               >
-                <svg
-                  className="node-inspector__delete-icon"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-2 6h2v8H7V9Zm4 0h2v8h-2V9Zm4 0h2v8h-2V9ZM6 9h12l-1 11a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 9Z"
-                    fill="currentColor"
-                  />
-                </svg>
-                Delete
+                Undo
               </button>
-            </aside>
-          ) : null}
-        </div>
+            </div>
+
+            <section className="node-inspector__section">
+              <div className="node-inspector__section-label">Color</div>
+              <div className="node-inspector__palette" aria-label="Node color palette">
+                {NODE_COLOR_OPTIONS.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    className={`node-inspector__color${
+                      selectedNodeMeta.color === color ? ' is-active' : ''
+                    }`}
+                    style={{ backgroundColor: color }}
+                    onClick={() => void setNodeColor(selectedNode.id, color)}
+                    aria-label={`Use ${color} for this node`}
+                  />
+                ))}
+              </div>
+            </section>
+
+            <section className="node-inspector__section">
+              <div className="node-inspector__section-row">
+                <div className="node-inspector__section-label">Notes</div>
+                <button
+                  type="button"
+                  className="node-inspector__add-note"
+                  onClick={() => void addNoteToNode(selectedNode.id)}
+                >
+                  Add note
+                </button>
+              </div>
+              <div className="node-inspector__notes">
+                {selectedNodeMeta.notes.length === 0 ? (
+                  <div className="node-inspector__empty">No notes yet.</div>
+                ) : (
+                  selectedNodeMeta.notes.map((note, index) => (
+                    <div key={note.id} className="node-inspector__note">
+                      <div className="node-inspector__note-header">
+                        <span className="node-inspector__note-label">Note {index + 1}</span>
+                        <button
+                          type="button"
+                          className="node-inspector__note-delete"
+                          onClick={() => void deleteNodeNote(selectedNode.id, note.id)}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <textarea
+                        className="node-inspector__note-input"
+                        value={note.text}
+                        placeholder="Write a note about this person"
+                        onChange={(event) =>
+                          void updateNodeNote(selectedNode.id, note.id, event.target.value)
+                        }
+                      />
+                    </div>
+                  ))
+                )}
+              </div>
+            </section>
+
+            <button
+              type="button"
+              className="node-inspector__delete"
+              onClick={() => void deleteSelectedNode(selectedNode.id)}
+              disabled={selectedNode.kind === 'root'}
+            >
+              <svg
+                className="node-inspector__delete-icon"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-2 6h2v8H7V9Zm4 0h2v8h-2V9Zm4 0h2v8h-2V9ZM6 9h12l-1 11a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 9Z"
+                  fill="currentColor"
+                />
+              </svg>
+              Delete
+            </button>
+          </aside>
+        ) : null}
 
         {isMobileLayout ? (
           <div className="mobile-toolbar" aria-label="Mobile board controls">
@@ -1345,7 +1352,8 @@ function screenToWorld(
 function getLinkPath(fromNode?: GraphNode, toNode?: Offset | null, isMobileLayout = false) {
   if (!fromNode || !toNode) return null
 
-  const radius = getNodeRadius(fromNode.kind, isMobileLayout)
+  const startRadius = getNodeRadius(fromNode.kind, isMobileLayout)
+  const endRadius = isGraphNode(toNode) ? getNodeRadius(toNode.kind, isMobileLayout) : 0
   const dx = toNode.x - fromNode.x
   const dy = toNode.y - fromNode.y
   const distance = Math.hypot(dx, dy) || 1
@@ -1355,26 +1363,26 @@ function getLinkPath(fromNode?: GraphNode, toNode?: Offset | null, isMobileLayou
 
   return {
     start: {
-      x: fromNode.x + unitX * radius,
-      y: fromNode.y + unitY * radius,
+      x: fromNode.x + unitX * startRadius,
+      y: fromNode.y + unitY * startRadius,
     },
     end: {
-      x: toNode.x - unitX * NODE_RADIUS,
-      y: toNode.y - unitY * NODE_RADIUS,
+      x: toNode.x - unitX * endRadius,
+      y: toNode.y - unitY * endRadius,
     },
     controlA: {
-      x: fromNode.x + unitX * (radius + curve),
-      y: fromNode.y + unitY * (radius + curve),
+      x: fromNode.x + unitX * (startRadius + curve),
+      y: fromNode.y + unitY * (startRadius + curve),
     },
     controlB: {
-      x: toNode.x - unitX * (NODE_RADIUS + curve),
-      y: toNode.y - unitY * (NODE_RADIUS + curve),
+      x: toNode.x - unitX * (endRadius + curve),
+      y: toNode.y - unitY * (endRadius + curve),
     },
   }
 }
 
-function getPreviewPath(fromNode?: GraphNode, pointer?: Offset | null) {
-  return getLinkPath(fromNode, pointer)
+function getPreviewPath(fromNode?: GraphNode, pointer?: Offset | null, isMobileLayout = false) {
+  return getLinkPath(fromNode, pointer, isMobileLayout)
 }
 
 function clampScale(value: number) {
@@ -1394,10 +1402,26 @@ function getCenter(first: Offset, second: Offset) {
 
 function getNodeRadius(kind: GraphNode['kind'], isMobileLayout: boolean) {
   if (!isMobileLayout) {
-    return kind === 'root' ? 15 : 12
+    return kind === 'root' ? 17 : 12
   }
 
   return kind === 'root' ? 36 : 28
+}
+
+function getNodeDiameter(kind: GraphNode['kind'], isMobileLayout: boolean) {
+  return getNodeRadius(kind, isMobileLayout) * 2
+}
+
+function getNodeHitRadius(kind: GraphNode['kind'], isMobileLayout: boolean) {
+  return isMobileLayout ? getNodeRadius(kind, true) + 20 : getNodeRadius(kind, false) + 16
+}
+
+function getNodeHitDiameter(kind: GraphNode['kind'], isMobileLayout: boolean) {
+  return getNodeHitRadius(kind, isMobileLayout) * 2
+}
+
+function isGraphNode(value: GraphNode | Offset): value is GraphNode {
+  return 'kind' in value
 }
 
 function parseNodeMeta(noteValue: string | null): NodeInspectorMeta {

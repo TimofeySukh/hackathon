@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { createAnonymousGraph, ROOT_NODE_LABEL, type GraphEdge, type GraphNode } from './types'
 
 type GraphStatus = 'loading' | 'ready'
+type GraphStorageMode = 'local' | 'remote'
 
 type BoardNodeRow = {
   id: string
@@ -61,6 +62,15 @@ const createEdgeRow = (boardId: string, edge: GraphEdge): BoardEdgeRow => ({
 
 const hasEdge = (edges: GraphEdge[], from: string, to: string) =>
   edges.some((edge) => edge.from === from && edge.to === to)
+
+function hasMissingGraphTables(error: unknown) {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 'PGRST205'
+  )
+}
 
 async function ensureBoardRoot(boardId: string) {
   if (!supabase) return
@@ -134,6 +144,9 @@ export function useBoardGraph(boardId: string | null) {
   const [edges, setEdges] = useState<GraphEdge[]>(anonymousGraph.edges)
   const [status, setStatus] = useState<GraphStatus>('ready')
   const [error, setError] = useState<string | null>(null)
+  const [storageMode, setStorageMode] = useState<GraphStorageMode>(() =>
+    boardId && supabase ? 'remote' : 'local',
+  )
 
   const refreshGraph = useCallback(async () => {
     if (!boardId || !supabase) {
@@ -141,6 +154,7 @@ export function useBoardGraph(boardId: string | null) {
       setEdges(anonymousGraph.edges)
       setStatus('ready')
       setError(null)
+      setStorageMode('local')
       return
     }
 
@@ -152,7 +166,17 @@ export function useBoardGraph(boardId: string | null) {
       setEdges(graph.edges)
       setStatus('ready')
       setError(null)
+      setStorageMode('remote')
     } catch (loadError) {
+      if (hasMissingGraphTables(loadError)) {
+        setNodes(anonymousGraph.nodes)
+        setEdges(anonymousGraph.edges)
+        setStatus('ready')
+        setError(null)
+        setStorageMode('local')
+        return
+      }
+
       setStatus('ready')
       setError(loadError instanceof Error ? loadError.message : 'Unable to load board graph.')
     }
@@ -165,7 +189,7 @@ export function useBoardGraph(boardId: string | null) {
   }, [refreshGraph])
 
   useEffect(() => {
-    if (!boardId || !supabase) return undefined
+    if (!boardId || !supabase || storageMode !== 'remote') return undefined
 
     const client = supabase
 
@@ -200,13 +224,14 @@ export function useBoardGraph(boardId: string | null) {
     return () => {
       void client.removeChannel(channel)
     }
-  }, [boardId, refreshGraph])
+  }, [boardId, refreshGraph, storageMode])
 
   const persistNode = useCallback(
     async (node: GraphNode) => {
-      if (!boardId || !supabase) return
+      if (!boardId || !supabase || storageMode !== 'remote') return
+      const client = supabase
 
-      const { error: persistError } = await supabase
+      const { error: persistError } = await client
         .from('board_nodes')
         .upsert(createNodeRow(boardId, node))
 
@@ -214,14 +239,15 @@ export function useBoardGraph(boardId: string | null) {
         throw persistError
       }
     },
-    [boardId],
+    [boardId, storageMode],
   )
 
   const persistEdge = useCallback(
     async (edge: GraphEdge) => {
-      if (!boardId || !supabase) return
+      if (!boardId || !supabase || storageMode !== 'remote') return
+      const client = supabase
 
-      const { error: persistError } = await supabase
+      const { error: persistError } = await client
         .from('board_edges')
         .upsert(createEdgeRow(boardId, edge))
 
@@ -229,7 +255,7 @@ export function useBoardGraph(boardId: string | null) {
         throw persistError
       }
     },
-    [boardId],
+    [boardId, storageMode],
   )
 
   const updateNode = useCallback(
@@ -331,15 +357,16 @@ export function useBoardGraph(boardId: string | null) {
         currentEdges.filter((edge) => edge.from !== nodeId && edge.to !== nodeId),
       )
 
-      if (!boardId || !supabase) return
+      if (!boardId || !supabase || storageMode !== 'remote') return
+      const client = supabase
 
-      const deleteEdges = supabase
+      const deleteEdges = client
         .from('board_edges')
         .delete()
         .eq('board_id', boardId)
         .or(`from_node_id.eq.${nodeId},to_node_id.eq.${nodeId}`)
 
-      const deleteNodeQuery = supabase
+      const deleteNodeQuery = client
         .from('board_nodes')
         .delete()
         .eq('board_id', boardId)
@@ -355,7 +382,7 @@ export function useBoardGraph(boardId: string | null) {
         void refreshGraph()
       }
     },
-    [boardId, nodes, refreshGraph],
+    [boardId, nodes, refreshGraph, storageMode],
   )
 
   const replaceGraph = useCallback(
@@ -363,20 +390,21 @@ export function useBoardGraph(boardId: string | null) {
       setNodes(nextNodes)
       setEdges(nextEdges)
 
-      if (!boardId || !supabase) return
+      if (!boardId || !supabase || storageMode !== 'remote') return
+      const client = supabase
 
       const nodeRows = nextNodes.map((node) => createNodeRow(boardId, node))
       const edgeRows = nextEdges.map((edge) => createEdgeRow(boardId, edge))
 
       try {
-        const { error: deleteEdgesError } = await supabase
+        const { error: deleteEdgesError } = await client
           .from('board_edges')
           .delete()
           .eq('board_id', boardId)
 
         if (deleteEdgesError) throw deleteEdgesError
 
-        const { error: deleteNodesError } = await supabase
+        const { error: deleteNodesError } = await client
           .from('board_nodes')
           .delete()
           .eq('board_id', boardId)
@@ -384,12 +412,12 @@ export function useBoardGraph(boardId: string | null) {
         if (deleteNodesError) throw deleteNodesError
 
         if (nodeRows.length > 0) {
-          const { error: insertNodesError } = await supabase.from('board_nodes').insert(nodeRows)
+          const { error: insertNodesError } = await client.from('board_nodes').insert(nodeRows)
           if (insertNodesError) throw insertNodesError
         }
 
         if (edgeRows.length > 0) {
-          const { error: insertEdgesError } = await supabase.from('board_edges').insert(edgeRows)
+          const { error: insertEdgesError } = await client.from('board_edges').insert(edgeRows)
           if (insertEdgesError) throw insertEdgesError
         }
       } catch (replaceError) {
@@ -397,7 +425,7 @@ export function useBoardGraph(boardId: string | null) {
         void refreshGraph()
       }
     },
-    [boardId, refreshGraph],
+    [boardId, refreshGraph, storageMode],
   )
 
   return {
