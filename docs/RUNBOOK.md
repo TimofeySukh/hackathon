@@ -13,6 +13,7 @@ There is no application code yet, so there are no build or test commands. Curren
 - Use `main` as the trunk branch.
 - Create short-lived task branches once implementation starts.
 - Keep pull requests small and link them to the relevant Linear issue.
+- Before starting new repo work, run `git fetch` and then `git pull --ff-only` when the working tree is clean, so local work starts from the latest GitHub state without creating automatic merge commits.
 - When the user asks an agent to commit changes, push the resulting commit to GitHub as part of the same workflow unless the user explicitly asks to keep it local.
 
 ## Current Priorities
