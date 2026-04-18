@@ -273,7 +273,7 @@ Manual verification:
 9. Confirm the signed-in account gets a root node at `0,0`.
 10. Drag out from a node to create a new connected person and confirm it persists after reload.
 11. Drag a non-root person to a new position, confirm connected lines follow it, then reload and confirm the coordinates persist.
-12. Assign an existing tag to a person from the inspector tag picker, create a new tag from the same field, add a note, reload, and confirm they persist.
+12. Assign an existing tag to a person from the inspector tag picker, use ArrowUp/ArrowDown plus Enter in that picker, create a new tag from the same field, add a note, reload, and confirm they persist.
 13. Create a connection between two existing people, confirm reload preserves it, then click the line and confirm `Delete connection` or Backspace removes it.
 14. Open the top-left Tags menu, create a tag, adjust its color, and confirm tagged nodes use that color.
 15. Open the search layer and verify that typing a person name, tag, or note text returns local matching people.

@@ -732,6 +732,7 @@ select {
 }
 
 .tag-picker__option:hover,
+.tag-picker__option.is-active,
 .tag-picker__option.is-selected {
   background: var(--button-bg);
 }

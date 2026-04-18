@@ -107,6 +107,24 @@ type TagMenuItem = Pick<Tag, 'id' | 'name' | 'color'> & {
   isPersisted: boolean
 }
 
+type TagPickerOption =
+  | {
+      id: 'clear'
+      type: 'clear'
+      label: string
+    }
+  | {
+      id: string
+      type: 'tag'
+      label: string
+      tagId: string
+    }
+  | {
+      id: 'create'
+      type: 'create'
+      label: string
+    }
+
 const THEME_STORAGE_KEY = 'hackathon-theme'
 const TAG_COLOR_STORAGE_KEY = 'hackathon-tag-colors'
 const MIN_SCALE = 0.2
@@ -183,6 +201,7 @@ function App() {
   const [nameDraft, setNameDraft] = useState('')
   const [tagDraft, setTagDraft] = useState('')
   const [isTagPickerOpen, setIsTagPickerOpen] = useState(false)
+  const [activeTagOptionIndex, setActiveTagOptionIndex] = useState(0)
   const [isTagsMenuOpen, setIsTagsMenuOpen] = useState(false)
   const [activeColorTagId, setActiveColorTagId] = useState<string | null>(null)
   const [tagColorDrafts, setTagColorDrafts] = useState<Record<string, string>>(() =>
@@ -306,6 +325,36 @@ function App() {
 
     return !tags.some((tag) => normalizeTagName(tag.name).toLowerCase() === normalizedDraft.toLowerCase())
   }, [isGraphReady, tagDraft, tags])
+  const tagPickerOptions = useMemo<TagPickerOption[]>(() => {
+    const nextOptions: TagPickerOption[] = []
+
+    if (selectedInspectorTag) {
+      nextOptions.push({
+        id: 'clear',
+        type: 'clear',
+        label: 'No tag',
+      })
+    }
+
+    nextOptions.push(
+      ...filteredInspectorTags.map((tag) => ({
+        id: tag.id,
+        type: 'tag' as const,
+        label: tag.name,
+        tagId: tag.id,
+      })),
+    )
+
+    if (canCreateInspectorTag) {
+      nextOptions.push({
+        id: 'create',
+        type: 'create',
+        label: `Create "${normalizeTagName(tagDraft)}"`,
+      })
+    }
+
+    return nextOptions
+  }, [canCreateInspectorTag, filteredInspectorTags, selectedInspectorTag, tagDraft])
   const notesByPersonId = useMemo(() => {
     const nextNotesByPersonId: Record<string, PersonNote[]> = {}
 
@@ -865,6 +914,7 @@ function App() {
     })
     setTagDraft(nextTagId ? tagsById[nextTagId]?.name ?? '' : '')
     setIsTagPickerOpen(false)
+    setActiveTagOptionIndex(0)
   }
 
   async function handleCreateTag() {
@@ -877,6 +927,7 @@ function App() {
     const createdTag = existingTag ?? (await createTag(nextName))
     setTagDraft(createdTag.name)
     setIsTagPickerOpen(false)
+    setActiveTagOptionIndex(0)
     await updatePerson({
       id: inspectorNode.id,
       tag_id: createdTag.id,
@@ -892,6 +943,21 @@ function App() {
     })
     setTagDraft('')
     setIsTagPickerOpen(false)
+    setActiveTagOptionIndex(0)
+  }
+
+  function chooseTagPickerOption(option: TagPickerOption) {
+    if (option.type === 'clear') {
+      void handleClearTag()
+      return
+    }
+
+    if (option.type === 'create') {
+      void handleCreateTag()
+      return
+    }
+
+    void handleTagSelection(option.tagId)
   }
 
   function handleTagKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
@@ -899,21 +965,30 @@ function App() {
       event.preventDefault()
       setTagDraft(selectedInspectorTag?.name ?? '')
       setIsTagPickerOpen(false)
+      setActiveTagOptionIndex(0)
       event.currentTarget.blur()
+      return
+    }
+
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      setIsTagPickerOpen(true)
+      setActiveTagOptionIndex((currentIndex) => {
+        if (tagPickerOptions.length === 0) return 0
+
+        const direction = event.key === 'ArrowDown' ? 1 : -1
+        return (currentIndex + direction + tagPickerOptions.length) % tagPickerOptions.length
+      })
       return
     }
 
     if (event.key !== 'Enter') return
 
     event.preventDefault()
-    const firstTag = filteredInspectorTags[0]
-    if (firstTag) {
-      void handleTagSelection(firstTag.id)
+    const activeOption = tagPickerOptions[Math.min(activeTagOptionIndex, tagPickerOptions.length - 1)]
+    if (activeOption) {
+      chooseTagPickerOption(activeOption)
       return
-    }
-
-    if (canCreateInspectorTag) {
-      void handleCreateTag()
     }
   }
 
@@ -1503,16 +1578,21 @@ function App() {
               <input
                 className="field-group__input tag-picker__input"
                 value={tagDraft}
-                onFocus={() => setIsTagPickerOpen(true)}
+                onFocus={() => {
+                  setIsTagPickerOpen(true)
+                  setActiveTagOptionIndex(0)
+                }}
                 onChange={(event) => {
                   setTagDraft(event.target.value)
                   setIsTagPickerOpen(true)
+                  setActiveTagOptionIndex(0)
                 }}
                 onKeyDown={handleTagKeyDown}
                 onBlur={() => {
                   window.setTimeout(() => {
                     setIsTagPickerOpen(false)
                     setTagDraft(selectedInspectorTag?.name ?? '')
+                    setActiveTagOptionIndex(0)
                   }, 120)
                 }}
                 placeholder="Choose or create a tag"
@@ -1520,50 +1600,39 @@ function App() {
                 role="combobox"
                 aria-expanded={isTagPickerOpen}
                 aria-controls="inspector-tag-options"
+                aria-activedescendant={
+                  isTagPickerOpen && tagPickerOptions[activeTagOptionIndex]
+                    ? `inspector-tag-option-${tagPickerOptions[activeTagOptionIndex].id}`
+                    : undefined
+                }
               />
               {isTagPickerOpen ? (
                 <div id="inspector-tag-options" className="tag-picker__menu" role="listbox">
-                  {selectedInspectorTag ? (
+                  {tagPickerOptions.map((option, optionIndex) => (
                     <button
+                      key={option.id}
+                      id={`inspector-tag-option-${option.id}`}
                       type="button"
-                      className="tag-picker__option tag-picker__option--muted"
+                      className={[
+                        'tag-picker__option',
+                        option.type === 'clear' ? 'tag-picker__option--muted' : '',
+                        option.type === 'create' ? 'tag-picker__option--create' : '',
+                        option.type === 'tag' && option.tagId === inspectorNode.tag_id ? 'is-selected' : '',
+                        optionIndex === activeTagOptionIndex ? 'is-active' : '',
+                      ].filter(Boolean).join(' ')}
                       onMouseDown={(event) => event.preventDefault()}
+                      onMouseEnter={() => setActiveTagOptionIndex(optionIndex)}
                       onClick={() => {
-                        void handleClearTag()
-                      }}
-                    >
-                      No tag
-                    </button>
-                  ) : null}
-                  {filteredInspectorTags.map((tag) => (
-                    <button
-                      key={tag.id}
-                      type="button"
-                      className={`tag-picker__option${tag.id === inspectorNode.tag_id ? ' is-selected' : ''}`}
-                      onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => {
-                        void handleTagSelection(tag.id)
+                        chooseTagPickerOption(option)
                       }}
                       role="option"
-                      aria-selected={tag.id === inspectorNode.tag_id}
+                      aria-selected={optionIndex === activeTagOptionIndex}
                     >
-                      {tag.name}
+                      {option.label}
                     </button>
                   ))}
-                  {filteredInspectorTags.length === 0 && !canCreateInspectorTag ? (
+                  {tagPickerOptions.length === 0 ? (
                     <span className="tag-picker__empty">No matching tags.</span>
-                  ) : null}
-                  {canCreateInspectorTag ? (
-                    <button
-                      type="button"
-                      className="tag-picker__option tag-picker__option--create"
-                      onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => {
-                        void handleCreateTag()
-                      }}
-                    >
-                      Create "{normalizeTagName(tagDraft)}"
-                    </button>
                   ) : null}
                 </div>
               ) : null}
