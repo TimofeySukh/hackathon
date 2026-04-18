@@ -2,7 +2,97 @@
 
 ## Status
 
-There is no application code yet, so there are no build or test commands. Current work is coordination and scoping in Linear.
+The repository contains a minimal React, Vite, and TypeScript infinite board app.
+
+Current app behavior:
+
+- open a full-window board
+- drag with the mouse to move across the point grid
+- switch between dark and light themes
+- persist the selected theme in `localStorage`
+
+There is no backend, persistence layer, authentication, multiplayer, or drawing toolset yet.
+
+## Local Setup
+
+Install dependencies from the lockfile:
+
+```bash
+npm ci
+```
+
+Start the development server:
+
+```bash
+npm run dev
+```
+
+Vite prints a local URL in the terminal. Open that URL in a browser.
+
+## Dependency Workflow
+
+Use npm for this repository.
+
+For a clean, reproducible install, use:
+
+```bash
+npm ci
+```
+
+This is the closest npm equivalent to a lockfile sync command. It installs exactly what is recorded in `package-lock.json`.
+
+Use `npm install` only when intentionally adding, removing, or changing dependencies:
+
+```bash
+npm install <package>
+npm install -D <package>
+```
+
+To update installed packages within the semver ranges already declared in `package.json`, use:
+
+```bash
+npm update
+```
+
+To inspect available updates before changing anything, use:
+
+```bash
+npm outdated
+```
+
+After any dependency change:
+
+1. Review `package.json` and `package-lock.json`.
+2. Run `npm run build`.
+3. Run `npm run lint`.
+4. Do not keep lockfile churn that is unrelated to the intended dependency change.
+
+## Build And Verification
+
+Create a production build:
+
+```bash
+npm run build
+```
+
+Run lint checks:
+
+```bash
+npm run lint
+```
+
+Preview the production build locally:
+
+```bash
+npm run preview
+```
+
+Manual verification:
+
+1. Open the app in a browser.
+2. Drag anywhere on the board and confirm the point grid moves smoothly.
+3. Toggle the theme.
+4. Reload the page and confirm the selected theme is preserved.
 
 ## Team Workflow
 
@@ -18,20 +108,21 @@ There is no application code yet, so there are no build or test commands. Curren
 
 ## Current Priorities
 
-1. Finalize the project idea and scope.
-2. Collect all links and access paths the team needs.
-3. Define presentation and demo roles.
-4. Prepare the final presentation deck.
+1. Keep the demo path stable.
+2. Finalize the project idea and scope in Linear.
+3. Collect all links and access paths the team needs.
+4. Define presentation and demo roles.
+5. Prepare the final presentation deck.
 
-## What To Do When Code Is Added
+## What To Do When Code Changes
 
-- Document the main install, run, test, and verification commands here.
-- Include the expected output for successful runs.
+- Keep the commands above current.
+- Add test commands when automated tests are introduced.
 - Note common failures and the next action to take.
-- Add one obvious local verification command before the first substantial pull request.
+- Add one obvious local verification command before each substantial pull request.
 
 ## Current Verification
 
-- Confirm the repo clones correctly.
-- Confirm the Linear Hackathon project exists.
-- Confirm active tasks are linked from `docs/PROJECT_MAP.md`.
+- `npm run build`
+- `npm run lint`
+- Manual browser check of drag navigation and theme persistence
