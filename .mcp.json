@@ -6,6 +6,10 @@
       "headers": {
         "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkMzU4NzM5OC03YjYyLTQ2OWItOWZkMS1mYjE1MjZkNzNiMDUiLCJpc3MiOiJuOG4iLCJhdWQiOiJtY3Atc2VydmVyLWFwaSIsImp0aSI6ImI2ZTYzOWEyLThhZjQtNDQ3Zi05MDQ5LWI3NDAxODJjOTUwNCIsImlhdCI6MTc3NjUzMjYyN30.KWyA_ZdZ5lyKyPo5Vyd4AIPDyItuxdFH9hlgFofL3uk"
       }
+    },
+    "hackathon-board": {
+      "command": "node",
+      "args": ["./mcp/server.mjs"]
     }
   }
 }

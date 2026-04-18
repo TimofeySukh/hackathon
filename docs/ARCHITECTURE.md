@@ -13,6 +13,7 @@ Runtime boundaries:
 - Supabase owns Google authentication and user-owned graph records.
 - Supabase Edge Functions own the server-side n8n webhook call for AI note enrichment.
 - n8n owns LLM execution, structured summary generation for `person_ai_notes`, and natural-language people search ranking.
+- The local MCP server owns agent-facing project documentation resources plus service-role scoped board graph tooling.
 - Linear owns task state, status, ownership, priority, and blockers.
 - `docs/` owns durable product and repository knowledge.
 
@@ -28,6 +29,7 @@ The backend boundary remains intentionally narrow: Supabase Auth provides identi
 - `src/lib/useBoardGraph.ts` owns board graph loading, frontend mutation state, and debounced AI note refresh scheduling.
 - `src/lib/graphStorage.ts` owns Supabase CRUD for graph data, `person_ai_notes`, and Edge Function invocation.
 - `src/lib/userWorkspace.ts` upserts the user profile and ensures a single personal board plus root node.
+- `mcp/server.mjs` exposes repo docs as MCP resources and the persisted graph model as MCP tools and dynamic resources.
 - `supabase/functions/sync-person-ai-note/index.ts` authenticates the caller, loads person context, calls n8n, and upserts `person_ai_notes`.
 - `supabase/functions/search-people-ai/index.ts` authenticates the caller, builds candidate context, calls n8n, and returns ranked people.
 - `src/index.css` contains the full visual system.
@@ -72,6 +74,7 @@ Out of scope for the current version:
 - Preserve the clean-board product principle from `docs/product-vision.md`.
 - Keep all graph rows user-owned and protected by RLS keyed to `auth.uid()`.
 - Keep n8n webhook secrets out of the browser and only inside Supabase Edge Function secrets.
+- Keep `SUPABASE_SERVICE_ROLE_KEY` out of browser-exposed `VITE_` variables and only in local MCP env files or shell env.
 - Keep the root person immutable in position and deletion semantics.
 - Keep Google OAuth redirect/origin configuration aligned with the real deployed frontend origins.
 

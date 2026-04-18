@@ -52,6 +52,9 @@ Completed tasks can remain listed here when they explain repository history. Liv
 - `docs/product-vision.md`: product direction and scope.
 - `docs/project-structure.md`: file-by-file project structure notes.
 - `README.md`: top-level overview and local development commands.
+- `.env.mcp.example`: local-only MCP environment template for service-role access.
+- `.mcp.json`: project MCP configuration for the shared `n8n-mcp` HTTP server and the local Hackathon board stdio server.
+- `mcp/server.mjs`: local MCP server that exposes project docs and board graph tooling.
 - `src/main.tsx`: React entry point.
 - `src/App.tsx`: current board behavior.
 - `src/lib/supabase.ts`: browser Supabase client configuration.
@@ -75,4 +78,5 @@ Task ownership is tracked in Linear. Code ownership is not split by directory ye
 - Link any implementation task or pull request back to the relevant Linear issue.
 - Update `docs/product-vision.md` when product scope changes.
 - Update `docs/project-structure.md` and `docs/ARCHITECTURE.md` when source structure or boundaries change.
+- Keep the local MCP server aligned with the Supabase schema and documentation resources.
 - Keep Supabase Auth redirect URLs and Google OAuth origins aligned with every deployed frontend origin.
