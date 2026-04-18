@@ -31,10 +31,10 @@ select {
 }
 
 .app-shell {
-  --dot-size: 1.5px;
-  --dot-gap: 38px;
-  --major-dot-size: 3px;
-  --major-dot-gap: 152px;
+  --dot-size: 1px;
+  --dot-gap: 26px;
+  --major-dot-size: 2px;
+  --major-dot-gap: 104px;
   position: relative;
   width: 100%;
   height: 100%;
@@ -53,6 +53,8 @@ select {
   --toggle-label: #dff9ef;
   --grid-dot: rgba(94, 226, 180, 0.14);
   --grid-dot-major: rgba(115, 255, 201, 0.3);
+  --grid-dot-hover: rgba(119, 255, 209, 0.92);
+  --grid-dot-major-hover: rgba(226, 255, 244, 0.98);
   --grid-glow-a: rgba(12, 67, 46, 0.22);
   --grid-glow-b: rgba(10, 24, 18, 0);
   background:
@@ -71,6 +73,8 @@ select {
   --toggle-label: #174c37;
   --grid-dot: rgba(24, 79, 58, 0.12);
   --grid-dot-major: rgba(24, 101, 70, 0.26);
+  --grid-dot-hover: rgba(14, 132, 89, 0.78);
+  --grid-dot-major-hover: rgba(5, 84, 54, 0.9);
   --grid-glow-a: rgba(69, 181, 135, 0.1);
   --grid-glow-b: rgba(255, 255, 255, 0);
   background:
@@ -146,6 +150,8 @@ select {
 .board-surface {
   position: absolute;
   inset: 0;
+  z-index: 0;
+  overflow: hidden;
   background-image:
     radial-gradient(circle, var(--grid-dot) 0 var(--dot-size), transparent calc(var(--dot-size) + 0.2px)),
     radial-gradient(circle, var(--grid-dot-major) 0 var(--major-dot-size), transparent calc(var(--major-dot-size) + 0.2px)),
@@ -156,6 +162,11 @@ select {
     var(--major-dot-gap) var(--major-dot-gap),
     100% 100%,
     100% 100%;
+  background-position:
+    var(--board-offset-x) var(--board-offset-y),
+    var(--board-offset-x) var(--board-offset-y),
+    center,
+    center;
 }
 
 .board-surface::after {
@@ -166,6 +177,44 @@ select {
     linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 20%),
     radial-gradient(circle at center, transparent 56%, rgba(0, 0, 0, 0.08) 100%);
   pointer-events: none;
+}
+
+.board-highlights {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.board-highlights__spot {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle, var(--grid-dot-hover) 0 calc(var(--dot-size) + 0.45px), transparent calc(var(--dot-size) + 0.65px)),
+    radial-gradient(circle, var(--grid-dot-major-hover) 0 calc(var(--major-dot-size) + 0.65px), transparent calc(var(--major-dot-size) + 0.85px));
+  background-size:
+    var(--dot-gap) var(--dot-gap),
+    var(--major-dot-gap) var(--major-dot-gap);
+  background-position:
+    var(--board-offset-x) var(--board-offset-y),
+    var(--board-offset-x) var(--board-offset-y);
+  mask-image: radial-gradient(
+    circle at var(--highlight-x) var(--highlight-y),
+    rgba(0, 0, 0, 1) 0,
+    rgba(0, 0, 0, 0.9) 22px,
+    rgba(0, 0, 0, 0.34) 42px,
+    transparent 62px
+  );
+  -webkit-mask-image: radial-gradient(
+    circle at var(--highlight-x) var(--highlight-y),
+    rgba(0, 0, 0, 1) 0,
+    rgba(0, 0, 0, 0.9) 22px,
+    rgba(0, 0, 0, 0.34) 42px,
+    transparent 62px
+  );
+  pointer-events: none;
+  transition: opacity 80ms linear;
 }
 
 @media (max-width: 720px) {

@@ -9,7 +9,7 @@ The current product is intentionally narrow:
 - a full-window board surface
 - mouse drag navigation
 - a dark/light theme toggle
-- a CSS-rendered point grid
+- a dense CSS-rendered point grid with motion-triggered point highlights
 - no drawing tools, side panels, persistence, backend, or collaboration yet
 
 ## Active Work

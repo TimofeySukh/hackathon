@@ -39,6 +39,7 @@ Contains the board experience:
 - theme state
 - mouse drag navigation state
 - board zoom state
+- motion-triggered point highlight state
 - theme toggle
 - infinite board surface positioning
 
@@ -47,7 +48,8 @@ Contains the board experience:
 Contains the complete visual system for:
 
 - dark and light themes
-- point-grid background
+- dense point-grid background
+- motion-triggered point highlight styling
 - board overlay styling
 - responsive layout behavior
 
@@ -70,6 +72,7 @@ It currently supports:
 - trackpad and wheel-based navigation across the canvas
 - cursor-centered zoom with the mouse wheel
 - visual theme switching
+- motion-triggered point highlighting that fades when movement stops
 - grid movement through background offset changes
 
 The visual board is simulated by shifting layered CSS backgrounds based on the current camera offset.
