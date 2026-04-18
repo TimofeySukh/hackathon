@@ -213,9 +213,6 @@ function App() {
   const viewportRef = useRef({ offset: { x: 0, y: 0 }, scale: 1 })
   const pendingViewportRef = useRef<{ offset: Offset; scale: number } | null>(null)
   const viewportFrameRef = useRef<number | null>(null)
-  const pendingNodeDragPositionRef = useRef<{ nodeId: string; position: Offset } | null>(null)
-  const currentNodeDragPositionRef = useRef<{ nodeId: string; position: Offset } | null>(null)
-  const nodeDragFrameRef = useRef<number | null>(null)
   const gestureScaleRef = useRef(1)
   const boardDragRef = useRef({
     startX: 0,
@@ -521,26 +518,6 @@ function App() {
     [applyViewport],
   )
 
-  const queueNodeDragPosition = useCallback((nodeId: string, position: Offset) => {
-    pendingNodeDragPositionRef.current = { nodeId, position }
-    currentNodeDragPositionRef.current = { nodeId, position }
-
-    if (nodeDragFrameRef.current !== null) return
-
-    nodeDragFrameRef.current = window.requestAnimationFrame(() => {
-      nodeDragFrameRef.current = null
-
-      const pendingNodeDragPosition = pendingNodeDragPositionRef.current
-      if (!pendingNodeDragPosition) return
-
-      pendingNodeDragPositionRef.current = null
-      setDraggedPositions((currentPositions) => ({
-        ...currentPositions,
-        [pendingNodeDragPosition.nodeId]: pendingNodeDragPosition.position,
-      }))
-    })
-  }, [])
-
   useEffect(() => {
     applyViewport(viewportRef.current.offset, viewportRef.current.scale)
 
@@ -670,10 +647,13 @@ function App() {
       }
 
       if (nodeDrag) {
-        queueNodeDragPosition(nodeDrag.nodeId, {
-          x: nodeDrag.originX + (event.clientX - nodeDrag.startClientX) / viewportRef.current.scale,
-          y: nodeDrag.originY + (event.clientY - nodeDrag.startClientY) / viewportRef.current.scale,
-        })
+        setDraggedPositions((currentPositions) => ({
+          ...currentPositions,
+          [nodeDrag.nodeId]: {
+            x: nodeDrag.originX + (event.clientX - nodeDrag.startClientX) / viewportRef.current.scale,
+            y: nodeDrag.originY + (event.clientY - nodeDrag.startClientY) / viewportRef.current.scale,
+          },
+        }))
         return
       }
 
@@ -693,30 +673,13 @@ function App() {
         }
 
         if (nodeDrag) {
-          const pendingNodeDragPosition = pendingNodeDragPositionRef.current
-          if (nodeDragFrameRef.current !== null) {
-            window.cancelAnimationFrame(nodeDragFrameRef.current)
-            nodeDragFrameRef.current = null
-          }
-          if (pendingNodeDragPosition?.nodeId === nodeDrag.nodeId) {
-            setDraggedPositions((currentPositions) => ({
-              ...currentPositions,
-              [nodeDrag.nodeId]: pendingNodeDragPosition.position,
-            }))
-          }
-
-          const finalPosition =
-            currentNodeDragPositionRef.current?.nodeId === nodeDrag.nodeId
-              ? currentNodeDragPositionRef.current.position
-              : draggedPositions[nodeDrag.nodeId]
+          const finalPosition = draggedPositions[nodeDrag.nodeId]
           const movedDistance = Math.hypot(
             event.clientX - nodeDrag.startClientX,
             event.clientY - nodeDrag.startClientY,
           )
           suppressNodeClickRef.current = movedDistance > NODE_CLICK_DRAG_THRESHOLD
           setNodeDrag(null)
-          pendingNodeDragPositionRef.current = null
-          currentNodeDragPositionRef.current = null
           setDraggedPositions((currentPositions) => {
             const nextPositions = { ...currentPositions }
             delete nextPositions[nodeDrag.nodeId]
@@ -743,13 +706,10 @@ function App() {
     window.addEventListener('mouseup', handleMouseUp)
 
     return () => {
-      if (nodeDragFrameRef.current !== null) {
-        window.cancelAnimationFrame(nodeDragFrameRef.current)
-      }
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [connectionDrag, draggedPositions, finishConnectionDrag, movePerson, nodeDrag, queueNodeDragPosition, queueViewportUpdate])
+  }, [connectionDrag, draggedPositions, finishConnectionDrag, movePerson, nodeDrag, queueViewportUpdate])
 
   function startBoardDragging(event: ReactMouseEvent<HTMLElement>) {
     if (event.button !== 0 || connectionDrag || nodeDrag) return
@@ -1681,8 +1641,7 @@ function App() {
             const isSelected = node.id === selectedNode?.id
             const tagColor = node.tag_id ? tagColorById[node.tag_id] : null
             const nodeStyle = {
-              left: `${node.x}px`,
-              top: `${node.y}px`,
+              transform: `translate(${node.x}px, ${node.y}px)`,
               ...(tagColor ? { '--node-color': tagColor } : {}),
             } as GraphNodeStyle
 
