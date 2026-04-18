@@ -45,6 +45,7 @@ select {
 }
 
 .top-bar {
+  --top-bar-control-height: 72px;
   position: absolute;
   inset: 16px 16px auto;
   z-index: 4;
@@ -131,10 +132,10 @@ select {
 
 .tags-menu__toggle,
 .tags-menu__new {
-  min-height: 50px;
-  padding: 12px 16px;
+  min-height: var(--top-bar-control-height);
+  padding: 14px 20px;
   border: 1px solid var(--button-border);
-  border-radius: 16px;
+  border-radius: 22px;
   background: var(--panel-bg);
   color: var(--panel-text);
   box-shadow:
@@ -150,7 +151,7 @@ select {
 
 .tags-menu__toggle {
   width: fit-content;
-  min-width: 108px;
+  min-width: 124px;
   text-align: center;
 }
 
@@ -270,13 +271,15 @@ select {
 
 .search-panel {
   display: grid;
+  align-content: center;
   gap: 10px;
   flex: 0 1 360px;
   width: min(360px, 100%);
   min-width: min(280px, 100%);
-  padding: 10px;
+  min-height: var(--top-bar-control-height);
+  padding: 12px 14px;
   border: 1px solid var(--panel-border);
-  border-radius: 16px;
+  border-radius: 22px;
   background: var(--panel-bg);
   color: var(--panel-text);
   box-shadow:
@@ -310,7 +313,7 @@ select {
 }
 
 .search-panel__toggle {
-  min-height: 40px;
+  min-height: 44px;
 }
 
 .search-panel__clear {
@@ -428,12 +431,12 @@ select {
   flex: 1 1 320px;
   width: min(100%, 520px);
   max-width: 520px;
-  min-height: 48px;
+  min-height: var(--top-bar-control-height);
   align-items: center;
   gap: 10px;
-  padding: 8px;
+  padding: 12px 14px;
   border: 1px solid var(--panel-border);
-  border-radius: 8px;
+  border-radius: 22px;
   background: var(--panel-bg);
   color: var(--panel-text);
   box-shadow:
@@ -528,9 +531,11 @@ select {
 .theme-toggle__track {
   display: inline-flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
   min-width: 120px;
-  padding: 8px 10px 8px 14px;
+  min-height: var(--top-bar-control-height);
+  padding: 12px 14px 12px 18px;
   border-radius: 999px;
   border: 1px solid var(--toggle-border);
   background: var(--toggle-bg);
@@ -1005,6 +1010,7 @@ select {
     inset: 12px 12px auto;
     grid-template-columns: 1fr;
     gap: 10px;
+    --top-bar-control-height: 64px;
   }
 
   .top-bar__right {
@@ -1055,9 +1061,9 @@ select {
   .theme-toggle__track {
     width: 100%;
     justify-content: space-between;
-    min-width: 108px;
     gap: 10px;
-    padding: 7px 8px 7px 12px;
+    min-width: 108px;
+    padding: 10px 12px 10px 14px;
   }
 
   .theme-toggle__thumb {
