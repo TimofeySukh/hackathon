@@ -423,6 +423,7 @@ select {
   cursor: grab;
   user-select: none;
   overscroll-behavior: none;
+  touch-action: none;
 }
 
 .board-viewport.is-dragging {

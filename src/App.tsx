@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type {
-  CSSProperties,
-  MouseEvent as ReactMouseEvent,
-  WheelEvent as ReactWheelEvent,
-} from 'react'
+import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
 
 import { useAuth } from './lib/useAuth'
 import { normalizeTagName } from './lib/graphStorage'
@@ -546,7 +542,7 @@ function App() {
     })
   }
 
-  function moveWithWheel(event: ReactWheelEvent<HTMLElement>) {
+  const moveWithWheel = useCallback((event: WheelEvent) => {
     event.preventDefault()
     const view = viewportRef.current
     const deltaMultiplier = event.deltaMode === 1 ? 16 : 1
@@ -572,11 +568,14 @@ function App() {
 
     if (nextScale === view.scale) return
 
-    const { left, top } = event.currentTarget.getBoundingClientRect()
+    const viewport = boardRef.current
+    if (!viewport) return
+
+    const { left, top } = viewport.getBoundingClientRect()
     const pointerX = event.clientX - left
     const pointerY = event.clientY - top
-    const centerX = event.currentTarget.clientWidth / 2
-    const centerY = event.currentTarget.clientHeight / 2
+    const centerX = viewport.clientWidth / 2
+    const centerY = viewport.clientHeight / 2
     const worldX = (pointerX - centerX - view.offset.x) / view.scale
     const worldY = (pointerY - centerY - view.offset.y) / view.scale
 
@@ -587,7 +586,32 @@ function App() {
       },
       nextScale,
     )
-  }
+  }, [queueViewportUpdate])
+
+  useEffect(() => {
+    const viewport = boardRef.current
+    if (!viewport) return undefined
+
+    const handleWheel = (event: WheelEvent) => {
+      moveWithWheel(event)
+    }
+
+    const preventGestureDefault = (event: Event) => {
+      event.preventDefault()
+    }
+
+    viewport.addEventListener('wheel', handleWheel, { passive: false })
+    viewport.addEventListener('gesturestart', preventGestureDefault, { passive: false })
+    viewport.addEventListener('gesturechange', preventGestureDefault, { passive: false })
+    viewport.addEventListener('gestureend', preventGestureDefault, { passive: false })
+
+    return () => {
+      viewport.removeEventListener('wheel', handleWheel)
+      viewport.removeEventListener('gesturestart', preventGestureDefault)
+      viewport.removeEventListener('gesturechange', preventGestureDefault)
+      viewport.removeEventListener('gestureend', preventGestureDefault)
+    }
+  }, [moveWithWheel])
 
   async function saveInspectorName() {
     if (!inspectorNode || !isGraphReady) return
@@ -1002,7 +1026,6 @@ function App() {
           lastHighlightSpotRef.current = null
           setPointerPosition(null)
         }}
-        onWheel={moveWithWheel}
         aria-label="Social network graph canvas"
       >
         <div
