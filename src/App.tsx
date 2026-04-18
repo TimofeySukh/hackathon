@@ -46,6 +46,8 @@ type NoteDraft = {
 }
 
 type BoardStyle = CSSProperties & {
+  '--board-offset-x': string
+  '--board-offset-y': string
   '--dot-gap': string
   '--major-dot-gap': string
   '--dot-size': string
@@ -242,7 +244,20 @@ function App() {
     setScale(nextScale)
 
     if (boardSurfaceRef.current) {
-      boardSurfaceRef.current.style.transform = `translate(-50%, -50%) translate(${nextOffset.x}px, ${nextOffset.y}px) scale(${nextScale})`
+      const viewportWidth = boardRef.current?.clientWidth ?? 0
+      const viewportHeight = boardRef.current?.clientHeight ?? 0
+      const gridOriginX = viewportWidth / 2 + nextOffset.x
+      const gridOriginY = viewportHeight / 2 + nextOffset.y
+
+      boardSurfaceRef.current.style.setProperty('--dot-gap', `${GRID_GAP * nextScale}px`)
+      boardSurfaceRef.current.style.setProperty('--major-dot-gap', `${MAJOR_GRID_GAP * nextScale}px`)
+      boardSurfaceRef.current.style.setProperty('--dot-size', `${Math.max(0.45, DOT_SIZE * nextScale)}px`)
+      boardSurfaceRef.current.style.setProperty(
+        '--major-dot-size',
+        `${Math.max(1.5, MAJOR_DOT_SIZE * nextScale)}px`,
+      )
+      boardSurfaceRef.current.style.setProperty('--board-offset-x', `${gridOriginX}px`)
+      boardSurfaceRef.current.style.setProperty('--board-offset-y', `${gridOriginY}px`)
     }
 
     if (graphLayerRef.current) {
@@ -1095,6 +1110,8 @@ function App() {
               '--major-dot-gap': `${MAJOR_GRID_GAP}px`,
               '--dot-size': `${DOT_SIZE}px`,
               '--major-dot-size': `${MAJOR_DOT_SIZE}px`,
+              '--board-offset-x': '0px',
+              '--board-offset-y': '0px',
             } as BoardStyle
           }
         />
