@@ -1,9 +1,21 @@
 :root {
-  font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  font-family:
+    'IBM Plex Sans',
+    'SF Pro Text',
+    'Segoe UI Variable Text',
+    'Segoe UI',
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  font-weight: 400;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   color-scheme: dark;
 }
 
@@ -19,7 +31,12 @@ body,
   height: 100%;
 }
 
+html {
+  font-size: 16px;
+}
+
 body {
+  min-width: 320px;
   overflow: hidden;
 }
 
@@ -28,6 +45,30 @@ input,
 textarea,
 select {
   font: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+}
+
+button,
+input,
+textarea,
+select,
+option {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+input[type='color'] {
+  -webkit-appearance: auto;
+  appearance: auto;
+}
+
+input[type='search']::-webkit-search-decoration,
+input[type='search']::-webkit-search-cancel-button,
+input[type='search']::-webkit-search-results-button,
+input[type='search']::-webkit-search-results-decoration {
+  -webkit-appearance: none;
 }
 
 .app-shell {
