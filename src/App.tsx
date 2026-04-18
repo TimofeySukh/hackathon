@@ -15,6 +15,10 @@ type Offset = {
 type HighlightSpot = Offset & {
   id: number
   createdAt: number
+  tailX: number
+  tailY: number
+  tailCore: number
+  tailSize: number
 }
 
 type BoardStyle = CSSProperties & {
@@ -35,21 +39,27 @@ type HighlightSpotStyle = CSSProperties & {
   '--major-dot-gap': string
   '--dot-size': string
   '--major-dot-size': string
+  '--highlight-tail-x': string
+  '--highlight-tail-y': string
+  '--highlight-tail-core': string
+  '--highlight-tail-size': string
   opacity: number
 }
 
 const THEME_STORAGE_KEY = 'hackathon-theme'
 const MIN_SCALE = 0.2
 const MAX_SCALE = 2.5
-const GRID_GAP = 26
-const MAJOR_GRID_GAP = 104
-const DOT_SIZE = 1
+const GRID_GAP = 12
+const MAJOR_GRID_GAP = 96
+const DOT_SIZE = 0.65
 const MAJOR_DOT_SIZE = 2
 const HIGHLIGHT_LIFETIME_MS = 420
 const HIGHLIGHT_DISTANCE = 12
 const HIGHLIGHT_LIMIT = 28
-const HIGHLIGHT_RADIUS = 78
+const HIGHLIGHT_RADIUS = 56
 const HIGHLIGHT_TICK_MS = 50
+const HIGHLIGHT_TAIL_START = 18
+const HIGHLIGHT_TAIL_LIMIT = 48
 
 function App() {
   const [theme, setTheme] = useState<Theme>(() => {
@@ -109,6 +119,14 @@ function App() {
 
     if (!force && distanceFromPrevious < HIGHLIGHT_DISTANCE) return
 
+    const hasTail = previousSpot && Number.isFinite(distanceFromPrevious)
+    const tailReach = hasTail
+      ? Math.min(HIGHLIGHT_TAIL_LIMIT, Math.max(0, distanceFromPrevious - HIGHLIGHT_TAIL_START))
+      : 0
+    const tailUnitX = hasTail && distanceFromPrevious > 0 ? (nextSpot.x - previousSpot.x) / distanceFromPrevious : 0
+    const tailUnitY = hasTail && distanceFromPrevious > 0 ? (nextSpot.y - previousSpot.y) / distanceFromPrevious : 0
+    const tailSize = tailReach * 0.75
+
     const id = highlightIdRef.current + 1
     highlightIdRef.current = id
     lastHighlightSpotRef.current = nextSpot
@@ -117,7 +135,15 @@ function App() {
 
     setHighlightSpots((currentSpots) => [
       ...currentSpots.slice(-HIGHLIGHT_LIMIT + 1),
-      { id, createdAt: now, ...nextSpot },
+      {
+        id,
+        createdAt: now,
+        tailX: nextSpot.x - tailUnitX * tailReach,
+        tailY: nextSpot.y - tailUnitY * tailReach,
+        tailCore: tailSize * 0.36,
+        tailSize,
+        ...nextSpot,
+      },
     ])
   }, [])
 
@@ -164,6 +190,7 @@ function App() {
 
   const moveWithWheel = (event: ReactWheelEvent<HTMLElement>) => {
     event.preventDefault()
+    addHighlightSpot(event.clientX, event.clientY, true)
 
     const prefersPan = Math.abs(event.deltaX) > 0 || Math.abs(event.deltaY) < 24
 
@@ -196,7 +223,7 @@ function App() {
   const gridStyle = {
     '--dot-gap': `${GRID_GAP * scale}px`,
     '--major-dot-gap': `${MAJOR_GRID_GAP * scale}px`,
-    '--dot-size': `${Math.max(0.75, DOT_SIZE * scale)}px`,
+    '--dot-size': `${Math.max(0.45, DOT_SIZE * scale)}px`,
     '--major-dot-size': `${Math.max(1.5, MAJOR_DOT_SIZE * scale)}px`,
     '--board-offset-x': `${offset.x}px`,
     '--board-offset-y': `${offset.y}px`,
@@ -225,6 +252,10 @@ function App() {
       ...gridStyle,
       '--highlight-x': `${spot.x}px`,
       '--highlight-y': `${spot.y}px`,
+      '--highlight-tail-x': `${spot.tailX}px`,
+      '--highlight-tail-y': `${spot.tailY}px`,
+      '--highlight-tail-core': `${spot.tailCore}px`,
+      '--highlight-tail-size': `${spot.tailSize}px`,
       opacity,
     }
   }

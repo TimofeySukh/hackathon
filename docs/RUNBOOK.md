@@ -8,7 +8,7 @@ Current app behavior:
 
 - open a full-window board
 - drag with the mouse to move across the point grid
-- show nearby point highlights while the mouse moves
+- show compact nearby point highlights while the mouse moves, wheel-pans, or zooms
 - switch between dark and light themes
 - persist the selected theme in `localStorage`
 
@@ -92,10 +92,11 @@ Manual verification:
 
 1. Open the app in a browser.
 2. Drag anywhere on the board and confirm the point grid moves smoothly.
-3. Move the mouse across the board and confirm only nearby grid points brighten.
-4. Stop moving the mouse and confirm the highlighted points fade out.
-5. Toggle the theme.
-6. Reload the page and confirm the selected theme is preserved.
+3. Move the mouse across the board and confirm only nearby grid points brighten in a compact area.
+4. Pan or zoom with a wheel or trackpad and confirm nearby grid points brighten.
+5. Stop moving the mouse and confirm the highlighted points fade out.
+6. Toggle the theme.
+7. Reload the page and confirm the selected theme is preserved.
 
 ## Team Workflow
 
@@ -128,4 +129,4 @@ Manual verification:
 
 - `npm run build`
 - `npm run lint`
-- Manual browser check of drag navigation, motion-triggered point highlights, and theme persistence
+- Manual browser check of drag navigation, wheel and trackpad navigation, motion-triggered point highlights, and theme persistence

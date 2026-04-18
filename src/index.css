@@ -202,17 +202,33 @@ select {
   mask-image: radial-gradient(
     circle at var(--highlight-x) var(--highlight-y),
     rgba(0, 0, 0, 1) 0,
-    rgba(0, 0, 0, 0.9) 22px,
-    rgba(0, 0, 0, 0.34) 42px,
-    transparent 62px
-  );
+    rgba(0, 0, 0, 0.88) 14px,
+    rgba(0, 0, 0, 0.28) 25px,
+    transparent 38px
+  ),
+    radial-gradient(
+      circle at var(--highlight-tail-x) var(--highlight-tail-y),
+      rgba(0, 0, 0, 0.54) 0,
+      rgba(0, 0, 0, 0.26) var(--highlight-tail-core),
+      transparent var(--highlight-tail-size)
+    );
+  mask-repeat: no-repeat;
+  mask-composite: add;
+  -webkit-mask-composite: source-over;
   -webkit-mask-image: radial-gradient(
-    circle at var(--highlight-x) var(--highlight-y),
-    rgba(0, 0, 0, 1) 0,
-    rgba(0, 0, 0, 0.9) 22px,
-    rgba(0, 0, 0, 0.34) 42px,
-    transparent 62px
-  );
+      circle at var(--highlight-x) var(--highlight-y),
+      rgba(0, 0, 0, 1) 0,
+      rgba(0, 0, 0, 0.88) 14px,
+      rgba(0, 0, 0, 0.28) 25px,
+      transparent 38px
+    ),
+    radial-gradient(
+      circle at var(--highlight-tail-x) var(--highlight-tail-y),
+      rgba(0, 0, 0, 0.54) 0,
+      rgba(0, 0, 0, 0.26) var(--highlight-tail-core),
+      transparent var(--highlight-tail-size)
+    );
+  -webkit-mask-repeat: no-repeat;
   pointer-events: none;
   transition: opacity 80ms linear;
 }

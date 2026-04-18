@@ -31,8 +31,8 @@ Current scope:
 
 - mouse drag navigation
 - dark/light theme switching
-- dense point-grid spatial reference
-- motion-triggered point highlighting that fades when movement stops
+- very dense point-grid spatial reference
+- compact motion-triggered point highlighting during mouse movement, drag, wheel pan, and zoom
 
 Out of scope for the current version:
 
