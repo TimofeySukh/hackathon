@@ -13,7 +13,7 @@ type Offset = {
 }
 
 const THEME_STORAGE_KEY = 'hackathon-theme'
-const MIN_SCALE = 0.5
+const MIN_SCALE = 0.2
 const MAX_SCALE = 2.5
 const GRID_GAP = 38
 const MAJOR_GRID_GAP = 152
@@ -92,7 +92,7 @@ function App() {
       return
     }
 
-    const zoomIntensity = event.deltaY > 0 ? 0.9 : 1.1
+    const zoomIntensity = event.deltaY > 0 ? 0.88 : 1.12
     const nextScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale * zoomIntensity))
 
     if (nextScale === scale) return
