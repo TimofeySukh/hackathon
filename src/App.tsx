@@ -177,6 +177,7 @@ function App() {
   const [boardSize, setBoardSize] = useState({ width: 0, height: 0 })
   const [scale, setScale] = useState(1)
   const [selectedNodeId, setSelectedNodeId] = useState('root')
+  const [inspectorNodeId, setInspectorNodeId] = useState<string | null>(null)
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
   const [actionSheetNodeId, setActionSheetNodeId] = useState<string | null>(null)
   const [interactionMode, setInteractionMode] = useState<InteractionMode>('navigate')
@@ -306,6 +307,7 @@ function App() {
     [nodes],
   )
   const activeSelectedNodeId = nodesById[selectedNodeId] ? selectedNodeId : (nodes[0]?.id ?? 'root')
+  const activeInspectorNodeId = inspectorNodeId && nodesById[inspectorNodeId] ? inspectorNodeId : null
   const activeInteractionMode = isMobileLayout ? interactionMode : 'navigate'
 
   const pushHistory = useCallback(() => {
@@ -329,6 +331,7 @@ function App() {
         previousSnapshot.edges.map((edge) => ({ ...edge })),
       )
       setSelectedNodeId(previousSnapshot.selectedNodeId ?? previousSnapshot.nodes[0]?.id ?? 'root')
+      setInspectorNodeId(null)
       setEditingNodeId(null)
       setActionSheetNodeId(null)
       setConnectionDrag(null)
@@ -390,6 +393,7 @@ function App() {
         pushHistory()
         await connectNodes(connectionDrag.fromId, targetNode.id)
         setSelectedNodeId(targetNode.id)
+        setInspectorNodeId(null)
         suppressNodeClickRef.current = true
         setConnectionDrag(null)
         return
@@ -404,6 +408,7 @@ function App() {
 
       if (nextNode) {
         setSelectedNodeId(nextNode.id)
+        setInspectorNodeId(null)
         setEditingNodeId(nextNode.id)
       }
     }
@@ -437,6 +442,7 @@ function App() {
     if ((event.target as HTMLElement).closest('[data-node-interactive="true"]')) return
     if (event.pointerType === 'mouse' && event.button !== 0) return
 
+    setInspectorNodeId(null)
     setEditingNodeId(null)
     activePointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
 
@@ -578,6 +584,7 @@ function App() {
         const nextNode = await createConnectedNode(activeSelectedNodeId, worldPoint.x, worldPoint.y)
         if (nextNode) {
           setSelectedNodeId(nextNode.id)
+          setInspectorNodeId(null)
           setEditingNodeId(nextNode.id)
         }
       }
@@ -700,11 +707,13 @@ function App() {
       }
 
       setSelectedNodeId(nodeId)
+      setInspectorNodeId(null)
       clearLongPress()
       return
     }
 
     setSelectedNodeId(nodeId)
+    setInspectorNodeId(null)
   }
 
   const startNodeMove = (nodeId: string, event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -719,6 +728,7 @@ function App() {
     if (!worldPoint || !node) return
 
     setSelectedNodeId(nodeId)
+    setInspectorNodeId(null)
     setActionSheetNodeId(null)
     setInteractionMode('move')
     boardGestureRef.current = {
@@ -745,14 +755,16 @@ function App() {
 
   const startEditingNode = (nodeId: string) => {
     setSelectedNodeId(nodeId)
+    setInspectorNodeId(null)
     setEditingNodeId(nodeId)
     setActionSheetNodeId(null)
     setInteractionMode('edit')
   }
 
   const selectedNode = nodesById[activeSelectedNodeId]
+  const inspectorNode = activeInspectorNodeId ? nodesById[activeInspectorNodeId] : null
   const actionSheetNode = actionSheetNodeId ? nodesById[actionSheetNodeId] : null
-  const selectedNodeMeta = selectedNode ? parseNodeMeta(selectedNode.note) : null
+  const selectedNodeMeta = inspectorNode ? parseNodeMeta(inspectorNode.note) : null
   const actionSheetNodeMeta = actionSheetNode ? parseNodeMeta(actionSheetNode.note) : null
 
   const setNodeColor = async (nodeId: string, color: string) => {
@@ -807,6 +819,7 @@ function App() {
 
     pushHistory()
     await deleteNode(nodeId)
+    setInspectorNodeId(null)
     setActionSheetNodeId(null)
     setInteractionMode('navigate')
     setSelectedNodeId(nodes.find((candidate) => candidate.id !== nodeId)?.id ?? 'root')
@@ -817,7 +830,7 @@ function App() {
     ? getPreviewPath(nodesById[connectionDrag.fromId], {
         x: connectionDrag.worldX,
         y: connectionDrag.worldY,
-      }, isMobileLayout)
+      })
     : null
 
   const gridStyle = {
@@ -835,17 +848,17 @@ function App() {
   } satisfies CSSProperties
 
   const inspectorStyle = useMemo(() => {
-    if (!selectedNode || isMobileLayout || boardSize.width === 0 || boardSize.height === 0) return null
+    if (!inspectorNode || isMobileLayout || boardSize.width === 0 || boardSize.height === 0) return null
 
     const { width, height } = boardSize
-    const rawLeft = width / 2 + offset.x + selectedNode.x * scale + 52
-    const rawTop = height / 2 + offset.y + selectedNode.y * scale - 28
+    const rawLeft = width / 2 + offset.x + inspectorNode.x * scale + 52
+    const rawTop = height / 2 + offset.y + inspectorNode.y * scale - 28
 
     return {
       left: `${Math.min(width - 302, Math.max(18, rawLeft))}px`,
       top: `${Math.min(height - 410, Math.max(90, rawTop))}px`,
     }
-  }, [boardSize, isMobileLayout, offset.x, offset.y, scale, selectedNode])
+  }, [boardSize, inspectorNode, isMobileLayout, offset.x, offset.y, scale])
 
   const getHighlightOpacity = (spot: HighlightSpot) => {
     const age = highlightClock - spot.createdAt
@@ -976,7 +989,7 @@ function App() {
               const toNode = nodesById[edge.to]
               if (!fromNode || !toNode) return null
 
-              const link = getLinkPath(fromNode, toNode, isMobileLayout)
+              const link = getLinkPath(fromNode, toNode)
               if (!link) return null
 
               return (
@@ -1053,11 +1066,13 @@ function App() {
                           return
                         }
                         setSelectedNodeId(node.id)
+                        setInspectorNodeId(null)
                       }}
                       onDoubleClick={(event) => {
                         event.stopPropagation()
                         if (!isMobileLayout) {
-                          startEditingNode(node.id)
+                          setSelectedNodeId(node.id)
+                          setInspectorNodeId(node.id)
                         }
                       }}
                     >
@@ -1096,7 +1111,7 @@ function App() {
 
         </div>
 
-        {selectedNode && selectedNodeMeta && inspectorStyle && !isMobileLayout ? (
+        {inspectorNode && selectedNodeMeta && inspectorStyle && !isMobileLayout ? (
           <aside
             className="node-inspector"
             style={inspectorStyle}
@@ -1113,7 +1128,7 @@ function App() {
                 <div>
                   <div className="node-inspector__eyebrow">Node</div>
                   <div className="node-inspector__title">
-                    {selectedNode.label.trim() || 'Untitled person'}
+                    {inspectorNode.label.trim() || 'Untitled person'}
                   </div>
                 </div>
               </div>
@@ -1138,7 +1153,7 @@ function App() {
                       selectedNodeMeta.color === color ? ' is-active' : ''
                     }`}
                     style={{ backgroundColor: color }}
-                    onClick={() => void setNodeColor(selectedNode.id, color)}
+                    onClick={() => void setNodeColor(inspectorNode.id, color)}
                     aria-label={`Use ${color} for this node`}
                   />
                 ))}
@@ -1151,7 +1166,7 @@ function App() {
                 <button
                   type="button"
                   className="node-inspector__add-note"
-                  onClick={() => void addNoteToNode(selectedNode.id)}
+                  onClick={() => void addNoteToNode(inspectorNode.id)}
                 >
                   Add note
                 </button>
@@ -1167,7 +1182,7 @@ function App() {
                         <button
                           type="button"
                           className="node-inspector__note-delete"
-                          onClick={() => void deleteNodeNote(selectedNode.id, note.id)}
+                          onClick={() => void deleteNodeNote(inspectorNode.id, note.id)}
                         >
                           Remove
                         </button>
@@ -1177,7 +1192,7 @@ function App() {
                         value={note.text}
                         placeholder="Write a note about this person"
                         onChange={(event) =>
-                          void updateNodeNote(selectedNode.id, note.id, event.target.value)
+                          void updateNodeNote(inspectorNode.id, note.id, event.target.value)
                         }
                       />
                     </div>
@@ -1189,8 +1204,8 @@ function App() {
             <button
               type="button"
               className="node-inspector__delete"
-              onClick={() => void deleteSelectedNode(selectedNode.id)}
-              disabled={selectedNode.kind === 'root'}
+              onClick={() => void deleteSelectedNode(inspectorNode.id)}
+              disabled={inspectorNode.kind === 'root'}
             >
               <svg
                 className="node-inspector__delete-icon"
@@ -1349,40 +1364,36 @@ function screenToWorld(
   }
 }
 
-function getLinkPath(fromNode?: GraphNode, toNode?: Offset | null, isMobileLayout = false) {
+function getLinkPath(fromNode?: GraphNode, toNode?: Offset | null) {
   if (!fromNode || !toNode) return null
 
-  const startRadius = getNodeRadius(fromNode.kind, isMobileLayout)
-  const endRadius = isGraphNode(toNode) ? getNodeRadius(toNode.kind, isMobileLayout) : 0
   const dx = toNode.x - fromNode.x
   const dy = toNode.y - fromNode.y
-  const distance = Math.hypot(dx, dy) || 1
-  const unitX = dx / distance
-  const unitY = dy / distance
-  const curve = Math.min(isMobileLayout ? 88 : 44, distance * 0.18)
+  const controlOffsetX = dx * 0.35
+  const controlOffsetY = dy * 0.35
 
   return {
     start: {
-      x: fromNode.x + unitX * startRadius,
-      y: fromNode.y + unitY * startRadius,
+      x: fromNode.x,
+      y: fromNode.y,
     },
     end: {
-      x: toNode.x - unitX * endRadius,
-      y: toNode.y - unitY * endRadius,
+      x: toNode.x,
+      y: toNode.y,
     },
     controlA: {
-      x: fromNode.x + unitX * (startRadius + curve),
-      y: fromNode.y + unitY * (startRadius + curve),
+      x: fromNode.x + controlOffsetX,
+      y: fromNode.y + controlOffsetY,
     },
     controlB: {
-      x: toNode.x - unitX * (endRadius + curve),
-      y: toNode.y - unitY * (endRadius + curve),
+      x: toNode.x - controlOffsetX,
+      y: toNode.y - controlOffsetY,
     },
   }
 }
 
-function getPreviewPath(fromNode?: GraphNode, pointer?: Offset | null, isMobileLayout = false) {
-  return getLinkPath(fromNode, pointer, isMobileLayout)
+function getPreviewPath(fromNode?: GraphNode, pointer?: Offset | null) {
+  return getLinkPath(fromNode, pointer)
 }
 
 function clampScale(value: number) {
@@ -1420,9 +1431,6 @@ function getNodeHitDiameter(kind: GraphNode['kind'], isMobileLayout: boolean) {
   return getNodeHitRadius(kind, isMobileLayout) * 2
 }
 
-function isGraphNode(value: GraphNode | Offset): value is GraphNode {
-  return 'kind' in value
-}
 
 function parseNodeMeta(noteValue: string | null): NodeInspectorMeta {
   if (!noteValue) {
