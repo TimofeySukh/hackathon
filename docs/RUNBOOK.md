@@ -164,7 +164,7 @@ supabase secrets set N8N_PEOPLE_SEARCH_WEBHOOK_URL=https://your-n8n-search-webho
 If `N8N_PEOPLE_SEARCH_WEBHOOK_URL` is not set, the function falls back to:
 
 ```text
-https://velizard.app.n8n.cloud/webhook/person-search
+https://velizard.app.n8n.cloud/webhook/2cd5be55-8e6f-494b-9519-754ae150a9b5
 ```
 
 The browser never calls n8n directly. It invokes Edge Functions, and those functions authenticate the user, load user-owned graph context, call n8n, and return or persist structured AI output.

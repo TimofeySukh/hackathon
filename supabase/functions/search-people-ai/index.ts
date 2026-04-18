@@ -13,7 +13,8 @@ type SearchResult = {
   matched_signals: string[]
 }
 
-const DEFAULT_N8N_PEOPLE_SEARCH_WEBHOOK_URL = 'https://velizard.app.n8n.cloud/webhook/person-search'
+const DEFAULT_N8N_PEOPLE_SEARCH_WEBHOOK_URL =
+  'https://velizard.app.n8n.cloud/webhook/2cd5be55-8e6f-494b-9519-754ae150a9b5'
 const MAX_CANDIDATES = 40
 
 const corsHeaders = {
