@@ -45,6 +45,7 @@ Current scope:
 - persistent people nodes with saved coordinates
 - one reusable user-owned tag per person
 - multiple notes per person
+- at most one separate AI summary note per person
 - undirected person-to-person connections
 
 Out of scope for the current version:

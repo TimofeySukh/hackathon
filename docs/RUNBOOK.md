@@ -15,6 +15,7 @@ Current app behavior:
 - create one personal board record for each signed-in user
 - create one immutable root person at `0,0` for each signed-in user
 - persist people, tags, notes, and undirected connections in Supabase
+- allow one separate AI summary row per person in Supabase
 - edit the selected person in the right-side inspector
 
 There is no multiplayer or drawing toolset yet.
@@ -220,7 +221,7 @@ Supabase verification:
 1. Confirm a row exists in `profiles` for the signed-in user.
 2. Confirm a single row exists in `boards` for the signed-in user.
 3. Confirm a single root row exists in `people` for the signed-in user with `is_root = true`, `x = 0`, and `y = 0`.
-4. Confirm `tags`, `notes`, and `connections` rows are created for user actions.
+4. Confirm `tags`, `notes`, `person_ai_notes`, and `connections` rows are created for user actions.
 5. Confirm row-level security prevents reading or updating another user's board data.
 
 ## Team Workflow

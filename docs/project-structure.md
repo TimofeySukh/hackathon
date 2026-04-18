@@ -68,7 +68,7 @@ Shared low-level helpers.
 - `useAuth.ts` owns session loading, Google OAuth sign-in, and sign-out.
 - `useBoardGraph.ts` owns board graph loading and mutation state.
 - `graphStorage.ts` owns Supabase CRUD calls for persisted graph data.
-- `graphTypes.ts` defines shared profile, board, person, note, tag, and connection interfaces.
+- `graphTypes.ts` defines shared profile, board, person, note, AI note, tag, and connection interfaces.
 - `userWorkspace.ts` upserts profile data and ensures one personal board plus root person for the signed-in user.
 
 Supabase browser configuration reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`. The older `VITE_SUPABASE_ANON_KEY` variable remains supported for compatibility.
@@ -110,6 +110,7 @@ It currently supports:
 - visual theme switching
 - compact motion-triggered point highlighting during mouse movement, drag, wheel pan, and zoom
 - persistent social graph nodes connected by lines
+- one separate AI summary record per person in the database
 - drag-to-connect two existing nodes by releasing on another node hit area
 - drag-to-create node growth from any existing node with an immediate connecting line
 - selected-node detail cards with reusable tag selection, note editing, connection removal, and deletion
