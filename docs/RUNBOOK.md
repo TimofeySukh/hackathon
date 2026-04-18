@@ -146,6 +146,12 @@ Required function secret:
 supabase secrets set N8N_PERSON_AI_WEBHOOK_URL=https://your-n8n-webhook-url
 ```
 
+If `N8N_PERSON_AI_WEBHOOK_URL` is not set, the function falls back to the published production webhook:
+
+```text
+https://velizard.app.n8n.cloud/webhook/person-enrichment
+```
+
 The browser never calls n8n directly. It invokes `sync-person-ai-note`, and that function authenticates the user, loads the current person plus notes, calls n8n, and upserts `person_ai_notes`.
 
 Configure Google as an auth provider in Supabase Auth. Add redirect URLs for each app URL used by the team, including:

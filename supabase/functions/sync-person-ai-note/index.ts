@@ -15,6 +15,8 @@ type N8nResponse = {
   structured_summary?: unknown
 }
 
+const DEFAULT_N8N_PERSON_AI_WEBHOOK_URL = 'https://velizard.app.n8n.cloud/webhook/person-enrichment'
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -39,6 +41,10 @@ function getRequiredEnv(name: string) {
   }
 
   return value
+}
+
+function getN8nWebhookUrl() {
+  return Deno.env.get('N8N_PERSON_AI_WEBHOOK_URL') || DEFAULT_N8N_PERSON_AI_WEBHOOK_URL
 }
 
 function normalizeStringArray(value: unknown) {
@@ -124,7 +130,7 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = getRequiredEnv('SUPABASE_URL')
   const supabaseAnonKey = getRequiredEnv('SUPABASE_ANON_KEY')
-  const n8nWebhookUrl = getRequiredEnv('N8N_PERSON_AI_WEBHOOK_URL')
+  const n8nWebhookUrl = getN8nWebhookUrl()
 
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
