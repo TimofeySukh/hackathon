@@ -70,6 +70,12 @@ type HighlightSpotStyle = CSSProperties & {
   opacity: number
 }
 
+type GestureEventLike = Event & {
+  clientX: number
+  clientY: number
+  scale: number
+}
+
 const THEME_STORAGE_KEY = 'hackathon-theme'
 const MIN_SCALE = 0.2
 const MAX_SCALE = 2.5
@@ -155,6 +161,7 @@ function App() {
   const viewportRef = useRef({ offset: { x: 0, y: 0 }, scale: 1 })
   const pendingViewportRef = useRef<{ offset: Offset; scale: number } | null>(null)
   const viewportFrameRef = useRef<number | null>(null)
+  const gestureScaleRef = useRef(1)
   const boardDragRef = useRef({
     startX: 0,
     startY: 0,
@@ -347,6 +354,35 @@ function App() {
       }
     }
   }, [applyViewport])
+
+  const zoomAtClientPoint = useCallback(
+    (clientX: number, clientY: number, nextScale: number) => {
+      const viewport = boardRef.current
+      if (!viewport) return
+
+      const view = viewportRef.current
+      const clampedScale = clampScale(nextScale)
+
+      if (clampedScale === view.scale) return
+
+      const { left, top } = viewport.getBoundingClientRect()
+      const pointerX = clientX - left
+      const pointerY = clientY - top
+      const centerX = viewport.clientWidth / 2
+      const centerY = viewport.clientHeight / 2
+      const worldX = (pointerX - centerX - view.offset.x) / view.scale
+      const worldY = (pointerY - centerY - view.offset.y) / view.scale
+
+      queueViewportUpdate(
+        {
+          x: pointerX - centerX - worldX * clampedScale,
+          y: pointerY - centerY - worldY * clampedScale,
+        },
+        clampedScale,
+      )
+    },
+    [queueViewportUpdate],
+  )
 
   const finishConnectionDrag = useCallback(
     async (clientX: number, clientY: number) => {
@@ -549,8 +585,10 @@ function App() {
     const deltaX = event.deltaX * deltaMultiplier
     const deltaY = event.deltaY * deltaMultiplier
     const isPinchZoom = event.ctrlKey
-    const isPixelScrollInput = event.deltaMode === 0
-    const shouldPanViewport = !isPinchZoom && isPixelScrollInput
+    const looksLikeTrackpadScroll =
+      event.deltaMode === 0 &&
+      (Math.abs(deltaX) > 0.01 || Math.abs(deltaY) < 40 || !Number.isInteger(event.deltaY))
+    const shouldPanViewport = !isPinchZoom && looksLikeTrackpadScroll
 
     if (shouldPanViewport) {
       queueViewportUpdate(
@@ -564,29 +602,9 @@ function App() {
     }
 
     const normalizedDelta = Math.max(-120, Math.min(120, deltaY))
-    const nextScale = clampScale(view.scale * Math.exp(-normalizedDelta * WHEEL_ZOOM_INTENSITY))
-
-    if (nextScale === view.scale) return
-
-    const viewport = boardRef.current
-    if (!viewport) return
-
-    const { left, top } = viewport.getBoundingClientRect()
-    const pointerX = event.clientX - left
-    const pointerY = event.clientY - top
-    const centerX = viewport.clientWidth / 2
-    const centerY = viewport.clientHeight / 2
-    const worldX = (pointerX - centerX - view.offset.x) / view.scale
-    const worldY = (pointerY - centerY - view.offset.y) / view.scale
-
-    queueViewportUpdate(
-      {
-        x: pointerX - centerX - worldX * nextScale,
-        y: pointerY - centerY - worldY * nextScale,
-      },
-      nextScale,
-    )
-  }, [queueViewportUpdate])
+    const nextScale = view.scale * Math.exp(-normalizedDelta * WHEEL_ZOOM_INTENSITY)
+    zoomAtClientPoint(event.clientX, event.clientY, nextScale)
+  }, [queueViewportUpdate, zoomAtClientPoint])
 
   useEffect(() => {
     const viewport = boardRef.current
@@ -596,22 +614,45 @@ function App() {
       moveWithWheel(event)
     }
 
-    const preventGestureDefault = (event: Event) => {
+    const handleGestureStart = (event: Event) => {
       event.preventDefault()
+      gestureScaleRef.current = 1
+    }
+
+    const handleGestureChange = (event: Event) => {
+      event.preventDefault()
+
+      const gestureEvent = event as GestureEventLike
+      const scaleDelta = gestureEvent.scale / gestureScaleRef.current
+      gestureScaleRef.current = gestureEvent.scale
+
+      if (!Number.isFinite(scaleDelta) || scaleDelta === 1) return
+
+      const view = viewportRef.current
+      zoomAtClientPoint(
+        gestureEvent.clientX,
+        gestureEvent.clientY,
+        view.scale * scaleDelta,
+      )
+    }
+
+    const handleGestureEnd = (event: Event) => {
+      event.preventDefault()
+      gestureScaleRef.current = 1
     }
 
     viewport.addEventListener('wheel', handleWheel, { passive: false })
-    viewport.addEventListener('gesturestart', preventGestureDefault, { passive: false })
-    viewport.addEventListener('gesturechange', preventGestureDefault, { passive: false })
-    viewport.addEventListener('gestureend', preventGestureDefault, { passive: false })
+    viewport.addEventListener('gesturestart', handleGestureStart, { passive: false })
+    viewport.addEventListener('gesturechange', handleGestureChange, { passive: false })
+    viewport.addEventListener('gestureend', handleGestureEnd, { passive: false })
 
     return () => {
       viewport.removeEventListener('wheel', handleWheel)
-      viewport.removeEventListener('gesturestart', preventGestureDefault)
-      viewport.removeEventListener('gesturechange', preventGestureDefault)
-      viewport.removeEventListener('gestureend', preventGestureDefault)
+      viewport.removeEventListener('gesturestart', handleGestureStart)
+      viewport.removeEventListener('gesturechange', handleGestureChange)
+      viewport.removeEventListener('gestureend', handleGestureEnd)
     }
-  }, [moveWithWheel])
+  }, [moveWithWheel, zoomAtClientPoint])
 
   async function saveInspectorName() {
     if (!inspectorNode || !isGraphReady) return
