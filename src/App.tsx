@@ -680,19 +680,22 @@ function App() {
           )
           suppressNodeClickRef.current = movedDistance > NODE_CLICK_DRAG_THRESHOLD
           setNodeDrag(null)
-          setDraggedPositions((currentPositions) => {
-            const nextPositions = { ...currentPositions }
-            delete nextPositions[nodeDrag.nodeId]
-            return nextPositions
-          })
 
-          if (finalPosition) {
+          try {
+            if (finalPosition) {
             const xChanged = Math.abs(finalPosition.x - nodeDrag.originX) > 0.001
             const yChanged = Math.abs(finalPosition.y - nodeDrag.originY) > 0.001
 
             if (xChanged || yChanged) {
               await movePerson(nodeDrag.nodeId, finalPosition.x, finalPosition.y)
             }
+          }
+          } finally {
+            setDraggedPositions((currentPositions) => {
+              const nextPositions = { ...currentPositions }
+              delete nextPositions[nodeDrag.nodeId]
+              return nextPositions
+            })
           }
           return
         }
