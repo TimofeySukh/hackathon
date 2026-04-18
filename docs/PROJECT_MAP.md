@@ -10,7 +10,9 @@ The current product is intentionally narrow:
 - mouse drag navigation
 - a dark/light theme toggle
 - a very dense CSS-rendered point grid with motion-triggered point highlights
-- no drawing tools, side panels, persistence, backend, or collaboration yet
+- Supabase-backed Google login
+- one personal board record per signed-in user
+- no drawing tools, side panels, board content persistence, or collaboration yet
 
 ## Active Work
 
@@ -47,7 +49,11 @@ Completed tasks can remain listed here when they explain repository history. Liv
 - `README.md`: top-level overview and local development commands.
 - `src/main.tsx`: React entry point.
 - `src/App.tsx`: current board behavior.
+- `src/lib/supabase.ts`: browser Supabase client configuration.
+- `src/lib/useAuth.ts`: session and Google sign-in state.
+- `src/lib/userWorkspace.ts`: profile upsert and personal board bootstrap.
 - `src/index.css`: current visual system.
+- `supabase/migrations/`: database schema and row-level security migrations.
 
 ## Ownership
 

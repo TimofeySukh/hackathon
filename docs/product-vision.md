@@ -10,7 +10,7 @@ This first version is intentionally limited:
 - no widgets
 - no sidebars
 - no collaboration features
-- no backend
+- no board content persistence
 
 The core value right now is simple navigation across a large visual surface.
 
@@ -24,6 +24,7 @@ Users should be able to open the page and immediately:
 2. move across the board with a trackpad or mouse wheel
 3. understand the available space from the point grid
 4. switch between dark and light visual modes
+5. optionally sign in with Google to claim a personal board space
 
 ## Visual Goal
 
@@ -50,6 +51,7 @@ Building the board ourselves keeps the interaction model simple and gives us com
 2. A distinctive visual identity
 3. Minimal interface chrome
 4. A codebase that is easy to extend with custom board objects later
+5. A lightweight account foundation for personal board ownership
 
 ## What We Intentionally Avoid Right Now
 
@@ -57,9 +59,7 @@ Building the board ourselves keeps the interaction model simple and gives us com
 - sticky notes
 - comments
 - multiplayer
-- authentication
-- persistence
-- backend storage
+- board object persistence
 - templates
 
 ## Possible Future Product Directions

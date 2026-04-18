@@ -22,6 +22,10 @@ The main HTML entry point used by Vite.
 
 Project metadata, scripts, and dependencies.
 
+### `supabase/migrations/`
+
+Supabase database migrations for auth-adjacent product data, including profiles, personal boards, and row-level security policies.
+
 ### `src/`
 
 Application source code.
@@ -36,6 +40,7 @@ The React entry point. It mounts the app into the root DOM node.
 
 Contains the board experience:
 
+- Supabase-backed account controls
 - theme state
 - mouse drag navigation state
 - board zoom state
@@ -43,11 +48,20 @@ Contains the board experience:
 - theme toggle
 - infinite board surface positioning
 
+### `src/lib/`
+
+Shared low-level helpers.
+
+- `supabase.ts` creates the browser Supabase client from Vite environment variables.
+- `useAuth.ts` owns session loading, Google OAuth sign-in, sign-out, and workspace state.
+- `userWorkspace.ts` upserts profile data and ensures one personal board for the signed-in user.
+
 ### `src/index.css`
 
 Contains the complete visual system for:
 
 - dark and light themes
+- account controls
 - very dense point-grid background
 - compact motion-triggered point highlight styling with directional tails for fast cursor movement
 - board overlay styling
@@ -60,6 +74,7 @@ The application is intentionally minimal:
 - React for state and rendering
 - Vite for development and builds
 - TypeScript for maintainability
+- Supabase for Google auth and private user-owned records
 - Custom CSS-based board rendering
 
 ## Interaction Model
@@ -68,6 +83,8 @@ The board is not an editor yet.
 
 It currently supports:
 
+- Google sign-in and sign-out when Supabase is configured
+- one personal board record per signed-in user
 - mouse drag navigation across the canvas
 - trackpad and wheel-based navigation across the canvas
 - cursor-centered zoom with the mouse wheel
@@ -83,7 +100,7 @@ The project should evolve in controlled layers:
 
 1. Preserve smooth navigation and visual clarity.
 2. Add simple board objects only when the base movement feels solid.
-3. Introduce persistence after the object model is clear.
+3. Keep account persistence separate from board content persistence until the object model is clear.
 4. Add advanced interactions only when they fit the clean-board principle.
 
 ## Future Folders We May Add

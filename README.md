@@ -9,6 +9,8 @@ A minimal infinite board built with React, Vite, and TypeScript.
 - Zoom in and out with the mouse wheel
 - No drawing tools or side panels
 - Theme switcher in the top-right corner
+- Optional Google login through Supabase
+- One personal board record for each signed-in user
 - Dark green-black theme inspired by the provided reference
 - Light theme designed to match the same visual language
 - High-contrast point grid across the board
@@ -17,10 +19,11 @@ A minimal infinite board built with React, Vite, and TypeScript.
 
 ```bash
 npm install
+cp .env.example .env.local
 npm run dev
 ```
 
-Open the local Vite URL in your browser.
+Open the local Vite URL in your browser. Fill in the Supabase values in `.env.local` to enable Google login.
 
 ## Available Scripts
 

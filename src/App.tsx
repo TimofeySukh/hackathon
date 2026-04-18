@@ -5,6 +5,8 @@ import type {
   WheelEvent as ReactWheelEvent,
 } from 'react'
 
+import { useAuth } from './lib/useAuth'
+
 type Theme = 'dark' | 'light'
 
 type Offset = {
@@ -62,6 +64,7 @@ const HIGHLIGHT_TAIL_START = 18
 const HIGHLIGHT_TAIL_LIMIT = 48
 
 function App() {
+  const { session, board, status, error, signInWithGoogle, signOut } = useAuth()
   const [theme, setTheme] = useState<Theme>(() => {
     const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY)
     return savedTheme === 'light' ? 'light' : 'dark'
@@ -262,17 +265,64 @@ function App() {
 
   return (
     <main className={`app-shell theme-${theme}`}>
-      <button
-        type="button"
-        className="theme-toggle"
-        onClick={() => setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))}
-        aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
-      >
-        <span className="theme-toggle__track">
-          <span className="theme-toggle__label">{theme === 'dark' ? 'Dark' : 'Light'}</span>
-          <span className="theme-toggle__thumb" />
-        </span>
-      </button>
+      <div className="app-actions">
+        <div className="account-panel" aria-live="polite">
+          {status === 'authenticated' && session?.user ? (
+            <>
+              {session.user.user_metadata.avatar_url ? (
+                <img
+                  className="account-panel__avatar"
+                  src={session.user.user_metadata.avatar_url}
+                  alt=""
+                />
+              ) : (
+                <span className="account-panel__avatar" aria-hidden="true">
+                  {(session.user.email ?? 'U').slice(0, 1).toUpperCase()}
+                </span>
+              )}
+              <span className="account-panel__text">
+                <span className="account-panel__label">{session.user.email}</span>
+                <span className="account-panel__meta">{board?.title ?? 'Personal board'}</span>
+              </span>
+              <button type="button" className="account-panel__button" onClick={signOut}>
+                Sign out
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="account-panel__text">
+                <span className="account-panel__label">
+                  {status === 'loading' ? 'Checking session' : 'Personal board'}
+                </span>
+                <span className="account-panel__meta">
+                  {status === 'unconfigured' ? 'Connect Supabase to enable Google login' : 'Sign in to save your space'}
+                </span>
+              </span>
+              <button
+                type="button"
+                className="account-panel__button"
+                onClick={signInWithGoogle}
+                disabled={status === 'loading' || status === 'unconfigured'}
+              >
+                Sign in with Google
+              </button>
+            </>
+          )}
+          {error ? <span className="account-panel__error">{error}</span> : null}
+        </div>
+
+        <button
+          type="button"
+          className="theme-toggle"
+          onClick={() => setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))}
+          aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+        >
+          <span className="theme-toggle__track">
+            <span className="theme-toggle__label">{theme === 'dark' ? 'Dark' : 'Light'}</span>
+            <span className="theme-toggle__thumb" />
+          </span>
+        </button>
+      </div>
 
       <section
         ref={boardRef}

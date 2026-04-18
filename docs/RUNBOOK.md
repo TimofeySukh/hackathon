@@ -11,8 +11,10 @@ Current app behavior:
 - show compact nearby point highlights while the mouse moves, wheel-pans, or zooms
 - switch between dark and light themes
 - persist the selected theme in `localStorage`
+- optionally sign in with Google through Supabase
+- create one personal board record for each signed-in user
 
-There is no backend, persistence layer, authentication, multiplayer, or drawing toolset yet.
+There is no board object persistence, multiplayer, or drawing toolset yet.
 
 ## Local Setup
 
@@ -22,6 +24,17 @@ Install dependencies from the lockfile:
 npm ci
 ```
 
+Copy the local environment example and fill in the Supabase project values:
+
+```bash
+cp .env.example .env.local
+```
+
+Required Vite variables:
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+
 Start the development server:
 
 ```bash
@@ -29,6 +42,27 @@ npm run dev
 ```
 
 Vite prints a local URL in the terminal. Open that URL in a browser.
+
+If the Supabase variables are missing, the app still opens as an anonymous board and disables Google sign-in.
+
+## Supabase Setup
+
+Apply the database migration in `supabase/migrations/` to the target Supabase project.
+
+For local Supabase CLI workflows:
+
+```bash
+supabase db push
+```
+
+For hosted dashboard workflows, paste and run the migration SQL in the Supabase SQL editor.
+
+Configure Google as an auth provider in Supabase Auth. Add redirect URLs for each app URL used by the team, including:
+
+- `http://localhost:5173`
+- the deployed production URL
+
+The app redirects Google OAuth back to `window.location.origin`, so each origin must be allowlisted in Supabase.
 
 ## Dependency Workflow
 
@@ -97,6 +131,15 @@ Manual verification:
 5. Stop moving the mouse and confirm the highlighted points fade out.
 6. Toggle the theme.
 7. Reload the page and confirm the selected theme is preserved.
+8. Sign in with Google and confirm the account state appears.
+9. Reload while signed in and confirm the same personal board label remains.
+10. Sign out and confirm the anonymous board state returns.
+
+Supabase verification:
+
+1. Confirm a row exists in `profiles` for the signed-in user.
+2. Confirm a single row exists in `boards` for the signed-in user.
+3. Confirm row-level security prevents reading or updating another user's board.
 
 ## Team Workflow
 
@@ -130,3 +173,4 @@ Manual verification:
 - `npm run build`
 - `npm run lint`
 - Manual browser check of drag navigation, wheel and trackpad navigation, motion-triggered point highlights, and theme persistence
+- Manual Supabase auth check when credentials and Google OAuth are configured

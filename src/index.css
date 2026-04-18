@@ -51,6 +51,13 @@ select {
   --toggle-border: rgba(64, 191, 148, 0.38);
   --toggle-thumb: linear-gradient(135deg, #8affd6 0%, #39c795 100%);
   --toggle-label: #dff9ef;
+  --panel-bg: rgba(7, 28, 20, 0.82);
+  --panel-border: rgba(64, 191, 148, 0.34);
+  --panel-text: #e7faf1;
+  --panel-muted: rgba(223, 249, 239, 0.72);
+  --panel-error: #ffb6a8;
+  --button-bg: rgba(138, 255, 214, 0.16);
+  --button-border: rgba(138, 255, 214, 0.34);
   --grid-dot: rgba(94, 226, 180, 0.14);
   --grid-dot-major: rgba(115, 255, 201, 0.3);
   --grid-dot-hover: rgba(119, 255, 209, 0.92);
@@ -71,6 +78,13 @@ select {
   --toggle-border: rgba(22, 81, 58, 0.22);
   --toggle-thumb: linear-gradient(135deg, #9ce7c4 0%, #62c898 100%);
   --toggle-label: #174c37;
+  --panel-bg: rgba(255, 255, 255, 0.96);
+  --panel-border: rgba(22, 81, 58, 0.2);
+  --panel-text: #0c241a;
+  --panel-muted: rgba(23, 76, 55, 0.7);
+  --panel-error: #9d2f22;
+  --button-bg: rgba(98, 200, 152, 0.18);
+  --button-border: rgba(22, 81, 58, 0.22);
   --grid-dot: rgba(24, 79, 58, 0.12);
   --grid-dot-major: rgba(24, 101, 70, 0.26);
   --grid-dot-hover: rgba(14, 132, 89, 0.78);
@@ -84,11 +98,18 @@ select {
   color: var(--text-strong);
 }
 
-.theme-toggle {
+.app-actions {
   position: absolute;
   top: 24px;
   right: 24px;
   z-index: 3;
+  display: flex;
+  max-width: calc(100% - 48px);
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.theme-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -96,6 +117,88 @@ select {
   border: 0;
   background: transparent;
   cursor: pointer;
+}
+
+.account-panel {
+  display: inline-flex;
+  max-width: min(520px, calc(100vw - 204px));
+  min-height: 48px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--panel-bg);
+  color: var(--panel-text);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.32),
+    0 10px 30px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(14px);
+}
+
+.account-panel__avatar {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--button-bg);
+  color: var(--panel-text);
+  font-size: 14px;
+  font-weight: 700;
+  object-fit: cover;
+}
+
+.account-panel__text {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.account-panel__label,
+.account-panel__meta,
+.account-panel__error {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-panel__label {
+  color: var(--panel-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.account-panel__meta {
+  color: var(--panel-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.account-panel__error {
+  max-width: 160px;
+  color: var(--panel-error);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.account-panel__button {
+  flex: 0 0 auto;
+  padding: 8px 10px;
+  border: 1px solid var(--button-border);
+  border-radius: 8px;
+  background: var(--button-bg);
+  color: var(--panel-text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.account-panel__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
 }
 
 .theme-toggle__track {
@@ -234,9 +337,30 @@ select {
 }
 
 @media (max-width: 720px) {
-  .theme-toggle {
+  .app-actions {
     top: 16px;
     right: 16px;
+    left: 16px;
+    max-width: none;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .account-panel {
+    flex: 1 1 auto;
+    max-width: none;
+  }
+
+  .account-panel__avatar {
+    display: none;
+  }
+
+  .account-panel__button {
+    padding: 7px 8px;
+  }
+
+  .account-panel__error {
+    display: none;
   }
 
   .theme-toggle__track {
