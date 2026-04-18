@@ -64,6 +64,8 @@ Shared low-level helpers.
 - `useAuth.ts` owns session loading, Google OAuth sign-in, sign-out, and workspace state.
 - `userWorkspace.ts` upserts profile data and ensures one personal board for the signed-in user.
 
+Supabase browser configuration reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`. The older `VITE_SUPABASE_ANON_KEY` variable remains supported for compatibility.
+
 ### `src/index.css`
 
 Contains the complete visual system for:

@@ -33,7 +33,9 @@ cp .env.example .env.local
 Required Vite variables:
 
 - `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+
+`VITE_SUPABASE_ANON_KEY` is still supported for older local setups, but new local environments should use the Supabase publishable key.
 
 Start the development server:
 
@@ -60,9 +62,19 @@ For hosted dashboard workflows, paste and run the migration SQL in the Supabase 
 Configure Google as an auth provider in Supabase Auth. Add redirect URLs for each app URL used by the team, including:
 
 - `http://localhost:5173`
+- `http://127.0.0.1:5173`
+- `http://127.0.0.1:5174`
 - the deployed production URL
 
 The app redirects Google OAuth back to `window.location.origin`, so each origin must be allowlisted in Supabase.
+
+For the hosted Supabase project, use this callback URL in the Google OAuth client:
+
+```text
+https://lycfoukfoesobeuumuad.supabase.co/auth/v1/callback
+```
+
+The Supabase Google provider also needs the Google OAuth Client ID and Client Secret before `Sign in with Google` can complete.
 
 ## Dependency Workflow
 
