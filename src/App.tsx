@@ -1230,8 +1230,9 @@ function isDiscreteMouseWheel(event: WheelEvent, deltaX: number, deltaY: number)
   if (Math.abs(deltaX) > 0.01 || !Number.isInteger(deltaY)) return false
 
   const wheelDelta = Math.abs((event as WheelEventLike).wheelDelta ?? 0)
+  if (wheelDelta > 0) return true
 
-  return Math.abs(deltaY) >= 80 && (wheelDelta === 0 || wheelDelta % 120 === 0)
+  return Math.abs(deltaY) >= 40
 }
 
 export default App
