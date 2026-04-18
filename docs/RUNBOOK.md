@@ -276,15 +276,17 @@ Manual verification:
 11. Drag a non-root person to a new position, confirm connected lines follow it, then reload and confirm the coordinates persist.
 12. Click a person near a viewport edge and confirm the board pans enough to keep the inspector visible without enlarging it at higher zoom.
 13. Start trackpad panning on the board, pass over the inspector, and confirm panning continues; then start a trackpad gesture on the inspector and confirm it does not begin board panning.
-14. Assign an existing tag to a person from the inspector tag picker, use ArrowUp/ArrowDown plus Enter in that picker, create a new tag from the same field, delete an unused tag with the `x` confirmation flow, add a note, reload, and confirm they persist.
-15. Create a connection between two existing people, confirm reload preserves it, then click the widened line target and confirm `Delete connection` or Backspace removes it.
-16. Open the top-left Tags menu, create a tag, adjust its color, and confirm tagged nodes use that color.
-17. Open the search layer and verify that typing a person name, tag, or note text returns local matching people.
-18. Press Enter with a natural-language query and verify AI search returns ranked people with reasons.
-19. Click a search result and verify the board recenters on that person and opens the inspector.
-20. After creating a note, wait at least 3 seconds and confirm a `person_ai_notes` row for that person reaches `status = 'created'`.
-21. Edit an existing note, blur the input, wait at least 3 seconds, and confirm the same `person_ai_notes` row updates its `updated_at`, `summary`, and `structured_summary`.
-22. Sign out and confirm the anonymous board state returns.
+14. Confirm the inspector opens as a compact panel with only a large name field, the tag picker, notes, and the delete-person action.
+15. Assign an existing tag to a person from the inspector tag picker, use ArrowUp/ArrowDown plus Enter in that picker, create a new tag from the same field, delete an unused tag with the `x` confirmation flow, and confirm the selection persists after reload.
+16. Create a note by typing into the `Create new note` field, start the title with `#`, press Enter to continue in the body, collapse and expand the note, delete a note from the icon button, reload, and confirm note changes persist.
+17. Create a connection between two existing people, confirm reload preserves it, then click the widened line target and confirm `Delete connection` or Backspace removes it.
+18. Open the top-left Tags menu, create a tag, adjust its color, and confirm tagged nodes use that color.
+19. Open the search layer and verify that typing a person name, tag, or note text returns local matching people.
+20. Press Enter with a natural-language query and verify AI search returns ranked people with reasons.
+21. Click a search result and verify the board recenters on that person and opens the inspector.
+22. After creating a note, wait at least 3 seconds and confirm a `person_ai_notes` row for that person reaches `status = 'created'`.
+23. Edit an existing note, blur the input, wait at least 3 seconds, and confirm the same `person_ai_notes` row updates its `updated_at`, `summary`, and `structured_summary`.
+24. Sign out and confirm the anonymous board state returns.
 
 Supabase verification:
 

@@ -206,9 +206,9 @@ function App() {
     loadTagColorDrafts(),
   )
   const [tagNameDrafts, setTagNameDrafts] = useState<Record<string, string>>({})
-  const [newNoteTitle, setNewNoteTitle] = useState('')
-  const [newNoteBody, setNewNoteBody] = useState('')
+  const [newNoteDraft, setNewNoteDraft] = useState<NoteDraft>({ title: '', body: '' })
   const [noteDrafts, setNoteDrafts] = useState<Record<string, NoteDraft>>({})
+  const [collapsedNotes, setCollapsedNotes] = useState<Record<string, boolean>>({})
   const [highlightSpots, setHighlightSpots] = useState<HighlightSpot[]>([])
   const [pointerPosition, setPointerPosition] = useState<Offset | null>(null)
   const [highlightClock, setHighlightClock] = useState(() => Date.now())
@@ -229,6 +229,7 @@ function App() {
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const tagPickerMenuRef = useRef<HTMLDivElement | null>(null)
   const tagPickerOptionRefs = useRef<Array<HTMLDivElement | null>>([])
+  const noteBodyRefs = useRef<Record<string, HTMLTextAreaElement | null>>({})
   const highlightIdRef = useRef(0)
   const lastHighlightSpotRef = useRef<Offset | null>(null)
   const inspectorWorldPositionRef = useRef<Offset | null>(null)
@@ -937,15 +938,18 @@ function App() {
   }, [markTrackpadPanActive, queueViewportUpdate, zoomAtClientPoint])
 
   function handleInspectorWheel(event: ReactWheelEvent<HTMLElement>) {
-    if (!event.ctrlKey && trackpadPanRef.current.active) {
+    if (event.ctrlKey) {
       event.stopPropagation()
       moveWithWheel(event.nativeEvent)
       return
     }
 
-    if (event.ctrlKey) {
-      event.preventDefault()
+    if (trackpadPanRef.current.active) {
+      event.stopPropagation()
+      moveWithWheel(event.nativeEvent)
+      return
     }
+
     event.stopPropagation()
   }
 
@@ -1253,17 +1257,32 @@ function App() {
     selectedNode,
   ])
 
-  async function handleCreateNote() {
-    if (!inspectorNode || !isGraphReady) return
+  async function createInspectorNote(draft: NoteDraft) {
+    if (!inspectorNode || !isGraphReady) return null
 
-    const title = newNoteTitle.trim() || 'Untitled note'
-    const body = newNoteBody.trim()
+    const title = normalizeNoteTitle(draft.title)
+    const body = draft.body.trim()
+    if (!title && !body) return null
 
-    if (!title && !body) return
+    const createdNote = await createNote(title, body, inspectorNode.id)
+    setCollapsedNotes((currentNotes) => ({
+      ...currentNotes,
+      [createdNote.id]: false,
+    }))
+    return createdNote
+  }
 
-    await createNote(title, body, inspectorNode.id)
-    setNewNoteTitle('')
-    setNewNoteBody('')
+  async function handleCreateNoteFromDraft(focusBody = false) {
+    const createdNote = await createInspectorNote(newNoteDraft)
+    if (!createdNote) return
+
+    setNewNoteDraft({ title: '', body: '' })
+
+    if (!focusBody) return
+
+    window.requestAnimationFrame(() => {
+      noteBodyRefs.current[createdNote.id]?.focus()
+    })
   }
 
   async function handleAiSearch() {
@@ -1320,7 +1339,7 @@ function App() {
     const draft = noteDrafts[note.id]
     if (!draft) return
 
-    const nextTitle = draft.title.trim() || 'Untitled note'
+    const nextTitle = normalizeNoteTitle(draft.title)
     const nextBody = draft.body
 
     if (nextTitle === note.title && nextBody === note.body) return
@@ -1336,6 +1355,41 @@ function App() {
         title: updated.title,
         body: updated.body,
       },
+    }))
+  }
+
+  function handleExistingNoteTitleKeyDown(noteId: string, event: ReactKeyboardEvent<HTMLInputElement>) {
+    if (event.key !== 'Enter') return
+
+    event.preventDefault()
+    setCollapsedNotes((currentNotes) => ({
+      ...currentNotes,
+      [noteId]: false,
+    }))
+    window.requestAnimationFrame(() => {
+      noteBodyRefs.current[noteId]?.focus()
+    })
+  }
+
+  async function handleNewNoteTitleKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
+    if (event.key !== 'Enter') return
+
+    event.preventDefault()
+    if (!newNoteDraft.title.trim() && !newNoteDraft.body.trim()) return
+
+    await handleCreateNoteFromDraft(true)
+  }
+
+  async function handleNewNoteBlur() {
+    if (!newNoteDraft.title.trim() && !newNoteDraft.body.trim()) return
+
+    await handleCreateNoteFromDraft(false)
+  }
+
+  function toggleNoteCollapse(noteId: string) {
+    setCollapsedNotes((currentNotes) => ({
+      ...currentNotes,
+      [noteId]: !currentNotes[noteId],
     }))
   }
 
@@ -1746,40 +1800,18 @@ function App() {
           onMouseDown={(event) => event.stopPropagation()}
           onWheel={handleInspectorWheel}
         >
-          <div className="inspector-panel__header">
-            <div>
-              <p className="inspector-panel__eyebrow">
-                {inspectorNode.is_root ? 'Your node' : 'Selected person'}
-              </p>
-              <h2 className="inspector-panel__title">
-                {inspectorNode.name.trim() || (inspectorNode.is_root ? 'You' : 'Unnamed person')}
-              </h2>
-            </div>
-            <span className="inspector-panel__hint">
-              {inspectorNode.is_root
-                ? 'Root stays at 0,0'
-                : isGraphReady
-                  ? `Drag to move. Hold ${connectionModifierLabel} and drag to connect.`
-                  : 'Sign in to edit'}
-            </span>
-          </div>
+          <input
+            className="field-group__input inspector-panel__name"
+            value={nameDraft}
+            onChange={(event) => setNameDraft(event.target.value)}
+            onBlur={() => {
+              void saveInspectorName()
+            }}
+            disabled={!isGraphReady}
+            placeholder="Name"
+          />
 
-          <label className="field-group">
-            <span className="field-group__label">Name</span>
-            <input
-              className="field-group__input"
-              value={nameDraft}
-              onChange={(event) => setNameDraft(event.target.value)}
-              onBlur={() => {
-                void saveInspectorName()
-              }}
-              disabled={!isGraphReady}
-              placeholder="Name"
-            />
-          </label>
-
-          <div className="field-group">
-            <span className="field-group__label">Tag</span>
+          <div className="field-group field-group--compact">
             <div className="tag-picker">
               <input
                 className="field-group__input tag-picker__input"
@@ -1875,89 +1907,97 @@ function App() {
             </div>
           </div>
 
-          <div className="field-group">
-            <div className="field-group__header">
-              <span className="field-group__label">Notes</span>
-              <span className="field-group__meta">{inspectorNodeNotes.length}</span>
-            </div>
+          <div className="note-list">
+            {inspectorNodeNotes.map((note) => {
+              const draft = noteDrafts[note.id] ?? {
+                title: note.title,
+                body: note.body,
+              }
+              const isCollapsed = collapsedNotes[note.id] ?? false
 
-            {inspectorNodeNotes.length > 0 ? (
-              <div className="note-list">
-                {inspectorNodeNotes.map((note) => {
-                  const draft = noteDrafts[note.id] ?? {
-                    title: note.title,
-                    body: note.body,
+              return (
+                <article key={note.id} className={`note-card${isCollapsed ? ' is-collapsed' : ''}`}>
+                  <div className="note-card__header">
+                    <button
+                      type="button"
+                      className="note-card__icon"
+                      onClick={() => toggleNoteCollapse(note.id)}
+                      aria-label={isCollapsed ? 'Expand note' : 'Collapse note'}
+                    >
+                      {isCollapsed ? '>' : 'v'}
+                    </button>
+                    <input
+                      className="note-card__title"
+                      value={draft.title}
+                      onChange={(event) => updateNoteDraft(note.id, 'title', event.target.value)}
+                      onKeyDown={(event) => handleExistingNoteTitleKeyDown(note.id, event)}
+                      onBlur={() => {
+                        void persistNote(note)
+                      }}
+                      disabled={!isGraphReady}
+                      placeholder="# Title"
+                    />
+                    {isGraphReady ? (
+                      <button
+                        type="button"
+                        className="note-card__icon note-card__icon--danger"
+                        aria-label="Delete note"
+                        onClick={() => {
+                          void deleteNote(note.id)
+                        }}
+                      >
+                        x
+                      </button>
+                    ) : null}
+                  </div>
+                  {!isCollapsed ? (
+                    <textarea
+                      ref={(element) => {
+                        noteBodyRefs.current[note.id] = element
+                        autoResizeTextarea(element)
+                      }}
+                      className="note-card__body"
+                      value={draft.body}
+                      onChange={(event) => {
+                        autoResizeTextarea(event.currentTarget)
+                        updateNoteDraft(note.id, 'body', event.target.value)
+                      }}
+                      onBlur={() => {
+                        void persistNote(note)
+                      }}
+                      disabled={!isGraphReady}
+                      placeholder="Write a note"
+                      rows={1}
+                    />
+                  ) : null}
+                </article>
+              )
+            })}
+
+            <article className="note-card note-card--draft">
+              <div className="note-card__header">
+                <span className="note-card__spacer" aria-hidden="true" />
+                <input
+                  className="note-card__title"
+                  value={newNoteDraft.title}
+                  onChange={(event) =>
+                    setNewNoteDraft((currentDraft) => ({
+                      ...currentDraft,
+                      title: event.target.value,
+                    }))
                   }
-
-                  return (
-                    <article key={note.id} className="note-card">
-                      <input
-                        className="field-group__input"
-                        value={draft.title}
-                        onChange={(event) => updateNoteDraft(note.id, 'title', event.target.value)}
-                        onBlur={() => {
-                          void persistNote(note)
-                        }}
-                        disabled={!isGraphReady}
-                        placeholder="Title"
-                      />
-                      <textarea
-                        className="field-group__textarea"
-                        value={draft.body}
-                        onChange={(event) => updateNoteDraft(note.id, 'body', event.target.value)}
-                        onBlur={() => {
-                          void persistNote(note)
-                        }}
-                        disabled={!isGraphReady}
-                        placeholder="Write a note"
-                        rows={4}
-                      />
-                      {isGraphReady ? (
-                        <button
-                          type="button"
-                          className="stack-list__button stack-list__button--danger"
-                          onClick={() => {
-                            void deleteNote(note.id)
-                          }}
-                        >
-                          Delete note
-                        </button>
-                      ) : null}
-                    </article>
-                  )
-                })}
+                  onKeyDown={(event) => {
+                    void handleNewNoteTitleKeyDown(event)
+                  }}
+                  onBlur={() => {
+                    void handleNewNoteBlur()
+                  }}
+                  disabled={!isGraphReady}
+                  placeholder="Create new note"
+                />
+                <span className="note-card__spacer" aria-hidden="true" />
               </div>
-            ) : (
-              <p className="field-group__meta">No notes yet.</p>
-            )}
-
-            <div className="note-card note-card--draft">
-              <input
-                className="field-group__input"
-                value={newNoteTitle}
-                onChange={(event) => setNewNoteTitle(event.target.value)}
-                placeholder="New note title"
-                disabled={!isGraphReady}
-              />
-              <textarea
-                className="field-group__textarea"
-                value={newNoteBody}
-                onChange={(event) => setNewNoteBody(event.target.value)}
-                placeholder="New note body"
-                rows={4}
-                disabled={!isGraphReady}
-              />
-              <button
-                type="button"
-                className="field-group__button"
-                onClick={() => {
-                  void handleCreateNote()
-                }}
-                disabled={!isGraphReady || (!newNoteTitle.trim() && !newNoteBody.trim())}
-              >
-                Add note
-              </button>
-            </div>
+            </article>
           </div>
 
           {!inspectorNode.is_root && isGraphReady ? (
@@ -2173,6 +2213,20 @@ function clampScale(value: number) {
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value))
+}
+
+function normalizeNoteTitle(value: string) {
+  const trimmedValue = value.trim()
+  if (!trimmedValue) return 'Untitled note'
+
+  return trimmedValue.replace(/^#+\s*/, '').trim() || 'Untitled note'
+}
+
+function autoResizeTextarea(element: HTMLTextAreaElement | null) {
+  if (!element) return
+
+  element.style.height = '0px'
+  element.style.height = `${element.scrollHeight}px`
 }
 
 function loadTagColorDrafts() {
