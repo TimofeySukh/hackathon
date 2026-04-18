@@ -20,7 +20,7 @@ Current app behavior:
 - debounce note create and note update events for 3 seconds before triggering AI enrichment
 - call a Supabase Edge Function that forwards person context to n8n and rewrites `person_ai_notes`
 - edit the selected person in the right-side inspector
-- open a temporary people search layer and match by name, tag, or note content
+- open a people search layer, match locally while typing, and run natural-language AI search on Enter
 
 There is no multiplayer or drawing toolset yet.
 
@@ -132,15 +132,16 @@ supabase db push
 
 For hosted dashboard workflows, paste and run the migration SQL in the Supabase SQL editor.
 
-This repository now also includes its first Supabase Edge Function in `supabase/functions/sync-person-ai-note/`.
+This repository includes Supabase Edge Functions in `supabase/functions/`.
 
-Deploy the function before testing AI note sync:
+Deploy functions before testing AI features:
 
 ```bash
 supabase functions deploy sync-person-ai-note
+supabase functions deploy search-people-ai
 ```
 
-`supabase/config.toml` sets `sync-person-ai-note` to `verify_jwt = false` at the Supabase gateway because the function performs its own user-token validation with `supabase.auth.getUser()`. Do not remove the in-function authorization check.
+`supabase/config.toml` sets AI functions to `verify_jwt = false` at the Supabase gateway because each function performs its own user-token validation with `supabase.auth.getUser()`. Do not remove the in-function authorization checks.
 
 Required function secret:
 
@@ -154,7 +155,19 @@ If `N8N_PERSON_AI_WEBHOOK_URL` is not set, the function falls back to the publis
 https://velizard.app.n8n.cloud/webhook/person-enrichment
 ```
 
-The browser never calls n8n directly. It invokes `sync-person-ai-note`, and that function authenticates the user, loads the current person plus notes, calls n8n, and upserts `person_ai_notes`.
+Optional AI search function secret:
+
+```bash
+supabase secrets set N8N_PEOPLE_SEARCH_WEBHOOK_URL=https://your-n8n-search-webhook-url
+```
+
+If `N8N_PEOPLE_SEARCH_WEBHOOK_URL` is not set, the function falls back to:
+
+```text
+https://velizard.app.n8n.cloud/webhook/person-search
+```
+
+The browser never calls n8n directly. It invokes Edge Functions, and those functions authenticate the user, load user-owned graph context, call n8n, and return or persist structured AI output.
 
 Configure Google as an auth provider in Supabase Auth. Add redirect URLs for each app URL used by the team, including:
 
@@ -249,23 +262,24 @@ npm run preview
 Manual verification:
 
 1. Open the board and confirm the `Search people` control appears in the top action area.
-2. Open the search layer and verify that typing a person name, tag, or note text returns matching people.
-3. Click a search result and verify the board recenters on that person and opens the inspector.
-4. Drag anywhere on the board and confirm the point grid moves smoothly.
-5. Scroll on a trackpad and confirm the board pans without triggering zoom.
-6. Use the mouse wheel and confirm zoom centers around the cursor.
-7. Confirm the zoom indicator in the bottom-right updates smoothly.
-8. Toggle the theme.
-9. Reload the page and confirm the selected theme is preserved.
-10. Sign in with Google and confirm the account state appears.
-11. Confirm the signed-in account gets a root node at `0,0`.
-12. Drag out from a node to create a new connected person and confirm it persists after reload.
-13. Hold `Shift` and drag a non-root person to a new position, then reload and confirm the coordinates persist.
-14. Assign a tag to a person, add a note, reload, and confirm both persist.
-15. After creating a note, wait at least 3 seconds and confirm a `person_ai_notes` row for that person reaches `status = 'created'`.
-16. Edit an existing note, blur the input, wait at least 3 seconds, and confirm the same `person_ai_notes` row updates its `updated_at`, `summary`, and `structured_summary`.
-17. Create a connection between two existing people and confirm reload preserves it.
-18. Sign out and confirm the anonymous board state returns.
+2. Open the search layer and verify that typing a person name, tag, or note text returns local matching people.
+3. Press Enter with a natural-language query and verify AI search returns ranked people with reasons.
+4. Click a search result and verify the board recenters on that person and opens the inspector.
+5. Drag anywhere on the board and confirm the point grid moves smoothly.
+6. Scroll on a trackpad and confirm the board pans without triggering zoom.
+7. Use the mouse wheel and confirm zoom centers around the cursor.
+8. Confirm the zoom indicator in the bottom-right updates smoothly.
+9. Toggle the theme.
+10. Reload the page and confirm the selected theme is preserved.
+11. Sign in with Google and confirm the account state appears.
+12. Confirm the signed-in account gets a root node at `0,0`.
+13. Drag out from a node to create a new connected person and confirm it persists after reload.
+14. Hold `Shift` and drag a non-root person to a new position, then reload and confirm the coordinates persist.
+15. Assign a tag to a person, add a note, reload, and confirm both persist.
+16. After creating a note, wait at least 3 seconds and confirm a `person_ai_notes` row for that person reaches `status = 'created'`.
+17. Edit an existing note, blur the input, wait at least 3 seconds, and confirm the same `person_ai_notes` row updates its `updated_at`, `summary`, and `structured_summary`.
+18. Create a connection between two existing people and confirm reload preserves it.
+19. Sign out and confirm the anonymous board state returns.
 
 Supabase verification:
 
@@ -308,5 +322,5 @@ Supabase verification:
 
 - `npm run build`
 - `npm run lint`
-- Manual browser check of drag navigation, wheel and trackpad navigation, motion-triggered point highlights, theme persistence, persisted graph editing, and debounced AI note sync
+- Manual browser check of drag navigation, wheel and trackpad navigation, motion-triggered point highlights, theme persistence, persisted graph editing, debounced AI note sync, and AI people search
 - Manual Supabase auth check when credentials and Google OAuth are configured

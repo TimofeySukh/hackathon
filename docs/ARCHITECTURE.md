@@ -12,7 +12,7 @@ Runtime boundaries:
 - The browser owns theme persistence through `localStorage`.
 - Supabase owns Google authentication and user-owned graph records.
 - Supabase Edge Functions own the server-side n8n webhook call for AI note enrichment.
-- n8n owns LLM execution and structured summary generation for `person_ai_notes`.
+- n8n owns LLM execution, structured summary generation for `person_ai_notes`, and natural-language people search ranking.
 - Linear owns task state, status, ownership, priority, and blockers.
 - `docs/` owns durable product and repository knowledge.
 
@@ -22,13 +22,14 @@ The backend boundary remains intentionally narrow: Supabase Auth provides identi
 
 - `src/main.tsx` mounts the React app.
 - `src/App.tsx` contains the board interaction model and selected-person inspector.
-- `src/App.tsx` also contains the temporary local people search overlay.
+- `src/App.tsx` also contains the people search overlay with local matching while typing and AI search on Enter.
 - `src/lib/supabase.ts` creates the browser Supabase client from Vite environment variables.
 - `src/lib/useAuth.ts` owns session loading, Google sign-in, and sign-out.
 - `src/lib/useBoardGraph.ts` owns board graph loading, frontend mutation state, and debounced AI note refresh scheduling.
 - `src/lib/graphStorage.ts` owns Supabase CRUD for graph data, `person_ai_notes`, and Edge Function invocation.
 - `src/lib/userWorkspace.ts` upserts the user profile and ensures a single personal board plus root node.
 - `supabase/functions/sync-person-ai-note/index.ts` authenticates the caller, loads person context, calls n8n, and upserts `person_ai_notes`.
+- `supabase/functions/search-people-ai/index.ts` authenticates the caller, builds candidate context, calls n8n, and returns ranked people.
 - `src/index.css` contains the full visual system.
 
 The board is simulated by shifting layered CSS backgrounds according to a camera offset. The app does not store board objects or draw on a canvas element.
@@ -52,7 +53,7 @@ Current scope:
 - multiple notes per person
 - at most one separate AI summary record per person with a top-level text summary plus structured JSON fields
 - undirected person-to-person connections
-- a temporary local people search overlay over names, tags, and notes
+- a people search overlay over names, tags, notes, and AI-generated search explanations
 
 Out of scope for the current version:
 

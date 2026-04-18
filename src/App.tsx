@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   CSSProperties,
+  KeyboardEvent as ReactKeyboardEvent,
   MouseEvent as ReactMouseEvent,
   WheelEvent as ReactWheelEvent,
 } from 'react'
 
 import { useAuth } from './lib/useAuth'
-import { normalizeTagName } from './lib/graphStorage'
+import { normalizeTagName, searchPeopleWithAi } from './lib/graphStorage'
 import type { PersonNode, PersonNote, Tag } from './lib/graphTypes'
 import { useBoardGraph } from './lib/useBoardGraph'
 
@@ -53,6 +54,7 @@ type SearchResult = {
   node: PersonNode
   score: number
   matches: string[]
+  source: 'local' | 'ai'
 }
 
 type BoardStyle = CSSProperties & {
@@ -157,6 +159,10 @@ function App() {
   const [isDraggingBoard, setIsDraggingBoard] = useState(false)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [aiSearchQuery, setAiSearchQuery] = useState('')
+  const [aiSearchResults, setAiSearchResults] = useState<SearchResult[]>([])
+  const [aiSearchStatus, setAiSearchStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  const [aiSearchError, setAiSearchError] = useState<string | null>(null)
 
   const boardRef = useRef<HTMLElement | null>(null)
   const boardSurfaceRef = useRef<HTMLDivElement | null>(null)
@@ -272,6 +278,7 @@ function App() {
           node,
           score,
           matches: Array.from(new Set(matches)).slice(0, 3),
+          source: 'local' as const,
         }
       })
       .filter((entry) => entry.score > 0)
@@ -281,6 +288,7 @@ function App() {
       })
       .slice(0, 8)
   }, [boardNodes, notesByPersonId, searchQuery, tagsById])
+  const visibleSearchResults = aiSearchQuery === searchQuery.trim() ? aiSearchResults : searchResults
 
   const inspectorNodeConnections = useMemo(() => {
     if (!inspectorNode) return []
@@ -718,6 +726,45 @@ function App() {
     setNewNoteBody('')
   }
 
+  async function handleAiSearch() {
+    const query = searchQuery.trim()
+    if (!query || !isGraphReady) return
+
+    setAiSearchStatus('loading')
+    setAiSearchError(null)
+
+    try {
+      const results = await searchPeopleWithAi(query)
+      const nextAiSearchResults: SearchResult[] = []
+
+      for (const result of results) {
+          const node = nodesById[result.person_id]
+        if (!node) continue
+
+        nextAiSearchResults.push({
+          node,
+          score: result.score,
+          matches: [result.reason, ...result.matched_signals].filter(Boolean).slice(0, 4),
+          source: 'ai',
+        })
+      }
+
+      setAiSearchQuery(query)
+      setAiSearchResults(nextAiSearchResults)
+      setAiSearchStatus('ready')
+    } catch (error) {
+      setAiSearchStatus('error')
+      setAiSearchError(error instanceof Error ? error.message : 'AI search failed.')
+    }
+  }
+
+  function handleSearchKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
+    if (event.key !== 'Enter') return
+
+    event.preventDefault()
+    void handleAiSearch()
+  }
+
   function updateNoteDraft(noteId: string, field: keyof NoteDraft, value: string) {
     setNoteDrafts((currentDrafts) => ({
       ...currentDrafts,
@@ -854,15 +901,40 @@ function App() {
                   ref={searchInputRef}
                   className="search-panel__input"
                   value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Search anything about a person"
+                  onChange={(event) => {
+                    setSearchQuery(event.target.value)
+                    setAiSearchStatus('idle')
+                    setAiSearchError(null)
+                  }}
+                  onKeyDown={handleSearchKeyDown}
+                  placeholder="Describe who you want to find, then press Enter"
                 />
               </label>
+              {isGraphReady ? (
+                <div className="search-panel__hint">
+                  <span>{aiSearchStatus === 'loading' ? 'Asking AI...' : 'Press Enter for AI search.'}</span>
+                  {searchQuery.trim() ? (
+                    <button
+                      type="button"
+                      className="search-panel__ai-button"
+                      onClick={() => {
+                        void handleAiSearch()
+                      }}
+                      disabled={aiSearchStatus === 'loading'}
+                    >
+                      AI search
+                    </button>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="search-panel__empty">Sign in to use AI search.</p>
+              )}
+              {aiSearchError ? <p className="search-panel__error">{aiSearchError}</p> : null}
 
               {searchQuery.trim() ? (
-                searchResults.length > 0 ? (
+                visibleSearchResults.length > 0 ? (
                   <div className="search-panel__results">
-                    {searchResults.map((result) => (
+                    {visibleSearchResults.map((result) => (
                       <button
                         key={result.node.id}
                         type="button"
@@ -873,17 +945,20 @@ function App() {
                           {result.node.name.trim() || (result.node.is_root ? 'You' : 'Unnamed person')}
                         </span>
                         <span className="search-result__meta">
+                          {result.source === 'ai' ? 'AI match: ' : ''}
                           {result.matches.join(' • ')}
                         </span>
                       </button>
                     ))}
                   </div>
                 ) : (
-                  <p className="search-panel__empty">No people match this query yet.</p>
+                  <p className="search-panel__empty">
+                    {aiSearchStatus === 'loading' ? 'Searching your graph with AI...' : 'No people match this query yet.'}
+                  </p>
                 )
               ) : (
                 <p className="search-panel__empty">
-                  This is a temporary search layer over names, tags, and notes.
+                  Type naturally, for example: "someone who can help with n8n automation".
                 </p>
               )}
             </div>

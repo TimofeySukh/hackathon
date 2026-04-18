@@ -55,6 +55,13 @@ type UpsertPersonAiNoteStatusInput = {
   errorMessage?: string | null
 }
 
+export type AiPeopleSearchResult = {
+  person_id: string
+  score: number
+  reason: string
+  matched_signals: string[]
+}
+
 const EMPTY_PERSON_AI_STRUCTURED_SUMMARY: PersonAiStructuredSummary = {
   summary: '',
   traits: [],
@@ -374,4 +381,28 @@ export async function invokePersonAiNoteSync(personId: string) {
   })
 
   if (error) throw error
+}
+
+export async function searchPeopleWithAi(query: string): Promise<AiPeopleSearchResult[]> {
+  const client = requireSupabase()
+  const { data, error } = await client.functions.invoke('search-people-ai', {
+    body: {
+      query,
+    },
+  })
+
+  if (error) throw error
+
+  const results = data && typeof data === 'object' && 'results' in data ? (data as { results?: unknown }).results : []
+  if (!Array.isArray(results)) return []
+
+  return results
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === 'object')
+    .map((entry) => ({
+      person_id: typeof entry.person_id === 'string' ? entry.person_id : '',
+      score: typeof entry.score === 'number' ? entry.score : 0,
+      reason: typeof entry.reason === 'string' ? entry.reason : '',
+      matched_signals: normalizeStringArray(entry.matched_signals),
+    }))
+    .filter((entry) => entry.person_id)
 }

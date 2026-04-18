@@ -36,7 +36,7 @@ Supabase database migrations for profiles, personal boards, persisted graph data
 
 ### `supabase/functions/`
 
-Supabase Edge Functions. The first function in this repository is `sync-person-ai-note`, which forwards person note context to n8n and upserts `person_ai_notes`.
+Supabase Edge Functions. `sync-person-ai-note` forwards person note context to n8n and upserts `person_ai_notes`. `search-people-ai` forwards graph candidates to n8n and returns ranked natural-language search results.
 
 ### `src/`
 
@@ -58,7 +58,7 @@ Contains the board experience:
 - board zoom state
 - motion-triggered point highlight state
 - selected-person inspector state
-- temporary people search overlay state
+- people search overlay state
 - persisted social graph node and connection rendering
 - drag-to-create node connections
 - shift-drag node repositioning
@@ -72,7 +72,7 @@ Shared low-level helpers.
 - `supabase.ts` creates the browser Supabase client from Vite environment variables.
 - `useAuth.ts` owns session loading, Google OAuth sign-in, and sign-out.
 - `useBoardGraph.ts` owns board graph loading, mutation state, and debounced AI note refresh scheduling per person.
-- `graphStorage.ts` owns Supabase CRUD calls for persisted graph data, `person_ai_notes`, and the `sync-person-ai-note` Edge Function invocation.
+- `graphStorage.ts` owns Supabase CRUD calls for persisted graph data, `person_ai_notes`, and AI Edge Function invocation.
 - `graphTypes.ts` defines shared profile, board, person, note, AI note, tag, and connection interfaces, including the structured AI summary shape.
 - `userWorkspace.ts` upserts profile data and ensures one personal board plus root person for the signed-in user.
 
@@ -84,7 +84,7 @@ Contains the complete visual system for:
 
 - dark and light themes
 - account controls
-- temporary people search panel
+- people search panel
 - very dense point-grid background
 - compact motion-triggered point highlight styling with directional tails for fast cursor movement
 - compact graph node styling
@@ -119,6 +119,7 @@ It currently supports:
 - drag-to-connect two existing nodes by releasing on another node hit area
 - drag-to-create node growth from any existing node with an immediate connecting line
 - selected-node detail cards with reusable tag selection, note editing, connection removal, and deletion
+- local people search while typing plus natural-language AI search on Enter
 - shift-drag repositioning for non-root nodes
 - persisted node renaming
 - grid movement through background offset changes
