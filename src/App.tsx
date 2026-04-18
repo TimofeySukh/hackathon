@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   CSSProperties,
   MouseEvent as ReactMouseEvent,
@@ -12,6 +12,20 @@ type Theme = 'dark' | 'light'
 type Offset = {
   x: number
   y: number
+}
+
+type GraphNode = {
+  id: string
+  label: string
+  x: number
+  y: number
+  kind?: 'root' | 'default'
+}
+
+type GraphEdge = {
+  id: string
+  from: string
+  to: string
 }
 
 type HighlightSpot = Offset & {
@@ -48,6 +62,16 @@ type HighlightSpotStyle = CSSProperties & {
   opacity: number
 }
 
+type ConnectionDrag = {
+  fromId: string
+  startClientX: number
+  startClientY: number
+  clientX: number
+  clientY: number
+  worldX: number
+  worldY: number
+}
+
 const THEME_STORAGE_KEY = 'hackathon-theme'
 const MIN_SCALE = 0.2
 const MAX_SCALE = 2.5
@@ -62,6 +86,11 @@ const HIGHLIGHT_RADIUS = 56
 const HIGHLIGHT_TICK_MS = 50
 const HIGHLIGHT_TAIL_START = 18
 const HIGHLIGHT_TAIL_LIMIT = 48
+const NODE_RADIUS = 7
+const CREATE_THRESHOLD = 18
+
+const INITIAL_NODES: GraphNode[] = [{ id: 'root', label: 'You', x: 0, y: 0, kind: 'root' }]
+const INITIAL_EDGES: GraphEdge[] = []
 
 function App() {
   const { session, board, status, error, signInWithGoogle, signOut } = useAuth()
@@ -71,15 +100,20 @@ function App() {
   })
   const [offset, setOffset] = useState<Offset>({ x: 0, y: 0 })
   const [scale, setScale] = useState(1)
+  const [nodes, setNodes] = useState<GraphNode[]>(INITIAL_NODES)
+  const [edges, setEdges] = useState<GraphEdge[]>(INITIAL_EDGES)
+  const [selectedNodeId, setSelectedNodeId] = useState('root')
+  const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
+  const [connectionDrag, setConnectionDrag] = useState<ConnectionDrag | null>(null)
   const [highlightSpots, setHighlightSpots] = useState<HighlightSpot[]>([])
   const [pointerPosition, setPointerPosition] = useState<Offset | null>(null)
   const [highlightClock, setHighlightClock] = useState(() => Date.now())
-  const [isDragging, setIsDragging] = useState(false)
+  const [isDraggingBoard, setIsDraggingBoard] = useState(false)
 
   const boardRef = useRef<HTMLElement | null>(null)
   const highlightIdRef = useRef(0)
   const lastHighlightSpotRef = useRef<Offset | null>(null)
-  const dragStateRef = useRef({
+  const boardDragRef = useRef({
     startX: 0,
     startY: 0,
     originX: 0,
@@ -126,8 +160,10 @@ function App() {
     const tailReach = hasTail
       ? Math.min(HIGHLIGHT_TAIL_LIMIT, Math.max(0, distanceFromPrevious - HIGHLIGHT_TAIL_START))
       : 0
-    const tailUnitX = hasTail && distanceFromPrevious > 0 ? (nextSpot.x - previousSpot.x) / distanceFromPrevious : 0
-    const tailUnitY = hasTail && distanceFromPrevious > 0 ? (nextSpot.y - previousSpot.y) / distanceFromPrevious : 0
+    const tailUnitX =
+      hasTail && distanceFromPrevious > 0 ? (nextSpot.x - previousSpot.x) / distanceFromPrevious : 0
+    const tailUnitY =
+      hasTail && distanceFromPrevious > 0 ? (nextSpot.y - previousSpot.y) / distanceFromPrevious : 0
     const tailSize = tailReach * 0.75
 
     const id = highlightIdRef.current + 1
@@ -150,21 +186,86 @@ function App() {
     ])
   }, [])
 
+  const nodesById = useMemo(
+    () => Object.fromEntries(nodes.map((node) => [node.id, node])) as Record<string, GraphNode>,
+    [nodes],
+  )
+
+  const finishConnectionDrag = useCallback(
+    (clientX: number, clientY: number) => {
+      if (!connectionDrag) return
+
+      const distance = Math.hypot(
+        clientX - connectionDrag.startClientX,
+        clientY - connectionDrag.startClientY,
+      )
+
+      if (distance < CREATE_THRESHOLD) {
+        setConnectionDrag(null)
+        return
+      }
+
+      const nextId = `node-${crypto.randomUUID()}`
+      const nextNode: GraphNode = {
+        id: nextId,
+        label: 'New person',
+        x: connectionDrag.worldX,
+        y: connectionDrag.worldY,
+      }
+
+      setNodes((currentNodes) => [...currentNodes, nextNode])
+      setEdges((currentEdges) => [
+        ...currentEdges,
+        {
+          id: `edge-${connectionDrag.fromId}-${nextId}`,
+          from: connectionDrag.fromId,
+          to: nextId,
+        },
+      ])
+      setSelectedNodeId(nextId)
+      setEditingNodeId(nextId)
+      setConnectionDrag(null)
+    },
+    [connectionDrag],
+  )
+
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
-      if (!dragStateRef.current.active) return
+      if (connectionDrag) {
+        const worldPoint = screenToWorld(event.clientX, event.clientY, boardRef.current, offset, scale)
 
-      const nextX = dragStateRef.current.originX + event.clientX - dragStateRef.current.startX
-      const nextY = dragStateRef.current.originY + event.clientY - dragStateRef.current.startY
+        setConnectionDrag((currentDrag) =>
+          currentDrag
+            ? {
+                ...currentDrag,
+                clientX: event.clientX,
+                clientY: event.clientY,
+                worldX: worldPoint?.x ?? currentDrag.worldX,
+                worldY: worldPoint?.y ?? currentDrag.worldY,
+              }
+            : null,
+        )
+        return
+      }
+
+      if (!boardDragRef.current.active) return
+
+      const nextX = boardDragRef.current.originX + event.clientX - boardDragRef.current.startX
+      const nextY = boardDragRef.current.originY + event.clientY - boardDragRef.current.startY
 
       setOffset({ x: nextX, y: nextY })
       addHighlightSpot(event.clientX, event.clientY)
     }
 
-    const handleMouseUp = () => {
-      dragStateRef.current.active = false
+    const handleMouseUp = (event: MouseEvent) => {
+      if (connectionDrag) {
+        finishConnectionDrag(event.clientX, event.clientY)
+        return
+      }
+
+      boardDragRef.current.active = false
       lastHighlightSpotRef.current = null
-      setIsDragging(false)
+      setIsDraggingBoard(false)
     }
 
     window.addEventListener('mousemove', handleMouseMove)
@@ -174,12 +275,12 @@ function App() {
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [addHighlightSpot])
+  }, [addHighlightSpot, connectionDrag, finishConnectionDrag, offset, scale])
 
-  const startDragging = (event: ReactMouseEvent<HTMLElement>) => {
-    if (event.button !== 0) return
+  const startBoardDragging = (event: ReactMouseEvent<HTMLElement>) => {
+    if (event.button !== 0 || connectionDrag) return
 
-    dragStateRef.current = {
+    boardDragRef.current = {
       startX: event.clientX,
       startY: event.clientY,
       originX: offset.x,
@@ -188,7 +289,34 @@ function App() {
     }
 
     addHighlightSpot(event.clientX, event.clientY, true)
-    setIsDragging(true)
+    setIsDraggingBoard(true)
+    setEditingNodeId(null)
+  }
+
+  const startConnectionDrag = (nodeId: string, event: ReactMouseEvent<HTMLButtonElement>) => {
+    if (event.button !== 0) return
+
+    event.stopPropagation()
+    boardDragRef.current.active = false
+    setIsDraggingBoard(false)
+    setSelectedNodeId(nodeId)
+    setEditingNodeId(null)
+    const worldPoint = screenToWorld(event.clientX, event.clientY, boardRef.current, offset, scale)
+    setConnectionDrag({
+      fromId: nodeId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      worldX: worldPoint?.x ?? nodesById[nodeId].x,
+      worldY: worldPoint?.y ?? nodesById[nodeId].y,
+    })
+  }
+
+  const updateNodeLabel = (nodeId: string, value: string) => {
+    setNodes((currentNodes) =>
+      currentNodes.map((node) => (node.id === nodeId ? { ...node, label: value } : node)),
+    )
   }
 
   const moveWithWheel = (event: ReactWheelEvent<HTMLElement>) => {
@@ -233,6 +361,17 @@ function App() {
   }
 
   const boardStyle: BoardStyle = gridStyle
+
+  const graphStyle = {
+    transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+  } satisfies CSSProperties
+
+  const previewPath = connectionDrag
+    ? getPreviewPath(nodesById[connectionDrag.fromId], {
+        x: connectionDrag.worldX,
+        y: connectionDrag.worldY,
+      })
+    : null
 
   const getHighlightOpacity = (spot: HighlightSpot) => {
     const age = highlightClock - spot.createdAt
@@ -292,10 +431,12 @@ function App() {
             <>
               <span className="account-panel__text">
                 <span className="account-panel__label">
-                  {status === 'loading' ? 'Checking session' : 'Personal board'}
+                  {status === 'loading' ? 'Checking session' : 'Social graph'}
                 </span>
                 <span className="account-panel__meta">
-                  {status === 'unconfigured' ? 'Connect Supabase to enable Google login' : 'Sign in to save your space'}
+                  {status === 'unconfigured'
+                    ? 'Connect Supabase to enable Google login'
+                    : 'Sign in to save your network space'}
                 </span>
               </span>
               <button
@@ -326,8 +467,8 @@ function App() {
 
       <section
         ref={boardRef}
-        className={`board-viewport${isDragging ? ' is-dragging' : ''}`}
-        onMouseDown={startDragging}
+        className={`board-viewport${isDraggingBoard ? ' is-dragging' : ''}`}
+        onMouseDown={startBoardDragging}
         onMouseEnter={(event) => addHighlightSpot(event.clientX, event.clientY, true)}
         onMouseMove={(event) => addHighlightSpot(event.clientX, event.clientY)}
         onMouseLeave={() => {
@@ -335,7 +476,7 @@ function App() {
           setPointerPosition(null)
         }}
         onWheel={moveWithWheel}
-        aria-label="Infinite board canvas"
+        aria-label="Social network graph canvas"
       >
         <div className="board-surface" style={boardStyle} />
         <div className="board-highlights" aria-hidden="true">
@@ -347,9 +488,144 @@ function App() {
             return <span key={spot.id} className="board-highlights__spot" style={spotStyle} />
           })}
         </div>
+
+        <div className="graph-layer" style={graphStyle}>
+          <svg className="graph-connections" aria-hidden="true">
+            <defs>
+              <marker
+                id="network-arrow"
+                viewBox="0 0 10 10"
+                refX="8"
+                refY="5"
+                markerWidth="8"
+                markerHeight="8"
+                orient="auto-start-reverse"
+              >
+                <path d="M 0 0 L 10 5 L 0 10 z" className="graph-arrow-head" />
+              </marker>
+            </defs>
+
+            {edges.map((edge) => {
+              const fromNode = nodesById[edge.from]
+              const toNode = nodesById[edge.to]
+              if (!fromNode || !toNode) return null
+
+              const link = getLinkPath(fromNode, toNode)
+              if (!link) return null
+
+              return (
+                <path
+                  key={edge.id}
+                  className="graph-edge"
+                  d={`M ${link.start.x} ${link.start.y} C ${link.controlA.x} ${link.controlA.y}, ${link.controlB.x} ${link.controlB.y}, ${link.end.x} ${link.end.y}`}
+                  markerEnd="url(#network-arrow)"
+                />
+              )
+            })}
+
+            {previewPath ? (
+              <path
+                className="graph-edge graph-edge--preview"
+                d={`M ${previewPath.start.x} ${previewPath.start.y} C ${previewPath.controlA.x} ${previewPath.controlA.y}, ${previewPath.controlB.x} ${previewPath.controlB.y}, ${previewPath.end.x} ${previewPath.end.y}`}
+              />
+            ) : null}
+          </svg>
+
+          {nodes.map((node) => {
+            const isSelected = node.id === selectedNodeId
+            const isEditing = node.id === editingNodeId
+
+            return (
+              <div
+                key={node.id}
+                className={`graph-node${node.kind === 'root' ? ' graph-node--root' : ''}${isSelected ? ' is-selected' : ''}`}
+                style={{ transform: `translate(${node.x}px, ${node.y}px)` }}
+              >
+                {isEditing ? (
+                  <input
+                    className="graph-node__input"
+                    value={node.label}
+                    autoFocus
+                    onChange={(event) => updateNodeLabel(node.id, event.target.value)}
+                    onBlur={() => setEditingNodeId(null)}
+                    onMouseDown={(event) => event.stopPropagation()}
+                    onClick={(event) => event.stopPropagation()}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    className="graph-node__button"
+                    onMouseDown={(event) => startConnectionDrag(node.id, event)}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      setSelectedNodeId(node.id)
+                    }}
+                    onDoubleClick={(event) => {
+                      event.stopPropagation()
+                      setEditingNodeId(node.id)
+                    }}
+                  >
+                    <span className="graph-node__dot" />
+                    <span className="graph-node__label">{node.label}</span>
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
       </section>
     </main>
   )
+}
+
+function screenToWorld(
+  clientX: number,
+  clientY: number,
+  boardElement: HTMLElement | null,
+  offset: Offset,
+  scale: number,
+) {
+  const viewport = boardElement?.getBoundingClientRect()
+  if (!viewport) return null
+
+  return {
+    x: (clientX - viewport.left - offset.x) / scale,
+    y: (clientY - viewport.top - offset.y) / scale,
+  }
+}
+
+function getLinkPath(fromNode?: GraphNode, toNode?: Offset | null) {
+  if (!fromNode || !toNode) return null
+
+  const dx = toNode.x - fromNode.x
+  const dy = toNode.y - fromNode.y
+  const distance = Math.hypot(dx, dy) || 1
+  const unitX = dx / distance
+  const unitY = dy / distance
+  const curve = Math.min(44, distance * 0.18)
+
+  return {
+    start: {
+      x: fromNode.x + unitX * NODE_RADIUS,
+      y: fromNode.y + unitY * NODE_RADIUS,
+    },
+    end: {
+      x: toNode.x - unitX * NODE_RADIUS,
+      y: toNode.y - unitY * NODE_RADIUS,
+    },
+    controlA: {
+      x: fromNode.x + unitX * (NODE_RADIUS + curve),
+      y: fromNode.y + unitY * (NODE_RADIUS + curve),
+    },
+    controlB: {
+      x: toNode.x - unitX * (NODE_RADIUS + curve),
+      y: toNode.y - unitY * (NODE_RADIUS + curve),
+    },
+  }
+}
+
+function getPreviewPath(fromNode?: GraphNode, pointer?: Offset | null) {
+  return getLinkPath(fromNode, pointer)
 }
 
 export default App

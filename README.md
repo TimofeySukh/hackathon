@@ -1,9 +1,13 @@
 # Hackathon Board
 
-A minimal infinite board built with React, Vite, and TypeScript.
+A minimal social graph board built with React, Vite, and TypeScript.
 
 ## Current Experience
 
+- A single central node as the starting point of the graph
+- Create a new node by dragging a connection out from any existing node
+- Curved directional arrows between connected nodes
+- Compact obsidian-like nodes with labels
 - Infinite canvas-style navigation by dragging with the mouse
 - Infinite canvas-style navigation by scrolling on a trackpad or mouse wheel
 - Zoom in and out with the mouse wheel
@@ -34,9 +38,9 @@ Open the local Vite URL in your browser. Fill in the Supabase values in `.env.lo
 
 ## Product Direction
 
-This version is intentionally narrow. It is a navigable board first, not a whiteboard editor.
+This version is intentionally focused on social graph building rather than generic whiteboarding.
 
-The goal is to create a strong visual and interaction foundation before adding any product-specific objects or workflows.
+The goal is to make relationship mapping feel clean, compact, and pleasant to grow directly from each node.
 
 ## Documentation
 

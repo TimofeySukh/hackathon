@@ -336,6 +336,148 @@ select {
   transition: opacity 80ms linear;
 }
 
+.graph-layer {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+}
+
+.graph-connections {
+  position: absolute;
+  left: -2200px;
+  top: -2200px;
+  width: 4400px;
+  height: 4400px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.graph-edge {
+  fill: none;
+  stroke: rgba(214, 236, 226, 0.24);
+  stroke-width: 1.45;
+  stroke-linecap: round;
+}
+
+.graph-edge--preview {
+  stroke: rgba(138, 255, 214, 0.6);
+  stroke-dasharray: 5 7;
+}
+
+.graph-arrow-head {
+  fill: rgba(214, 236, 226, 0.32);
+}
+
+.theme-light .graph-edge {
+  stroke: rgba(18, 77, 54, 0.16);
+}
+
+.theme-light .graph-edge--preview {
+  stroke: rgba(18, 121, 79, 0.42);
+}
+
+.theme-light .graph-arrow-head {
+  fill: rgba(18, 77, 54, 0.22);
+}
+
+.graph-node {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+}
+
+.graph-node__button,
+.graph-node__input {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-strong);
+}
+
+.graph-node__button {
+  cursor: crosshair;
+}
+
+.graph-node__dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: rgba(226, 255, 244, 0.82);
+  box-shadow: 0 0 10px rgba(138, 255, 214, 0.2);
+}
+
+.theme-light .graph-node__dot {
+  background: rgba(18, 77, 54, 0.72);
+  box-shadow: none;
+}
+
+.graph-node__label {
+  max-width: 116px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(231, 250, 241, 0.9);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.theme-light .graph-node__label {
+  color: rgba(12, 36, 26, 0.86);
+}
+
+.graph-node--root .graph-node__dot {
+  width: 11px;
+  height: 11px;
+  background: #8affd6;
+  box-shadow:
+    0 0 0 3px rgba(138, 255, 214, 0.12),
+    0 0 16px rgba(138, 255, 214, 0.36);
+}
+
+.theme-light .graph-node--root .graph-node__dot {
+  background: #12794f;
+  box-shadow:
+    0 0 0 3px rgba(18, 121, 79, 0.08),
+    0 0 12px rgba(18, 121, 79, 0.18);
+}
+
+.graph-node.is-selected .graph-node__label {
+  color: #f4fff9;
+}
+
+.theme-light .graph-node.is-selected .graph-node__label {
+  color: #0f3626;
+}
+
+.graph-node__input {
+  width: 128px;
+  padding: 6px 10px;
+  border: 1px solid rgba(138, 255, 214, 0.24);
+  border-radius: 999px;
+  background: rgba(7, 28, 20, 0.88);
+  color: var(--text-strong);
+  font-size: 12px;
+  outline: none;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+}
+
+.theme-light .graph-node__input {
+  border-color: rgba(22, 81, 58, 0.16);
+  background: rgba(255, 255, 255, 0.96);
+  color: #0f3626;
+}
+
 @media (max-width: 720px) {
   .app-actions {
     top: 16px;
