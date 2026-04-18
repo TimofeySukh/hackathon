@@ -1941,9 +1941,19 @@ function App() {
 
           <div className="field-group field-group--compact">
             <div className="tag-picker">
+              {!isTagPickerOpen && selectedTagColor && tagDraft.trim() ? (
+                <span
+                  className="tag-picker__selected-chip"
+                  style={{ '--tag-color': selectedTagColor } as TagColorStyle}
+                  aria-hidden="true"
+                >
+                  {tagDraft}
+                </span>
+              ) : null}
               <input
-                className={`field-group__input tag-picker__input${selectedTagColor ? ' is-tagged' : ''}`}
-                style={selectedTagColor ? ({ '--tag-color': selectedTagColor } as TagColorStyle) : undefined}
+                className={`field-group__input tag-picker__input${
+                  !isTagPickerOpen && selectedTagColor && tagDraft.trim() ? ' is-tagged-display' : ''
+                }`}
                 value={tagDraft}
                 onFocus={() => {
                   setIsTagPickerOpen(true)
