@@ -1,11 +1,10 @@
 :root {
-  color-scheme: light;
-  font-family: Inter, system-ui, sans-serif;
+  font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #f3f4f6;
+  color-scheme: dark;
 }
 
 * {
@@ -24,7 +23,218 @@ body {
   overflow: hidden;
 }
 
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
 .app-shell {
+  --dot-size: 1.5px;
+  --dot-gap: 38px;
+  --major-dot-size: 3px;
+  --major-dot-gap: 152px;
+  position: relative;
   width: 100%;
   height: 100%;
+  overflow: hidden;
+  transition:
+    background-color 180ms ease,
+    color 180ms ease;
+}
+
+.theme-dark {
+  --app-bg: #020806;
+  --panel-bg: rgba(5, 22, 16, 0.74);
+  --panel-border: rgba(43, 170, 131, 0.32);
+  --panel-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+  --text-strong: #e7faf1;
+  --text-soft: rgba(196, 234, 218, 0.76);
+  --eyebrow: #68f3c5;
+  --toggle-bg: rgba(7, 28, 20, 0.82);
+  --toggle-border: rgba(64, 191, 148, 0.38);
+  --toggle-thumb: linear-gradient(135deg, #8affd6 0%, #39c795 100%);
+  --grid-dot: rgba(94, 226, 180, 0.14);
+  --grid-dot-major: rgba(115, 255, 201, 0.3);
+  --grid-glow-a: rgba(12, 67, 46, 0.22);
+  --grid-glow-b: rgba(10, 24, 18, 0);
+  background:
+    radial-gradient(circle at top left, rgba(28, 85, 63, 0.22), transparent 34%),
+    radial-gradient(circle at right center, rgba(120, 104, 27, 0.08), transparent 26%),
+    var(--app-bg);
+  color: var(--text-strong);
+}
+
+.theme-light {
+  --app-bg: #f4fbf7;
+  --panel-bg: rgba(249, 255, 252, 0.88);
+  --panel-border: rgba(46, 133, 98, 0.18);
+  --panel-shadow: 0 24px 80px rgba(33, 77, 57, 0.12);
+  --text-strong: #0c241a;
+  --text-soft: rgba(27, 68, 50, 0.72);
+  --eyebrow: #1b9f72;
+  --toggle-bg: rgba(255, 255, 255, 0.86);
+  --toggle-border: rgba(33, 112, 80, 0.18);
+  --toggle-thumb: linear-gradient(135deg, #eefbf4 0%, #c8f1dd 100%);
+  --grid-dot: rgba(24, 79, 58, 0.12);
+  --grid-dot-major: rgba(24, 101, 70, 0.26);
+  --grid-glow-a: rgba(69, 181, 135, 0.1);
+  --grid-glow-b: rgba(255, 255, 255, 0);
+  background:
+    radial-gradient(circle at top left, rgba(132, 230, 190, 0.2), transparent 36%),
+    radial-gradient(circle at right center, rgba(236, 248, 229, 0.8), transparent 30%),
+    var(--app-bg);
+  color: var(--text-strong);
+}
+
+.theme-toggle {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.theme-toggle__track {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 120px;
+  padding: 8px 10px 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--toggle-border);
+  background: var(--toggle-bg);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(14px);
+}
+
+.theme-toggle__label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.theme-toggle__thumb {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--toggle-thumb);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.35),
+    0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
+.board-viewport {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  user-select: none;
+}
+
+.board-viewport.is-dragging {
+  cursor: grabbing;
+}
+
+.board-surface {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle, var(--grid-dot) 0 var(--dot-size), transparent calc(var(--dot-size) + 0.2px)),
+    radial-gradient(circle, var(--grid-dot-major) 0 var(--major-dot-size), transparent calc(var(--major-dot-size) + 0.2px)),
+    radial-gradient(circle at center, var(--grid-glow-a) 0%, var(--grid-glow-b) 60%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0));
+  background-size:
+    var(--dot-gap) var(--dot-gap),
+    var(--major-dot-gap) var(--major-dot-gap),
+    100% 100%,
+    100% 100%;
+}
+
+.board-surface::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 20%),
+    radial-gradient(circle at center, transparent 56%, rgba(0, 0, 0, 0.08) 100%);
+  pointer-events: none;
+}
+
+.board-overlay {
+  position: absolute;
+  left: clamp(16px, 4vw, 48px);
+  bottom: clamp(16px, 4vw, 48px);
+  z-index: 2;
+  max-width: min(520px, calc(100vw - 32px));
+  padding: 24px 24px 22px;
+  border: 1px solid var(--panel-border);
+  border-radius: 28px;
+  background: var(--panel-bg);
+  box-shadow: var(--panel-shadow);
+  backdrop-filter: blur(18px);
+}
+
+.board-overlay__eyebrow {
+  margin: 0 0 10px;
+  color: var(--eyebrow);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+.board-overlay h1 {
+  margin: 0;
+  font-size: clamp(32px, 4vw, 52px);
+  line-height: 0.95;
+  letter-spacing: -0.06em;
+}
+
+.board-overlay__text {
+  margin: 16px 0 0;
+  max-width: 38ch;
+  color: var(--text-soft);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+@media (max-width: 720px) {
+  .theme-toggle {
+    top: 16px;
+    right: 16px;
+  }
+
+  .theme-toggle__track {
+    min-width: 108px;
+    gap: 10px;
+    padding: 7px 8px 7px 12px;
+  }
+
+  .theme-toggle__thumb {
+    width: 26px;
+    height: 26px;
+  }
+
+  .board-overlay {
+    right: 16px;
+    left: 16px;
+    bottom: 16px;
+    padding: 20px;
+    border-radius: 24px;
+  }
+
+  .board-overlay__text {
+    font-size: 14px;
+  }
 }

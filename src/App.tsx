@@ -1,10 +1,105 @@
-import { Tldraw } from 'tldraw'
-import 'tldraw/tldraw.css'
+import { useEffect, useRef, useState } from 'react'
+import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
+
+type Theme = 'dark' | 'light'
+
+type Offset = {
+  x: number
+  y: number
+}
+
+const THEME_STORAGE_KEY = 'hackathon-theme'
 
 function App() {
+  const [theme, setTheme] = useState<Theme>(() => {
+    const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY)
+    return savedTheme === 'light' ? 'light' : 'dark'
+  })
+  const [offset, setOffset] = useState<Offset>({ x: 0, y: 0 })
+  const [isDragging, setIsDragging] = useState(false)
+
+  const dragStateRef = useRef({
+    startX: 0,
+    startY: 0,
+    originX: 0,
+    originY: 0,
+    active: false,
+  })
+
+  useEffect(() => {
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme)
+  }, [theme])
+
+  useEffect(() => {
+    const handleMouseMove = (event: MouseEvent) => {
+      if (!dragStateRef.current.active) return
+
+      const nextX = dragStateRef.current.originX + event.clientX - dragStateRef.current.startX
+      const nextY = dragStateRef.current.originY + event.clientY - dragStateRef.current.startY
+
+      setOffset({ x: nextX, y: nextY })
+    }
+
+    const handleMouseUp = () => {
+      dragStateRef.current.active = false
+      setIsDragging(false)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [])
+
+  const startDragging = (event: ReactMouseEvent<HTMLElement>) => {
+    if (event.button !== 0) return
+
+    dragStateRef.current = {
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: offset.x,
+      originY: offset.y,
+      active: true,
+    }
+
+    setIsDragging(true)
+  }
+
+  const boardStyle = {
+    backgroundPosition: `${offset.x}px ${offset.y}px, ${offset.x}px ${offset.y}px, center, center`,
+  } satisfies CSSProperties
+
   return (
-    <main className="app-shell">
-      <Tldraw persistenceKey="hackathon-board" />
+    <main className={`app-shell theme-${theme}`}>
+      <button
+        type="button"
+        className="theme-toggle"
+        onClick={() => setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))}
+        aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+      >
+        <span className="theme-toggle__track">
+          <span className="theme-toggle__label">{theme === 'dark' ? 'Dark' : 'Light'}</span>
+          <span className="theme-toggle__thumb" />
+        </span>
+      </button>
+
+      <section
+        className={`board-viewport${isDragging ? ' is-dragging' : ''}`}
+        onMouseDown={startDragging}
+        aria-label="Infinite board canvas"
+      >
+        <div className="board-surface" style={boardStyle} />
+        <div className="board-overlay">
+          <p className="board-overlay__eyebrow">Infinite canvas</p>
+          <h1>Drag anywhere to move across the board.</h1>
+          <p className="board-overlay__text">
+            This version stays intentionally clean: no drawing tools, no panels, only space.
+          </p>
+        </div>
+      </section>
     </main>
   )
 }

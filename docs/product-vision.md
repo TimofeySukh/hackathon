@@ -2,51 +2,76 @@
 
 ## Current Product Idea
 
-The project starts as a clean, fast, and easy-to-navigate infinite whiteboard.
+The product starts as a clean infinite board that focuses on movement, space, and atmosphere.
 
-The first version should feel lightweight:
+This first version is intentionally limited:
 
-- no unnecessary onboarding
-- no heavy workspace complexity
-- no extra product surface before it is needed
+- no drawing tools
+- no widgets
+- no sidebars
+- no collaboration features
+- no backend
 
-The whiteboard itself is the product core.
+The core value right now is simple navigation across a large visual surface.
+
+## Interaction Goal
+
+The board should feel calm and frictionless.
+
+Users should be able to open the page and immediately:
+
+1. drag the board with the mouse
+2. understand the available space from the point grid
+3. switch between dark and light visual modes
+
+## Visual Goal
+
+The dark theme should feel deep, green-black, and slightly futuristic, similar to the provided reference.
+
+The light theme should keep the same product identity while becoming brighter, cleaner, and easier to use in daylight conditions.
+
+The board background should include visible point markers at regular intervals, similar to spatial references on tools like Miro.
 
 ## Why This Direction
 
-The goal is to begin with a simple board that is immediately useful and can later grow into a more specific product.
+The project needs a strong custom foundation instead of a generic third-party canvas product.
 
-`tldraw` is a good fit because it already provides a strong infinite canvas foundation and supports deeper customization later.
+Building the board ourselves keeps the interaction model simple and gives us complete control over:
+
+- movement behavior
+- theme design
+- grid density and styling
+- future product objects and interactions
 
 ## MVP Priorities
 
-1. Reliable infinite canvas navigation
-2. Fast startup and responsive interaction
-3. Clean default editing experience
-4. A codebase that is easy to extend
+1. Smooth drag-based navigation
+2. A distinctive visual identity
+3. Minimal interface chrome
+4. A codebase that is easy to extend with custom board objects later
 
 ## What We Intentionally Avoid Right Now
 
+- drawing tools
+- sticky notes
+- comments
+- multiplayer
 - authentication
-- teams and permissions
+- persistence
 - backend storage
-- custom domain objects
-- dashboards and side panels
-- analytics
-- billing
+- templates
 
 ## Possible Future Product Directions
 
-- Multiplayer collaboration
-- Custom shapes for domain-specific workflows
-- Smart templates
-- Structured canvases for planning, mapping, or diagramming
-- AI-assisted board actions
-- Board sharing and publishing
-- Version history and snapshots
+- Custom cards or blocks placed on the board
+- Project nodes and connectors
+- Spatial planning views
+- Board persistence and saved camera positions
+- Multiplayer presence
+- Domain-specific interaction tools
 
 ## Product Principle
 
-Every new feature should improve the board experience directly or clearly support the future product direction.
+Each new addition should protect the feeling of a clean board.
 
-If a feature does not make the board more useful, simpler, faster, or more extensible, it should wait.
+If a feature adds clutter before it adds value, it should not be introduced yet.

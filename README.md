@@ -1,12 +1,15 @@
 # Hackathon Board
 
-A minimal infinite canvas board built with React, Vite, TypeScript, and `tldraw`.
+A minimal infinite board built with React, Vite, and TypeScript.
 
-## Goals
+## Current Experience
 
-- Keep the first version as simple as possible.
-- Start with a useful board, not a complex product shell.
-- Use a foundation that can grow into a custom product later.
+- Infinite canvas-style navigation by dragging with the mouse
+- No drawing tools or side panels
+- Theme switcher in the top-right corner
+- Dark green-black theme inspired by the provided reference
+- Light theme designed to match the same visual language
+- High-contrast point grid across the board
 
 ## Local Development
 
@@ -15,7 +18,7 @@ npm install
 npm run dev
 ```
 
-The app starts a local Vite server. Open the printed local URL in your browser.
+Open the local Vite URL in your browser.
 
 ## Available Scripts
 
@@ -24,11 +27,11 @@ The app starts a local Vite server. Open the printed local URL in your browser.
 - `npm run preview` previews the production build locally.
 - `npm run lint` runs ESLint.
 
-## Current Scope
+## Product Direction
 
-- Full-screen infinite canvas
-- Built-in `tldraw` tools and UI
-- Local browser persistence via `persistenceKey`
+This version is intentionally narrow. It is a navigable board first, not a whiteboard editor.
+
+The goal is to create a strong visual and interaction foundation before adding any product-specific objects or workflows.
 
 ## Documentation
 
