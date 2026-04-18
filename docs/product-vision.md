@@ -2,7 +2,7 @@
 
 ## Current Product Idea
 
-The product starts as a clean infinite board that focuses on movement, space, and atmosphere.
+The product starts as a clean infinite board for social networking graphs.
 
 This first version is intentionally limited:
 
@@ -12,7 +12,7 @@ This first version is intentionally limited:
 - no collaboration features
 - no board content persistence
 
-The core value right now is simple navigation across a large visual surface.
+The core value right now is building and exploring relationship maps on a large visual surface.
 
 ## Interaction Goal
 
@@ -20,11 +20,12 @@ The board should feel calm and frictionless.
 
 Users should be able to open the page and immediately:
 
-1. drag the board with the mouse
-2. move across the board with a trackpad or mouse wheel
-3. understand the available space from the point grid
-4. switch between dark and light visual modes
-5. optionally sign in with Google to claim a personal board space
+1. start from a central node
+2. drag out a connection from any node
+3. release the cursor to create a new connected node
+4. move across the board with a trackpad, mouse drag, or mouse wheel
+5. switch between dark and light visual modes
+6. optionally sign in with Google to claim a personal board space
 
 ## Visual Goal
 
@@ -33,6 +34,8 @@ The dark theme should feel deep, green-black, and slightly futuristic, similar t
 The light theme should keep the same product identity while becoming brighter, cleaner, and easier to use in daylight conditions.
 
 The board background should include visible point markers at regular intervals, similar to spatial references on tools like Miro.
+
+The graph layer should feel compact and readable, with node growth happening through a direct drag gesture rather than extra UI chrome.
 
 ## Why This Direction
 
@@ -43,14 +46,15 @@ Building the board ourselves keeps the interaction model simple and gives us com
 - movement behavior
 - theme design
 - grid density and styling
+- graph density and link shape
 - future product objects and interactions
 
 ## MVP Priorities
 
 1. Smooth drag-based navigation
-2. A distinctive visual identity
-3. Minimal interface chrome
-4. A codebase that is easy to extend with custom board objects later
+2. Fast drag-to-create node growth
+3. A distinctive visual identity
+4. Minimal interface chrome
 5. A lightweight account foundation for personal board ownership
 
 ## What We Intentionally Avoid Right Now
@@ -64,15 +68,14 @@ Building the board ourselves keeps the interaction model simple and gives us com
 
 ## Possible Future Product Directions
 
-- Custom cards or blocks placed on the board
-- Project nodes and connectors
-- Spatial planning views
+- Contact cards with richer metadata
+- Relationship types and strengths
 - Board persistence and saved camera positions
 - Multiplayer presence
-- Domain-specific interaction tools
+- Domain-specific networking workflows
 
 ## Product Principle
 
-Each new addition should protect the feeling of a clean board.
+Each new addition should protect the feeling of a clean and readable relationship map.
 
 If a feature adds clutter before it adds value, it should not be introduced yet.

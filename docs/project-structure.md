@@ -53,6 +53,8 @@ Contains the board experience:
 - mouse drag navigation state
 - board zoom state
 - motion-triggered point highlight state
+- social graph node and edge state
+- drag-to-create node connections
 - theme toggle
 - infinite board surface positioning
 
@@ -74,7 +76,8 @@ Contains the complete visual system for:
 - account controls
 - very dense point-grid background
 - compact motion-triggered point highlight styling with directional tails for fast cursor movement
-- board overlay styling
+- compact graph node styling
+- graph edge styling and preview connection styling
 - responsive layout behavior
 
 ## Current Technical Shape
@@ -100,6 +103,9 @@ It currently supports:
 - cursor-centered zoom with the mouse wheel
 - visual theme switching
 - compact motion-triggered point highlighting during mouse movement, drag, wheel pan, and zoom
+- social graph nodes connected by arrows
+- drag-to-create node growth from any existing node
+- in-place node renaming
 - grid movement through background offset changes
 
 The visual board is simulated by shifting layered CSS backgrounds based on the current camera offset.
