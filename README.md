@@ -29,6 +29,16 @@ npm run dev
 
 Open the local Vite URL in your browser. Fill in the Supabase values in `.env.local` to enable Google login.
 
+Recommended local env format:
+
+```bash
+VITE_SUPABASE_URL=https://lycfoukfoesobeuumuad.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_l_x_y5rxdhL8Sd1ZE3QXag_lOCtr_M9
+VITE_SUPABASE_ANON_KEY=
+```
+
+`VITE_SUPABASE_ANON_KEY` can stay empty when the publishable key is used.
+
 ## Available Scripts
 
 - `npm run dev` starts the development server.

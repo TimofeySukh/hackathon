@@ -33,7 +33,17 @@ cp .env.example .env.local
 Required Vite variables:
 
 - `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
+- `VITE_SUPABASE_PUBLISHABLE_KEY` or `VITE_SUPABASE_ANON_KEY`
+
+Recommended teammate setup:
+
+```bash
+VITE_SUPABASE_URL=https://lycfoukfoesobeuumuad.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_l_x_y5rxdhL8Sd1ZE3QXag_lOCtr_M9
+VITE_SUPABASE_ANON_KEY=
+```
+
+If `VITE_SUPABASE_PUBLISHABLE_KEY` is present, `VITE_SUPABASE_ANON_KEY` may stay empty.
 
 Start the development server:
 
@@ -60,9 +70,25 @@ For hosted dashboard workflows, paste and run the migration SQL in the Supabase 
 Configure Google as an auth provider in Supabase Auth. Add redirect URLs for each app URL used by the team, including:
 
 - `http://localhost:5173`
+- `http://localhost:5174`
+- `http://localhost:5175`
+- `http://127.0.0.1:5173`
+- `http://127.0.0.1:5174`
+- `http://127.0.0.1:5175`
 - the deployed production URL
 
 The app redirects Google OAuth back to `window.location.origin`, so each origin must be allowlisted in Supabase.
+
+Google Cloud OAuth setup:
+
+- Add the same localhost and `127.0.0.1` origins to Authorized JavaScript origins.
+- Keep the Supabase callback as the Authorized redirect URI:
+
+```text
+https://lycfoukfoesobeuumuad.supabase.co/auth/v1/callback
+```
+
+If the Google OAuth app is still in Testing mode, add each teammate email to Test users in the Google Cloud OAuth consent screen.
 
 ## Dependency Workflow
 

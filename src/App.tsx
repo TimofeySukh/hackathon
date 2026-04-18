@@ -539,7 +539,7 @@ function App() {
               <div
                 key={node.id}
                 className={`graph-node${node.kind === 'root' ? ' graph-node--root' : ''}${isSelected ? ' is-selected' : ''}`}
-                style={{ transform: `translate(${node.x}px, ${node.y}px)` }}
+                style={{ left: `${node.x}px`, top: `${node.y}px` }}
               >
                 {isEditing ? (
                   <input
