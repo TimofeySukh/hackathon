@@ -106,7 +106,7 @@ input[type='search']::-webkit-search-results-decoration {
 .top-bar__right {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: stretch;
   justify-content: flex-end;
   gap: 12px;
 }
@@ -174,7 +174,7 @@ input[type='search']::-webkit-search-results-decoration {
 
 .tags-menu__toggle,
 .tags-menu__new {
-  min-height: var(--top-bar-control-height);
+  height: var(--top-bar-control-height);
   padding: 14px 20px;
   border: 1px solid var(--button-border);
   border-radius: 22px;
@@ -371,6 +371,7 @@ input[type='search']::-webkit-search-results-decoration {
   position: relative;
   flex: 0 1 300px;
   width: min(300px, 100%);
+  height: var(--top-bar-control-height);
   min-width: min(220px, 100%);
   color: var(--panel-text);
 }
@@ -378,7 +379,7 @@ input[type='search']::-webkit-search-results-decoration {
 .search-panel__bar {
   display: flex;
   align-items: center;
-  min-height: var(--top-bar-control-height);
+  height: 100%;
   padding: 8px 10px;
   border: 1px solid var(--panel-border);
   border-radius: 22px;
@@ -440,7 +441,7 @@ input[type='search']::-webkit-search-results-decoration {
 
 .search-panel__input {
   width: 100%;
-  min-height: 44px;
+  height: 100%;
   min-width: 0;
   padding: 10px 14px;
   border: 0;
@@ -523,7 +524,7 @@ input[type='search']::-webkit-search-results-decoration {
   flex: 1 1 320px;
   width: min(100%, 520px);
   max-width: 520px;
-  min-height: var(--top-bar-control-height);
+  height: var(--top-bar-control-height);
   align-items: center;
   gap: 10px;
   padding: 12px 14px;
@@ -626,7 +627,7 @@ input[type='search']::-webkit-search-results-decoration {
   justify-content: space-between;
   gap: 12px;
   min-width: 120px;
-  min-height: var(--top-bar-control-height);
+  height: var(--top-bar-control-height);
   padding: 12px 14px 12px 18px;
   border-radius: 999px;
   border: 1px solid var(--toggle-border);
@@ -1414,6 +1415,7 @@ input[type='search']::-webkit-search-results-decoration {
 
   .top-bar__right {
     justify-content: stretch;
+    align-items: stretch;
     gap: 8px;
   }
 
