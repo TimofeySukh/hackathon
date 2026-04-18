@@ -1013,6 +1013,15 @@ function App() {
     void handleAiSearch()
   }
 
+  function closeSearchPanel() {
+    setSearchQuery('')
+    setAiSearchQuery('')
+    setAiSearchResults([])
+    setAiSearchStatus('idle')
+    setAiSearchError(null)
+    setIsSearchOpen(false)
+  }
+
   function updateNoteDraft(noteId: string, field: keyof NoteDraft, value: string) {
     setNoteDrafts((currentDrafts) => ({
       ...currentDrafts,
@@ -1205,36 +1214,8 @@ function App() {
 
         <div className="top-bar__right">
           <div className={`search-panel${isSearchOpen ? ' is-open' : ''}`}>
-          <div className="search-panel__header">
-            <button
-              type="button"
-              className="search-panel__toggle"
-              onClick={() => {
-                setIsSearchOpen((currentValue) => !currentValue)
-              }}
-              aria-expanded={isSearchOpen}
-              aria-controls="people-search-panel"
-            >
-              Search people
-            </button>
-            {isSearchOpen ? (
-              <button
-                type="button"
-                className="search-panel__clear"
-                onClick={() => {
-                  setSearchQuery('')
-                  setIsSearchOpen(false)
-                }}
-              >
-                Close
-              </button>
-            ) : null}
-          </div>
-
-          {isSearchOpen ? (
-            <div id="people-search-panel" className="search-panel__body">
-              <label className="search-panel__field">
-                <span className="search-panel__label">Find by name, tag, or note</span>
+            <div className="search-panel__bar">
+              {isSearchOpen ? (
                 <input
                   ref={searchInputRef}
                   className="search-panel__input"
@@ -1245,9 +1226,37 @@ function App() {
                     setAiSearchError(null)
                   }}
                   onKeyDown={handleSearchKeyDown}
-                  placeholder="Describe who you want to find, then press Enter"
+                  placeholder="Search people"
+                  aria-label="Search people"
                 />
-              </label>
+              ) : (
+                <button
+                  type="button"
+                  className="search-panel__trigger"
+                  onClick={() => {
+                    setIsSearchOpen(true)
+                  }}
+                  aria-expanded={isSearchOpen}
+                  aria-controls="people-search-panel"
+                >
+                  Search people
+                </button>
+              )}
+
+              <button
+                type="button"
+                className={`search-panel__close${isSearchOpen ? ' is-visible' : ''}`}
+                onClick={() => {
+                  closeSearchPanel()
+                }}
+                aria-label="Close search"
+              >
+                ×
+              </button>
+            </div>
+
+            {isSearchOpen ? (
+            <div id="people-search-panel" className="search-panel__dropdown">
               {isGraphReady ? (
                 <div className="search-panel__hint">
                   <span>{aiSearchStatus === 'loading' ? 'Asking AI...' : 'Press Enter for AI search.'}</span>
@@ -1300,7 +1309,7 @@ function App() {
                 </p>
               )}
             </div>
-          ) : null}
+            ) : null}
           </div>
 
           <div className="account-panel" aria-live="polite">
