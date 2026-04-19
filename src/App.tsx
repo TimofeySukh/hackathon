@@ -301,6 +301,10 @@ function App() {
     () => new Set(tagMenuItems.filter((tag) => !hiddenTagIds[tag.id]).map((tag) => tag.id)),
     [hiddenTagIds, tagMenuItems],
   )
+  const areAllTagsVisible = useMemo(
+    () => tagMenuItems.every((tag) => !hiddenTagIds[tag.id]),
+    [hiddenTagIds, tagMenuItems],
+  )
   const visibleBoardNodes = useMemo(
     () =>
       boardNodes.filter((node) => {
@@ -1292,6 +1296,15 @@ function App() {
     })
   }
 
+  function toggleAllTagsInMenu() {
+    if (areAllTagsVisible) {
+      hideAllTagsInMenu()
+      return
+    }
+
+    showAllTagsInMenu()
+  }
+
   const handleDeleteSelectedNode = useCallback(async (nodeId: string) => {
     await deletePerson(nodeId)
     setInspectorNodeId((currentNodeId) => (currentNodeId === nodeId ? null : currentNodeId))
@@ -1615,16 +1628,9 @@ function App() {
                   <button
                     type="button"
                     className="tags-menu__action-button"
-                    onClick={showAllTagsInMenu}
+                    onClick={toggleAllTagsInMenu}
                   >
-                    Select all
-                  </button>
-                  <button
-                    type="button"
-                    className="tags-menu__action-button"
-                    onClick={hideAllTagsInMenu}
-                  >
-                    Clear all
+                    {areAllTagsVisible ? 'Clear all' : 'Select all'}
                   </button>
                 </div>
 
