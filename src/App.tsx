@@ -766,12 +766,13 @@ function App() {
     if (!isTagPickerOpen) return
 
     const frameId = window.requestAnimationFrame(() => {
+      if (nameTagRange) return
       tagSearchInputRef.current?.focus()
       tagSearchInputRef.current?.select()
     })
 
     return () => window.cancelAnimationFrame(frameId)
-  }, [isTagPickerOpen])
+  }, [isTagPickerOpen, nameTagRange])
 
   const zoomAtClientPoint = useCallback(
     (clientX: number, clientY: number, nextScale: number) => {
@@ -2131,6 +2132,35 @@ function App() {
               )
             }}
             onKeyDown={(event) => {
+              if (isTagPickerOpen && nameTagRange) {
+                if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                  event.preventDefault()
+                  setActiveTagOptionIndex((currentIndex) => {
+                    if (tagPickerOptions.length === 0) return 0
+
+                    const direction = event.key === 'ArrowDown' ? 1 : -1
+                    return (currentIndex + direction + tagPickerOptions.length) % tagPickerOptions.length
+                  })
+                  return
+                }
+
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  const activeOption =
+                    tagPickerOptions[Math.min(activeTagOptionIndex, tagPickerOptions.length - 1)]
+                  if (activeOption) {
+                    chooseTagPickerOption(activeOption)
+                  }
+                  return
+                }
+
+                if (event.key === 'Escape') {
+                  event.preventDefault()
+                  closeTagPicker()
+                  return
+                }
+              }
+
               if (event.key === 'Enter') {
                 event.preventDefault()
                 tagTriggerRef.current?.focus()
