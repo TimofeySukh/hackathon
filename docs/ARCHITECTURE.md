@@ -29,7 +29,8 @@ The backend boundary remains intentionally narrow: Supabase Auth provides identi
 - `src/lib/useBoardGraph.ts` owns board graph loading, frontend mutation state, and debounced AI note refresh scheduling.
 - `src/lib/graphStorage.ts` owns Supabase CRUD for graph data, `person_ai_notes`, and Edge Function invocation.
 - `src/lib/userWorkspace.ts` upserts the user profile and ensures a single personal board plus root node.
-- `mcp/server.mjs` exposes repo docs as MCP resources and the persisted graph model as MCP tools and dynamic resources.
+- `mcp/server.mjs` defines the MCP resources and tools plus the stdio entrypoint.
+- `mcp/http-server.mjs` exposes the same MCP surface over LAN-friendly Streamable HTTP.
 - `supabase/functions/sync-person-ai-note/index.ts` authenticates the caller, loads person context, calls n8n, and upserts `person_ai_notes`.
 - `supabase/functions/search-people-ai/index.ts` authenticates the caller, builds candidate context, calls n8n, and returns ranked people.
 - `src/index.css` contains the full visual system.

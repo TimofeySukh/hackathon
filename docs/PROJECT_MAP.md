@@ -52,9 +52,10 @@ Completed tasks can remain listed here when they explain repository history. Liv
 - `docs/product-vision.md`: product direction and scope.
 - `docs/project-structure.md`: file-by-file project structure notes.
 - `README.md`: top-level overview and local development commands.
-- `.env.mcp.example`: local-only MCP environment template for service-role access.
+- `.env.mcp.example`: local MCP environment template for service-role access plus optional HTTP host, port, and host allowlist settings.
 - `.mcp.json`: project MCP configuration for the shared `n8n-mcp` HTTP server and the local Hackathon board stdio server.
-- `mcp/server.mjs`: local MCP server that exposes project docs and board graph tooling.
+- `mcp/server.mjs`: local MCP stdio entrypoint plus shared server factory for docs and board graph tooling.
+- `mcp/http-server.mjs`: LAN-accessible Streamable HTTP entrypoint for the local Hackathon MCP server.
 - `src/main.tsx`: React entry point.
 - `src/App.tsx`: current board behavior.
 - `src/lib/supabase.ts`: browser Supabase client configuration.

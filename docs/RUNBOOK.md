@@ -44,6 +44,7 @@ Project MCP configuration lives in `.mcp.json`. The repository now includes:
 
 - the shared `n8n-mcp` HTTP server configuration for `https://velizard.app.n8n.cloud/mcp-server/http`
 - the local `hackathon-board` stdio server in `mcp/server.mjs`
+- the local `hackathon-board` Streamable HTTP server in `mcp/http-server.mjs`
 
 If you want the local MCP server to read and mutate live board data, create a separate MCP env file:
 
@@ -58,6 +59,9 @@ Required MCP variable:
 Optional MCP variable:
 
 - `HACKATHON_MCP_SUPABASE_URL`
+- `HACKATHON_MCP_HTTP_HOST`
+- `HACKATHON_MCP_HTTP_PORT`
+- `HACKATHON_MCP_ALLOWED_HOSTS`
 
 If `HACKATHON_MCP_SUPABASE_URL` is missing, the MCP server falls back to `VITE_SUPABASE_URL` from `.env.local`.
 Without a service-role key, the local MCP server still exposes project documentation resources but data tools return a setup error.
@@ -100,6 +104,20 @@ Start the local project MCP server manually when you want to test it outside the
 ```bash
 npm run mcp:start
 ```
+
+Start the LAN-accessible MCP server when another device or agent should connect over the network:
+
+```bash
+npm run mcp:start:http
+```
+
+The default MCP HTTP endpoint is:
+
+```text
+http://<host-ip>:3334/mcp
+```
+
+The HTTP server binds to `0.0.0.0` by default. Set `HACKATHON_MCP_ALLOWED_HOSTS` to a comma-separated allowlist when you want host-header protection on a shared network.
 
 Vite listens on all network interfaces in this repository, so it prints both a local URL and a network URL in the terminal. Open either URL in a browser.
 
@@ -149,6 +167,7 @@ Teammate quick-start:
 
 5. Open the URL printed by Vite.
 6. Optional for MCP data tools: create `.env.mcp.local` from `.env.mcp.example` and add the service-role key.
+7. Optional for LAN MCP access: start `npm run mcp:start:http` and use the host machine IP with port `3334`.
 
 ## Supabase Setup
 

@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "mcp:start": "node ./mcp/server.mjs",
+    "mcp:start:http": "node ./mcp/http-server.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
