@@ -22,7 +22,10 @@ A persisted social graph board built with React, Vite, and TypeScript.
 - Compact top bar with a rounded search field plus circular tags, account, and theme controls that close other overlays when opened
 - The selected inspector tag keeps a visible color accent even when the picker is closed
 - A login popup appears when signed-out users try to edit the board
-- Minimal selected-person inspector with a large name field, a compact tag picker with inline tag color editing, and auto-saving notes
+- Minimal selected-person inspector with a Notion-like large name field, a single-tag chip flow, and keyboard-first note capture
+- Typing `#` inside the name field opens tag selection and removes the `#tag` token from the saved name after applying the tag
+- New notes are captured in one textarea and saved with `Cmd/Ctrl + Enter`, using the first line as the rendered title
+- Newly created people open their inspector automatically
 - Single-click a person to open that inspector directly on the board
 - Opening the inspector pans the board enough to keep it visible and opens it at a consistent size before later zoom changes affect it
 - Click the widened connection-line target to delete it from the inline menu or with Backspace

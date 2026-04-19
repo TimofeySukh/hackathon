@@ -127,6 +127,7 @@ It currently supports:
 - continued trackpad panning over the inspector when the gesture starts on the board
 - connection line selection with a widened hit target, inline deletion, and Backspace deletion
 - a compact top bar with a capped-width search field, circular tags/account/theme controls, and exclusive overlay behavior
+- a keyboard-first inspector that treats `#tag` in the name field as a tag command and uses one capture textarea for new notes
 - local people search while typing plus natural-language AI search on Enter
 - drag repositioning for non-root nodes
 - persisted node renaming

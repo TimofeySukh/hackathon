@@ -51,6 +51,11 @@ type NoteDraft = {
   body: string
 }
 
+type TextRange = {
+  start: number
+  end: number
+}
+
 type SearchResult = {
   node: PersonNode
   score: number
@@ -208,7 +213,7 @@ function App() {
     loadTagColorDrafts(),
   )
   const [tagNameDrafts, setTagNameDrafts] = useState<Record<string, string>>({})
-  const [newNoteDraft, setNewNoteDraft] = useState<NoteDraft>({ title: '', body: '' })
+  const [newNoteText, setNewNoteText] = useState('')
   const [noteDrafts, setNoteDrafts] = useState<Record<string, NoteDraft>>({})
   const [collapsedNotes, setCollapsedNotes] = useState<Record<string, boolean>>({})
   const [highlightSpots, setHighlightSpots] = useState<HighlightSpot[]>([])
@@ -217,6 +222,7 @@ function App() {
   const [isDraggingBoard, setIsDraggingBoard] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [nameTagRange, setNameTagRange] = useState<TextRange | null>(null)
   const [aiSearchQuery, setAiSearchQuery] = useState('')
   const [aiSearchResults, setAiSearchResults] = useState<SearchResult[]>([])
   const [aiSearchStatus, setAiSearchStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
@@ -232,6 +238,10 @@ function App() {
   const accountPanelRef = useRef<HTMLDivElement | null>(null)
   const inspectorPanelRef = useRef<HTMLElement | null>(null)
   const zoomIndicatorRef = useRef<HTMLDivElement | null>(null)
+  const nameInputRef = useRef<HTMLInputElement | null>(null)
+  const tagTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const tagSearchInputRef = useRef<HTMLInputElement | null>(null)
+  const newNoteTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const tagPickerMenuRef = useRef<HTMLDivElement | null>(null)
   const tagPickerOptionRefs = useRef<Array<HTMLDivElement | null>>([])
@@ -705,6 +715,34 @@ function App() {
     return () => window.cancelAnimationFrame(frameId)
   }, [applyViewport, inspectorNode, keepInspectorInView])
 
+  useEffect(() => {
+    if (!inspectorNode) return undefined
+
+    const frameId = window.requestAnimationFrame(() => {
+      if (!inspectorNode.name.trim()) {
+        nameInputRef.current?.focus()
+        nameInputRef.current?.select()
+        return
+      }
+
+      newNoteTextareaRef.current?.focus()
+      autoResizeTextarea(newNoteTextareaRef.current)
+    })
+
+    return () => window.cancelAnimationFrame(frameId)
+  }, [inspectorNode])
+
+  useEffect(() => {
+    if (!isTagPickerOpen) return
+
+    const frameId = window.requestAnimationFrame(() => {
+      tagSearchInputRef.current?.focus()
+      tagSearchInputRef.current?.select()
+    })
+
+    return () => window.cancelAnimationFrame(frameId)
+  }, [isTagPickerOpen])
+
   const zoomAtClientPoint = useCallback(
     (clientX: number, clientY: number, nextScale: number) => {
       const viewport = boardRef.current
@@ -733,6 +771,19 @@ function App() {
     },
     [queueViewportUpdate],
   )
+
+  const openInspectorForNode = useCallback((node: PersonNode) => {
+    inspectorOpenScaleRef.current = viewportRef.current.scale
+    setInspectorNodeId(node.id)
+    setSelectedNodeId(node.id)
+    setSelectedConnectionId(null)
+    setConnectionMenuPosition(null)
+    setNameDraft(node.name)
+    setTagDraft('')
+    setNameTagRange(null)
+    setNewNoteText('')
+    closeTransientUi()
+  }, [closeTransientUi])
 
   const finishConnectionDrag = useCallback(
     async (clientX: number, clientY: number) => {
@@ -777,13 +828,12 @@ function App() {
           y: connectionDrag.worldY,
         })
         await createConnection(connectionDrag.fromId, createdNode.id)
-        setSelectedNodeId(createdNode.id)
-        setInspectorNodeId(null)
+        openInspectorForNode(createdNode)
       } finally {
         setConnectionDrag(null)
       }
     },
-    [boardNodes, connectionDrag, createConnection, createPerson, isGraphReady],
+    [boardNodes, connectionDrag, createConnection, createPerson, isGraphReady, openInspectorForNode],
   )
 
   useEffect(() => {
@@ -1066,16 +1116,62 @@ function App() {
     })
   }
 
+  function openTagPicker(query = '') {
+    setTagDraft(query)
+    setIsTagPickerOpen(true)
+    setActiveTagOptionIndex(0)
+  }
+
+  function closeTagPicker() {
+    setIsTagPickerOpen(false)
+    setTagDraft('')
+    setActiveTagOptionIndex(0)
+    setNameTagRange(null)
+  }
+
+  function handleInspectorNameChange(value: string, caretIndex: number) {
+    setNameDraft(value)
+
+    const trigger = extractTagTrigger(value, caretIndex)
+    if (!trigger) {
+      if (nameTagRange) {
+        closeTagPicker()
+      }
+      return
+    }
+
+    setNameTagRange({ start: trigger.start, end: trigger.end })
+    openTagPicker(trigger.query)
+  }
+
   async function handleTagSelection(nextTagId: string) {
     if (!inspectorNode || !isGraphReady) return
+
+    const selectedTagName = tagsById[nextTagId]?.name ?? ''
+    if (nameTagRange) {
+      const nextName = `${nameDraft.slice(0, nameTagRange.start)}${nameDraft.slice(nameTagRange.end)}`
+        .replace(/\s{2,}/g, ' ')
+        .trim()
+
+      setNameDraft(nextName)
+      await updatePerson({
+        id: inspectorNode.id,
+        name: nextName,
+        tag_id: nextTagId || null,
+      })
+      closeTagPicker()
+      window.requestAnimationFrame(() => {
+        nameInputRef.current?.focus()
+      })
+      return
+    }
 
     await updatePerson({
       id: inspectorNode.id,
       tag_id: nextTagId || null,
     })
-    setTagDraft(nextTagId ? tagsById[nextTagId]?.name ?? '' : '')
-    setIsTagPickerOpen(false)
-    setActiveTagOptionIndex(0)
+    setTagDraft(selectedTagName)
+    closeTagPicker()
   }
 
   async function handleCreateTag() {
@@ -1087,24 +1183,36 @@ function App() {
     )
     const createdTag = existingTag ?? (await createTag(nextName))
     setTagDraft(createdTag.name)
-    setIsTagPickerOpen(false)
-    setActiveTagOptionIndex(0)
-    await updatePerson({
-      id: inspectorNode.id,
-      tag_id: createdTag.id,
-    })
+    await handleTagSelection(createdTag.id)
   }
 
   async function handleClearTag() {
     if (!inspectorNode || !isGraphReady) return
+
+    if (nameTagRange) {
+      const nextName = `${nameDraft.slice(0, nameTagRange.start)}${nameDraft.slice(nameTagRange.end)}`
+        .replace(/\s{2,}/g, ' ')
+        .trim()
+
+      setNameDraft(nextName)
+      await updatePerson({
+        id: inspectorNode.id,
+        name: nextName,
+        tag_id: null,
+      })
+      closeTagPicker()
+      window.requestAnimationFrame(() => {
+        nameInputRef.current?.focus()
+      })
+      return
+    }
 
     await updatePerson({
       id: inspectorNode.id,
       tag_id: null,
     })
     setTagDraft('')
-    setIsTagPickerOpen(false)
-    setActiveTagOptionIndex(0)
+    closeTagPicker()
   }
 
   async function handleDeleteInspectorTag(tagId: string, tagName: string) {
@@ -1147,10 +1255,13 @@ function App() {
   function handleTagKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
     if (event.key === 'Escape') {
       event.preventDefault()
-      setTagDraft(selectedInspectorTag?.name ?? '')
-      setIsTagPickerOpen(false)
-      setActiveTagOptionIndex(0)
-      event.currentTarget.blur()
+      closeTagPicker()
+      if (nameTagRange) {
+        nameInputRef.current?.focus()
+        return
+      }
+
+      tagTriggerRef.current?.focus()
       return
     }
 
@@ -1314,11 +1425,10 @@ function App() {
     selectedNode,
   ])
 
-  async function createInspectorNote(draft: NoteDraft) {
+  async function createInspectorNote(value: string) {
     if (!inspectorNode || !isGraphReady) return null
 
-    const title = normalizeNoteTitle(draft.title)
-    const body = draft.body.trim()
+    const { title, body } = parseNoteContent(value)
     if (!title && !body) return null
 
     const createdNote = await createNote(title, body, inspectorNode.id)
@@ -1329,16 +1439,14 @@ function App() {
     return createdNote
   }
 
-  async function handleCreateNoteFromDraft(focusBody = false) {
-    const createdNote = await createInspectorNote(newNoteDraft)
+  async function handleCreateNoteFromDraft() {
+    const createdNote = await createInspectorNote(newNoteText)
     if (!createdNote) return
 
-    setNewNoteDraft({ title: '', body: '' })
-
-    if (!focusBody) return
-
+    setNewNoteText('')
     window.requestAnimationFrame(() => {
-      noteBodyRefs.current[createdNote.id]?.focus()
+      newNoteTextareaRef.current?.focus()
+      autoResizeTextarea(newNoteTextareaRef.current)
     })
   }
 
@@ -1435,19 +1543,12 @@ function App() {
     })
   }
 
-  async function handleNewNoteTitleKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
-    if (event.key !== 'Enter') return
+  async function handleNewNoteKeyDown(event: ReactKeyboardEvent<HTMLTextAreaElement>) {
+    const isSubmit = event.key === 'Enter' && (event.metaKey || event.ctrlKey)
+    if (!isSubmit) return
 
     event.preventDefault()
-    if (!newNoteDraft.title.trim() && !newNoteDraft.body.trim()) return
-
-    await handleCreateNoteFromDraft(true)
-  }
-
-  async function handleNewNoteBlur() {
-    if (!newNoteDraft.title.trim() && !newNoteDraft.body.trim()) return
-
-    await handleCreateNoteFromDraft(false)
+    await handleCreateNoteFromDraft()
   }
 
   function toggleNoteCollapse(noteId: string) {
@@ -1472,14 +1573,7 @@ function App() {
       },
       nextScale,
     )
-    setSelectedNodeId(node.id)
-    inspectorOpenScaleRef.current = nextScale
-    setInspectorNodeId(node.id)
-    setSelectedConnectionId(null)
-    setConnectionMenuPosition(null)
-    setNameDraft(node.name)
-    setTagDraft(node.tag_id ? tagsById[node.tag_id]?.name ?? '' : '')
-    closeTransientUi()
+    openInspectorForNode(node)
   }
 
   function selectConnection(connectionId: string, event: ReactMouseEvent<SVGPathElement>) {
@@ -1929,9 +2023,21 @@ function App() {
           onWheel={handleInspectorWheel}
         >
           <input
-            className="field-group__input inspector-panel__name"
+            ref={nameInputRef}
+            className="inspector-panel__name"
             value={nameDraft}
-            onChange={(event) => setNameDraft(event.target.value)}
+            onChange={(event) => {
+              handleInspectorNameChange(
+                event.target.value,
+                event.target.selectionStart ?? event.target.value.length,
+              )
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                tagTriggerRef.current?.focus()
+              }
+            }}
             onBlur={() => {
               void saveInspectorName()
             }}
@@ -1941,48 +2047,42 @@ function App() {
 
           <div className="field-group field-group--compact">
             <div className="tag-picker">
-              {!isTagPickerOpen && selectedTagColor && tagDraft.trim() ? (
-                <span
-                  className="tag-picker__selected-chip"
-                  style={{ '--tag-color': selectedTagColor } as TagColorStyle}
-                  aria-hidden="true"
-                >
-                  {tagDraft}
-                </span>
-              ) : null}
-              <input
-                className={`field-group__input tag-picker__input${
-                  !isTagPickerOpen && selectedTagColor && tagDraft.trim() ? ' is-tagged-display' : ''
-                }`}
-                value={tagDraft}
-                onFocus={() => {
-                  setIsTagPickerOpen(true)
-                  setActiveTagOptionIndex(0)
-                }}
-                onChange={(event) => {
-                  setTagDraft(event.target.value)
-                  setIsTagPickerOpen(true)
-                  setActiveTagOptionIndex(0)
-                }}
-                onKeyDown={handleTagKeyDown}
-                onBlur={() => {
-                  window.setTimeout(() => {
-                    setIsTagPickerOpen(false)
-                    setTagDraft(selectedInspectorTag?.name ?? '')
-                    setActiveTagOptionIndex(0)
-                  }, 120)
-                }}
-                placeholder="Choose or create a tag"
-                disabled={!isGraphReady}
-                role="combobox"
-                aria-expanded={isTagPickerOpen}
-                aria-controls="inspector-tag-options"
-                aria-activedescendant={
-                  isTagPickerOpen && tagPickerOptions[activeTagOptionIndex]
-                    ? `inspector-tag-option-${tagPickerOptions[activeTagOptionIndex].id}`
+              <button
+                ref={tagTriggerRef}
+                type="button"
+                className={`tag-picker__trigger${selectedInspectorTag ? ' is-selected' : ' is-ghost'}`}
+                style={
+                  selectedTagColor
+                    ? ({ '--tag-color': selectedTagColor } as TagColorStyle)
                     : undefined
                 }
-              />
+                onClick={() => {
+                  openTagPicker()
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    openTagPicker()
+                    return
+                  }
+
+                  if ((event.key === 'Backspace' || event.key === 'Delete') && selectedInspectorTag) {
+                    event.preventDefault()
+                    void handleClearTag()
+                  }
+                }}
+                aria-expanded={isTagPickerOpen}
+                aria-controls="inspector-tag-options"
+              >
+                {selectedInspectorTag ? (
+                  <>
+                    <span className="tag-picker__trigger-dot" aria-hidden="true" />
+                    <span className="tag-picker__trigger-label">{selectedInspectorTag.name}</span>
+                  </>
+                ) : (
+                  <span className="tag-picker__ghost-label">+ add tag</span>
+                )}
+              </button>
               {isTagPickerOpen ? (
                 <div
                   ref={tagPickerMenuRef}
@@ -1990,6 +2090,31 @@ function App() {
                   className="tag-picker__menu"
                   role="listbox"
                 >
+                  <input
+                    ref={tagSearchInputRef}
+                    className="tag-picker__search"
+                    value={tagDraft}
+                    onChange={(event) => {
+                      setTagDraft(event.target.value)
+                      setActiveTagOptionIndex(0)
+                    }}
+                    onKeyDown={handleTagKeyDown}
+                    onBlur={() => {
+                      window.setTimeout(() => {
+                        closeTagPicker()
+                      }, 120)
+                    }}
+                    placeholder="Search or create a tag"
+                    disabled={!isGraphReady}
+                    role="combobox"
+                    aria-expanded={isTagPickerOpen}
+                    aria-controls="inspector-tag-options"
+                    aria-activedescendant={
+                      isTagPickerOpen && tagPickerOptions[activeTagOptionIndex]
+                        ? `inspector-tag-option-${tagPickerOptions[activeTagOptionIndex].id}`
+                        : undefined
+                    }
+                  />
                   {tagPickerOptions.map((option, optionIndex) => {
                     const isTagSelected = option.type === 'tag' && option.tagId === inspectorNode.tag_id
 
@@ -2145,28 +2270,21 @@ function App() {
             })}
 
             <article className="note-card note-card--draft">
-              <div className="note-card__header">
-                <span className="note-card__spacer" aria-hidden="true" />
-                <input
-                  className="note-card__title"
-                  value={newNoteDraft.title}
-                  onChange={(event) =>
-                    setNewNoteDraft((currentDraft) => ({
-                      ...currentDraft,
-                      title: event.target.value,
-                    }))
-                  }
-                  onKeyDown={(event) => {
-                    void handleNewNoteTitleKeyDown(event)
-                  }}
-                  onBlur={() => {
-                    void handleNewNoteBlur()
-                  }}
-                  disabled={!isGraphReady}
-                  placeholder="Create new note"
-                />
-                <span className="note-card__spacer" aria-hidden="true" />
-              </div>
+              <textarea
+                ref={newNoteTextareaRef}
+                className="note-card__composer"
+                value={newNoteText}
+                onChange={(event) => {
+                  setNewNoteText(event.target.value)
+                  autoResizeTextarea(event.currentTarget)
+                }}
+                onKeyDown={(event) => {
+                  void handleNewNoteKeyDown(event)
+                }}
+                disabled={!isGraphReady}
+                placeholder={'Write a note\nTitle on the first line, details below'}
+                rows={4}
+              />
             </article>
           </div>
 
@@ -2281,16 +2399,11 @@ function App() {
                   onClick={(event) => {
                     event.stopPropagation()
                     if (requestLogin()) return
-                    setSelectedNodeId(node.id)
                     if (suppressNodeClickRef.current) {
                       suppressNodeClickRef.current = false
                       return
                     }
-                    inspectorOpenScaleRef.current = viewportRef.current.scale
-                    setInspectorNodeId(node.id)
-                    setNameDraft(node.name)
-                    setTagDraft(node.tag_id ? tagsById[node.tag_id]?.name ?? '' : '')
-                    setIsTagPickerOpen(false)
+                    openInspectorForNode(node)
                   }}
                 >
                   <span className="graph-node__dot" />
@@ -2391,6 +2504,35 @@ function normalizeNoteTitle(value: string) {
   if (!trimmedValue) return 'Untitled note'
 
   return trimmedValue.replace(/^#+\s*/, '').trim() || 'Untitled note'
+}
+
+function parseNoteContent(value: string) {
+  const normalizedValue = value.replace(/\r\n/g, '\n').trim()
+  if (!normalizedValue) {
+    return { title: '', body: '' }
+  }
+
+  const [rawTitle, ...bodyLines] = normalizedValue.split('\n')
+
+  return {
+    title: normalizeNoteTitle(rawTitle),
+    body: bodyLines.join('\n').trim(),
+  }
+}
+
+function extractTagTrigger(value: string, caretIndex: number) {
+  const beforeCaret = value.slice(0, caretIndex)
+  const match = beforeCaret.match(/(?:^|\s)#([^\s#]*)$/)
+  if (!match || match.index === undefined) return null
+
+  const prefixOffset = match[0].startsWith('#') ? 0 : 1
+  const start = match.index + prefixOffset
+
+  return {
+    start,
+    end: caretIndex,
+    query: match[1] ?? '',
+  }
 }
 
 function autoResizeTextarea(element: HTMLTextAreaElement | null) {

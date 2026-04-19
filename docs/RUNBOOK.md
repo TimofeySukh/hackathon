@@ -277,8 +277,10 @@ Manual verification:
 12. Click a person near a viewport edge and confirm the board pans enough to keep the inspector visible, and that the inspector opens at a consistent size regardless of the current zoom.
 13. Start trackpad panning on the board, pass over the inspector, and confirm panning continues; then start a trackpad gesture on the inspector and confirm it does not begin board panning.
 14. Confirm the inspector opens as a compact panel with only a large name field, the tag picker, notes, and the delete-person action.
-15. Assign an existing tag to a person from the inspector tag picker, use ArrowUp/ArrowDown plus Enter in that picker, edit a tag color from the picker, create a new tag from the same field, delete an unused tag with the `x` confirmation flow, and confirm the selection persists after reload.
-16. Open the top-bar tag menu, toggle a tag color palette from its swatch, change the color, and confirm the selected person inspector still shows the chosen tag with a visible color accent after the picker closes.
+15. Type `#` inside the inspector name field, confirm the tag dropdown opens, choose a tag with ArrowUp/ArrowDown plus Enter, and verify the applied tag is removed from the saved name text.
+16. Use the tag chip or `+ add tag` ghost button to open the inspector tag dropdown, create a new tag from the same field, delete an unused tag with the `x` confirmation flow, and confirm the single selected tag persists after reload.
+17. Open the top-bar tag menu, toggle a tag color palette from its swatch, change the color, and confirm the selected person inspector still shows the chosen tag with a visible color accent after the picker closes.
+18. Create a new person, confirm the inspector opens automatically, confirm an empty person focuses the name field, then fill the note capture textarea and save a new note with `Cmd/Ctrl + Enter`.
 16. Create a note by typing into the `Create new note` field, start the title with `#`, press Enter to continue in the body, collapse and expand the note, delete a note from the icon button, reload, and confirm note changes persist.
 17. Create a connection between two existing people, confirm reload preserves it, then click the widened line target and confirm `Delete connection` or Backspace removes it.
 18. Open the top-left Tags menu, create a tag, adjust its color, and confirm tagged nodes use that color.
