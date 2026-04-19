@@ -2276,6 +2276,8 @@ function App() {
             })}
 
             <article className="note-card note-card--draft">
+              <div className="note-card__composer-shell">
+                <span className="note-card__composer-hint">Cmd/Ctrl + Enter to save</span>
               <textarea
                 ref={newNoteTextareaRef}
                 className="note-card__composer"
@@ -2294,6 +2296,7 @@ function App() {
                 placeholder={'Write a note\nTitle on the first line, details below'}
                 rows={4}
               />
+              </div>
             </article>
           </div>
 
