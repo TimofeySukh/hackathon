@@ -10,6 +10,10 @@ Project workflow rules and documentation update order.
 
 Top-level project overview, local setup instructions, and links to deeper documentation.
 
+### `.env.mcp.example`
+
+Template for local-only MCP server variables, including the Supabase service-role key.
+
 ### `.agents/skills/`
 
 Project-scoped agent skills. The current installed skills provide Supabase workflow guidance and Supabase Postgres best practices for agents working in this repository.
@@ -17,6 +21,14 @@ Project-scoped agent skills. The current installed skills provide Supabase workf
 ### `docs/`
 
 Detailed product and structure documentation.
+
+### `mcp/`
+
+Project-local MCP server files.
+
+### `scripts/`
+
+Local maintenance and seeding utilities. `seed-board.mjs` can bulk-create fake people on a board and optionally connect them to the root node.
 
 ### `index.html`
 
@@ -41,6 +53,10 @@ Supabase Edge Functions. `sync-person-ai-note` forwards person note context to n
 ### `src/`
 
 Application source code.
+
+### `.mcp.json`
+
+Project MCP configuration for the shared `n8n-mcp` HTTP server and the local `hackathon-board` stdio server.
 
 ## Source Structure
 
@@ -76,6 +92,18 @@ Shared low-level helpers.
 - `graphStorage.ts` owns Supabase CRUD calls for persisted graph data, `person_ai_notes`, and AI Edge Function invocation.
 - `graphTypes.ts` defines shared profile, board, person, note, AI note, tag, and connection interfaces, including the structured AI summary shape.
 - `userWorkspace.ts` upserts profile data and ensures one personal board plus root person for the signed-in user.
+
+### `mcp/server.mjs`
+
+The local MCP server. It exposes:
+
+- fixed documentation resources from `docs/`
+- dynamic board and person JSON resources
+- graph mutation tools backed by Supabase service-role access from local env
+
+### `scripts/seed-board.mjs`
+
+Bulk seed utility for local or MCP-enabled environments. It reads `.env.mcp.local`, inserts many people into a board, and can also create root-node connections for the new people.
 
 Supabase browser configuration reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`. The older `VITE_SUPABASE_ANON_KEY` variable remains supported for compatibility.
 

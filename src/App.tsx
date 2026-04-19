@@ -213,6 +213,7 @@ function App() {
     loadTagColorDrafts(),
   )
   const [tagNameDrafts, setTagNameDrafts] = useState<Record<string, string>>({})
+  const [hiddenTagIds, setHiddenTagIds] = useState<Record<string, boolean>>({})
   const [newNoteText, setNewNoteText] = useState('')
   const [noteDrafts, setNoteDrafts] = useState<Record<string, NoteDraft>>({})
   const [collapsedNotes, setCollapsedNotes] = useState<Record<string, boolean>>({})
@@ -312,20 +313,49 @@ function App() {
       ) as Record<string, string>,
     [tagColorDrafts, tags],
   )
-  const defaultSelectedNodeId = boardNodes.find((node) => node.is_root)?.id ?? boardNodes[0]?.id ?? null
+  const visibleTagIds = useMemo(
+    () => new Set(tagMenuItems.filter((tag) => !hiddenTagIds[tag.id]).map((tag) => tag.id)),
+    [hiddenTagIds, tagMenuItems],
+  )
+  const areAllTagsVisible = useMemo(
+    () => tagMenuItems.every((tag) => !hiddenTagIds[tag.id]),
+    [hiddenTagIds, tagMenuItems],
+  )
+  const visibleBoardNodes = useMemo(
+    () =>
+      boardNodes.filter((node) => {
+        if (node.is_root || !node.tag_id) return true
+        return visibleTagIds.has(node.tag_id)
+      }),
+    [boardNodes, visibleTagIds],
+  )
+  const visibleNodesById = useMemo(
+    () =>
+      Object.fromEntries(visibleBoardNodes.map((node) => [node.id, node])) as Record<string, PersonNode>,
+    [visibleBoardNodes],
+  )
+  const visibleBoardConnections = useMemo(
+    () =>
+      boardConnections.filter(
+        (edge) => visibleNodesById[edge.person_a_id] && visibleNodesById[edge.person_b_id],
+      ),
+    [boardConnections, visibleNodesById],
+  )
+  const defaultSelectedNodeId =
+    visibleBoardNodes.find((node) => node.is_root)?.id ?? visibleBoardNodes[0]?.id ?? null
   const activeSelectedNodeId =
-    selectedNodeId && nodesById[selectedNodeId] ? selectedNodeId : defaultSelectedNodeId
+    selectedNodeId && visibleNodesById[selectedNodeId] ? selectedNodeId : defaultSelectedNodeId
 
   const selectedNode = useMemo(() => {
-    if (boardNodes.length === 0) return null
-    if (activeSelectedNodeId) return nodesById[activeSelectedNodeId] ?? null
+    if (visibleBoardNodes.length === 0) return null
+    if (activeSelectedNodeId) return visibleNodesById[activeSelectedNodeId] ?? null
     return null
-  }, [activeSelectedNodeId, boardNodes.length, nodesById])
+  }, [activeSelectedNodeId, visibleBoardNodes.length, visibleNodesById])
 
   const inspectorNode = useMemo(() => {
     if (!inspectorNodeId) return null
-    return nodesById[inspectorNodeId] ?? null
-  }, [inspectorNodeId, nodesById])
+    return visibleNodesById[inspectorNodeId] ?? null
+  }, [inspectorNodeId, visibleNodesById])
 
   const inspectorNodeNotes = useMemo(
     () => notes.filter((note) => note.person_id === inspectorNode?.id),
@@ -1325,10 +1355,45 @@ function App() {
     }
   }
 
+  function showTagInMenu(tagId: string) {
+    setHiddenTagIds((currentTagIds) => {
+      if (!currentTagIds[tagId]) return currentTagIds
+
+      const nextTagIds = { ...currentTagIds }
+      delete nextTagIds[tagId]
+      return nextTagIds
+    })
+  }
+
+  function hideTagInMenu(tagId: string) {
+    setHiddenTagIds((currentTagIds) => ({
+      ...currentTagIds,
+      [tagId]: true,
+    }))
+  }
+
+  function toggleAllTagsInMenu() {
+    if (areAllTagsVisible) {
+      setHiddenTagIds(
+        Object.fromEntries(tagMenuItems.map((tag) => [tag.id, true])) as Record<string, boolean>,
+      )
+      return
+    }
+
+    setHiddenTagIds({})
+  }
+
   async function handleDeleteMenuTag(tagId: string) {
     if (!isGraphReady) return
 
     await deleteTag(tagId)
+    setHiddenTagIds((currentTagIds) => {
+      if (!currentTagIds[tagId]) return currentTagIds
+
+      const nextTagIds = { ...currentTagIds }
+      delete nextTagIds[tagId]
+      return nextTagIds
+    })
     setTagColorDrafts((currentDrafts) => {
       const nextDrafts = { ...currentDrafts }
       delete nextDrafts[tagId]
@@ -1730,10 +1795,21 @@ function App() {
 
             {isTagsMenuOpen ? (
               <section className="tags-menu__panel" aria-label="Tag colors">
+                <div className="tags-menu__actions">
+                  <button
+                    type="button"
+                    className="tags-menu__action-button"
+                    onClick={toggleAllTagsInMenu}
+                  >
+                    {areAllTagsVisible ? 'Clear all' : 'Select all'}
+                  </button>
+                </div>
+
                 <div className="tags-menu__list">
                   {tagMenuItems.map((tag) => {
                     const color = normalizeTagColor(tagColorDrafts[tag.id] ?? tag.color ?? DEFAULT_TAG_COLOR)
                     const isPaletteOpen = activeColorTagId === tag.id
+                    const isVisible = !hiddenTagIds[tag.id]
                     const tagColorStyle = { '--tag-color': color } as TagColorStyle
 
                     return (
@@ -1778,6 +1854,22 @@ function App() {
                           disabled={!tag.isPersisted}
                           aria-label={`Rename ${tag.name} tag`}
                         />
+                        <button
+                          type="button"
+                          className={`tags-menu__visibility-toggle${isVisible ? ' is-active' : ''}`}
+                          onClick={() => {
+                            if (isVisible) {
+                              hideTagInMenu(tag.id)
+                              return
+                            }
+
+                            showTagInMenu(tag.id)
+                          }}
+                          aria-label={`${isVisible ? 'Hide' : 'Show'} people with ${tag.name} tag`}
+                          aria-pressed={isVisible}
+                        >
+                          {isVisible ? '✓' : ''}
+                        </button>
                         {tag.isPersisted ? (
                           <button
                             type="button"
@@ -2354,7 +2446,7 @@ function App() {
             viewBox="-2200 -2200 4400 4400"
             aria-hidden="true"
           >
-            {boardConnections.map((edge) => {
+            {visibleBoardConnections.map((edge) => {
               const fromNode = nodesById[edge.person_a_id]
               const toNode = nodesById[edge.person_b_id]
               const link = getLinkPath(fromNode, toNode)
@@ -2383,7 +2475,7 @@ function App() {
             ) : null}
           </svg>
 
-          {boardNodes.map((node) => {
+          {visibleBoardNodes.map((node) => {
             const isSelected = node.id === selectedNode?.id
             const tagColor = node.tag_id ? tagColorById[node.tag_id] : null
             const nodeStyle = {

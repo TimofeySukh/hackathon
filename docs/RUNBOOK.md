@@ -40,7 +40,27 @@ Copy the local environment example and fill in the Supabase project values:
 cp .env.example .env.local
 ```
 
-Project MCP configuration lives in `.mcp.json`. The repository currently includes the shared `n8n-mcp` HTTP server configuration for `https://velizard.app.n8n.cloud/mcp-server/http`.
+Project MCP configuration lives in `.mcp.json`. The repository now includes:
+
+- the shared `n8n-mcp` HTTP server configuration for `https://velizard.app.n8n.cloud/mcp-server/http`
+- the local `hackathon-board` stdio server in `mcp/server.mjs`
+
+If you want the local MCP server to read and mutate live board data, create a separate MCP env file:
+
+```bash
+cp .env.mcp.example .env.mcp.local
+```
+
+Required MCP variable:
+
+- `HACKATHON_MCP_SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_SERVICE_ROLE_KEY`
+
+Optional MCP variable:
+
+- `HACKATHON_MCP_SUPABASE_URL`
+
+If `HACKATHON_MCP_SUPABASE_URL` is missing, the MCP server falls back to `VITE_SUPABASE_URL` from `.env.local`.
+Without a service-role key, the local MCP server still exposes project documentation resources but data tools return a setup error.
 
 Required Vite variables:
 
@@ -63,6 +83,7 @@ Everything else the teammate needs is already in the repository:
 - application code
 - the Supabase migration
 - `.env.example`
+- `.env.mcp.example`
 - project documentation
 - project-scoped Supabase MCP skills
 
@@ -73,6 +94,23 @@ Start the development server:
 ```bash
 npm run dev
 ```
+
+Start the local project MCP server manually when you want to test it outside the app:
+
+```bash
+npm run mcp:start
+```
+
+Seed a board with fake nodes from local service-role credentials:
+
+```bash
+npm run seed:board -- --board-id <board-uuid> --count 1000 --connect-center
+```
+
+Optional seeding flags:
+
+- `--random-links <n>` adds extra random connections among the newly created people.
+- `--ring-start <pixels>` and `--ring-step <pixels>` control how far the generated nodes are placed from the origin.
 
 Vite listens on all network interfaces in this repository, so it prints both a local URL and a network URL in the terminal. Open either URL in a browser.
 
@@ -121,6 +159,7 @@ Teammate quick-start:
    ```
 
 5. Open the URL printed by Vite.
+6. Optional for MCP data tools: create `.env.mcp.local` from `.env.mcp.example` and add the service-role key.
 
 ## Supabase Setup
 
@@ -283,7 +322,7 @@ Manual verification:
 18. Create a new person, confirm the inspector opens automatically, confirm an empty person focuses the name field, then fill the note capture textarea and save a new note both with `Cmd/Ctrl + Enter` and by blurring the textarea.
 16. Create a note by typing into the `Create new note` field, start the title with `#`, press Enter to continue in the body, collapse and expand the note, delete a note from the icon button, reload, and confirm note changes persist.
 17. Create a connection between two existing people, confirm reload preserves it, then click the widened line target and confirm `Delete connection` or Backspace removes it.
-18. Open the top-left Tags menu, create a tag, adjust its color, and confirm tagged nodes use that color.
+18. Open the top-left Tags menu, create a tag, adjust its color, toggle one tag off with the visibility checkbox, and confirm both tagged nodes and their connections disappear. Use `Select all` and `Clear all` to confirm bulk visibility controls work.
 19. Open the search layer and verify that typing a person name, tag, or note text returns local matching people.
 20. Press Enter with a natural-language query and verify AI search returns ranked people with reasons.
 21. Click a search result and verify the board recenters on that person and opens the inspector.

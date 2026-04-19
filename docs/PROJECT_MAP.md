@@ -13,7 +13,7 @@ The current product is intentionally narrow:
 - Supabase-backed Google login
 - one personal board record per signed-in user
 - persistent people nodes, reusable colored tags, notes, and undirected connections per signed-in user
-- a top-left Tags menu for creating tags and changing tag colors
+- a top-left Tags menu for creating tags, renaming them, changing tag colors, and toggling tag visibility on the board
 - a node-anchored inspector for editing the selected person that opens on single click
 - a people search layer that matches locally while typing and can run AI search on Enter
 - no collaboration yet
@@ -52,6 +52,9 @@ Completed tasks can remain listed here when they explain repository history. Liv
 - `docs/product-vision.md`: product direction and scope.
 - `docs/project-structure.md`: file-by-file project structure notes.
 - `README.md`: top-level overview and local development commands.
+- `.env.mcp.example`: local-only MCP environment template for service-role access.
+- `.mcp.json`: project MCP configuration for the shared `n8n-mcp` HTTP server and the local Hackathon board stdio server.
+- `mcp/server.mjs`: local MCP server that exposes project docs and board graph tooling.
 - `src/main.tsx`: React entry point.
 - `src/App.tsx`: current board behavior.
 - `src/lib/supabase.ts`: browser Supabase client configuration.
@@ -75,4 +78,5 @@ Task ownership is tracked in Linear. Code ownership is not split by directory ye
 - Link any implementation task or pull request back to the relevant Linear issue.
 - Update `docs/product-vision.md` when product scope changes.
 - Update `docs/project-structure.md` and `docs/ARCHITECTURE.md` when source structure or boundaries change.
+- Keep the local MCP server aligned with the Supabase schema and documentation resources.
 - Keep Supabase Auth redirect URLs and Google OAuth origins aligned with every deployed frontend origin.
