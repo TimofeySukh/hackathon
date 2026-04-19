@@ -73,7 +73,7 @@ Contains the board experience:
 - mouse drag navigation state
 - board zoom state
 - top-left tag menu state
-- motion-triggered point highlight state
+- board viewport and camera state
 - selected-person inspector state
 - people search overlay state
 - persisted social graph node and connection rendering
@@ -119,7 +119,7 @@ Contains the complete visual system for:
 - account controls
 - people search panel with rounded results and dismissible overlay behavior
 - very dense point-grid background
-- compact motion-triggered point highlight styling with directional tails for fast cursor movement
+- dense board grid styling and layered graph presentation
 - compact graph node styling
 - top-left tag menu and color palette styling
 - graph edge styling and preview connection styling

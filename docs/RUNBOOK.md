@@ -379,5 +379,5 @@ Supabase verification:
 
 - `npm run build`
 - `npm run lint`
-- Manual browser check of drag navigation, wheel and trackpad navigation, motion-triggered point highlights, theme persistence, persisted graph editing, debounced AI note sync, and AI people search
+- Manual browser check of drag navigation, wheel and trackpad navigation, theme persistence, persisted graph editing, debounced AI note sync, and AI people search
 - Manual Supabase auth check when credentials and Google OAuth are configured

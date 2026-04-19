@@ -9,7 +9,7 @@ The current product is intentionally narrow:
 - a full-window board surface
 - mouse drag navigation
 - a dark/light theme toggle
-- a very dense CSS-rendered point grid with motion-triggered point highlights
+- a very dense CSS-rendered point grid
 - Supabase-backed Google login
 - one personal board record per signed-in user
 - persistent people nodes, reusable colored tags, notes, and undirected connections per signed-in user
