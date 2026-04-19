@@ -2537,6 +2537,12 @@ function App() {
                       suppressNodeClickRef.current = false
                       return
                     }
+                    if (inspectorNodeId === node.id) {
+                      setInspectorNodeId(null)
+                      setIsTagPickerOpen(false)
+                      setActiveTagOptionIndex(0)
+                      return
+                    }
                     openInspectorForNode(node)
                   }}
                 >
