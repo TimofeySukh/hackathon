@@ -28,7 +28,7 @@ Project-local MCP server files.
 
 ### `scripts/`
 
-Local maintenance and seeding utilities. `seed-board.mjs` can bulk-create fake people on a board and optionally connect them to the root node.
+Local maintenance and seeding utilities. `seed-board.mjs` can bulk-create fake people on a board and optionally connect them to the root node. `seed-demo-user.mjs` can populate one user's board with a repeatable demo cluster that includes people, notes, AI summaries, and connections.
 
 ### `index.html`
 
@@ -104,6 +104,10 @@ The local MCP server. It exposes:
 ### `scripts/seed-board.mjs`
 
 Bulk seed utility for local or MCP-enabled environments. It reads `.env.mcp.local`, inserts many people into a board, and can also create root-node connections for the new people.
+
+### `scripts/seed-demo-user.mjs`
+
+Demo data seed utility for local or MCP-enabled environments. It targets one user by email, ensures the required tags exist, upserts a fixed demo contact set, recreates their notes and AI summaries, and connects the cluster to the root person.
 
 Supabase browser configuration reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`. The older `VITE_SUPABASE_ANON_KEY` variable remains supported for compatibility.
 
