@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "mcp:start": "node ./mcp/server.mjs",
+    "seed:board": "node ./scripts/seed-board.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

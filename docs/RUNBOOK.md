@@ -101,6 +101,17 @@ Start the local project MCP server manually when you want to test it outside the
 npm run mcp:start
 ```
 
+Seed a board with fake nodes from local service-role credentials:
+
+```bash
+npm run seed:board -- --board-id <board-uuid> --count 1000 --connect-center
+```
+
+Optional seeding flags:
+
+- `--random-links <n>` adds extra random connections among the newly created people.
+- `--ring-start <pixels>` and `--ring-step <pixels>` control how far the generated nodes are placed from the origin.
+
 Vite listens on all network interfaces in this repository, so it prints both a local URL and a network URL in the terminal. Open either URL in a browser.
 
 For other devices on the same local network, open the printed network URL, for example:

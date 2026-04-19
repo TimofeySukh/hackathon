@@ -26,6 +26,10 @@ Detailed product and structure documentation.
 
 Project-local MCP server files.
 
+### `scripts/`
+
+Local maintenance and seeding utilities. `seed-board.mjs` can bulk-create fake people on a board and optionally connect them to the root node.
+
 ### `index.html`
 
 The main HTML entry point used by Vite.
@@ -96,6 +100,10 @@ The local MCP server. It exposes:
 - fixed documentation resources from `docs/`
 - dynamic board and person JSON resources
 - graph mutation tools backed by Supabase service-role access from local env
+
+### `scripts/seed-board.mjs`
+
+Bulk seed utility for local or MCP-enabled environments. It reads `.env.mcp.local`, inserts many people into a board, and can also create root-node connections for the new people.
 
 Supabase browser configuration reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`. The older `VITE_SUPABASE_ANON_KEY` variable remains supported for compatibility.
 
