@@ -1499,7 +1499,7 @@ function App() {
     const createdNote = await createNote(title, body, inspectorNode.id)
     setCollapsedNotes((currentNotes) => ({
       ...currentNotes,
-      [createdNote.id]: false,
+      [createdNote.id]: true,
     }))
     return createdNote
   }
@@ -1625,7 +1625,7 @@ function App() {
   function toggleNoteCollapse(noteId: string) {
     setCollapsedNotes((currentNotes) => ({
       ...currentNotes,
-      [noteId]: !currentNotes[noteId],
+      [noteId]: !(currentNotes[noteId] ?? true),
     }))
   }
 
@@ -2335,7 +2335,7 @@ function App() {
                 title: note.title,
                 body: note.body,
               }
-              const isCollapsed = collapsedNotes[note.id] ?? false
+              const isCollapsed = collapsedNotes[note.id] ?? true
 
               return (
                 <article key={note.id} className={`note-card${isCollapsed ? ' is-collapsed' : ''}`}>
