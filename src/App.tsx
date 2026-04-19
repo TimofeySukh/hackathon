@@ -886,6 +886,7 @@ function App() {
     boardDragRef.current.active = false
     setIsDraggingBoard(false)
     setSelectedNodeId(node.id)
+    setInspectorNodeId(null)
     setSelectedConnectionId(null)
     setConnectionMenuPosition(null)
 
