@@ -49,7 +49,6 @@ cp .env.mcp.example .env.mcp.local
 ```
 
 Then fill in a non-browser `HACKATHON_MCP_SUPABASE_SERVICE_ROLE_KEY`. The MCP server also accepts `HACKATHON_MCP_SUPABASE_URL`, but it can fall back to `VITE_SUPABASE_URL` from `.env.local`.
-For LAN access, `.env.mcp.local` can also define `HACKATHON_MCP_HTTP_HOST`, `HACKATHON_MCP_HTTP_PORT`, and `HACKATHON_MCP_ALLOWED_HOSTS`.
 
 Recommended local env format:
 
@@ -82,7 +81,6 @@ Teammates only need to:
 4. Run `npm run dev`.
 5. Open the local Vite URL shown in the terminal, or the network URL from another device on the same LAN.
 6. Optional for MCP data tools: create `.env.mcp.local` from `.env.mcp.example` and add the service-role key.
-7. Optional for LAN MCP access: run `npm run mcp:start:http` and connect other devices to `http://<host-ip>:3334/mcp`.
 
 If Vite starts on a different local port such as `5173`, `5174`, or `5175`, or the app is opened through a LAN IP such as `http://10.29.0.117:5173`, that exact origin must be added to the Supabase Auth redirect allow list and to Google Cloud Authorized JavaScript origins.
 For multi-device login, deploy the frontend on one stable server origin and add that exact origin to both configurations.
@@ -94,7 +92,6 @@ For multi-device login, deploy the frontend on one stable server origin and add 
 - `npm run preview` previews the production build on all local network interfaces.
 - `npm run lint` runs ESLint.
 - `npm run mcp:start` starts the local Hackathon board MCP server over stdio.
-- `npm run mcp:start:http` starts the local Hackathon board MCP server over Streamable HTTP for LAN clients.
 
 ## Product Direction
 

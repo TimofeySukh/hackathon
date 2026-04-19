@@ -9,10 +9,9 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { createClient } from '@supabase/supabase-js'
 import * as z from 'zod/v4'
 
-export const serverVersion = '0.1.0'
+const serverVersion = '0.1.0'
 const fileDir = dirname(fileURLToPath(import.meta.url))
-export const repoRoot = resolve(fileDir, '..')
-const entryFilePath = process.argv[1] ? resolve(process.argv[1]) : null
+const repoRoot = resolve(fileDir, '..')
 const hexColorPattern = /^#[0-9A-Fa-f]{6}$/
 const emptyRowsResult = { data: [], error: null }
 
@@ -23,6 +22,18 @@ for (const envPath of [
 ]) {
   loadDotEnv({ path: envPath, override: false, quiet: true })
 }
+
+const server = new McpServer(
+  {
+    name: 'hackathon-board',
+    version: serverVersion,
+  },
+  {
+    capabilities: {
+      logging: {},
+    },
+  },
+)
 
 let adminClient = null
 
@@ -534,7 +545,7 @@ async function deleteNote({ note_id: noteId }) {
   return { deleted_note_id: noteId }
 }
 
-function registerJsonTool(server, name, config, handler) {
+function registerJsonTool(name, config, handler) {
   server.registerTool(name, config, async (args) => {
     try {
       return await handler(args)
@@ -543,19 +554,6 @@ function registerJsonTool(server, name, config, handler) {
     }
   })
 }
-
-export function createHackathonServer() {
-  const server = new McpServer(
-    {
-      name: 'hackathon-board',
-      version: serverVersion,
-    },
-    {
-      capabilities: {
-        logging: {},
-      },
-    },
-  )
 
 server.registerResource(
   'project-map',
@@ -688,7 +686,6 @@ server.registerResource(
 )
 
 registerJsonTool(
-  server,
   'list-boards',
   {
     title: 'List Boards',
@@ -707,7 +704,6 @@ registerJsonTool(
 )
 
 registerJsonTool(
-  server,
   'get-board-graph',
   {
     title: 'Get Board Graph',
@@ -726,7 +722,6 @@ registerJsonTool(
 )
 
 registerJsonTool(
-  server,
   'get-person-context',
   {
     title: 'Get Person Context',
@@ -742,7 +737,6 @@ registerJsonTool(
 )
 
 registerJsonTool(
-  server,
   'list-tags',
   {
     title: 'List Tags',
@@ -758,7 +752,6 @@ registerJsonTool(
 )
 
 registerJsonTool(
-  server,
   'create-tag',
   {
     title: 'Create Tag',
@@ -776,7 +769,6 @@ registerJsonTool(
 )
 
 registerJsonTool(
-  server,
   'update-tag',
   {
     title: 'Update Tag',
@@ -794,7 +786,6 @@ registerJsonTool(
 )
 
 registerJsonTool(
-  server,
   'delete-tag',
   {
     title: 'Delete Tag',
@@ -807,7 +798,6 @@ registerJsonTool(
 )
 
 registerJsonTool(
-  server,
   'create-person',
   {
     title: 'Create Person',
@@ -827,7 +817,6 @@ registerJsonTool(
 )
 
 registerJsonTool(
-  server,
   'update-person',
   {
     title: 'Update Person',
@@ -845,7 +834,6 @@ registerJsonTool(
 )
 
 registerJsonTool(
-  server,
   'move-person',
   {
     title: 'Move Person',
@@ -863,7 +851,6 @@ registerJsonTool(
 )
 
 registerJsonTool(
-  server,
   'delete-person',
   {
     title: 'Delete Person',
@@ -876,7 +863,6 @@ registerJsonTool(
 )
 
 registerJsonTool(
-  server,
   'create-connection',
   {
     title: 'Create Connection',
@@ -893,7 +879,6 @@ registerJsonTool(
 )
 
 registerJsonTool(
-  server,
   'delete-connection',
   {
     title: 'Delete Connection',
@@ -906,7 +891,6 @@ registerJsonTool(
 )
 
 registerJsonTool(
-  server,
   'create-note',
   {
     title: 'Create Note',
@@ -924,7 +908,6 @@ registerJsonTool(
 )
 
 registerJsonTool(
-  server,
   'update-note',
   {
     title: 'Update Note',
@@ -942,7 +925,6 @@ registerJsonTool(
 )
 
 registerJsonTool(
-  server,
   'delete-note',
   {
     title: 'Delete Note',
@@ -954,19 +936,13 @@ registerJsonTool(
   async (args) => successResult(`Deleted note ${args.note_id}.`, await deleteNote(args)),
 )
 
-  return server
-}
-
 async function main() {
-  const server = createHackathonServer()
   const transport = new StdioServerTransport()
   await server.connect(transport)
   console.error('[hackathon-board MCP] ready')
 }
 
-if (entryFilePath === fileURLToPath(import.meta.url)) {
-  main().catch((error) => {
-    console.error('[hackathon-board MCP] fatal error', error)
-    process.exit(1)
-  })
-}
+main().catch((error) => {
+  console.error('[hackathon-board MCP] fatal error', error)
+  process.exit(1)
+})

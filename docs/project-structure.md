@@ -12,7 +12,7 @@ Top-level project overview, local setup instructions, and links to deeper docume
 
 ### `.env.mcp.example`
 
-Template for MCP server variables, including the Supabase service-role key and optional LAN HTTP settings.
+Template for local-only MCP server variables, including the Supabase service-role key.
 
 ### `.agents/skills/`
 
@@ -91,15 +91,11 @@ Shared low-level helpers.
 
 ### `mcp/server.mjs`
 
-The local MCP server factory and stdio entrypoint. It exposes:
+The local MCP server. It exposes:
 
 - fixed documentation resources from `docs/`
 - dynamic board and person JSON resources
 - graph mutation tools backed by Supabase service-role access from local env
-
-### `mcp/http-server.mjs`
-
-The LAN-accessible Streamable HTTP entrypoint for the same Hackathon MCP surface. It binds to `0.0.0.0` by default and serves `/mcp`, `/`, and `/health`.
 
 Supabase browser configuration reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`. The older `VITE_SUPABASE_ANON_KEY` variable remains supported for compatibility.
 
