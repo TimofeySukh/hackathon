@@ -1719,12 +1719,12 @@ function App() {
                 strokeLinejoin="round"
                 aria-hidden="true"
               >
-                <circle cx="12" cy="12" r="7" />
-                <path d="M12 3.5v2.5" />
-                <path d="M12 18v2.5" />
-                <path d="M3.5 12H6" />
-                <path d="M18 12h2.5" />
-                <path d="M9 15l2-6 4 2-6 4Z" />
+                <path d="M8 7.5h10" />
+                <path d="M8 12h10" />
+                <path d="M8 16.5h10" />
+                <circle cx="5.5" cy="7.5" r="1" fill="currentColor" stroke="none" />
+                <circle cx="5.5" cy="12" r="1" fill="currentColor" stroke="none" />
+                <circle cx="5.5" cy="16.5" r="1" fill="currentColor" stroke="none" />
               </svg>
             </button>
 
