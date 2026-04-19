@@ -113,7 +113,7 @@ Contains the complete visual system for:
 
 - dark and light themes
 - account controls
-- people search panel
+- people search panel with rounded results and dismissible overlay behavior
 - very dense point-grid background
 - compact motion-triggered point highlight styling with directional tails for fast cursor movement
 - compact graph node styling
@@ -154,6 +154,8 @@ It currently supports:
 - inspector opening at a consistent size regardless of current zoom, then scaling with later zoom changes
 - continued trackpad panning over the inspector when the gesture starts on the board
 - connection line selection with a widened hit target, inline deletion, and Backspace deletion
+- a compact top bar with a capped-width search field, circular tags/account/theme controls, and exclusive overlay behavior
+- a keyboard-first inspector that treats `#tag` in the name field as a tag command and uses one capture textarea for new notes
 - local people search while typing plus natural-language AI search on Enter
 - drag repositioning for non-root nodes
 - persisted node renaming

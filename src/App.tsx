@@ -51,6 +51,11 @@ type NoteDraft = {
   body: string
 }
 
+type TextRange = {
+  start: number
+  end: number
+}
+
 type SearchResult = {
   node: PersonNode
   score: number
@@ -112,6 +117,7 @@ type TagPickerOption =
       type: 'tag'
       label: string
       tagId: string
+      color: string
     }
   | {
       id: 'create'
@@ -201,13 +207,14 @@ function App() {
   const [isTagPickerOpen, setIsTagPickerOpen] = useState(false)
   const [activeTagOptionIndex, setActiveTagOptionIndex] = useState(0)
   const [isTagsMenuOpen, setIsTagsMenuOpen] = useState(false)
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
   const [activeColorTagId, setActiveColorTagId] = useState<string | null>(null)
   const [tagColorDrafts, setTagColorDrafts] = useState<Record<string, string>>(() =>
     loadTagColorDrafts(),
   )
   const [tagNameDrafts, setTagNameDrafts] = useState<Record<string, string>>({})
   const [hiddenTagIds, setHiddenTagIds] = useState<Record<string, boolean>>({})
-  const [newNoteDraft, setNewNoteDraft] = useState<NoteDraft>({ title: '', body: '' })
+  const [newNoteText, setNewNoteText] = useState('')
   const [noteDrafts, setNoteDrafts] = useState<Record<string, NoteDraft>>({})
   const [collapsedNotes, setCollapsedNotes] = useState<Record<string, boolean>>({})
   const [highlightSpots, setHighlightSpots] = useState<HighlightSpot[]>([])
@@ -215,6 +222,8 @@ function App() {
   const [highlightClock, setHighlightClock] = useState(() => Date.now())
   const [isDraggingBoard, setIsDraggingBoard] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [nameTagRange, setNameTagRange] = useState<TextRange | null>(null)
   const [aiSearchQuery, setAiSearchQuery] = useState('')
   const [aiSearchResults, setAiSearchResults] = useState<SearchResult[]>([])
   const [aiSearchStatus, setAiSearchStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
@@ -225,8 +234,15 @@ function App() {
   const boardRef = useRef<HTMLElement | null>(null)
   const boardSurfaceRef = useRef<HTMLDivElement | null>(null)
   const graphLayerRef = useRef<HTMLDivElement | null>(null)
+  const tagsMenuRef = useRef<HTMLDivElement | null>(null)
+  const searchPanelRef = useRef<HTMLDivElement | null>(null)
+  const accountPanelRef = useRef<HTMLDivElement | null>(null)
   const inspectorPanelRef = useRef<HTMLElement | null>(null)
   const zoomIndicatorRef = useRef<HTMLDivElement | null>(null)
+  const nameInputRef = useRef<HTMLInputElement | null>(null)
+  const tagTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const tagSearchInputRef = useRef<HTMLInputElement | null>(null)
+  const newNoteTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const tagPickerMenuRef = useRef<HTMLDivElement | null>(null)
   const tagPickerOptionRefs = useRef<Array<HTMLDivElement | null>>([])
@@ -379,6 +395,7 @@ function App() {
         type: 'tag' as const,
         label: tag.name,
         tagId: tag.id,
+        color: tagColorById[tag.id] ?? normalizeTagColor(tag.color ?? DEFAULT_TAG_COLOR),
       })),
     )
 
@@ -391,7 +408,7 @@ function App() {
     }
 
     return nextOptions
-  }, [canCreateInspectorTag, filteredInspectorTags, selectedInspectorTag, tagDraft])
+  }, [canCreateInspectorTag, filteredInspectorTags, selectedInspectorTag, tagColorById, tagDraft])
   const notesByPersonId = useMemo(() => {
     const nextNotesByPersonId: Record<string, PersonNote[]> = {}
 
@@ -404,7 +421,6 @@ function App() {
 
     return nextNotesByPersonId
   }, [notes])
-
   const searchResults: SearchResult[] = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase()
     if (!normalizedQuery) return []
@@ -469,9 +485,45 @@ function App() {
     return true
   }, [status])
 
+  const closeInspectorUi = useCallback(() => {
+    setInspectorNodeId(null)
+    setSelectedConnectionId(null)
+    setConnectionMenuPosition(null)
+    setIsTagPickerOpen(false)
+    setActiveTagOptionIndex(0)
+  }, [])
+
+  const closeTransientUi = useCallback(() => {
+    setIsTagsMenuOpen(false)
+    setIsAccountMenuOpen(false)
+    setIsSearchOpen(false)
+    setIsTagPickerOpen(false)
+    setActiveColorTagId(null)
+    setActiveTagOptionIndex(0)
+  }, [])
+
   useEffect(() => {
     window.localStorage.setItem(THEME_STORAGE_KEY, theme)
   }, [theme])
+
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target
+      if (!(target instanceof Node)) return
+
+      const isInsideTopBar =
+        tagsMenuRef.current?.contains(target) ||
+        searchPanelRef.current?.contains(target) ||
+        accountPanelRef.current?.contains(target)
+
+      if (!isInsideTopBar) {
+        closeTransientUi()
+      }
+    }
+
+    window.addEventListener('mousedown', handlePointerDown)
+    return () => window.removeEventListener('mousedown', handlePointerDown)
+  }, [closeTransientUi])
 
   useEffect(() => {
     if (!isTagPickerOpen) return
@@ -693,6 +745,34 @@ function App() {
     return () => window.cancelAnimationFrame(frameId)
   }, [applyViewport, inspectorNode, keepInspectorInView])
 
+  useEffect(() => {
+    if (!inspectorNode) return undefined
+
+    const frameId = window.requestAnimationFrame(() => {
+      if (!inspectorNode.name.trim()) {
+        nameInputRef.current?.focus()
+        nameInputRef.current?.select()
+        return
+      }
+
+      newNoteTextareaRef.current?.focus()
+      autoResizeTextarea(newNoteTextareaRef.current)
+    })
+
+    return () => window.cancelAnimationFrame(frameId)
+  }, [inspectorNode])
+
+  useEffect(() => {
+    if (!isTagPickerOpen) return
+
+    const frameId = window.requestAnimationFrame(() => {
+      tagSearchInputRef.current?.focus()
+      tagSearchInputRef.current?.select()
+    })
+
+    return () => window.cancelAnimationFrame(frameId)
+  }, [isTagPickerOpen])
+
   const zoomAtClientPoint = useCallback(
     (clientX: number, clientY: number, nextScale: number) => {
       const viewport = boardRef.current
@@ -721,6 +801,19 @@ function App() {
     },
     [queueViewportUpdate],
   )
+
+  const openInspectorForNode = useCallback((node: PersonNode) => {
+    inspectorOpenScaleRef.current = viewportRef.current.scale
+    setInspectorNodeId(node.id)
+    setSelectedNodeId(node.id)
+    setSelectedConnectionId(null)
+    setConnectionMenuPosition(null)
+    setNameDraft(node.name)
+    setTagDraft('')
+    setNameTagRange(null)
+    setNewNoteText('')
+    closeTransientUi()
+  }, [closeTransientUi])
 
   const finishConnectionDrag = useCallback(
     async (clientX: number, clientY: number) => {
@@ -765,13 +858,12 @@ function App() {
           y: connectionDrag.worldY,
         })
         await createConnection(connectionDrag.fromId, createdNode.id)
-        setSelectedNodeId(createdNode.id)
-        setInspectorNodeId(null)
+        openInspectorForNode(createdNode)
       } finally {
         setConnectionDrag(null)
       }
     },
-    [boardNodes, connectionDrag, createConnection, createPerson, isGraphReady],
+    [boardNodes, connectionDrag, createConnection, createPerson, isGraphReady, openInspectorForNode],
   )
 
   useEffect(() => {
@@ -1035,6 +1127,12 @@ function App() {
     }
   }, [moveWithWheel, zoomAtClientPoint])
 
+  function getTagAccentStyle(color: string): CSSProperties {
+    return {
+      '--tag-color': color,
+    } as CSSProperties
+  }
+
   async function saveInspectorName() {
     if (!inspectorNode || !isGraphReady) return
 
@@ -1048,16 +1146,62 @@ function App() {
     })
   }
 
+  function openTagPicker(query = '') {
+    setTagDraft(query)
+    setIsTagPickerOpen(true)
+    setActiveTagOptionIndex(0)
+  }
+
+  function closeTagPicker() {
+    setIsTagPickerOpen(false)
+    setTagDraft('')
+    setActiveTagOptionIndex(0)
+    setNameTagRange(null)
+  }
+
+  function handleInspectorNameChange(value: string, caretIndex: number) {
+    setNameDraft(value)
+
+    const trigger = extractTagTrigger(value, caretIndex)
+    if (!trigger) {
+      if (nameTagRange) {
+        closeTagPicker()
+      }
+      return
+    }
+
+    setNameTagRange({ start: trigger.start, end: trigger.end })
+    openTagPicker(trigger.query)
+  }
+
   async function handleTagSelection(nextTagId: string) {
     if (!inspectorNode || !isGraphReady) return
+
+    const selectedTagName = tagsById[nextTagId]?.name ?? ''
+    if (nameTagRange) {
+      const nextName = `${nameDraft.slice(0, nameTagRange.start)}${nameDraft.slice(nameTagRange.end)}`
+        .replace(/\s{2,}/g, ' ')
+        .trim()
+
+      setNameDraft(nextName)
+      await updatePerson({
+        id: inspectorNode.id,
+        name: nextName,
+        tag_id: nextTagId || null,
+      })
+      closeTagPicker()
+      window.requestAnimationFrame(() => {
+        nameInputRef.current?.focus()
+      })
+      return
+    }
 
     await updatePerson({
       id: inspectorNode.id,
       tag_id: nextTagId || null,
     })
-    setTagDraft(nextTagId ? tagsById[nextTagId]?.name ?? '' : '')
-    setIsTagPickerOpen(false)
-    setActiveTagOptionIndex(0)
+    setTagDraft(selectedTagName)
+    closeTagPicker()
   }
 
   async function handleCreateTag() {
@@ -1069,24 +1213,36 @@ function App() {
     )
     const createdTag = existingTag ?? (await createTag(nextName))
     setTagDraft(createdTag.name)
-    setIsTagPickerOpen(false)
-    setActiveTagOptionIndex(0)
-    await updatePerson({
-      id: inspectorNode.id,
-      tag_id: createdTag.id,
-    })
+    await handleTagSelection(createdTag.id)
   }
 
   async function handleClearTag() {
     if (!inspectorNode || !isGraphReady) return
+
+    if (nameTagRange) {
+      const nextName = `${nameDraft.slice(0, nameTagRange.start)}${nameDraft.slice(nameTagRange.end)}`
+        .replace(/\s{2,}/g, ' ')
+        .trim()
+
+      setNameDraft(nextName)
+      await updatePerson({
+        id: inspectorNode.id,
+        name: nextName,
+        tag_id: null,
+      })
+      closeTagPicker()
+      window.requestAnimationFrame(() => {
+        nameInputRef.current?.focus()
+      })
+      return
+    }
 
     await updatePerson({
       id: inspectorNode.id,
       tag_id: null,
     })
     setTagDraft('')
-    setIsTagPickerOpen(false)
-    setActiveTagOptionIndex(0)
+    closeTagPicker()
   }
 
   async function handleDeleteInspectorTag(tagId: string, tagName: string) {
@@ -1103,6 +1259,13 @@ function App() {
     }
     setActiveTagOptionIndex(0)
     setIsTagPickerOpen(true)
+  }
+
+  async function handleInspectorTagColorChange(tagId: string, color: string) {
+    if (!isGraphReady) return
+
+    previewTagColor(tagId, color)
+    await persistTagColor(tagId)
   }
 
   function chooseTagPickerOption(option: TagPickerOption) {
@@ -1122,10 +1285,13 @@ function App() {
   function handleTagKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
     if (event.key === 'Escape') {
       event.preventDefault()
-      setTagDraft(selectedInspectorTag?.name ?? '')
-      setIsTagPickerOpen(false)
-      setActiveTagOptionIndex(0)
-      event.currentTarget.blur()
+      closeTagPicker()
+      if (nameTagRange) {
+        nameInputRef.current?.focus()
+        return
+      }
+
+      tagTriggerRef.current?.focus()
       return
     }
 
@@ -1163,8 +1329,7 @@ function App() {
       suffix += 1
     }
 
-    const createdTag = await createTag(nextName)
-    setActiveColorTagId(createdTag.id)
+    await createTag(nextName)
   }
 
   function previewTagColor(tagId: string, color: string) {
@@ -1190,11 +1355,45 @@ function App() {
     }
   }
 
+  function showTagInMenu(tagId: string) {
+    setHiddenTagIds((currentTagIds) => {
+      if (!currentTagIds[tagId]) return currentTagIds
+
+      const nextTagIds = { ...currentTagIds }
+      delete nextTagIds[tagId]
+      return nextTagIds
+    })
+  }
+
+  function hideTagInMenu(tagId: string) {
+    setHiddenTagIds((currentTagIds) => ({
+      ...currentTagIds,
+      [tagId]: true,
+    }))
+  }
+
+  function toggleAllTagsInMenu() {
+    if (areAllTagsVisible) {
+      setHiddenTagIds(
+        Object.fromEntries(tagMenuItems.map((tag) => [tag.id, true])) as Record<string, boolean>,
+      )
+      return
+    }
+
+    setHiddenTagIds({})
+  }
+
   async function handleDeleteMenuTag(tagId: string) {
     if (!isGraphReady) return
 
     await deleteTag(tagId)
-    setActiveColorTagId((currentTagId) => (currentTagId === tagId ? null : currentTagId))
+    setHiddenTagIds((currentTagIds) => {
+      if (!currentTagIds[tagId]) return currentTagIds
+
+      const nextTagIds = { ...currentTagIds }
+      delete nextTagIds[tagId]
+      return nextTagIds
+    })
     setTagColorDrafts((currentDrafts) => {
       const nextDrafts = { ...currentDrafts }
       delete nextDrafts[tagId]
@@ -1247,64 +1446,6 @@ function App() {
     }
   }
 
-  function hideTagInMenu(tagId: string) {
-    setHiddenTagIds((currentHiddenTagIds) => ({
-      ...currentHiddenTagIds,
-      [tagId]: true,
-    }))
-
-    const selectedNodeTagId = selectedNode?.tag_id ?? null
-    if (selectedNodeTagId === tagId) {
-      setSelectedNodeId(null)
-    }
-
-    const inspectorNodeTagId = inspectorNode?.tag_id ?? null
-    if (inspectorNodeTagId === tagId) {
-      setInspectorNodeId(null)
-    }
-  }
-
-  function showTagInMenu(tagId: string) {
-    setHiddenTagIds((currentHiddenTagIds) => {
-      if (!currentHiddenTagIds[tagId]) return currentHiddenTagIds
-
-      const nextHiddenTagIds = { ...currentHiddenTagIds }
-      delete nextHiddenTagIds[tagId]
-      return nextHiddenTagIds
-    })
-  }
-
-  function showAllTagsInMenu() {
-    setHiddenTagIds({})
-  }
-
-  function hideAllTagsInMenu() {
-    setHiddenTagIds(
-      Object.fromEntries(tagMenuItems.map((tag) => [tag.id, true])) as Record<string, boolean>,
-    )
-    setSelectedNodeId((currentNodeId) => {
-      if (!currentNodeId) return currentNodeId
-      const currentNode = nodesById[currentNodeId]
-      if (!currentNode?.tag_id || currentNode.is_root) return currentNodeId
-      return null
-    })
-    setInspectorNodeId((currentNodeId) => {
-      if (!currentNodeId) return currentNodeId
-      const currentNode = nodesById[currentNodeId]
-      if (!currentNode?.tag_id || currentNode.is_root) return currentNodeId
-      return null
-    })
-  }
-
-  function toggleAllTagsInMenu() {
-    if (areAllTagsVisible) {
-      hideAllTagsInMenu()
-      return
-    }
-
-    showAllTagsInMenu()
-  }
-
   const handleDeleteSelectedNode = useCallback(async (nodeId: string) => {
     await deletePerson(nodeId)
     setInspectorNodeId((currentNodeId) => (currentNodeId === nodeId ? null : currentNodeId))
@@ -1349,11 +1490,10 @@ function App() {
     selectedNode,
   ])
 
-  async function createInspectorNote(draft: NoteDraft) {
+  async function createInspectorNote(value: string) {
     if (!inspectorNode || !isGraphReady) return null
 
-    const title = normalizeNoteTitle(draft.title)
-    const body = draft.body.trim()
+    const { title, body } = parseNoteContent(value)
     if (!title && !body) return null
 
     const createdNote = await createNote(title, body, inspectorNode.id)
@@ -1364,16 +1504,16 @@ function App() {
     return createdNote
   }
 
-  async function handleCreateNoteFromDraft(focusBody = false) {
-    const createdNote = await createInspectorNote(newNoteDraft)
+  async function handleCreateNoteFromDraft(refocusComposer = true) {
+    const createdNote = await createInspectorNote(newNoteText)
     if (!createdNote) return
 
-    setNewNoteDraft({ title: '', body: '' })
-
-    if (!focusBody) return
+    setNewNoteText('')
+    if (!refocusComposer) return
 
     window.requestAnimationFrame(() => {
-      noteBodyRefs.current[createdNote.id]?.focus()
+      newNoteTextareaRef.current?.focus()
+      autoResizeTextarea(newNoteTextareaRef.current)
     })
   }
 
@@ -1410,6 +1550,13 @@ function App() {
   }
 
   function handleSearchKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      setIsSearchOpen(false)
+      event.currentTarget.blur()
+      return
+    }
+
     if (event.key !== 'Enter') return
 
     event.preventDefault()
@@ -1463,18 +1610,15 @@ function App() {
     })
   }
 
-  async function handleNewNoteTitleKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
-    if (event.key !== 'Enter') return
+  async function handleNewNoteKeyDown(event: ReactKeyboardEvent<HTMLTextAreaElement>) {
+    const isSubmit = event.key === 'Enter' && (event.metaKey || event.ctrlKey)
+    if (!isSubmit) return
 
     event.preventDefault()
-    if (!newNoteDraft.title.trim() && !newNoteDraft.body.trim()) return
-
-    await handleCreateNoteFromDraft(true)
+    await handleCreateNoteFromDraft()
   }
 
   async function handleNewNoteBlur() {
-    if (!newNoteDraft.title.trim() && !newNoteDraft.body.trim()) return
-
     await handleCreateNoteFromDraft(false)
   }
 
@@ -1500,14 +1644,7 @@ function App() {
       },
       nextScale,
     )
-    setSelectedNodeId(node.id)
-    inspectorOpenScaleRef.current = nextScale
-    setInspectorNodeId(node.id)
-    setSelectedConnectionId(null)
-    setConnectionMenuPosition(null)
-    setNameDraft(node.name)
-    setTagDraft(node.tag_id ? tagsById[node.tag_id]?.name ?? '' : '')
-    setIsTagPickerOpen(false)
+    openInspectorForNode(node)
   }
 
   function selectConnection(connectionId: string, event: ReactMouseEvent<SVGPathElement>) {
@@ -1516,6 +1653,7 @@ function App() {
     event.preventDefault()
     event.stopPropagation()
     const viewport = boardRef.current?.getBoundingClientRect()
+    closeTransientUi()
     setSelectedNodeId(null)
     setInspectorNodeId(null)
     setSelectedConnectionId(connectionId)
@@ -1566,6 +1704,13 @@ function App() {
     }
   }
 
+  const themeIconLabel = theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'
+  const accountMenuLabel =
+    status === 'authenticated' && session?.user ? 'Account menu' : 'Sign in menu'
+  const selectedTagColor = selectedInspectorTag
+    ? tagColorById[selectedInspectorTag.id] ?? normalizeTagColor(selectedInspectorTag.color ?? DEFAULT_TAG_COLOR)
+    : null
+
   return (
     <main className={`app-shell theme-${theme}`}>
       {isLoginPromptOpen ? (
@@ -1612,14 +1757,40 @@ function App() {
 
       <div className="top-bar">
         <div className="top-bar__left">
-          <div className="tags-menu">
+          <div ref={tagsMenuRef} className="tags-menu">
             <button
               type="button"
-              className="tags-menu__toggle"
-              onClick={() => setIsTagsMenuOpen((isOpen) => !isOpen)}
+              className="top-bar__icon-button tags-menu__toggle"
+              onClick={() => {
+                const nextIsOpen = !isTagsMenuOpen
+                setIsTagsMenuOpen(nextIsOpen)
+                setIsAccountMenuOpen(false)
+                setIsSearchOpen(false)
+                setActiveColorTagId(null)
+                if (nextIsOpen) {
+                  closeInspectorUi()
+                }
+              }}
               aria-expanded={isTagsMenuOpen}
+              aria-label="Tags menu"
             >
-              Tags
+              <svg
+                className="top-bar__icon-glyph"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M8 7.5h10" />
+                <path d="M8 12h10" />
+                <path d="M8 16.5h10" />
+                <circle cx="5.5" cy="7.5" r="1" fill="currentColor" stroke="none" />
+                <circle cx="5.5" cy="12" r="1" fill="currentColor" stroke="none" />
+                <circle cx="5.5" cy="16.5" r="1" fill="currentColor" stroke="none" />
+              </svg>
             </button>
 
             {isTagsMenuOpen ? (
@@ -1650,7 +1821,9 @@ function App() {
                           onClick={() => setActiveColorTagId(isPaletteOpen ? null : tag.id)}
                           disabled={!tag.isPersisted}
                           aria-label={`Change ${tag.name} color`}
-                        />
+                        >
+                          <span className="tags-menu__swatch-core" aria-hidden="true" />
+                        </button>
                         <input
                           className="tags-menu__name-input"
                           value={tagNameDrafts[tag.id] ?? tag.name}
@@ -1713,7 +1886,7 @@ function App() {
                         {isPaletteOpen ? (
                           <div className="tags-menu__palette-wrap">
                             <div className="tags-menu__palette-header">
-                              <span className="tags-menu__palette-label">Choose a color</span>
+                              <span className="tags-menu__palette-label">Color</span>
                               <span className="tags-menu__palette-value">{color.toUpperCase()}</span>
                             </div>
                             <div className="tags-menu__preset-grid">
@@ -1767,7 +1940,7 @@ function App() {
         </div>
 
         <div className="top-bar__right">
-          <div className="search-panel">
+          <div ref={searchPanelRef} className="search-panel">
             <div className="search-panel__bar">
               <input
                 ref={searchInputRef}
@@ -1775,23 +1948,28 @@ function App() {
                 value={searchQuery}
                 onFocus={() => {
                   requestLogin()
+                  setIsSearchOpen(true)
+                  setIsTagsMenuOpen(false)
+                  setIsAccountMenuOpen(false)
+                  setActiveColorTagId(null)
+                  closeInspectorUi()
                 }}
                 onChange={(event) => {
-                  setSearchQuery(event.target.value)
+                  const nextQuery = event.target.value
+                  setSearchQuery(nextQuery)
+                  setIsSearchOpen(true)
                   setAiSearchStatus('idle')
                   setAiSearchError(null)
                 }}
                 onKeyDown={handleSearchKeyDown}
                 placeholder="Search people"
                 aria-label="Search people"
-                aria-expanded={
-                  Boolean(searchQuery.trim()) || aiSearchStatus === 'loading' || Boolean(aiSearchError)
-                }
+                aria-expanded={isSearchOpen}
                 aria-controls="people-search-panel"
               />
             </div>
 
-            {searchQuery.trim() || aiSearchStatus === 'loading' || aiSearchError ? (
+            {isSearchOpen ? (
               <div id="people-search-panel" className="search-panel__dropdown">
               {isGraphReady ? (
                 <div className="search-panel__hint">
@@ -1849,64 +2027,86 @@ function App() {
             ) : null}
           </div>
 
-          <div className="account-panel" aria-live="polite">
-            {status === 'authenticated' && session?.user ? (
-              <>
-                {session.user.user_metadata.avatar_url ? (
-                  <img
-                    className="account-panel__avatar"
-                    src={session.user.user_metadata.avatar_url}
-                    alt=""
-                  />
+          <div ref={accountPanelRef} className="account-panel" aria-live="polite">
+            <button
+              type="button"
+              className="top-bar__icon-button account-panel__trigger"
+              onClick={() => {
+                const nextIsOpen = !isAccountMenuOpen
+                setIsAccountMenuOpen(nextIsOpen)
+                setIsTagsMenuOpen(false)
+                setIsSearchOpen(false)
+                if (nextIsOpen) {
+                  closeInspectorUi()
+                }
+              }}
+              aria-expanded={isAccountMenuOpen}
+              aria-label={accountMenuLabel}
+            >
+              {status === 'authenticated' && session?.user?.user_metadata.avatar_url ? (
+                <img
+                  className="account-panel__avatar"
+                  src={session.user.user_metadata.avatar_url}
+                  alt=""
+                />
+              ) : (
+                <span className="account-panel__avatar" aria-hidden="true">
+                  {status === 'authenticated' && session?.user
+                    ? (session.user.email ?? 'U').slice(0, 1).toUpperCase()
+                    : '@'}
+                </span>
+              )}
+            </button>
+
+            {isAccountMenuOpen ? (
+              <div className="account-panel__popover">
+                {status === 'authenticated' && session?.user ? (
+                  <>
+                    <div className="account-panel__text">
+                      <span className="account-panel__label">{session.user.email}</span>
+                      <span className="account-panel__meta">
+                        {graphStatus === 'loading' ? 'Loading your graph' : board?.title ?? 'Personal board'}
+                      </span>
+                    </div>
+                    <button type="button" className="account-panel__button" onClick={signOut}>
+                      Sign out
+                    </button>
+                  </>
                 ) : (
-                  <span className="account-panel__avatar" aria-hidden="true">
-                    {(session.user.email ?? 'U').slice(0, 1).toUpperCase()}
-                  </span>
+                  <>
+                    <div className="account-panel__text">
+                      <span className="account-panel__label">
+                        {status === 'loading' ? 'Checking session' : 'Social graph'}
+                      </span>
+                      <span className="account-panel__meta">
+                        {status === 'unconfigured'
+                          ? 'Connect Supabase to enable Google login'
+                          : 'Sign in to save your network space'}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="account-panel__button"
+                      onClick={signInWithGoogle}
+                      disabled={status === 'loading' || status === 'unconfigured'}
+                    >
+                      Sign in with Google
+                    </button>
+                  </>
                 )}
-                <span className="account-panel__text">
-                  <span className="account-panel__label">{session.user.email}</span>
-                  <span className="account-panel__meta">
-                    {graphStatus === 'loading' ? 'Loading your graph' : board?.title ?? 'Personal board'}
-                  </span>
-                </span>
-                <button type="button" className="account-panel__button" onClick={signOut}>
-                  Sign out
-                </button>
-              </>
-            ) : (
-              <>
-                <span className="account-panel__text">
-                  <span className="account-panel__label">
-                    {status === 'loading' ? 'Checking session' : 'Social graph'}
-                  </span>
-                  <span className="account-panel__meta">
-                    {status === 'unconfigured'
-                      ? 'Connect Supabase to enable Google login'
-                      : 'Sign in to save your network space'}
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  className="account-panel__button"
-                  onClick={signInWithGoogle}
-                  disabled={status === 'loading' || status === 'unconfigured'}
-                >
-                  Sign in with Google
-                </button>
-              </>
-            )}
-            {error ? <span className="account-panel__error">{error}</span> : null}
+                {error ? <span className="account-panel__error">{error}</span> : null}
+              </div>
+            ) : null}
           </div>
 
           <button
             type="button"
-            className="theme-toggle"
+            className="top-bar__icon-button theme-toggle"
             onClick={() => setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))}
-            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+            aria-label={themeIconLabel}
           >
-            <span className="theme-toggle__track">
-              <span className="theme-toggle__label">{theme === 'dark' ? 'Dark' : 'Light'}</span>
-              <span className="theme-toggle__thumb" />
+            <span className="theme-toggle__glyph" aria-hidden="true">
+              {theme === 'dark' ? '☀' : '☾'}
             </span>
           </button>
         </div>
@@ -1921,9 +2121,21 @@ function App() {
           onWheel={handleInspectorWheel}
         >
           <input
-            className="field-group__input inspector-panel__name"
+            ref={nameInputRef}
+            className="inspector-panel__name"
             value={nameDraft}
-            onChange={(event) => setNameDraft(event.target.value)}
+            onChange={(event) => {
+              handleInspectorNameChange(
+                event.target.value,
+                event.target.selectionStart ?? event.target.value.length,
+              )
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                tagTriggerRef.current?.focus()
+              }
+            }}
             onBlur={() => {
               void saveInspectorName()
             }}
@@ -1933,37 +2145,42 @@ function App() {
 
           <div className="field-group field-group--compact">
             <div className="tag-picker">
-              <input
-                className="field-group__input tag-picker__input"
-                value={tagDraft}
-                onFocus={() => {
-                  setIsTagPickerOpen(true)
-                  setActiveTagOptionIndex(0)
-                }}
-                onChange={(event) => {
-                  setTagDraft(event.target.value)
-                  setIsTagPickerOpen(true)
-                  setActiveTagOptionIndex(0)
-                }}
-                onKeyDown={handleTagKeyDown}
-                onBlur={() => {
-                  window.setTimeout(() => {
-                    setIsTagPickerOpen(false)
-                    setTagDraft(selectedInspectorTag?.name ?? '')
-                    setActiveTagOptionIndex(0)
-                  }, 120)
-                }}
-                placeholder="Choose or create a tag"
-                disabled={!isGraphReady}
-                role="combobox"
-                aria-expanded={isTagPickerOpen}
-                aria-controls="inspector-tag-options"
-                aria-activedescendant={
-                  isTagPickerOpen && tagPickerOptions[activeTagOptionIndex]
-                    ? `inspector-tag-option-${tagPickerOptions[activeTagOptionIndex].id}`
+              <button
+                ref={tagTriggerRef}
+                type="button"
+                className={`tag-picker__trigger${selectedInspectorTag ? ' is-selected' : ' is-ghost'}`}
+                style={
+                  selectedTagColor
+                    ? ({ '--tag-color': selectedTagColor } as TagColorStyle)
                     : undefined
                 }
-              />
+                onClick={() => {
+                  openTagPicker()
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    openTagPicker()
+                    return
+                  }
+
+                  if ((event.key === 'Backspace' || event.key === 'Delete') && selectedInspectorTag) {
+                    event.preventDefault()
+                    void handleClearTag()
+                  }
+                }}
+                aria-expanded={isTagPickerOpen}
+                aria-controls="inspector-tag-options"
+              >
+                {selectedInspectorTag ? (
+                  <>
+                    <span className="tag-picker__trigger-dot" aria-hidden="true" />
+                    <span className="tag-picker__trigger-label">{selectedInspectorTag.name}</span>
+                  </>
+                ) : (
+                  <span className="tag-picker__ghost-label">+ add tag</span>
+                )}
+              </button>
               {isTagPickerOpen ? (
                 <div
                   ref={tagPickerMenuRef}
@@ -1971,6 +2188,31 @@ function App() {
                   className="tag-picker__menu"
                   role="listbox"
                 >
+                  <input
+                    ref={tagSearchInputRef}
+                    className="tag-picker__search"
+                    value={tagDraft}
+                    onChange={(event) => {
+                      setTagDraft(event.target.value)
+                      setActiveTagOptionIndex(0)
+                    }}
+                    onKeyDown={handleTagKeyDown}
+                    onBlur={() => {
+                      window.setTimeout(() => {
+                        closeTagPicker()
+                      }, 120)
+                    }}
+                    placeholder="Search or create a tag"
+                    disabled={!isGraphReady}
+                    role="combobox"
+                    aria-expanded={isTagPickerOpen}
+                    aria-controls="inspector-tag-options"
+                    aria-activedescendant={
+                      isTagPickerOpen && tagPickerOptions[activeTagOptionIndex]
+                        ? `inspector-tag-option-${tagPickerOptions[activeTagOptionIndex].id}`
+                        : undefined
+                    }
+                  />
                   {tagPickerOptions.map((option, optionIndex) => {
                     const isTagSelected = option.type === 'tag' && option.tagId === inspectorNode.tag_id
 
@@ -1992,6 +2234,26 @@ function App() {
                         role="option"
                         aria-selected={optionIndex === activeTagOptionIndex}
                       >
+                        {option.type === 'tag' ? (
+                          <label
+                            className="tag-picker__color"
+                            style={getTagAccentStyle(option.color)}
+                            aria-label={`Change ${option.label} color`}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <input
+                              type="color"
+                              className="tag-picker__color-input"
+                              value={option.color}
+                              onChange={(event) => {
+                                void handleInspectorTagColorChange(option.tagId, event.target.value)
+                              }}
+                            />
+                          </label>
+                        ) : (
+                          <span className="tag-picker__spacer" aria-hidden="true" />
+                        )}
                         <button
                           type="button"
                           className="tag-picker__option"
@@ -2000,7 +2262,16 @@ function App() {
                             chooseTagPickerOption(option)
                           }}
                         >
-                          {option.label}
+                          {option.type === 'tag' ? (
+                            <span
+                              className="tag-picker__label"
+                              style={getTagAccentStyle(option.color)}
+                            >
+                              {option.label}
+                            </span>
+                          ) : (
+                            option.label
+                          )}
                         </button>
                         {option.type === 'tag' ? (
                           <button
@@ -2015,7 +2286,9 @@ function App() {
                           >
                             x
                           </button>
-                        ) : null}
+                        ) : (
+                          <span className="tag-picker__spacer" aria-hidden="true" />
+                        )}
                       </div>
                     )
                   })}
@@ -2095,27 +2368,26 @@ function App() {
             })}
 
             <article className="note-card note-card--draft">
-              <div className="note-card__header">
-                <span className="note-card__spacer" aria-hidden="true" />
-                <input
-                  className="note-card__title"
-                  value={newNoteDraft.title}
-                  onChange={(event) =>
-                    setNewNoteDraft((currentDraft) => ({
-                      ...currentDraft,
-                      title: event.target.value,
-                    }))
-                  }
-                  onKeyDown={(event) => {
-                    void handleNewNoteTitleKeyDown(event)
-                  }}
-                  onBlur={() => {
-                    void handleNewNoteBlur()
-                  }}
-                  disabled={!isGraphReady}
-                  placeholder="Create new note"
-                />
-                <span className="note-card__spacer" aria-hidden="true" />
+              <div className="note-card__composer-shell">
+                <span className="note-card__composer-hint">Cmd/Ctrl + Enter to save</span>
+              <textarea
+                ref={newNoteTextareaRef}
+                className="note-card__composer"
+                value={newNoteText}
+                onChange={(event) => {
+                  setNewNoteText(event.target.value)
+                  autoResizeTextarea(event.currentTarget)
+                }}
+                onKeyDown={(event) => {
+                  void handleNewNoteKeyDown(event)
+                }}
+                onBlur={() => {
+                  void handleNewNoteBlur()
+                }}
+                disabled={!isGraphReady}
+                placeholder={'Write a note\nTitle on the first line, details below'}
+                rows={4}
+              />
               </div>
             </article>
           </div>
@@ -2175,8 +2447,8 @@ function App() {
             aria-hidden="true"
           >
             {visibleBoardConnections.map((edge) => {
-              const fromNode = visibleNodesById[edge.person_a_id]
-              const toNode = visibleNodesById[edge.person_b_id]
+              const fromNode = nodesById[edge.person_a_id]
+              const toNode = nodesById[edge.person_b_id]
               const link = getLinkPath(fromNode, toNode)
               if (!link) return null
 
@@ -2231,16 +2503,11 @@ function App() {
                   onClick={(event) => {
                     event.stopPropagation()
                     if (requestLogin()) return
-                    setSelectedNodeId(node.id)
                     if (suppressNodeClickRef.current) {
                       suppressNodeClickRef.current = false
                       return
                     }
-                    inspectorOpenScaleRef.current = viewportRef.current.scale
-                    setInspectorNodeId(node.id)
-                    setNameDraft(node.name)
-                    setTagDraft(node.tag_id ? tagsById[node.tag_id]?.name ?? '' : '')
-                    setIsTagPickerOpen(false)
+                    openInspectorForNode(node)
                   }}
                 >
                   <span className="graph-node__dot" />
@@ -2341,6 +2608,35 @@ function normalizeNoteTitle(value: string) {
   if (!trimmedValue) return 'Untitled note'
 
   return trimmedValue.replace(/^#+\s*/, '').trim() || 'Untitled note'
+}
+
+function parseNoteContent(value: string) {
+  const normalizedValue = value.replace(/\r\n/g, '\n').trim()
+  if (!normalizedValue) {
+    return { title: '', body: '' }
+  }
+
+  const [rawTitle, ...bodyLines] = normalizedValue.split('\n')
+
+  return {
+    title: normalizeNoteTitle(rawTitle),
+    body: bodyLines.join('\n').trim(),
+  }
+}
+
+function extractTagTrigger(value: string, caretIndex: number) {
+  const beforeCaret = value.slice(0, caretIndex)
+  const match = beforeCaret.match(/(?:^|\s)#([^\s#]*)$/)
+  if (!match || match.index === undefined) return null
+
+  const prefixOffset = match[0].startsWith('#') ? 0 : 1
+  const start = match.index + prefixOffset
+
+  return {
+    start,
+    end: caretIndex,
+    query: match[1] ?? '',
+  }
 }
 
 function autoResizeTextarea(element: HTMLTextAreaElement | null) {
