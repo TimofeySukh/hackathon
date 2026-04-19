@@ -1131,9 +1131,10 @@ input[type='search']::-webkit-search-results-decoration {
 .note-card {
   display: grid;
   gap: 8px;
-  padding: 10px 0;
-  border-radius: 0;
-  border-width: 0 0 1px;
+  padding: 12px 14px;
+  border-width: 1px;
+  border-radius: 24px;
+  background: rgba(4, 18, 13, 0.28);
 }
 
 .note-card__header {
@@ -1205,8 +1206,7 @@ input[type='search']::-webkit-search-results-decoration {
 }
 
 .note-card--draft {
-  border-style: solid;
-  border-width: 0;
+  border-style: none;
   padding: 0;
   background: transparent;
 }
