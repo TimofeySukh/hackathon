@@ -24,7 +24,7 @@ A persisted social graph board built with React, Vite, and TypeScript.
 - A login popup appears when signed-out users try to edit the board
 - Minimal selected-person inspector with a Notion-like large name field, a single-tag chip flow, and keyboard-first note capture
 - Typing `#` inside the name field opens tag selection and removes the `#tag` token from the saved name after applying the tag
-- New notes are captured in one textarea and saved with `Cmd/Ctrl + Enter`, using the first line as the rendered title
+- New notes are captured in one textarea and saved on blur or with `Cmd/Ctrl + Enter`, using the first line as the rendered title
 - Newly created people open their inspector automatically
 - Single-click a person to open that inspector directly on the board
 - Opening the inspector pans the board enough to keep it visible and opens it at a consistent size before later zoom changes affect it

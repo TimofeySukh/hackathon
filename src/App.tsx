@@ -1439,11 +1439,13 @@ function App() {
     return createdNote
   }
 
-  async function handleCreateNoteFromDraft() {
+  async function handleCreateNoteFromDraft(refocusComposer = true) {
     const createdNote = await createInspectorNote(newNoteText)
     if (!createdNote) return
 
     setNewNoteText('')
+    if (!refocusComposer) return
+
     window.requestAnimationFrame(() => {
       newNoteTextareaRef.current?.focus()
       autoResizeTextarea(newNoteTextareaRef.current)
@@ -1549,6 +1551,10 @@ function App() {
 
     event.preventDefault()
     await handleCreateNoteFromDraft()
+  }
+
+  async function handleNewNoteBlur() {
+    await handleCreateNoteFromDraft(false)
   }
 
   function toggleNoteCollapse(noteId: string) {
@@ -2280,6 +2286,9 @@ function App() {
                 }}
                 onKeyDown={(event) => {
                   void handleNewNoteKeyDown(event)
+                }}
+                onBlur={() => {
+                  void handleNewNoteBlur()
                 }}
                 disabled={!isGraphReady}
                 placeholder={'Write a note\nTitle on the first line, details below'}
