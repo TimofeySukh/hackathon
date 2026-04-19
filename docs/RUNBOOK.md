@@ -112,6 +112,14 @@ Optional seeding flags:
 - `--random-links <n>` adds extra random connections among the newly created people.
 - `--ring-start <pixels>` and `--ring-step <pixels>` control how far the generated nodes are placed from the origin.
 
+Seed one user's board with a reusable demo cluster of people, notes, AI summaries, and connections:
+
+```bash
+npm run seed:demo-user -- --email <user-email>
+```
+
+The demo seed is idempotent for the fixed contact set. Re-running it updates the seeded people, rebuilds their notes, and keeps the graph ready for search and live demos.
+
 Vite listens on all network interfaces in this repository, so it prints both a local URL and a network URL in the terminal. Open either URL in a browser.
 
 For other devices on the same local network, open the printed network URL, for example:

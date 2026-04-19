@@ -55,6 +55,7 @@ Completed tasks can remain listed here when they explain repository history. Liv
 - `.env.mcp.example`: local-only MCP environment template for service-role access.
 - `.mcp.json`: project MCP configuration for the shared `n8n-mcp` HTTP server and the local Hackathon board stdio server.
 - `mcp/server.mjs`: local MCP server that exposes project docs and board graph tooling.
+- `scripts/seed-demo-user.mjs`: idempotent demo-data seed for one user's board with reusable people, notes, AI summaries, and connections.
 - `src/main.tsx`: React entry point.
 - `src/App.tsx`: current board behavior.
 - `src/lib/supabase.ts`: browser Supabase client configuration.

@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "mcp:start": "node ./mcp/server.mjs",
     "seed:board": "node ./scripts/seed-board.mjs",
+    "seed:demo-user": "node ./scripts/seed-demo-user.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
