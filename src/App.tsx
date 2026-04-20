@@ -9,7 +9,7 @@ import type {
 import { useAuth } from './lib/useAuth'
 import { normalizeTagName, searchPeopleWithAi } from './lib/graphStorage'
 import type { Connection, PersonNode, PersonNote, Tag } from './lib/graphTypes'
-import { DEFAULT_TAG_COLOR, DEFAULT_TAGS, normalizeTagColor } from './lib/tagPalette'
+import { DEFAULT_TAG_COLOR, DEFAULT_TAGS, hexToRgb, normalizeTagColor } from './lib/tagPalette'
 import { useBoardGraph } from './lib/useBoardGraph'
 
 type Theme = 'dark' | 'light'
@@ -65,6 +65,7 @@ type BoardStyle = CSSProperties & {
 
 type TagColorStyle = CSSProperties & {
   '--tag-color': string
+  '--tag-color-rgb'?: string
 }
 
 type GraphNodeStyle = CSSProperties & {
@@ -1171,6 +1172,7 @@ function App() {
   function getTagAccentStyle(color: string): CSSProperties {
     return {
       '--tag-color': color,
+      '--tag-color-rgb': hexToRgb(color),
     } as CSSProperties
   }
 

@@ -14,6 +14,15 @@ export function normalizeTagColor(color: string) {
   return isHexColor(color) ? color.toLowerCase() : DEFAULT_TAG_COLOR
 }
 
+export function hexToRgb(color: string) {
+  const normalized = normalizeTagColor(color)
+  const red = Number.parseInt(normalized.slice(1, 3), 16)
+  const green = Number.parseInt(normalized.slice(3, 5), 16)
+  const blue = Number.parseInt(normalized.slice(5, 7), 16)
+
+  return `${red} ${green} ${blue}`
+}
+
 export function getDefaultTagColor(name: string) {
   const defaultTag = DEFAULT_TAGS.find((tag) => tag.name.toLowerCase() === name.trim().toLowerCase())
 

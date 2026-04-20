@@ -895,9 +895,9 @@ input[type='search']::-webkit-search-results-decoration {
 
 .tag-picker__trigger.is-selected {
   padding: 0 14px 0 10px;
-  border: 1px solid color-mix(in srgb, var(--tag-color) 56%, transparent);
+  border: 1px solid rgba(var(--tag-color-rgb), 0.56);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--tag-color) 24%, transparent);
+  background: rgba(var(--tag-color-rgb), 0.24);
 }
 
 .tag-picker__trigger.is-ghost {
@@ -909,7 +909,7 @@ input[type='search']::-webkit-search-results-decoration {
   height: 10px;
   border-radius: 999px;
   background: var(--tag-color);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tag-color) 64%, transparent);
+  box-shadow: 0 0 0 1px rgba(var(--tag-color-rgb), 0.64);
 }
 
 .tag-picker__trigger-label,
@@ -991,9 +991,9 @@ input[type='search']::-webkit-search-results-decoration {
   max-width: 100%;
   min-height: 30px;
   padding: 0 12px;
-  border: 1px solid color-mix(in srgb, var(--tag-color) 52%, transparent);
+  border: 1px solid rgba(var(--tag-color-rgb), 0.52);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--tag-color) 22%, transparent);
+  background: rgba(var(--tag-color-rgb), 0.22);
   color: var(--panel-text);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1032,7 +1032,7 @@ input[type='search']::-webkit-search-results-decoration {
 .tag-picker__color {
   position: relative;
   display: block;
-  border: 1px solid color-mix(in srgb, var(--tag-color) 62%, rgba(255, 255, 255, 0.25));
+  border: 1px solid rgba(var(--tag-color-rgb), 0.62);
   border-radius: 999px;
   background: var(--tag-color);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
@@ -1458,7 +1458,7 @@ input[type='search']::-webkit-search-results-decoration {
   height: 24px;
   border-radius: 50%;
   background: var(--node-color, rgba(226, 255, 244, 0.82));
-  box-shadow: 0 0 18px color-mix(in srgb, var(--node-color, #8affd6) 34%, transparent);
+  box-shadow: 0 0 18px rgba(138, 255, 214, 0.24);
   transform: translate(-50%, -50%);
 }
 
@@ -1474,7 +1474,23 @@ input[type='search']::-webkit-search-results-decoration {
 
 .theme-light .graph-node__dot {
   background: var(--node-color, rgba(62, 158, 118, 0.74));
-  box-shadow: 0 0 18px color-mix(in srgb, var(--node-color, #58bf91) 22%, transparent);
+  box-shadow: 0 0 18px rgba(88, 191, 145, 0.18);
+}
+
+@supports (-moz-appearance: none) {
+  .top-bar__icon-button,
+  .tags-menu__toggle,
+  .tags-menu__new,
+  .tags-menu__panel,
+  .search-panel__bar,
+  .search-panel__dropdown,
+  .account-panel__popover,
+  .login-prompt,
+  .inspector-panel,
+  .tag-picker__menu,
+  .connection-menu__button {
+    backdrop-filter: none;
+  }
 }
 
 .graph-node__label {
