@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   CSSProperties,
   KeyboardEvent as ReactKeyboardEvent,
@@ -8,7 +8,7 @@ import type {
 
 import { useAuth } from './lib/useAuth'
 import { normalizeTagName, searchPeopleWithAi } from './lib/graphStorage'
-import type { PersonNode, PersonNote, Tag } from './lib/graphTypes'
+import type { Connection, PersonNode, PersonNote, Tag } from './lib/graphTypes'
 import { DEFAULT_TAG_COLOR, DEFAULT_TAGS, normalizeTagColor } from './lib/tagPalette'
 import { useBoardGraph } from './lib/useBoardGraph'
 
@@ -145,6 +145,95 @@ const ANONYMOUS_ROOT: PersonNode = {
   updated_at: new Date(0).toISOString(),
 }
 
+type GraphEdgeProps = {
+  edge: Connection
+  fromNode: PersonNode
+  toNode: PersonNode
+  isSelected: boolean
+  onSelect: (connectionId: string, event: ReactMouseEvent<SVGPathElement>) => void
+}
+
+const GraphEdgePath = memo(function GraphEdgePath({
+  edge,
+  fromNode,
+  toNode,
+  isSelected,
+  onSelect,
+}: GraphEdgeProps) {
+  const link = getLinkPath(fromNode, toNode)
+  if (!link) return null
+
+  const pathD = `M ${link.start.x} ${link.start.y} C ${link.controlA.x} ${link.controlA.y}, ${link.controlB.x} ${link.controlB.y}, ${link.end.x} ${link.end.y}`
+
+  return (
+    <g>
+      <path
+        className="graph-edge-hit"
+        d={pathD}
+        onMouseDown={(event) => onSelect(edge.id, event)}
+      />
+      <path
+        className={`graph-edge${isSelected ? ' is-selected' : ''}`}
+        d={pathD}
+      />
+    </g>
+  )
+})
+
+type GraphNodeProps = {
+  node: PersonNode
+  isSelected: boolean
+  tagColor: string | null
+  isGraphReady: boolean
+  connectionModifierLabel: string
+  onMouseDown: (node: PersonNode, event: ReactMouseEvent<HTMLButtonElement>) => void
+  onClick: (node: PersonNode) => void
+}
+
+const GraphNodeCard = memo(function GraphNodeCard({
+  node,
+  isSelected,
+  tagColor,
+  isGraphReady,
+  connectionModifierLabel,
+  onMouseDown,
+  onClick,
+}: GraphNodeProps) {
+  const nodeStyle = {
+    transform: `translate(${node.x}px, ${node.y}px)`,
+    ...(tagColor ? { '--node-color': tagColor } : {}),
+  } as GraphNodeStyle
+
+  return (
+    <div
+      className={`graph-node${node.is_root ? ' graph-node--root' : ''}${isSelected ? ' is-selected' : ''}`}
+      style={nodeStyle}
+    >
+      <button
+        type="button"
+        className="graph-node__button"
+        title={
+          isGraphReady
+            ? node.is_root
+              ? `Hold ${connectionModifierLabel} and drag to connect`
+              : `Drag to move. Hold ${connectionModifierLabel} and drag to connect.`
+            : 'Sign in with Google to edit'
+        }
+        onMouseDown={(event) => onMouseDown(node, event)}
+        onClick={(event) => {
+          event.stopPropagation()
+          onClick(node)
+        }}
+      >
+        <span className="graph-node__dot" />
+        <span className="graph-node__label">
+          {node.name.trim() || (node.is_root ? 'You' : 'Unnamed person')}
+        </span>
+      </button>
+    </div>
+  )
+})
+
 function App() {
   const { session, status, error: authError, signInWithGoogle, signOut } = useAuth()
   const {
@@ -229,6 +318,9 @@ function App() {
   const viewportRef = useRef({ offset: { x: 0, y: 0 }, scale: 1 })
   const pendingViewportRef = useRef<{ offset: Offset; scale: number } | null>(null)
   const viewportFrameRef = useRef<number | null>(null)
+  const connectionDragStateRef = useRef<ConnectionDrag | null>(null)
+  const nodeDragStateRef = useRef<NodeDrag | null>(null)
+  const draggedPositionsRef = useRef<Record<string, Offset>>({})
   const gestureScaleRef = useRef(1)
   const trackpadPanRef = useRef<{ active: boolean; timeoutId: number | null }>({
     active: false,
@@ -399,7 +491,7 @@ function App() {
     const normalizedQuery = searchQuery.trim().toLowerCase()
     if (!normalizedQuery) return []
 
-    return boardNodes
+    return (isGraphReady ? people : [ANONYMOUS_ROOT])
       .map((node) => {
         const matches: string[] = []
         let score = 0
@@ -447,7 +539,7 @@ function App() {
         return (left.node.name || '').localeCompare(right.node.name || '')
       })
       .slice(0, 8)
-  }, [boardNodes, notesByPersonId, searchQuery, tagsById])
+  }, [isGraphReady, notesByPersonId, people, searchQuery, tagsById])
   const visibleSearchResults = aiSearchQuery === searchQuery.trim() ? aiSearchResults : searchResults
 
   const error = authError ?? graphError
@@ -458,6 +550,18 @@ function App() {
     setIsLoginPromptOpen(true)
     return true
   }, [status])
+
+  useEffect(() => {
+    connectionDragStateRef.current = connectionDrag
+  }, [connectionDrag])
+
+  useEffect(() => {
+    nodeDragStateRef.current = nodeDrag
+  }, [nodeDrag])
+
+  useEffect(() => {
+    draggedPositionsRef.current = draggedPositions
+  }, [draggedPositions])
 
   const closeInspectorUi = useCallback(() => {
     setInspectorNodeId(null)
@@ -781,7 +885,8 @@ function App() {
 
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
-      if (connectionDrag) {
+      const currentConnectionDrag = connectionDragStateRef.current
+      if (currentConnectionDrag) {
         const view = viewportRef.current
         const worldPoint = screenToWorld(
           event.clientX,
@@ -793,26 +898,36 @@ function App() {
 
         setConnectionDrag((currentDrag) =>
           currentDrag
-            ? {
+            ? ((connectionDragStateRef.current = {
                 ...currentDrag,
                 clientX: event.clientX,
                 clientY: event.clientY,
                 worldX: worldPoint?.x ?? currentDrag.worldX,
                 worldY: worldPoint?.y ?? currentDrag.worldY,
-              }
+              }),
+              connectionDragStateRef.current)
             : null,
         )
         return
       }
 
-      if (nodeDrag) {
-        setDraggedPositions((currentPositions) => ({
+      const currentNodeDrag = nodeDragStateRef.current
+      if (currentNodeDrag) {
+        setDraggedPositions((currentPositions) => {
+          const nextPositions = {
           ...currentPositions,
-          [nodeDrag.nodeId]: {
-            x: nodeDrag.originX + (event.clientX - nodeDrag.startClientX) / viewportRef.current.scale,
-            y: nodeDrag.originY + (event.clientY - nodeDrag.startClientY) / viewportRef.current.scale,
+          [currentNodeDrag.nodeId]: {
+            x:
+              currentNodeDrag.originX +
+              (event.clientX - currentNodeDrag.startClientX) / viewportRef.current.scale,
+            y:
+              currentNodeDrag.originY +
+              (event.clientY - currentNodeDrag.startClientY) / viewportRef.current.scale,
           },
-        }))
+          }
+          draggedPositionsRef.current = nextPositions
+          return nextPositions
+        })
         return
       }
 
@@ -826,33 +941,36 @@ function App() {
 
     const handleMouseUp = (event: MouseEvent) => {
       void (async () => {
-        if (connectionDrag) {
+        if (connectionDragStateRef.current) {
           await finishConnectionDrag(event.clientX, event.clientY)
           return
         }
 
-        if (nodeDrag) {
-          const finalPosition = draggedPositions[nodeDrag.nodeId]
+        const currentNodeDrag = nodeDragStateRef.current
+        if (currentNodeDrag) {
+          const finalPosition = draggedPositionsRef.current[currentNodeDrag.nodeId]
           const movedDistance = Math.hypot(
-            event.clientX - nodeDrag.startClientX,
-            event.clientY - nodeDrag.startClientY,
+            event.clientX - currentNodeDrag.startClientX,
+            event.clientY - currentNodeDrag.startClientY,
           )
           suppressNodeClickRef.current = movedDistance > NODE_CLICK_DRAG_THRESHOLD
           setNodeDrag(null)
+          nodeDragStateRef.current = null
 
           try {
             if (finalPosition) {
-            const xChanged = Math.abs(finalPosition.x - nodeDrag.originX) > 0.001
-            const yChanged = Math.abs(finalPosition.y - nodeDrag.originY) > 0.001
+            const xChanged = Math.abs(finalPosition.x - currentNodeDrag.originX) > 0.001
+            const yChanged = Math.abs(finalPosition.y - currentNodeDrag.originY) > 0.001
 
             if (xChanged || yChanged) {
-              await movePerson(nodeDrag.nodeId, finalPosition.x, finalPosition.y)
+              await movePerson(currentNodeDrag.nodeId, finalPosition.x, finalPosition.y)
             }
           }
           } finally {
             setDraggedPositions((currentPositions) => {
               const nextPositions = { ...currentPositions }
-              delete nextPositions[nodeDrag.nodeId]
+              delete nextPositions[currentNodeDrag.nodeId]
+              draggedPositionsRef.current = nextPositions
               return nextPositions
             })
           }
@@ -871,7 +989,7 @@ function App() {
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [connectionDrag, draggedPositions, finishConnectionDrag, movePerson, nodeDrag, queueViewportUpdate])
+  }, [finishConnectionDrag, movePerson, queueViewportUpdate])
 
   function startBoardDragging(event: ReactMouseEvent<HTMLElement>) {
     if (event.button !== 0 || connectionDrag || nodeDrag) return
@@ -890,7 +1008,7 @@ function App() {
     setInspectorNodeId(null)
   }
 
-  function startNodeInteraction(node: PersonNode, event: ReactMouseEvent<HTMLButtonElement>) {
+  const startNodeInteraction = useCallback((node: PersonNode, event: ReactMouseEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return
 
     event.stopPropagation()
@@ -908,13 +1026,15 @@ function App() {
     const isConnectionModifierPressed = IS_MAC_PLATFORM ? event.metaKey : event.ctrlKey
 
     if (!isConnectionModifierPressed && !node.is_root) {
-      setNodeDrag({
+      const nextNodeDrag = {
         nodeId: node.id,
         startClientX: event.clientX,
         startClientY: event.clientY,
         originX: node.x,
         originY: node.y,
-      })
+      }
+      nodeDragStateRef.current = nextNodeDrag
+      setNodeDrag(nextNodeDrag)
       return
     }
 
@@ -928,7 +1048,7 @@ function App() {
       view.offset,
       view.scale,
     )
-    setConnectionDrag({
+    const nextConnectionDrag = {
       fromId: node.id,
       startClientX: event.clientX,
       startClientY: event.clientY,
@@ -936,8 +1056,10 @@ function App() {
       clientY: event.clientY,
       worldX: worldPoint?.x ?? node.x,
       worldY: worldPoint?.y ?? node.y,
-    })
-  }
+    }
+    connectionDragStateRef.current = nextConnectionDrag
+    setConnectionDrag(nextConnectionDrag)
+  }, [isGraphReady, requestLogin])
 
   const markTrackpadPanActive = useCallback(() => {
     trackpadPanRef.current.active = true
@@ -1569,7 +1691,7 @@ function App() {
     openInspectorForNode(node)
   }
 
-  function selectConnection(connectionId: string, event: ReactMouseEvent<SVGPathElement>) {
+  const selectConnection = useCallback((connectionId: string, event: ReactMouseEvent<SVGPathElement>) => {
     if (!isGraphReady) return
 
     event.preventDefault()
@@ -1583,7 +1705,22 @@ function App() {
       x: event.clientX - (viewport?.left ?? 0),
       y: event.clientY - (viewport?.top ?? 0),
     })
-  }
+  }, [closeTransientUi, isGraphReady])
+
+  const handleNodeClick = useCallback((node: PersonNode) => {
+    if (requestLogin()) return
+    if (suppressNodeClickRef.current) {
+      suppressNodeClickRef.current = false
+      return
+    }
+    if (inspectorNodeId === node.id) {
+      setInspectorNodeId(null)
+      setIsTagPickerOpen(false)
+      setActiveTagOptionIndex(0)
+      return
+    }
+    openInspectorForNode(node)
+  }, [inspectorNodeId, openInspectorForNode, requestLogin])
 
   const previewPath = connectionDrag
     ? getLinkPath(nodesById[connectionDrag.fromId], {
@@ -2354,21 +2491,17 @@ function App() {
             {visibleBoardConnections.map((edge) => {
               const fromNode = nodesById[edge.person_a_id]
               const toNode = nodesById[edge.person_b_id]
-              const link = getLinkPath(fromNode, toNode)
-              if (!link) return null
+              if (!fromNode || !toNode) return null
 
               return (
-                <g key={edge.id}>
-                  <path
-                    className="graph-edge-hit"
-                    d={`M ${link.start.x} ${link.start.y} C ${link.controlA.x} ${link.controlA.y}, ${link.controlB.x} ${link.controlB.y}, ${link.end.x} ${link.end.y}`}
-                    onMouseDown={(event) => selectConnection(edge.id, event)}
-                  />
-                  <path
-                    className={`graph-edge${edge.id === selectedConnectionId ? ' is-selected' : ''}`}
-                    d={`M ${link.start.x} ${link.start.y} C ${link.controlA.x} ${link.controlA.y}, ${link.controlB.x} ${link.controlB.y}, ${link.end.x} ${link.end.y}`}
-                  />
-                </g>
+                <GraphEdgePath
+                  key={edge.id}
+                  edge={edge}
+                  fromNode={fromNode}
+                  toNode={toNode}
+                  isSelected={edge.id === selectedConnectionId}
+                  onSelect={selectConnection}
+                />
               )
             })}
 
@@ -2379,56 +2512,18 @@ function App() {
               />
             ) : null}
           </svg>
-
-          {visibleBoardNodes.map((node) => {
-            const isSelected = node.id === selectedNode?.id
-            const tagColor = node.tag_id ? tagColorById[node.tag_id] : null
-            const nodeStyle = {
-              transform: `translate(${node.x}px, ${node.y}px)`,
-              ...(tagColor ? { '--node-color': tagColor } : {}),
-            } as GraphNodeStyle
-
-            return (
-              <div
-                key={node.id}
-                className={`graph-node${node.is_root ? ' graph-node--root' : ''}${isSelected ? ' is-selected' : ''}`}
-                style={nodeStyle}
-              >
-                <button
-                  type="button"
-                  className="graph-node__button"
-                  title={
-                    isGraphReady
-                      ? node.is_root
-                        ? `Hold ${connectionModifierLabel} and drag to connect`
-                        : `Drag to move. Hold ${connectionModifierLabel} and drag to connect.`
-                      : 'Sign in with Google to edit'
-                  }
-                  onMouseDown={(event) => startNodeInteraction(node, event)}
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    if (requestLogin()) return
-                    if (suppressNodeClickRef.current) {
-                      suppressNodeClickRef.current = false
-                      return
-                    }
-                    if (inspectorNodeId === node.id) {
-                      setInspectorNodeId(null)
-                      setIsTagPickerOpen(false)
-                      setActiveTagOptionIndex(0)
-                      return
-                    }
-                    openInspectorForNode(node)
-                  }}
-                >
-                  <span className="graph-node__dot" />
-                  <span className="graph-node__label">
-                    {node.name.trim() || (node.is_root ? 'You' : 'Unnamed person')}
-                  </span>
-                </button>
-              </div>
-            )
-          })}
+          {visibleBoardNodes.map((node) => (
+            <GraphNodeCard
+              key={node.id}
+              node={node}
+              isSelected={node.id === selectedNode?.id}
+              tagColor={node.tag_id ? tagColorById[node.tag_id] : null}
+              isGraphReady={isGraphReady}
+              connectionModifierLabel={connectionModifierLabel}
+              onMouseDown={startNodeInteraction}
+              onClick={handleNodeClick}
+            />
+          ))}
         </div>
 
         {selectedConnectionId && connectionMenuPosition ? (
