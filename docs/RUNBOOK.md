@@ -23,6 +23,7 @@ Current app behavior:
 - call a Supabase Edge Function that forwards person context to n8n and rewrites `person_ai_notes`
 - edit the selected person in the node-anchored inspector that opens on single click
 - open a people search layer, match locally while typing, and run natural-language AI search on Enter
+- simplify node labels and heavy visual effects on dense boards or while dragging to keep navigation responsive
 
 There is no multiplayer or drawing toolset yet.
 

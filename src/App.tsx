@@ -184,6 +184,7 @@ type GraphNodeProps = {
   node: PersonNode
   isSelected: boolean
   tagColor: string | null
+  showLabel: boolean
   isGraphReady: boolean
   connectionModifierLabel: string
   onMouseDown: (node: PersonNode, event: ReactMouseEvent<HTMLButtonElement>) => void
@@ -194,6 +195,7 @@ const GraphNodeCard = memo(function GraphNodeCard({
   node,
   isSelected,
   tagColor,
+  showLabel,
   isGraphReady,
   connectionModifierLabel,
   onMouseDown,
@@ -226,9 +228,11 @@ const GraphNodeCard = memo(function GraphNodeCard({
         }}
       >
         <span className="graph-node__dot" />
-        <span className="graph-node__label">
-          {node.name.trim() || (node.is_root ? 'You' : 'Unnamed person')}
-        </span>
+        {showLabel ? (
+          <span className="graph-node__label">
+            {node.name.trim() || (node.is_root ? 'You' : 'Unnamed person')}
+          </span>
+        ) : null}
       </button>
     </div>
   )
@@ -407,6 +411,8 @@ function App() {
       ),
     [boardConnections, visibleNodesById],
   )
+  const isDenseGraph = visibleBoardNodes.length >= 24
+  const isVeryDenseGraph = visibleBoardNodes.length >= 60
   const defaultSelectedNodeId =
     visibleBoardNodes.find((node) => node.is_root)?.id ?? visibleBoardNodes[0]?.id ?? null
   const activeSelectedNodeId =
@@ -2461,7 +2467,7 @@ function App() {
 
       <section
         ref={boardRef}
-        className={`board-viewport${isDraggingBoard ? ' is-dragging' : ''}`}
+        className={`board-viewport${isDraggingBoard ? ' is-dragging' : ''}${isDenseGraph ? ' is-dense-graph' : ''}${isVeryDenseGraph ? ' is-very-dense-graph' : ''}`}
         onMouseDown={(event) => {
           flushDraftNoteOnBoardPointerDown()
           startBoardDragging(event)
@@ -2518,6 +2524,7 @@ function App() {
               node={node}
               isSelected={node.id === selectedNode?.id}
               tagColor={node.tag_id ? tagColorById[node.tag_id] : null}
+              showLabel={!isDenseGraph || node.id === selectedNode?.id || node.is_root}
               isGraphReady={isGraphReady}
               connectionModifierLabel={connectionModifierLabel}
               onMouseDown={startNodeInteraction}

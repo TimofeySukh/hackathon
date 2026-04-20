@@ -1288,6 +1288,19 @@ input[type='search']::-webkit-search-results-decoration {
     center;
 }
 
+.board-viewport.is-dragging .board-surface,
+.board-viewport.is-very-dense-graph .board-surface {
+  background-image:
+    radial-gradient(circle, var(--grid-dot) 0 var(--dot-size), transparent calc(var(--dot-size) + 0.2px)),
+    radial-gradient(circle, var(--grid-dot-major) 0 var(--major-dot-size), transparent calc(var(--major-dot-size) + 0.2px));
+  background-size:
+    var(--dot-gap) var(--dot-gap),
+    var(--major-dot-gap) var(--major-dot-gap);
+  background-position:
+    var(--board-offset-x) var(--board-offset-y),
+    var(--board-offset-x) var(--board-offset-y);
+}
+
 .board-surface::after {
   content: '';
   position: absolute;
@@ -1296,6 +1309,11 @@ input[type='search']::-webkit-search-results-decoration {
     linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 20%),
     radial-gradient(circle at center, transparent 56%, rgba(0, 0, 0, 0.08) 100%);
   pointer-events: none;
+}
+
+.board-viewport.is-dragging .board-surface::after,
+.board-viewport.is-very-dense-graph .board-surface::after {
+  display: none;
 }
 
 .graph-layer {
@@ -1327,7 +1345,6 @@ input[type='search']::-webkit-search-results-decoration {
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
-  filter: drop-shadow(0 0 6px rgba(138, 255, 214, 0.08));
   pointer-events: none;
 }
 
@@ -1445,6 +1462,11 @@ input[type='search']::-webkit-search-results-decoration {
   transform: translate(-50%, -50%);
 }
 
+.board-viewport.is-dragging .graph-node__dot,
+.board-viewport.is-dense-graph .graph-node__dot {
+  box-shadow: none;
+}
+
 .graph-node__editor .graph-node__dot {
   position: static;
   transform: none;
@@ -1483,6 +1505,11 @@ input[type='search']::-webkit-search-results-decoration {
     0 0 24px rgba(138, 255, 214, 0.36);
 }
 
+.board-viewport.is-dragging .graph-node--root .graph-node__dot,
+.board-viewport.is-dense-graph .graph-node--root .graph-node__dot {
+  box-shadow: 0 0 0 4px rgba(138, 255, 214, 0.12);
+}
+
 .theme-light .graph-node--root .graph-node__dot {
   background: #3aaa7e;
   box-shadow:
@@ -1496,6 +1523,14 @@ input[type='search']::-webkit-search-results-decoration {
 
 .theme-light .graph-node.is-selected .graph-node__label {
   color: #184432;
+}
+
+.board-viewport.is-dense-graph .graph-connections {
+  opacity: 0.82;
+}
+
+.board-viewport.is-very-dense-graph .graph-connections {
+  opacity: 0.62;
 }
 
 .graph-node__input {
