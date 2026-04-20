@@ -1449,6 +1449,24 @@ input[type='search']::-webkit-search-results-decoration {
   cursor: crosshair;
 }
 
+.graph-node__button::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 36px;
+  height: 36px;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  transform: translate(-50%, -50%);
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease;
+  pointer-events: none;
+}
+
 .graph-node__editor {
   position: absolute;
   left: 0;
@@ -1546,8 +1564,20 @@ input[type='search']::-webkit-search-results-decoration {
   color: #f4fff9;
 }
 
+.graph-node.is-selected .graph-node__button::before {
+  border-color: rgba(138, 255, 214, 0.94);
+  background: rgba(138, 255, 214, 0.12);
+  box-shadow: 0 0 0 1px rgba(138, 255, 214, 0.18);
+}
+
 .theme-light .graph-node.is-selected .graph-node__label {
   color: #184432;
+}
+
+.theme-light .graph-node.is-selected .graph-node__button::before {
+  border-color: rgba(58, 170, 126, 0.9);
+  background: rgba(58, 170, 126, 0.1);
+  box-shadow: 0 0 0 1px rgba(58, 170, 126, 0.14);
 }
 
 .board-viewport.is-very-dense-graph .graph-connections {
