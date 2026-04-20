@@ -30,11 +30,17 @@ type ConnectionDrag = {
 }
 
 type NodeDrag = {
-  nodeId: string
+  nodeIds: string[]
   startClientX: number
   startClientY: number
-  originX: number
-  originY: number
+  originPositions: Record<string, Offset>
+}
+
+type AreaSelection = {
+  startClientX: number
+  startClientY: number
+  currentClientX: number
+  currentClientY: number
 }
 
 type NoteDraft = {
@@ -275,6 +281,8 @@ function App() {
   const [connectionDrag, setConnectionDrag] = useState<ConnectionDrag | null>(null)
   const [nodeDrag, setNodeDrag] = useState<NodeDrag | null>(null)
   const [draggedPositions, setDraggedPositions] = useState<Record<string, Offset>>({})
+  const [multiSelectedNodeIds, setMultiSelectedNodeIds] = useState<string[]>([])
+  const [areaSelection, setAreaSelection] = useState<AreaSelection | null>(null)
   const [nameDraft, setNameDraft] = useState('')
   const [tagDraft, setTagDraft] = useState('')
   const [isTagPickerOpen, setIsTagPickerOpen] = useState(false)
@@ -326,6 +334,8 @@ function App() {
   const connectionDragStateRef = useRef<ConnectionDrag | null>(null)
   const nodeDragStateRef = useRef<NodeDrag | null>(null)
   const draggedPositionsRef = useRef<Record<string, Offset>>({})
+  const areaSelectionRef = useRef<AreaSelection | null>(null)
+  const visibleBoardNodesRef = useRef<PersonNode[]>([])
   const gestureScaleRef = useRef(1)
   const trackpadPanRef = useRef<{ active: boolean; timeoutId: number | null }>({
     active: false,
@@ -412,6 +422,7 @@ function App() {
       ),
     [boardConnections, visibleNodesById],
   )
+  const multiSelectedNodeIdSet = useMemo(() => new Set(multiSelectedNodeIds), [multiSelectedNodeIds])
   const isVeryDenseGraph = visibleBoardNodes.length >= 60
   const defaultSelectedNodeId =
     visibleBoardNodes.find((node) => node.is_root)?.id ?? visibleBoardNodes[0]?.id ?? null
@@ -568,6 +579,14 @@ function App() {
   useEffect(() => {
     draggedPositionsRef.current = draggedPositions
   }, [draggedPositions])
+
+  useEffect(() => {
+    areaSelectionRef.current = areaSelection
+  }, [areaSelection])
+
+  useEffect(() => {
+    visibleBoardNodesRef.current = visibleBoardNodes
+  }, [visibleBoardNodes])
 
   const closeInspectorUi = useCallback(() => {
     setInspectorNodeId(null)
@@ -891,6 +910,18 @@ function App() {
 
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
+      const currentAreaSelection = areaSelectionRef.current
+      if (currentAreaSelection) {
+        const nextSelection = {
+          ...currentAreaSelection,
+          currentClientX: event.clientX,
+          currentClientY: event.clientY,
+        }
+        areaSelectionRef.current = nextSelection
+        setAreaSelection(nextSelection)
+        return
+      }
+
       const currentConnectionDrag = connectionDragStateRef.current
       if (currentConnectionDrag) {
         const view = viewportRef.current
@@ -920,16 +951,18 @@ function App() {
       const currentNodeDrag = nodeDragStateRef.current
       if (currentNodeDrag) {
         setDraggedPositions((currentPositions) => {
+          const deltaX = (event.clientX - currentNodeDrag.startClientX) / viewportRef.current.scale
+          const deltaY = (event.clientY - currentNodeDrag.startClientY) / viewportRef.current.scale
           const nextPositions = {
-          ...currentPositions,
-          [currentNodeDrag.nodeId]: {
-            x:
-              currentNodeDrag.originX +
-              (event.clientX - currentNodeDrag.startClientX) / viewportRef.current.scale,
-            y:
-              currentNodeDrag.originY +
-              (event.clientY - currentNodeDrag.startClientY) / viewportRef.current.scale,
-          },
+            ...currentPositions,
+          }
+          for (const nodeId of currentNodeDrag.nodeIds) {
+            const originPosition = currentNodeDrag.originPositions[nodeId]
+            if (!originPosition) continue
+            nextPositions[nodeId] = {
+              x: originPosition.x + deltaX,
+              y: originPosition.y + deltaY,
+            }
           }
           draggedPositionsRef.current = nextPositions
           return nextPositions
@@ -947,6 +980,47 @@ function App() {
 
     const handleMouseUp = (event: MouseEvent) => {
       void (async () => {
+        const currentAreaSelection = areaSelectionRef.current
+        if (currentAreaSelection) {
+          const viewport = boardRef.current?.getBoundingClientRect()
+          const movedDistance = Math.hypot(
+            event.clientX - currentAreaSelection.startClientX,
+            event.clientY - currentAreaSelection.startClientY,
+          )
+
+          if (viewport && movedDistance >= NODE_CLICK_DRAG_THRESHOLD) {
+            const minClientX = Math.min(currentAreaSelection.startClientX, currentAreaSelection.currentClientX)
+            const maxClientX = Math.max(currentAreaSelection.startClientX, currentAreaSelection.currentClientX)
+            const minClientY = Math.min(currentAreaSelection.startClientY, currentAreaSelection.currentClientY)
+            const maxClientY = Math.max(currentAreaSelection.startClientY, currentAreaSelection.currentClientY)
+
+            setMultiSelectedNodeIds(
+              visibleBoardNodesRef.current
+                .filter((node) => {
+                  if (node.is_root) return false
+                  const clientX =
+                    viewport.left + viewport.width / 2 + viewportRef.current.offset.x + node.x * viewportRef.current.scale
+                  const clientY =
+                    viewport.top + viewport.height / 2 + viewportRef.current.offset.y + node.y * viewportRef.current.scale
+
+                  return (
+                    clientX >= minClientX &&
+                    clientX <= maxClientX &&
+                    clientY >= minClientY &&
+                    clientY <= maxClientY
+                  )
+                })
+                .map((node) => node.id),
+            )
+          } else {
+            setMultiSelectedNodeIds([])
+          }
+
+          areaSelectionRef.current = null
+          setAreaSelection(null)
+          return
+        }
+
         if (connectionDragStateRef.current) {
           await finishConnectionDrag(event.clientX, event.clientY)
           return
@@ -954,7 +1028,6 @@ function App() {
 
         const currentNodeDrag = nodeDragStateRef.current
         if (currentNodeDrag) {
-          const finalPosition = draggedPositionsRef.current[currentNodeDrag.nodeId]
           const movedDistance = Math.hypot(
             event.clientX - currentNodeDrag.startClientX,
             event.clientY - currentNodeDrag.startClientY,
@@ -964,18 +1037,31 @@ function App() {
           nodeDragStateRef.current = null
 
           try {
-            if (finalPosition) {
-            const xChanged = Math.abs(finalPosition.x - currentNodeDrag.originX) > 0.001
-            const yChanged = Math.abs(finalPosition.y - currentNodeDrag.originY) > 0.001
+            const movedNodeIds = currentNodeDrag.nodeIds.filter((nodeId) => {
+              const finalPosition = draggedPositionsRef.current[nodeId]
+              const originPosition = currentNodeDrag.originPositions[nodeId]
+              if (!finalPosition || !originPosition) return false
 
-            if (xChanged || yChanged) {
-              await movePerson(currentNodeDrag.nodeId, finalPosition.x, finalPosition.y)
+              return (
+                Math.abs(finalPosition.x - originPosition.x) > 0.001 ||
+                Math.abs(finalPosition.y - originPosition.y) > 0.001
+              )
+            })
+
+            if (movedNodeIds.length > 0) {
+              await Promise.all(
+                movedNodeIds.map((nodeId) => {
+                  const finalPosition = draggedPositionsRef.current[nodeId]
+                  return movePerson(nodeId, finalPosition.x, finalPosition.y)
+                }),
+              )
             }
-          }
           } finally {
             setDraggedPositions((currentPositions) => {
               const nextPositions = { ...currentPositions }
-              delete nextPositions[currentNodeDrag.nodeId]
+              for (const nodeId of currentNodeDrag.nodeIds) {
+                delete nextPositions[nodeId]
+              }
               draggedPositionsRef.current = nextPositions
               return nextPositions
             })
@@ -998,10 +1084,30 @@ function App() {
   }, [finishConnectionDrag, movePerson, queueViewportUpdate])
 
   function startBoardDragging(event: ReactMouseEvent<HTMLElement>) {
-    if (event.button !== 0 || connectionDrag || nodeDrag) return
+    if (connectionDrag || nodeDrag) return
+
+    if (event.button === 2) {
+      event.preventDefault()
+      setSelectedConnectionId(null)
+      setConnectionMenuPosition(null)
+      setInspectorNodeId(null)
+      closeTransientUi()
+      const nextAreaSelection = {
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        currentClientX: event.clientX,
+        currentClientY: event.clientY,
+      }
+      areaSelectionRef.current = nextAreaSelection
+      setAreaSelection(nextAreaSelection)
+      return
+    }
+
+    if (event.button !== 0) return
 
     setSelectedConnectionId(null)
     setConnectionMenuPosition(null)
+    setMultiSelectedNodeIds([])
     boardDragRef.current = {
       startX: event.clientX,
       startY: event.clientY,
@@ -1032,12 +1138,23 @@ function App() {
     const isConnectionModifierPressed = IS_MAC_PLATFORM ? event.metaKey : event.ctrlKey
 
     if (!isConnectionModifierPressed && !node.is_root) {
+      const dragNodeIds =
+        multiSelectedNodeIdSet.has(node.id) && multiSelectedNodeIds.length > 1
+          ? visibleBoardNodes
+              .filter((candidateNode) => multiSelectedNodeIdSet.has(candidateNode.id) && !candidateNode.is_root)
+              .map((candidateNode) => candidateNode.id)
+          : [node.id]
+      const originPositions = Object.fromEntries(
+        dragNodeIds.map((nodeId) => {
+          const dragNode = nodesById[nodeId]
+          return [nodeId, { x: dragNode.x, y: dragNode.y }]
+        }),
+      ) as Record<string, Offset>
       const nextNodeDrag = {
-        nodeId: node.id,
+        nodeIds: dragNodeIds,
         startClientX: event.clientX,
         startClientY: event.clientY,
-        originX: node.x,
-        originY: node.y,
+        originPositions,
       }
       nodeDragStateRef.current = nextNodeDrag
       setNodeDrag(nextNodeDrag)
@@ -1065,7 +1182,7 @@ function App() {
     }
     connectionDragStateRef.current = nextConnectionDrag
     setConnectionDrag(nextConnectionDrag)
-  }, [isGraphReady, requestLogin])
+  }, [isGraphReady, multiSelectedNodeIdSet, multiSelectedNodeIds.length, nodesById, requestLogin, visibleBoardNodes])
 
   const markTrackpadPanActive = useCallback(() => {
     trackpadPanRef.current.active = true
@@ -1187,6 +1304,19 @@ function App() {
       name: nextName,
     })
   }
+
+  useEffect(() => {
+    if (!inspectorNode || !isGraphReady) return undefined
+
+    const nextName = nameDraft.trim()
+    if (nextName === inspectorNode.name) return undefined
+
+    const timeoutId = window.setTimeout(() => {
+      void saveInspectorName()
+    }, 500)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [inspectorNode, isGraphReady, nameDraft])
 
   function openTagPicker(query = '') {
     setTagDraft(query)
@@ -1726,6 +1856,7 @@ function App() {
       setActiveTagOptionIndex(0)
       return
     }
+    setMultiSelectedNodeIds([])
     openInspectorForNode(node)
   }, [inspectorNodeId, openInspectorForNode, requestLogin])
 
@@ -2473,6 +2604,9 @@ function App() {
           flushDraftNoteOnBoardPointerDown()
           startBoardDragging(event)
         }}
+        onContextMenu={(event) => {
+          event.preventDefault()
+        }}
         aria-label="Social network graph canvas"
       >
         <div
@@ -2523,7 +2657,7 @@ function App() {
             <GraphNodeCard
               key={node.id}
               node={node}
-              isSelected={node.id === selectedNode?.id}
+              isSelected={node.id === selectedNode?.id || multiSelectedNodeIdSet.has(node.id)}
               tagColor={node.tag_id ? tagColorById[node.tag_id] : null}
               showLabel
               isGraphReady={isGraphReady}
@@ -2533,6 +2667,18 @@ function App() {
             />
           ))}
         </div>
+
+        {areaSelection ? (
+          <div
+            className="board-selection-box"
+            style={{
+              left: `${Math.min(areaSelection.startClientX, areaSelection.currentClientX) - (boardRef.current?.getBoundingClientRect().left ?? 0)}px`,
+              top: `${Math.min(areaSelection.startClientY, areaSelection.currentClientY) - (boardRef.current?.getBoundingClientRect().top ?? 0)}px`,
+              width: `${Math.abs(areaSelection.currentClientX - areaSelection.startClientX)}px`,
+              height: `${Math.abs(areaSelection.currentClientY - areaSelection.startClientY)}px`,
+            }}
+          />
+        ) : null}
 
         {selectedConnectionId && connectionMenuPosition ? (
           <div

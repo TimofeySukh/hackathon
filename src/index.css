@@ -1265,6 +1265,15 @@ input[type='search']::-webkit-search-results-decoration {
   cursor: grabbing;
 }
 
+.board-selection-box {
+  position: absolute;
+  z-index: 7;
+  border: 1px solid rgba(138, 255, 214, 0.88);
+  background: rgba(138, 255, 214, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(138, 255, 214, 0.18);
+  pointer-events: none;
+}
+
 .board-surface {
   position: absolute;
   inset: 0;

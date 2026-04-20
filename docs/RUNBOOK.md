@@ -22,7 +22,9 @@ Current app behavior:
 - debounce note create and note update events for 3 seconds before triggering AI enrichment
 - call a Supabase Edge Function that forwards person context to n8n and rewrites `person_ai_notes`
 - edit the selected person in the node-anchored inspector that opens on single click
+- autosave person names shortly after typing or when the name field loses focus
 - open a people search layer, match locally while typing, and run natural-language AI search on Enter
+- drag a right-click selection box to select multiple people, then drag one of them to move the group
 - simplify some heavy visual effects while dragging and on very dense boards to keep navigation responsive
 - avoid browser-fragile `color-mix()` styling for tag accents and disable heavy blur compositing on Firefox
 
