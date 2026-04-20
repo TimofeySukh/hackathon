@@ -119,6 +119,19 @@ const INSPECTOR_VIEWPORT_MARGIN = 16
 const TRACKPAD_PAN_IDLE_MS = 320
 const IS_MAC_PLATFORM = /Mac|iPhone|iPad|iPod/i.test(window.navigator.platform)
 
+function isLikelyTrackpadPan(event: WheelEvent) {
+  if (event.ctrlKey) return false
+  if (Math.abs(event.deltaX) > 0) return true
+  if (event.deltaMode === 1) return false
+
+  const absDeltaY = Math.abs(event.deltaY)
+
+  if (absDeltaY === 0) return false
+  if (absDeltaY < 24) return true
+
+  return !Number.isInteger(absDeltaY / 120)
+}
+
 const ANONYMOUS_ROOT: PersonNode = {
   id: 'anonymous-root',
   board_id: 'anonymous-board',
@@ -946,7 +959,7 @@ function App() {
     const deltaX = event.deltaX * deltaMultiplier
     const deltaY = event.deltaY * deltaMultiplier
 
-    if (!event.ctrlKey) {
+    if (isLikelyTrackpadPan(event)) {
       markTrackpadPanActive()
       queueViewportUpdate(
         {
@@ -1520,6 +1533,15 @@ function App() {
 
   async function handleNewNoteBlur() {
     await handleCreateNoteFromDraft(false)
+  }
+
+  function flushDraftNoteOnBoardPointerDown() {
+    const activeElement = document.activeElement
+    const isComposerFocused = activeElement === newNoteTextareaRef.current
+
+    if (!isComposerFocused || !newNoteText.trim()) return
+
+    void handleNewNoteBlur()
   }
 
   function toggleNoteCollapse(noteId: string) {
@@ -2264,7 +2286,6 @@ function App() {
 
             <article className="note-card note-card--draft">
               <div className="note-card__composer-shell">
-                <span className="note-card__composer-hint">Cmd/Ctrl + Enter to save</span>
               <textarea
                 ref={newNoteTextareaRef}
                 className="note-card__composer"
@@ -2304,7 +2325,10 @@ function App() {
       <section
         ref={boardRef}
         className={`board-viewport${isDraggingBoard ? ' is-dragging' : ''}`}
-        onMouseDown={startBoardDragging}
+        onMouseDown={(event) => {
+          flushDraftNoteOnBoardPointerDown()
+          startBoardDragging(event)
+        }}
         aria-label="Social network graph canvas"
       >
         <div

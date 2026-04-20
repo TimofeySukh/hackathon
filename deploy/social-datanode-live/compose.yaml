@@ -1,0 +1,9 @@
+services:
+  social-datanode-live:
+    build:
+      context: .
+    image: social-datanode-live:latest
+    container_name: social-datanode-live
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4180:80"

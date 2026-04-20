@@ -1,21 +1,7 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
-
-type PersonAiStructuredSummary = {
-  summary: string
-  traits: string[]
-  interests: string[]
-  relationship_context: string[]
-  open_questions: string[]
-}
-
-type N8nResponse = {
-  summary?: unknown
-  structured_summary?: unknown
-}
-
-const DEFAULT_N8N_PERSON_AI_WEBHOOK_URL = 'https://velizard.app.n8n.cloud/webhook/person-enrichment'
+import { generatePersonSummaryWithFallback, type PersonAiStructuredSummary } from '../_shared/ai.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -41,38 +27,6 @@ function getRequiredEnv(name: string) {
   }
 
   return value
-}
-
-function getN8nWebhookUrl() {
-  return Deno.env.get('N8N_PERSON_AI_WEBHOOK_URL') || DEFAULT_N8N_PERSON_AI_WEBHOOK_URL
-}
-
-function normalizeStringArray(value: unknown) {
-  if (!Array.isArray(value)) return []
-
-  return value
-    .filter((entry): entry is string => typeof entry === 'string')
-    .map((entry) => entry.trim())
-    .filter(Boolean)
-}
-
-function normalizeStructuredSummary(payload: N8nResponse): PersonAiStructuredSummary {
-  const candidate =
-    payload.structured_summary && typeof payload.structured_summary === 'object' && !Array.isArray(payload.structured_summary)
-      ? (payload.structured_summary as Record<string, unknown>)
-      : {}
-
-  const summaryFromPayload = typeof payload.summary === 'string' ? payload.summary.trim() : ''
-  const summaryFromObject = typeof candidate.summary === 'string' ? candidate.summary.trim() : ''
-  const summary = summaryFromPayload || summaryFromObject
-
-  return {
-    summary,
-    traits: normalizeStringArray(candidate.traits),
-    interests: normalizeStringArray(candidate.interests),
-    relationship_context: normalizeStringArray(candidate.relationship_context),
-    open_questions: normalizeStringArray(candidate.open_questions),
-  }
 }
 
 async function writePersonAiNoteState(
@@ -130,8 +84,6 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = getRequiredEnv('SUPABASE_URL')
   const supabaseAnonKey = getRequiredEnv('SUPABASE_ANON_KEY')
-  const n8nWebhookUrl = getN8nWebhookUrl()
-
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       persistSession: false,
@@ -209,29 +161,15 @@ Deno.serve(async (req) => {
       tagName = tag?.name ?? null
     }
 
-    const webhookResponse = await fetch(n8nWebhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+    const structuredSummary = await generatePersonSummaryWithFallback({
+      person: {
+        id: person.id,
+        name: person.name,
+        tag_id: person.tag_id,
+        tag_name: tagName,
       },
-      body: JSON.stringify({
-        person: {
-          id: person.id,
-          name: person.name,
-          tag_id: person.tag_id,
-          tag_name: tagName,
-        },
-        notes: notes ?? [],
-      }),
+      notes: notes ?? [],
     })
-
-    if (!webhookResponse.ok) {
-      const message = await webhookResponse.text()
-      throw new Error(message || `n8n webhook failed with status ${webhookResponse.status}.`)
-    }
-
-    const payload = (await webhookResponse.json()) as N8nResponse
-    const structuredSummary = normalizeStructuredSummary(payload)
 
     await writePersonAiNoteState(supabase, {
       personId,

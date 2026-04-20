@@ -1,20 +1,7 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
-
-type SearchResponse = {
-  results?: unknown
-}
-
-type SearchResult = {
-  person_id: string
-  score: number
-  reason: string
-  matched_signals: string[]
-}
-
-const DEFAULT_N8N_PEOPLE_SEARCH_WEBHOOK_URL =
-  'https://velizard.app.n8n.cloud/webhook/2cd5be55-8e6f-494b-9519-754ae150a9b5'
+import { searchPeopleWithFallback } from '../_shared/ai.ts'
 const MAX_CANDIDATES = 40
 
 const corsHeaders = {
@@ -43,35 +30,6 @@ function getRequiredEnv(name: string) {
   return value
 }
 
-function getN8nPeopleSearchWebhookUrl() {
-  return Deno.env.get('N8N_PEOPLE_SEARCH_WEBHOOK_URL') || DEFAULT_N8N_PEOPLE_SEARCH_WEBHOOK_URL
-}
-
-function normalizeStringArray(value: unknown) {
-  if (!Array.isArray(value)) return []
-
-  return value
-    .filter((entry): entry is string => typeof entry === 'string')
-    .map((entry) => entry.trim())
-    .filter(Boolean)
-}
-
-function normalizeSearchResults(payload: SearchResponse, allowedPersonIds: Set<string>): SearchResult[] {
-  if (!Array.isArray(payload.results)) return []
-
-  return payload.results
-    .filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === 'object')
-    .map((entry) => ({
-      person_id: typeof entry.person_id === 'string' ? entry.person_id : '',
-      score: typeof entry.score === 'number' ? Math.max(0, Math.min(1, entry.score)) : 0,
-      reason: typeof entry.reason === 'string' ? entry.reason.trim() : '',
-      matched_signals: normalizeStringArray(entry.matched_signals).slice(0, 5),
-    }))
-    .filter((entry) => allowedPersonIds.has(entry.person_id))
-    .sort((left, right) => right.score - left.score)
-    .slice(0, 8)
-}
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -97,7 +55,6 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = getRequiredEnv('SUPABASE_URL')
     const supabaseAnonKey = getRequiredEnv('SUPABASE_ANON_KEY')
-    const n8nWebhookUrl = getN8nPeopleSearchWebhookUrl()
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
         persistSession: false,
@@ -181,24 +138,10 @@ Deno.serve(async (req) => {
     }))
     const allowedPersonIds = new Set(candidates.map((person) => person.id))
 
-    const webhookResponse = await fetch(n8nWebhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        query,
-        candidates,
-      }),
-    })
-
-    if (!webhookResponse.ok) {
-      const message = await webhookResponse.text()
-      throw new Error(message || `n8n people search webhook failed with status ${webhookResponse.status}.`)
-    }
-
-    const payload = (await webhookResponse.json()) as SearchResponse
-    const results = normalizeSearchResults(payload, allowedPersonIds)
+    const results = (await searchPeopleWithFallback({ query, candidates }))
+      .filter((entry) => allowedPersonIds.has(entry.person_id))
+      .sort((left, right) => right.score - left.score)
+      .slice(0, 8)
 
     return jsonResponse({ results })
   } catch (error) {

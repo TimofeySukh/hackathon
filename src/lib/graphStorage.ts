@@ -1,3 +1,4 @@
+import { FunctionsHttpError } from '@supabase/supabase-js'
 import type { User } from '@supabase/supabase-js'
 
 import { supabase } from './supabase'
@@ -83,6 +84,37 @@ function requireSupabase() {
   }
 
   return supabase
+}
+
+async function readFunctionError(error: unknown) {
+  if (!(error instanceof FunctionsHttpError)) {
+    return error instanceof Error ? error.message : 'Edge Function call failed.'
+  }
+
+  const response = error.context as Response | undefined
+  if (!response) {
+    return error.message
+  }
+
+  try {
+    const contentType = response.headers.get('content-type') || ''
+
+    if (contentType.includes('application/json')) {
+      const payload = (await response.json()) as { error?: unknown; message?: unknown }
+      if (typeof payload.error === 'string') return payload.error
+      if (payload.error && typeof payload.error === 'object' && 'message' in payload.error) {
+        const message = (payload.error as { message?: unknown }).message
+        if (typeof message === 'string') return message
+      }
+      if (typeof payload.message === 'string') return payload.message
+      return JSON.stringify(payload)
+    }
+
+    const text = await response.text()
+    return text || error.message
+  } catch {
+    return error.message
+  }
 }
 
 function canonicalizeConnection(firstPersonId: string, secondPersonId: string) {
@@ -469,7 +501,9 @@ export async function invokePersonAiNoteSync(personId: string) {
     },
   })
 
-  if (error) throw error
+  if (error) {
+    throw new Error(await readFunctionError(error))
+  }
 }
 
 export async function searchPeopleWithAi(query: string): Promise<AiPeopleSearchResult[]> {
@@ -480,7 +514,9 @@ export async function searchPeopleWithAi(query: string): Promise<AiPeopleSearchR
     },
   })
 
-  if (error) throw error
+  if (error) {
+    throw new Error(await readFunctionError(error))
+  }
 
   const results = data && typeof data === 'object' && 'results' in data ? (data as { results?: unknown }).results : []
   if (!Array.isArray(results)) return []
