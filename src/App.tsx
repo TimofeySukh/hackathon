@@ -412,7 +412,6 @@ function App() {
       ),
     [boardConnections, visibleNodesById],
   )
-  const isDenseGraph = visibleBoardNodes.length >= 24
   const isVeryDenseGraph = visibleBoardNodes.length >= 60
   const defaultSelectedNodeId =
     visibleBoardNodes.find((node) => node.is_root)?.id ?? visibleBoardNodes[0]?.id ?? null
@@ -2469,7 +2468,7 @@ function App() {
 
       <section
         ref={boardRef}
-        className={`board-viewport${isDraggingBoard ? ' is-dragging' : ''}${isDenseGraph ? ' is-dense-graph' : ''}${isVeryDenseGraph ? ' is-very-dense-graph' : ''}`}
+        className={`board-viewport${isDraggingBoard ? ' is-dragging' : ''}${isVeryDenseGraph ? ' is-very-dense-graph' : ''}`}
         onMouseDown={(event) => {
           flushDraftNoteOnBoardPointerDown()
           startBoardDragging(event)
@@ -2526,7 +2525,7 @@ function App() {
               node={node}
               isSelected={node.id === selectedNode?.id}
               tagColor={node.tag_id ? tagColorById[node.tag_id] : null}
-              showLabel={!isDenseGraph || node.id === selectedNode?.id || node.is_root}
+              showLabel
               isGraphReady={isGraphReady}
               connectionModifierLabel={connectionModifierLabel}
               onMouseDown={startNodeInteraction}

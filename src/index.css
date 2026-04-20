@@ -1463,7 +1463,7 @@ input[type='search']::-webkit-search-results-decoration {
 }
 
 .board-viewport.is-dragging .graph-node__dot,
-.board-viewport.is-dense-graph .graph-node__dot {
+.board-viewport.is-very-dense-graph .graph-node__dot {
   box-shadow: none;
 }
 
@@ -1522,7 +1522,7 @@ input[type='search']::-webkit-search-results-decoration {
 }
 
 .board-viewport.is-dragging .graph-node--root .graph-node__dot,
-.board-viewport.is-dense-graph .graph-node--root .graph-node__dot {
+.board-viewport.is-very-dense-graph .graph-node--root .graph-node__dot {
   box-shadow: 0 0 0 4px rgba(138, 255, 214, 0.12);
 }
 
@@ -1539,10 +1539,6 @@ input[type='search']::-webkit-search-results-decoration {
 
 .theme-light .graph-node.is-selected .graph-node__label {
   color: #184432;
-}
-
-.board-viewport.is-dense-graph .graph-connections {
-  opacity: 0.82;
 }
 
 .board-viewport.is-very-dense-graph .graph-connections {
