@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   CSSProperties,
   KeyboardEvent as ReactKeyboardEvent,
-  MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
   WheelEvent as ReactWheelEvent,
 } from 'react'
 
@@ -41,6 +41,8 @@ type AreaSelection = {
   startClientY: number
   currentClientX: number
   currentClientY: number
+  viewportLeft: number
+  viewportTop: number
 }
 
 type NoteDraft = {
@@ -157,7 +159,7 @@ type GraphEdgeProps = {
   fromNode: PersonNode
   toNode: PersonNode
   isSelected: boolean
-  onSelect: (connectionId: string, event: ReactMouseEvent<SVGPathElement>) => void
+  onSelect: (connectionId: string, event: ReactPointerEvent<SVGPathElement>) => void
 }
 
 const GraphEdgePath = memo(function GraphEdgePath({
@@ -177,7 +179,7 @@ const GraphEdgePath = memo(function GraphEdgePath({
       <path
         className="graph-edge-hit"
         d={pathD}
-        onMouseDown={(event) => onSelect(edge.id, event)}
+        onPointerDown={(event) => onSelect(edge.id, event)}
       />
       <path
         className={`graph-edge${isSelected ? ' is-selected' : ''}`}
@@ -194,7 +196,7 @@ type GraphNodeProps = {
   showLabel: boolean
   isGraphReady: boolean
   connectionModifierLabel: string
-  onMouseDown: (node: PersonNode, event: ReactMouseEvent<HTMLButtonElement>) => void
+  onPointerDown: (node: PersonNode, event: ReactPointerEvent<HTMLButtonElement>) => void
   onClick: (node: PersonNode) => void
 }
 
@@ -205,7 +207,7 @@ const GraphNodeCard = memo(function GraphNodeCard({
   showLabel,
   isGraphReady,
   connectionModifierLabel,
-  onMouseDown,
+  onPointerDown,
   onClick,
 }: GraphNodeProps) {
   const nodeStyle = {
@@ -228,7 +230,7 @@ const GraphNodeCard = memo(function GraphNodeCard({
               : `Drag to move. Hold ${connectionModifierLabel} and drag to connect.`
             : 'Sign in with Google to edit'
         }
-        onMouseDown={(event) => onMouseDown(node, event)}
+        onPointerDown={(event) => onPointerDown(node, event)}
         onClick={(event) => {
           event.stopPropagation()
           onClick(node)
@@ -335,6 +337,7 @@ function App() {
   const nodeDragStateRef = useRef<NodeDrag | null>(null)
   const draggedPositionsRef = useRef<Record<string, Offset>>({})
   const areaSelectionRef = useRef<AreaSelection | null>(null)
+  const activePointerIdRef = useRef<number | null>(null)
   const visibleBoardNodesRef = useRef<PersonNode[]>([])
   const gestureScaleRef = useRef(1)
   const trackpadPanRef = useRef<{ active: boolean; timeoutId: number | null }>({
@@ -909,9 +912,12 @@ function App() {
   )
 
   useEffect(() => {
-    const handleMouseMove = (event: MouseEvent) => {
+    const handlePointerMove = (event: PointerEvent) => {
+      if (activePointerIdRef.current !== null && event.pointerId !== activePointerIdRef.current) return
+
       const currentAreaSelection = areaSelectionRef.current
       if (currentAreaSelection) {
+        event.preventDefault()
         const nextSelection = {
           ...currentAreaSelection,
           currentClientX: event.clientX,
@@ -924,6 +930,7 @@ function App() {
 
       const currentConnectionDrag = connectionDragStateRef.current
       if (currentConnectionDrag) {
+        event.preventDefault()
         const view = viewportRef.current
         const worldPoint = screenToWorld(
           event.clientX,
@@ -950,6 +957,7 @@ function App() {
 
       const currentNodeDrag = nodeDragStateRef.current
       if (currentNodeDrag) {
+        event.preventDefault()
         setDraggedPositions((currentPositions) => {
           const deltaX = (event.clientX - currentNodeDrag.startClientX) / viewportRef.current.scale
           const deltaY = (event.clientY - currentNodeDrag.startClientY) / viewportRef.current.scale
@@ -972,16 +980,20 @@ function App() {
 
       if (!boardDragRef.current.active) return
 
+      event.preventDefault()
       const nextX = boardDragRef.current.originX + event.clientX - boardDragRef.current.startX
       const nextY = boardDragRef.current.originY + event.clientY - boardDragRef.current.startY
 
       queueViewportUpdate({ x: nextX, y: nextY }, viewportRef.current.scale)
     }
 
-    const handleMouseUp = (event: MouseEvent) => {
+    const handlePointerUp = (event: PointerEvent) => {
+      if (activePointerIdRef.current !== null && event.pointerId !== activePointerIdRef.current) return
+
       void (async () => {
         const currentAreaSelection = areaSelectionRef.current
         if (currentAreaSelection) {
+          activePointerIdRef.current = null
           const viewport = boardRef.current?.getBoundingClientRect()
           const movedDistance = Math.hypot(
             event.clientX - currentAreaSelection.startClientX,
@@ -1022,12 +1034,14 @@ function App() {
         }
 
         if (connectionDragStateRef.current) {
+          activePointerIdRef.current = null
           await finishConnectionDrag(event.clientX, event.clientY)
           return
         }
 
         const currentNodeDrag = nodeDragStateRef.current
         if (currentNodeDrag) {
+          activePointerIdRef.current = null
           const movedDistance = Math.hypot(
             event.clientX - currentNodeDrag.startClientX,
             event.clientY - currentNodeDrag.startClientY,
@@ -1070,33 +1084,41 @@ function App() {
         }
 
         boardDragRef.current.active = false
+        activePointerIdRef.current = null
         setIsDraggingBoard(false)
       })()
     }
 
-    window.addEventListener('mousemove', handleMouseMove)
-    window.addEventListener('mouseup', handleMouseUp)
+    window.addEventListener('pointermove', handlePointerMove, { passive: false })
+    window.addEventListener('pointerup', handlePointerUp)
+    window.addEventListener('pointercancel', handlePointerUp)
 
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('mouseup', handleMouseUp)
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+      window.removeEventListener('pointercancel', handlePointerUp)
     }
   }, [finishConnectionDrag, movePerson, queueViewportUpdate])
 
-  function startBoardDragging(event: ReactMouseEvent<HTMLElement>) {
+  function startBoardDragging(event: ReactPointerEvent<HTMLElement>) {
     if (connectionDrag || nodeDrag) return
+    if (!event.isPrimary) return
 
     if (event.button === 2) {
       event.preventDefault()
+      activePointerIdRef.current = event.pointerId
       setSelectedConnectionId(null)
       setConnectionMenuPosition(null)
       setInspectorNodeId(null)
       closeTransientUi()
+      const viewport = event.currentTarget.getBoundingClientRect()
       const nextAreaSelection = {
         startClientX: event.clientX,
         startClientY: event.clientY,
         currentClientX: event.clientX,
         currentClientY: event.clientY,
+        viewportLeft: viewport.left,
+        viewportTop: viewport.top,
       }
       areaSelectionRef.current = nextAreaSelection
       setAreaSelection(nextAreaSelection)
@@ -1105,6 +1127,8 @@ function App() {
 
     if (event.button !== 0) return
 
+    event.preventDefault()
+    activePointerIdRef.current = event.pointerId
     setSelectedConnectionId(null)
     setConnectionMenuPosition(null)
     setMultiSelectedNodeIds([])
@@ -1120,8 +1144,9 @@ function App() {
     setInspectorNodeId(null)
   }
 
-  const startNodeInteraction = useCallback((node: PersonNode, event: ReactMouseEvent<HTMLButtonElement>) => {
+  const startNodeInteraction = useCallback((node: PersonNode, event: ReactPointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return
+    if (!event.isPrimary) return
 
     event.stopPropagation()
     if (requestLogin()) return
@@ -1135,6 +1160,7 @@ function App() {
 
     if (!isGraphReady) return
 
+    activePointerIdRef.current = event.pointerId
     const isConnectionModifierPressed = IS_MAC_PLATFORM ? event.metaKey : event.ctrlKey
 
     if (!isConnectionModifierPressed && !node.is_root) {
@@ -1292,7 +1318,7 @@ function App() {
     } as CSSProperties
   }
 
-  async function saveInspectorName() {
+  const saveInspectorName = useCallback(async () => {
     if (!inspectorNode || !isGraphReady) return
 
     const nextValue = nameDraft
@@ -1303,7 +1329,7 @@ function App() {
       id: inspectorNode.id,
       name: nextName,
     })
-  }
+  }, [inspectorNode, isGraphReady, nameDraft, updatePerson])
 
   useEffect(() => {
     if (!inspectorNode || !isGraphReady) return undefined
@@ -1316,7 +1342,7 @@ function App() {
     }, 500)
 
     return () => window.clearTimeout(timeoutId)
-  }, [inspectorNode, isGraphReady, nameDraft])
+  }, [inspectorNode, isGraphReady, nameDraft, saveInspectorName])
 
   function openTagPicker(query = '') {
     setTagDraft(query)
@@ -1828,7 +1854,7 @@ function App() {
     openInspectorForNode(node)
   }
 
-  const selectConnection = useCallback((connectionId: string, event: ReactMouseEvent<SVGPathElement>) => {
+  const selectConnection = useCallback((connectionId: string, event: ReactPointerEvent<SVGPathElement>) => {
     if (!isGraphReady) return
 
     event.preventDefault()
@@ -2600,7 +2626,7 @@ function App() {
       <section
         ref={boardRef}
         className={`board-viewport${isDraggingBoard ? ' is-dragging' : ''}${isVeryDenseGraph ? ' is-very-dense-graph' : ''}`}
-        onMouseDown={(event) => {
+        onPointerDown={(event) => {
           flushDraftNoteOnBoardPointerDown()
           startBoardDragging(event)
         }}
@@ -2662,7 +2688,7 @@ function App() {
               showLabel
               isGraphReady={isGraphReady}
               connectionModifierLabel={connectionModifierLabel}
-              onMouseDown={startNodeInteraction}
+              onPointerDown={startNodeInteraction}
               onClick={handleNodeClick}
             />
           ))}
@@ -2672,8 +2698,8 @@ function App() {
           <div
             className="board-selection-box"
             style={{
-              left: `${Math.min(areaSelection.startClientX, areaSelection.currentClientX) - (boardRef.current?.getBoundingClientRect().left ?? 0)}px`,
-              top: `${Math.min(areaSelection.startClientY, areaSelection.currentClientY) - (boardRef.current?.getBoundingClientRect().top ?? 0)}px`,
+              left: `${Math.min(areaSelection.startClientX, areaSelection.currentClientX) - areaSelection.viewportLeft}px`,
+              top: `${Math.min(areaSelection.startClientY, areaSelection.currentClientY) - areaSelection.viewportTop}px`,
               width: `${Math.abs(areaSelection.currentClientX - areaSelection.startClientX)}px`,
               height: `${Math.abs(areaSelection.currentClientY - areaSelection.startClientY)}px`,
             }}
@@ -2687,6 +2713,7 @@ function App() {
               left: `${connectionMenuPosition.x}px`,
               top: `${connectionMenuPosition.y}px`,
             }}
+            onPointerDown={(event) => event.stopPropagation()}
             onMouseDown={(event) => event.stopPropagation()}
           >
             <button

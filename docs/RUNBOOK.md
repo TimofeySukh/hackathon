@@ -8,6 +8,7 @@ Current app behavior:
 
 - open a full-window board
 - drag with the mouse to move across the point grid
+- drag with one finger on touch devices to move across the point grid
 - scroll on a trackpad to pan the board
 - zoom toward the cursor with the mouse wheel
 - switch between dark and light themes
@@ -307,31 +308,33 @@ Manual verification:
 
 1. Open the app in a browser.
 2. Drag anywhere on the board and confirm the point grid moves smoothly.
-3. Scroll on a trackpad and confirm the board pans without triggering zoom.
-4. Use the mouse wheel and confirm zoom centers around the cursor.
-5. Confirm the zoom indicator in the bottom-right updates smoothly.
-6. Toggle the theme.
-7. Reload the page and confirm the selected theme is preserved.
-8. Sign in with Google and confirm the account state appears.
-9. Confirm the signed-in account gets a root node at `0,0`.
-10. Drag out from a node to create a new connected person and confirm it persists after reload.
-11. Drag a non-root person to a new position, confirm connected lines follow it, then reload and confirm the coordinates persist.
-12. Click a person near a viewport edge and confirm the board pans enough to keep the inspector visible, and that the inspector opens at a consistent size regardless of the current zoom.
-13. Start trackpad panning on the board, pass over the inspector, and confirm panning continues; then start a trackpad gesture on the inspector and confirm it does not begin board panning.
-14. Confirm the inspector opens as a compact panel with only a large name field, the tag picker, notes, and the delete-person action.
-15. Type `#` inside the inspector name field, confirm the tag dropdown opens, choose a tag with ArrowUp/ArrowDown plus Enter, and verify the applied tag is removed from the saved name text.
-16. Use the tag chip or `+ add tag` ghost button to open the inspector tag dropdown, create a new tag from the same field, delete an unused tag with the `x` confirmation flow, and confirm the single selected tag persists after reload.
-17. Open the top-bar tag menu, toggle a tag color palette from its swatch, change the color, and confirm the selected person inspector still shows the chosen tag with a visible color accent after the picker closes.
-18. Create a new person, confirm the inspector opens automatically, confirm an empty person focuses the name field, then fill the note capture textarea and save a new note both with `Cmd/Ctrl + Enter` and by blurring the textarea.
-16. Create a note by typing into the `Create new note` field, confirm saved notes start collapsed by default, expand one with the chevron, press Enter in the title to open the body, delete a note from the icon button, reload, and confirm note changes persist.
-17. Create a connection between two existing people, confirm reload preserves it, then click the widened line target and confirm `Delete connection` or Backspace removes it.
-18. Open the top-left Tags menu, create a tag, adjust its color, toggle one tag off with the visibility checkbox, and confirm both tagged nodes and their connections disappear. Use `Select all` and `Clear all` to confirm bulk visibility controls work.
-19. Open the search layer and verify that typing a person name, tag, or note text returns local matching people.
-20. Press Enter with a natural-language query and verify AI search returns ranked people with reasons.
-21. Click a search result and verify the board recenters on that person and opens the inspector.
-22. After creating a note, wait at least 3 seconds and confirm a `person_ai_notes` row for that person reaches `status = 'created'`.
-23. Edit an existing note, blur the input, wait at least 3 seconds, and confirm the same `person_ai_notes` row updates its `updated_at`, `summary`, and `structured_summary`.
-24. Sign out and confirm the anonymous board state returns.
+3. On a phone or mobile emulator, drag with one finger anywhere on the board and confirm the point grid moves smoothly.
+4. Tap a person on a touch device and confirm the inspector opens instead of starting a stuck drag.
+5. Scroll on a trackpad and confirm the board pans without triggering zoom.
+6. Use the mouse wheel and confirm zoom centers around the cursor.
+7. Confirm the zoom indicator in the bottom-right updates smoothly.
+8. Toggle the theme.
+9. Reload the page and confirm the selected theme is preserved.
+10. Sign in with Google and confirm the account state appears.
+11. Confirm the signed-in account gets a root node at `0,0`.
+12. Drag out from a node to create a new connected person and confirm it persists after reload.
+13. Drag a non-root person to a new position, confirm connected lines follow it, then reload and confirm the coordinates persist.
+14. Click a person near a viewport edge and confirm the board pans enough to keep the inspector visible, and that the inspector opens at a consistent size regardless of the current zoom.
+15. Start trackpad panning on the board, pass over the inspector, and confirm panning continues; then start a trackpad gesture on the inspector and confirm it does not begin board panning.
+16. Confirm the inspector opens as a compact panel with only a large name field, the tag picker, notes, and the delete-person action.
+17. Type `#` inside the inspector name field, confirm the tag dropdown opens, choose a tag with ArrowUp/ArrowDown plus Enter, and verify the applied tag is removed from the saved name text.
+18. Use the tag chip or `+ add tag` ghost button to open the inspector tag dropdown, create a new tag from the same field, delete an unused tag with the `x` confirmation flow, and confirm the single selected tag persists after reload.
+19. Open the top-bar tag menu, toggle a tag color palette from its swatch, change the color, and confirm the selected person inspector still shows the chosen tag with a visible color accent after the picker closes.
+20. Create a new person, confirm the inspector opens automatically, confirm an empty person focuses the name field, then fill the note capture textarea and save a new note both with `Cmd/Ctrl + Enter` and by blurring the textarea.
+21. Create a note by typing into the `Create new note` field, confirm saved notes start collapsed by default, expand one with the chevron, press Enter in the title to open the body, delete a note from the icon button, reload, and confirm note changes persist.
+22. Create a connection between two existing people, confirm reload preserves it, then click the widened line target and confirm `Delete connection` or Backspace removes it.
+23. Open the top-left Tags menu, create a tag, adjust its color, toggle one tag off with the visibility checkbox, and confirm both tagged nodes and their connections disappear. Use `Select all` and `Clear all` to confirm bulk visibility controls work.
+24. Open the search layer and verify that typing a person name, tag, or note text returns local matching people.
+25. Press Enter with a natural-language query and verify AI search returns ranked people with reasons.
+26. Click a search result and verify the board recenters on that person and opens the inspector.
+27. After creating a note, wait at least 3 seconds and confirm a `person_ai_notes` row for that person reaches `status = 'created'`.
+28. Edit an existing note, blur the input, wait at least 3 seconds, and confirm the same `person_ai_notes` row updates its `updated_at`, `summary`, and `structured_summary`.
+29. Sign out and confirm the anonymous board state returns.
 
 Supabase verification:
 

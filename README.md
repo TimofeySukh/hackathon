@@ -11,6 +11,7 @@ A persisted social graph board built with React, Vite, and TypeScript.
 - New nodes appear immediately with an empty inline name field
 - Compact obsidian-like nodes with labels
 - Infinite canvas-style navigation by dragging with the mouse
+- Infinite canvas-style navigation by dragging with one finger on touch devices
 - Infinite canvas-style navigation by scrolling on a trackpad
 - Cursor-centered zoom in and out with the mouse wheel
 - No drawing tools or side panels

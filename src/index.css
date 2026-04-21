@@ -1447,6 +1447,7 @@ input[type='search']::-webkit-search-results-decoration {
   background: transparent;
   transform: translate(-50%, -50%);
   cursor: crosshair;
+  touch-action: none;
 }
 
 .graph-node__button::before {

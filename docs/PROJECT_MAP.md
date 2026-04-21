@@ -8,6 +8,7 @@ The current product is intentionally narrow:
 
 - a full-window board surface
 - mouse drag navigation
+- one-finger touch drag navigation on mobile devices
 - a dark/light theme toggle
 - a very dense CSS-rendered point grid
 - Supabase-backed Google login

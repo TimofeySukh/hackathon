@@ -145,6 +145,7 @@ It currently supports:
 - one personal board record per signed-in user
 - one immutable root node at `0,0` per signed-in user
 - mouse drag navigation across the canvas
+- one-finger touch drag navigation across the canvas on mobile devices
 - trackpad scroll panning across the canvas
 - cursor-centered zoom with the mouse wheel
 - visual theme switching
