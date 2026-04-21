@@ -48,7 +48,7 @@ Supabase database migrations for profiles, personal boards, persisted graph data
 
 ### `supabase/functions/`
 
-Supabase Edge Functions. `sync-person-ai-note` forwards person note context to n8n and upserts `person_ai_notes`. `search-people-ai` forwards graph candidates to n8n and returns ranked natural-language search results.
+Supabase Edge Functions. `sync-person-ai-note` sends person note context through the shared Gemini/OpenRouter AI provider layer and upserts `person_ai_notes`. `search-people-ai` sends graph candidates through the same provider layer and returns ranked natural-language search results.
 
 ### `src/`
 
@@ -56,7 +56,7 @@ Application source code.
 
 ### `.mcp.json`
 
-Project MCP configuration for the shared `n8n-mcp` HTTP server and the local `hackathon-board` stdio server.
+Project MCP configuration for the local `hackathon-board` stdio server.
 
 ## Source Structure
 

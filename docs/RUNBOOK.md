@@ -20,7 +20,7 @@ Current app behavior:
 - show a login popup when signed-out users try to edit the board
 - allow one separate AI summary row per person in Supabase
 - debounce note create and note update events for 3 seconds before triggering AI enrichment
-- call a Supabase Edge Function that forwards person context to n8n and rewrites `person_ai_notes`
+- call a Supabase Edge Function that sends person context to Gemini with OpenRouter fallback and rewrites `person_ai_notes`
 - edit the selected person in the node-anchored inspector that opens on single click
 - autosave person names shortly after typing or when the name field loses focus
 - open a people search layer, match locally while typing, and run natural-language AI search on Enter
@@ -46,7 +46,6 @@ cp .env.example .env.local
 
 Project MCP configuration lives in `.mcp.json`. The repository now includes:
 
-- the shared `n8n-mcp` HTTP server configuration for `https://velizard.app.n8n.cloud/mcp-server/http`
 - the local `hackathon-board` stdio server in `mcp/server.mjs`
 
 If you want the local MCP server to read and mutate live board data, create a separate MCP env file:
@@ -196,31 +195,23 @@ supabase functions deploy search-people-ai
 
 `supabase/config.toml` sets AI functions to `verify_jwt = false` at the Supabase gateway because each function performs its own user-token validation with `supabase.auth.getUser()`. Do not remove the in-function authorization checks.
 
-Required function secret:
+Required AI function secrets:
 
 ```bash
-supabase secrets set N8N_PERSON_AI_WEBHOOK_URL=https://your-n8n-webhook-url
+supabase secrets set GEMINI_API_KEY=your-gemini-api-key
+supabase secrets set OPENROUTER_API_KEY=your-openrouter-api-key
 ```
 
-If `N8N_PERSON_AI_WEBHOOK_URL` is not set, the function falls back to the published production webhook:
-
-```text
-https://velizard.app.n8n.cloud/webhook/person-enrichment
-```
-
-Optional AI search function secret:
+Optional AI model overrides:
 
 ```bash
-supabase secrets set N8N_PEOPLE_SEARCH_WEBHOOK_URL=https://your-n8n-search-webhook-url
+supabase secrets set GEMINI_MODEL=gemini-2.5-flash
+supabase secrets set OPENROUTER_MODEL=openrouter/free
 ```
 
-If `N8N_PEOPLE_SEARCH_WEBHOOK_URL` is not set, the function falls back to:
+AI note sync and AI people search now run inside Supabase Edge Functions through direct provider API calls. The functions try Gemini first and fall back to OpenRouter for provider quota or availability errors.
 
-```text
-https://velizard.app.n8n.cloud/webhook/2cd5be55-8e6f-494b-9519-754ae150a9b5
-```
-
-The browser never calls n8n directly. It invokes Edge Functions, and those functions authenticate the user, load user-owned graph context, call n8n, and return or persist structured AI output.
+The browser never calls Gemini or OpenRouter directly. It invokes Edge Functions, and those functions authenticate the user, load user-owned graph context, call AI providers with server-side API keys, and return or persist structured AI output.
 
 Configure Google as an auth provider in Supabase Auth. Add redirect URLs for each app URL used by the team, including:
 

@@ -11,13 +11,14 @@ Runtime boundaries:
 - CSS owns the visual board surface, theme tokens, and responsive layout.
 - The browser owns theme persistence through `localStorage`.
 - Supabase owns Google authentication and user-owned graph records.
-- Supabase Edge Functions own the server-side n8n webhook call for AI note enrichment.
-- n8n owns LLM execution, structured summary generation for `person_ai_notes`, and natural-language people search ranking.
+- Supabase Edge Functions own server-side AI provider calls for AI note enrichment and people search.
+- Gemini owns the primary LLM execution path for structured summary generation and natural-language people search ranking.
+- OpenRouter owns the fallback LLM execution path when Gemini quota or availability errors occur.
 - The local MCP server owns agent-facing project documentation resources plus service-role scoped board graph tooling.
 - Linear owns task state, status, ownership, priority, and blockers.
 - `docs/` owns durable product and repository knowledge.
 
-The backend boundary remains intentionally narrow: Supabase Auth provides identity, Supabase Postgres stores one private board plus its graph data for each signed-in user, and one Supabase Edge Function bridges note updates into n8n without exposing webhook secrets to the browser.
+The backend boundary remains intentionally narrow: Supabase Auth provides identity, Supabase Postgres stores one private board plus its graph data for each signed-in user, and Supabase Edge Functions call Gemini/OpenRouter without exposing provider API keys to the browser.
 
 ## Current Frontend Shape
 
@@ -30,8 +31,9 @@ The backend boundary remains intentionally narrow: Supabase Auth provides identi
 - `src/lib/graphStorage.ts` owns Supabase CRUD for graph data, `person_ai_notes`, and Edge Function invocation.
 - `src/lib/userWorkspace.ts` upserts the user profile and ensures a single personal board plus root node.
 - `mcp/server.mjs` exposes repo docs as MCP resources and the persisted graph model as MCP tools and dynamic resources.
-- `supabase/functions/sync-person-ai-note/index.ts` authenticates the caller, loads person context, calls n8n, and upserts `person_ai_notes`.
-- `supabase/functions/search-people-ai/index.ts` authenticates the caller, builds candidate context, calls n8n, and returns ranked people.
+- `supabase/functions/_shared/ai.ts` calls Gemini first and falls back to OpenRouter for structured AI responses.
+- `supabase/functions/sync-person-ai-note/index.ts` authenticates the caller, loads person context, calls the shared AI provider layer, and upserts `person_ai_notes`.
+- `supabase/functions/search-people-ai/index.ts` authenticates the caller, builds candidate context, calls the shared AI provider layer, and returns ranked people.
 - `src/index.css` contains the full visual system.
 
 The board is simulated by shifting layered CSS backgrounds according to a camera offset. The app does not store board objects or draw on a canvas element.
@@ -73,7 +75,7 @@ Out of scope for the current version:
 - Link implementation work back to the relevant Linear issue.
 - Preserve the clean-board product principle from `docs/product-vision.md`.
 - Keep all graph rows user-owned and protected by RLS keyed to `auth.uid()`.
-- Keep n8n webhook secrets out of the browser and only inside Supabase Edge Function secrets.
+- Keep Gemini and OpenRouter API keys out of the browser and only inside Supabase Edge Function secrets.
 - Keep `SUPABASE_SERVICE_ROLE_KEY` out of browser-exposed `VITE_` variables and only in local MCP env files or shell env.
 - Keep the root person immutable in position and deletion semantics.
 - Keep Google OAuth redirect/origin configuration aligned with the real deployed frontend origins.

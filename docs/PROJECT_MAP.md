@@ -34,8 +34,8 @@ The current product is intentionally narrow:
 - [VEL-9 Break down project tasks](https://linear.app/velizard/issue/VEL-9/break-down-project-tasks)
 - [VEL-10 Understand Lovable for the project](https://linear.app/velizard/issue/VEL-10/understand-lovable-for-the-project)
 - [VEL-11 Find subscription options](https://linear.app/velizard/issue/VEL-11/find-subscription-options)
-- [VEL-12 Design the n8n workflow](https://linear.app/velizard/issue/VEL-12/design-the-n8n-workflow)
-- [VEL-13 Evaluate n8n and decide whether to use it](https://linear.app/velizard/issue/VEL-13/evaluate-n8n-and-decide-whether-to-use-it)
+- VEL-12 Design the AI enrichment workflow
+- VEL-13 Evaluate AI provider setup
 - [VEL-14 Set up presentation environment](https://linear.app/velizard/issue/VEL-14/set-up-presentation-environment)
 - [VEL-15 Write AGENTS.md instructions](https://linear.app/velizard/issue/VEL-15/write-agentsmd-instructions)
 - [VEL-16 Fix all bugs](https://linear.app/velizard/issue/VEL-16/fix-all-bugs)
@@ -53,7 +53,7 @@ Completed tasks can remain listed here when they explain repository history. Liv
 - `docs/project-structure.md`: file-by-file project structure notes.
 - `README.md`: top-level overview and local development commands.
 - `.env.mcp.example`: local-only MCP environment template for service-role access.
-- `.mcp.json`: project MCP configuration for the shared `n8n-mcp` HTTP server and the local Hackathon board stdio server.
+- `.mcp.json`: project MCP configuration for the local Hackathon board stdio server.
 - `mcp/server.mjs`: local MCP server that exposes project docs and board graph tooling.
 - `scripts/seed-demo-user.mjs`: idempotent demo-data seed for one user's board with reusable people, notes, AI summaries, and connections.
 - `src/main.tsx`: React entry point.
@@ -67,7 +67,7 @@ Completed tasks can remain listed here when they explain repository history. Liv
 - `src/index.css`: current visual system.
 - `skills-lock.json`: lockfile for installed project agent skills.
 - `supabase/migrations/`: database schema and row-level security migrations.
-- `supabase/functions/`: server-side Supabase Edge Functions for n8n AI note sync and AI people search.
+- `supabase/functions/`: server-side Supabase Edge Functions for Gemini/OpenRouter AI note sync and AI people search.
 
 ## Ownership
 
