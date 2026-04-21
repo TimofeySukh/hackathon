@@ -796,11 +796,7 @@ function App() {
       if (!inspectorNode.name.trim()) {
         nameInputRef.current?.focus()
         nameInputRef.current?.select()
-        return
       }
-
-      newNoteTextareaRef.current?.focus()
-      autoResizeTextarea(newNoteTextareaRef.current)
     })
 
     return () => window.cancelAnimationFrame(frameId)
@@ -2351,7 +2347,8 @@ function App() {
 
               if (event.key === 'Enter') {
                 event.preventDefault()
-                tagTriggerRef.current?.focus()
+                newNoteTextareaRef.current?.focus()
+                autoResizeTextarea(newNoteTextareaRef.current)
               }
             }}
             onBlur={() => {
