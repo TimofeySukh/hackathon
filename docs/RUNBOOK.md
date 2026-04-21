@@ -124,6 +124,42 @@ npm run seed:demo-user -- --email <user-email>
 
 The demo seed is idempotent for the fixed contact set. Re-running it updates the seeded people, rebuilds their notes, and keeps the graph ready for search and live demos.
 
+## Production Auto-Deploy
+
+The `social.datanode.live` deployment can run a lightweight user-level auto-deploy loop on the server.
+
+Files:
+
+- `deploy/social-datanode-live/auto-deploy/social-datanode-live-autodeploy.sh`
+- `deploy/social-datanode-live/auto-deploy/social-datanode-live-autodeploy.cron`
+
+What it does:
+
+- checks `main` on GitHub every 3 minutes from cron
+- exits immediately when the remote commit did not change
+- only runs `npm ci`, `npm run build`, and `docker compose up -d --build` when `main` changed
+- stores the last deployed commit SHA on the server to avoid unnecessary rebuilds
+
+Suggested server install for user `egg`:
+
+```bash
+mkdir -p ~/.local/bin ~/.local/share/social-datanode-live-autodeploy
+install -m 755 deploy/social-datanode-live/auto-deploy/social-datanode-live-autodeploy.sh ~/.local/bin/social-datanode-live-autodeploy
+crontab -l > /tmp/current-crontab 2>/dev/null || true
+grep -v 'social-datanode-live-autodeploy' /tmp/current-crontab > /tmp/next-crontab || true
+cat deploy/social-datanode-live/auto-deploy/social-datanode-live-autodeploy.cron >> /tmp/next-crontab
+crontab /tmp/next-crontab
+rm -f /tmp/current-crontab /tmp/next-crontab
+~/.local/bin/social-datanode-live-autodeploy
+```
+
+Check status:
+
+```bash
+crontab -l
+tail -n 100 ~/.local/share/social-datanode-live-autodeploy/cron.log
+```
+
 Vite listens on all network interfaces in this repository, so it prints both a local URL and a network URL in the terminal. Open either URL in a browser.
 
 For other devices on the same local network, open the printed network URL, for example:

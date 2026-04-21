@@ -1,0 +1,1 @@
+*/3 * * * * $HOME/.local/bin/social-datanode-live-autodeploy >> $HOME/.local/share/social-datanode-live-autodeploy/cron.log 2>&1
