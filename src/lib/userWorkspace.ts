@@ -6,6 +6,7 @@ import type { Board, PersonNode } from './graphTypes'
 export type UserWorkspace = {
   board: Board
   rootPerson: PersonNode
+  isNewRootPerson: boolean
 }
 
 const getDisplayName = (user: User) => {
@@ -71,6 +72,7 @@ export async function ensureUserWorkspace(user: User): Promise<UserWorkspace> {
     return {
       board,
       rootPerson: rootPersonResult.data as PersonNode,
+      isNewRootPerson: false,
     }
   }
 
@@ -94,5 +96,6 @@ export async function ensureUserWorkspace(user: User): Promise<UserWorkspace> {
   return {
     board,
     rootPerson: rootInsertResult.data as PersonNode,
+    isNewRootPerson: true,
   }
 }

@@ -82,3 +82,4 @@ Task ownership is tracked in Linear. Code ownership is not split by directory ye
 - Update `docs/project-structure.md` and `docs/ARCHITECTURE.md` when source structure or boundaries change.
 - Keep the local MCP server aligned with the Supabase schema and documentation resources.
 - Keep Supabase Auth redirect URLs and Google OAuth origins aligned with every deployed frontend origin.
+- Remember that commits on `main` deploy to the primary production site within about 3 minutes after they reach GitHub.

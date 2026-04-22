@@ -18,6 +18,7 @@ Current app behavior:
 - create one immutable root person at `0,0` for each signed-in user
 - persist people, colored tags, notes, and undirected connections in Supabase
 - open the top-left Tags menu to create tags, rename them, and choose tag colors from presets or a custom picker
+- scroll the top-left Tags menu when the tag list or open color palette exceeds the viewport
 - show a login popup when signed-out users try to edit the board
 - allow one separate AI summary row per person in Supabase
 - debounce note create and note update events for 3 seconds before triggering AI enrichment
@@ -74,7 +75,7 @@ Required Vite variables:
 Recommended teammate setup:
 
 ```bash
-VITE_SUPABASE_URL=https://lycfoukfoesobeuumuad.supabase.co
+VITE_SUPABASE_URL=https://lxnrpdeahoglgiocowsh.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_l_x_y5rxdhL8Sd1ZE3QXag_lOCtr_M9
 VITE_SUPABASE_ANON_KEY=
 ```
@@ -195,7 +196,7 @@ Teammate quick-start:
 3. Fill in `.env.local`:
 
    ```bash
-   VITE_SUPABASE_URL=https://lycfoukfoesobeuumuad.supabase.co
+   VITE_SUPABASE_URL=https://lxnrpdeahoglgiocowsh.supabase.co
    VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_l_x_y5rxdhL8Sd1ZE3QXag_lOCtr_M9
    VITE_SUPABASE_ANON_KEY=
    ```
@@ -275,7 +276,7 @@ Google Cloud OAuth setup:
 - Keep the Supabase callback as the Authorized redirect URI:
 
 ```text
-https://lycfoukfoesobeuumuad.supabase.co/auth/v1/callback
+https://lxnrpdeahoglgiocowsh.supabase.co/auth/v1/callback
 ```
 
 The Supabase Google provider also needs the Google OAuth Client ID and Client Secret before `Sign in with Google` can complete.
@@ -364,13 +365,14 @@ Manual verification:
 20. Create a new person, confirm the inspector opens automatically, confirm an empty person focuses the name field, then fill the note capture textarea and save a new note both with `Cmd/Ctrl + Enter` and by blurring the textarea.
 21. Create a note by typing into the `Create new note` field, confirm saved notes start collapsed by default, expand one with the chevron, press Enter in the title to open the body, delete a note from the icon button, reload, and confirm note changes persist.
 22. Create a connection between two existing people, confirm reload preserves it, then click the widened line target and confirm `Delete connection` or Backspace removes it.
-23. Open the top-left Tags menu, create a tag, adjust its color, toggle one tag off with the visibility checkbox, and confirm both tagged nodes and their connections disappear. Use `Select all` and `Clear all` to confirm bulk visibility controls work.
-24. Open the search layer and verify that typing a person name, tag, or note text returns local matching people.
-25. Press Enter with a natural-language query and verify AI search returns ranked people with reasons.
-26. Click a search result and verify the board recenters on that person and opens the inspector.
-27. After creating a note, wait at least 3 seconds and confirm a `person_ai_notes` row for that person reaches `status = 'created'`.
-28. Edit an existing note, blur the input, wait at least 3 seconds, and confirm the same `person_ai_notes` row updates its `updated_at`, `summary`, and `structured_summary`.
-29. Sign out and confirm the anonymous board state returns.
+23. Open the top-left Tags menu, create enough tags to overflow the panel, scroll to the lower tags, adjust a lower tag color, and confirm the palette remains reachable.
+24. Open the top-left Tags menu, create a tag, adjust its color, toggle one tag off with the visibility checkbox, and confirm both tagged nodes and their connections disappear. Use `Select all` and `Clear all` to confirm bulk visibility controls work.
+25. Open the search layer and verify that typing a person name, tag, or note text returns local matching people.
+26. Press Enter with a natural-language query and verify AI search returns ranked people with reasons.
+27. Click a search result and verify the board recenters on that person and opens the inspector.
+28. After creating a note, wait at least 3 seconds and confirm a `person_ai_notes` row for that person reaches `status = 'created'`.
+29. Edit an existing note, blur the input, wait at least 3 seconds, and confirm the same `person_ai_notes` row updates its `updated_at`, `summary`, and `structured_summary`.
+30. Sign out and confirm the anonymous board state returns.
 
 Supabase verification:
 
@@ -392,7 +394,9 @@ Supabase verification:
 - Create short-lived task branches once implementation starts.
 - Keep pull requests small and link them to the relevant Linear issue.
 - Before starting new repo work, run `git fetch` and then `git pull --ff-only` when the working tree is clean, so local work starts from the latest GitHub state without creating automatic merge commits.
-- When the user asks an agent to commit changes, push the resulting commit to GitHub as part of the same workflow unless the user explicitly asks to keep it local.
+- Create a commit after repository changes.
+- Do not push automatically after every change; push only when the user asks for it or the release workflow requires it.
+- Commits on `main` are deployed to the primary production site within about 3 minutes after they reach GitHub.
 
 ## Current Priorities
 

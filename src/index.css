@@ -230,6 +230,7 @@ input[type='search']::-webkit-search-results-decoration {
   top: calc(100% + 10px);
   left: 0;
   width: 320px;
+  max-height: calc(100dvh - 112px);
   display: grid;
   gap: 16px;
   padding: 16px;
@@ -241,6 +242,9 @@ input[type='search']::-webkit-search-results-decoration {
     inset 0 1px 0 rgba(255, 255, 255, 0.24),
     0 22px 54px rgba(0, 0, 0, 0.14);
   backdrop-filter: blur(18px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .tags-menu__list {
@@ -1707,6 +1711,7 @@ input[type='search']::-webkit-search-results-decoration {
   .tags-menu__panel {
     position: static;
     width: 100%;
+    max-height: calc(100dvh - 156px);
   }
 
   .zoom-indicator {

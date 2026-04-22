@@ -186,6 +186,7 @@ async function ensureDefaultTags(userId: string) {
     missingTags.map((tag) => ({
       user_id: userId,
       name: tag.name,
+      color: tag.color,
     })),
   )
 
@@ -210,7 +211,9 @@ function isMissingColorColumnError(error: { message?: string; code?: string } | 
 export async function loadBoardGraph(user: User): Promise<BoardGraphPayload> {
   const client = requireSupabase()
   const workspace = await ensureUserWorkspace(user)
-  await ensureDefaultTags(user.id)
+  if (workspace.isNewRootPerson) {
+    await ensureDefaultTags(user.id)
+  }
 
   const [tagsResult, peopleResult, notesResult, personAiNotesResult, connectionsResult] = await Promise.all([
     client
@@ -266,6 +269,7 @@ export async function createTag(userId: string, name: string, color = DEFAULT_TA
     .insert({
       user_id: userId,
       name: normalizedName,
+      color: normalizeTagColor(color),
     })
     .select('*')
     .single()

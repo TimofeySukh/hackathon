@@ -1523,7 +1523,8 @@ function App() {
       suffix += 1
     }
 
-    await createTag(nextName)
+    const createdTag = await createTag(nextName)
+    setActiveColorTagId(createdTag.id)
   }
 
   function previewTagColor(tagId: string, color: string) {
@@ -1535,8 +1536,8 @@ function App() {
     saveTagColorDraft(tagId, nextColor)
   }
 
-  async function persistTagColor(tagId: string) {
-    const color = tagColorDrafts[tagId]
+  async function persistTagColor(tagId: string, nextColor = tagColorDrafts[tagId]) {
+    const color = nextColor ? normalizeTagColor(nextColor) : null
     if (!color || !isGraphReady) return
 
     try {
@@ -2083,7 +2084,7 @@ function App() {
                                   style={{ '--tag-color': presetColor } as TagColorStyle}
                                   onClick={() => {
                                     previewTagColor(tag.id, presetColor)
-                                    void persistTagColor(tag.id)
+                                    void persistTagColor(tag.id, presetColor)
                                   }}
                                   aria-label={`Set ${tag.name} color to ${presetColor}`}
                                 />
@@ -2096,8 +2097,9 @@ function App() {
                                 type="color"
                                 value={color}
                                 onChange={(event) => {
-                                  previewTagColor(tag.id, event.target.value)
-                                  void persistTagColor(tag.id)
+                                  const nextColor = event.target.value
+                                  previewTagColor(tag.id, nextColor)
+                                  void persistTagColor(tag.id, nextColor)
                                 }}
                               />
                             </label>

@@ -155,6 +155,7 @@ It currently supports:
 - modifier-drag to create node growth from any existing node with an immediate connecting line: `Command` on macOS, `Control` elsewhere
 - selected-node detail cards with a large name field, searchable tag selection/creation/deletion, compact auto-saving notes, and person deletion
 - single-click opening for the node-anchored inspector
+- a scrollable top-left tag menu that supports long tag lists and lower-row color palette editing
 - automatic board panning to keep the node-anchored inspector inside the viewport
 - inspector opening at a consistent size regardless of current zoom, then scaling with later zoom changes
 - continued trackpad panning over the inspector when the gesture starts on the board
