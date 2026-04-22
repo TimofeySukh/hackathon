@@ -121,6 +121,7 @@ const TAG_PRESET_COLORS = ['#ff6b6b', '#ff9f43', '#ffd93d', '#4cd137', '#2ed573'
 const NODE_CLICK_DRAG_THRESHOLD = 4
 const NODE_RADIUS = 9
 const NODE_HIT_RADIUS = 31
+const MIN_LINK_VISIBLE_LENGTH = 2
 const CREATE_THRESHOLD = 18
 const WHEEL_ZOOM_INTENSITY = 0.0016
 const INSPECTOR_ANCHOR_GAP = 40
@@ -2756,27 +2757,33 @@ function getLinkPath(fromNode?: PersonNode, toNode?: Offset | null) {
 
   const dx = toNode.x - fromNode.x
   const dy = toNode.y - fromNode.y
-  const distance = Math.hypot(dx, dy) || 1
+  const distance = Math.hypot(dx, dy)
+  if (distance < MIN_LINK_VISIBLE_LENGTH) return null
+
   const unitX = dx / distance
   const unitY = dy / distance
-  const curve = Math.min(44, distance * 0.18)
+  const endpointInset = Math.min(NODE_RADIUS, Math.max(0, distance / 2 - MIN_LINK_VISIBLE_LENGTH / 2))
+  const visibleDistance = Math.max(0, distance - endpointInset * 2)
+  const curve = Math.min(44, visibleDistance * 0.18)
+  const start = {
+    x: fromNode.x + unitX * endpointInset,
+    y: fromNode.y + unitY * endpointInset,
+  }
+  const end = {
+    x: toNode.x - unitX * endpointInset,
+    y: toNode.y - unitY * endpointInset,
+  }
 
   return {
-    start: {
-      x: fromNode.x + unitX * NODE_RADIUS,
-      y: fromNode.y + unitY * NODE_RADIUS,
-    },
-    end: {
-      x: toNode.x - unitX * NODE_RADIUS,
-      y: toNode.y - unitY * NODE_RADIUS,
-    },
+    start,
+    end,
     controlA: {
-      x: fromNode.x + unitX * (NODE_RADIUS + curve),
-      y: fromNode.y + unitY * (NODE_RADIUS + curve),
+      x: start.x + unitX * curve,
+      y: start.y + unitY * curve,
     },
     controlB: {
-      x: toNode.x - unitX * (NODE_RADIUS + curve),
-      y: toNode.y - unitY * (NODE_RADIUS + curve),
+      x: end.x - unitX * curve,
+      y: end.y - unitY * curve,
     },
   }
 }
