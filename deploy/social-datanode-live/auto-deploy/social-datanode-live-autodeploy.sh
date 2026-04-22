@@ -41,6 +41,12 @@ git -C "$REPO_DIR" checkout --force "$remote_sha"
 git -C "$REPO_DIR" clean -fdx
 
 cd "$REPO_DIR"
+if [[ -f "$BASE_DIR/deploy.env" ]]; then
+  set -a
+  source "$BASE_DIR/deploy.env"
+  set +a
+fi
+
 npm ci --prefer-offline --no-audit
 npm run build
 

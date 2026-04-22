@@ -140,6 +140,17 @@ What it does:
 - exits immediately when the remote commit did not change
 - only runs `npm ci`, `npm run build`, and `docker compose up -d --build` when `main` changed
 - stores the last deployed commit SHA on the server to avoid unnecessary rebuilds
+- loads optional build-time Vite variables from `$HOME/apps/social-datanode-live-autodeploy/deploy.env` before `npm run build`
+
+Create the server-only build env file before the first production build:
+
+```bash
+cat > ~/apps/social-datanode-live-autodeploy/deploy.env <<'EOF'
+VITE_SUPABASE_URL=https://lxnrpdeahoglgiocowsh.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=<publishable-key-from-supabase>
+VITE_SUPABASE_ANON_KEY=
+EOF
+```
 
 Suggested server install for user `egg`:
 
