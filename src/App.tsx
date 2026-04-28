@@ -19,6 +19,20 @@ type Offset = {
   y: number
 }
 
+type TouchPoint = {
+  clientX: number
+  clientY: number
+}
+
+type PinchGesture = {
+  firstPointerId: number
+  secondPointerId: number
+  startDistance: number
+  startScale: number
+  worldX: number
+  worldY: number
+}
+
 type ConnectionDrag = {
   fromId: string
   startClientX: number
@@ -339,6 +353,8 @@ function App() {
   const draggedPositionsRef = useRef<Record<string, Offset>>({})
   const areaSelectionRef = useRef<AreaSelection | null>(null)
   const activePointerIdRef = useRef<number | null>(null)
+  const touchPointersRef = useRef(new Map<number, TouchPoint>())
+  const pinchGestureRef = useRef<PinchGesture | null>(null)
   const visibleBoardNodesRef = useRef<PersonNode[]>([])
   const gestureScaleRef = useRef(1)
   const trackpadPanRef = useRef<{ active: boolean; timeoutId: number | null }>({
@@ -844,6 +860,96 @@ function App() {
     [queueViewportUpdate],
   )
 
+  const cancelActiveDragForPinch = useCallback(() => {
+    boardDragRef.current.active = false
+    activePointerIdRef.current = null
+    areaSelectionRef.current = null
+    connectionDragStateRef.current = null
+    nodeDragStateRef.current = null
+    draggedPositionsRef.current = {}
+
+    setIsDraggingBoard(false)
+    setAreaSelection(null)
+    setConnectionDrag(null)
+    setNodeDrag(null)
+    setDraggedPositions({})
+  }, [])
+
+  const getTouchPointPair = useCallback((gesture: Pick<PinchGesture, 'firstPointerId' | 'secondPointerId'>) => {
+    const firstPoint = touchPointersRef.current.get(gesture.firstPointerId)
+    const secondPoint = touchPointersRef.current.get(gesture.secondPointerId)
+
+    if (!firstPoint || !secondPoint) return null
+
+    return {
+      firstPoint,
+      secondPoint,
+      midpoint: {
+        x: (firstPoint.clientX + secondPoint.clientX) / 2,
+        y: (firstPoint.clientY + secondPoint.clientY) / 2,
+      },
+      distance: Math.hypot(firstPoint.clientX - secondPoint.clientX, firstPoint.clientY - secondPoint.clientY),
+    }
+  }, [])
+
+  const beginTouchPinch = useCallback(() => {
+    const viewport = boardRef.current
+    if (!viewport || touchPointersRef.current.size < 2) return false
+
+    const [firstPointerId, secondPointerId] = Array.from(touchPointersRef.current.keys()).slice(-2)
+    const pair = getTouchPointPair({ firstPointerId, secondPointerId })
+    if (!pair || pair.distance < 4) return false
+
+    cancelActiveDragForPinch()
+    closeTransientUi()
+
+    const view = viewportRef.current
+    const { left, top } = viewport.getBoundingClientRect()
+    const midpointX = pair.midpoint.x - left
+    const midpointY = pair.midpoint.y - top
+    const centerX = viewport.clientWidth / 2
+    const centerY = viewport.clientHeight / 2
+
+    pinchGestureRef.current = {
+      firstPointerId,
+      secondPointerId,
+      startDistance: pair.distance,
+      startScale: view.scale,
+      worldX: (midpointX - centerX - view.offset.x) / view.scale,
+      worldY: (midpointY - centerY - view.offset.y) / view.scale,
+    }
+
+    setSelectedConnectionId(null)
+    setConnectionMenuPosition(null)
+    return true
+  }, [cancelActiveDragForPinch, closeTransientUi, getTouchPointPair])
+
+  const updateTouchPinch = useCallback(() => {
+    const viewport = boardRef.current
+    const gesture = pinchGestureRef.current
+    if (!viewport || !gesture) return false
+
+    const pair = getTouchPointPair(gesture)
+    if (!pair || pair.distance < 4) return false
+
+    const { left, top } = viewport.getBoundingClientRect()
+    const midpointX = pair.midpoint.x - left
+    const midpointY = pair.midpoint.y - top
+    const centerX = viewport.clientWidth / 2
+    const centerY = viewport.clientHeight / 2
+    const nextScale = clampScale(gesture.startScale * (pair.distance / gesture.startDistance))
+
+    queueViewportUpdate(
+      {
+        x: midpointX - centerX - gesture.worldX * nextScale,
+        y: midpointY - centerY - gesture.worldY * nextScale,
+      },
+      nextScale,
+    )
+
+    return true
+  }, [getTouchPointPair, queueViewportUpdate])
+
   const openInspectorForNode = useCallback((node: PersonNode) => {
     inspectorOpenScaleRef.current = viewportRef.current.scale
     setInspectorNodeId(node.id)
@@ -909,7 +1015,22 @@ function App() {
   )
 
   useEffect(() => {
+    const touchPointers = touchPointersRef.current
+
     const handlePointerMove = (event: PointerEvent) => {
+      if (event.pointerType === 'touch') {
+        touchPointers.set(event.pointerId, {
+          clientX: event.clientX,
+          clientY: event.clientY,
+        })
+
+        if (pinchGestureRef.current) {
+          event.preventDefault()
+          updateTouchPinch()
+          return
+        }
+      }
+
       if (activePointerIdRef.current !== null && event.pointerId !== activePointerIdRef.current) return
 
       const currentAreaSelection = areaSelectionRef.current
@@ -985,6 +1106,31 @@ function App() {
     }
 
     const handlePointerUp = (event: PointerEvent) => {
+      if (event.pointerType === 'touch') {
+        touchPointers.delete(event.pointerId)
+
+        if (pinchGestureRef.current) {
+          event.preventDefault()
+          pinchGestureRef.current = null
+
+          const remainingTouches = Array.from(touchPointers.entries())
+          const remainingTouch = remainingTouches[remainingTouches.length - 1]
+          if (remainingTouch) {
+            const [pointerId, point] = remainingTouch
+            activePointerIdRef.current = pointerId
+            boardDragRef.current = {
+              startX: point.clientX,
+              startY: point.clientY,
+              originX: viewportRef.current.offset.x,
+              originY: viewportRef.current.offset.y,
+              active: true,
+            }
+            setIsDraggingBoard(true)
+          }
+          return
+        }
+      }
+
       if (activePointerIdRef.current !== null && event.pointerId !== activePointerIdRef.current) return
 
       void (async () => {
@@ -1094,11 +1240,27 @@ function App() {
       window.removeEventListener('pointermove', handlePointerMove)
       window.removeEventListener('pointerup', handlePointerUp)
       window.removeEventListener('pointercancel', handlePointerUp)
+      touchPointers.clear()
+      pinchGestureRef.current = null
     }
-  }, [finishConnectionDrag, movePerson, queueViewportUpdate])
+  }, [finishConnectionDrag, movePerson, queueViewportUpdate, updateTouchPinch])
 
   function startBoardDragging(event: ReactPointerEvent<HTMLElement>) {
+    if (event.pointerType === 'touch') {
+      touchPointersRef.current.set(event.pointerId, {
+        clientX: event.clientX,
+        clientY: event.clientY,
+      })
+
+      if (touchPointersRef.current.size > 1) {
+        event.preventDefault()
+        beginTouchPinch()
+        return
+      }
+    }
+
     if (connectionDrag || nodeDrag) return
+
     if (!event.isPrimary) return
 
     if (event.button === 2) {
@@ -1143,6 +1305,21 @@ function App() {
 
   const startNodeInteraction = useCallback((node: PersonNode, event: ReactPointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return
+
+    if (event.pointerType === 'touch') {
+      touchPointersRef.current.set(event.pointerId, {
+        clientX: event.clientX,
+        clientY: event.clientY,
+      })
+
+      if (touchPointersRef.current.size > 1) {
+        event.preventDefault()
+        event.stopPropagation()
+        beginTouchPinch()
+        return
+      }
+    }
+
     if (!event.isPrimary) return
 
     event.stopPropagation()
@@ -1205,7 +1382,7 @@ function App() {
     }
     connectionDragStateRef.current = nextConnectionDrag
     setConnectionDrag(nextConnectionDrag)
-  }, [isGraphReady, multiSelectedNodeIdSet, multiSelectedNodeIds.length, nodesById, requestLogin, visibleBoardNodes])
+  }, [beginTouchPinch, isGraphReady, multiSelectedNodeIdSet, multiSelectedNodeIds.length, nodesById, requestLogin, visibleBoardNodes])
 
   const markTrackpadPanActive = useCallback(() => {
     trackpadPanRef.current.active = true

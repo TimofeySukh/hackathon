@@ -9,6 +9,7 @@ Current app behavior:
 - open a full-window board
 - drag with the mouse to move across the point grid
 - drag with one finger on touch devices to move across the point grid
+- pinch with two fingers on touch devices to zoom around the gesture midpoint while keeping one-finger board panning responsive
 - scroll on a trackpad to pan the board
 - zoom toward the cursor with the mouse wheel
 - switch between dark and light themes
@@ -27,6 +28,7 @@ Current app behavior:
 - autosave person names shortly after typing or when the name field loses focus
 - open a people search layer, match locally while typing, and run natural-language AI search on Enter
 - drag a right-click selection box to select multiple people, then drag one of them to move the group
+- use a mobile layout with the search field and account/theme controls at the top and the Tags control docked near the bottom-left safe area
 - simplify some heavy visual effects while dragging and on very dense boards to keep navigation responsive
 - avoid browser-fragile `color-mix()` styling for tag accents and disable heavy blur compositing on Firefox
 

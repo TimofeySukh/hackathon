@@ -47,6 +47,7 @@ Current scope:
 - mouse drag navigation
 - trackpad scroll panning
 - cursor-centered mouse-wheel zoom
+- two-finger touch pinch zoom with gesture-midpoint anchoring
 - dark/light theme switching
 - very dense point-grid spatial reference
 - Google sign-in through Supabase
