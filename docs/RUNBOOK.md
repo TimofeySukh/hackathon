@@ -9,7 +9,7 @@ Current app behavior:
 - open a full-window board
 - drag with the mouse to move across the point grid
 - drag with one finger on touch devices to move across the point grid
-- pinch with two fingers on touch devices to zoom around the gesture midpoint while keeping one-finger board panning responsive
+- pinch with two fingers on touch devices to zoom and pan around the live gesture midpoint while keeping one-finger board panning responsive
 - scroll on a trackpad to pan the board
 - zoom toward the cursor with the mouse wheel
 - switch between dark and light themes

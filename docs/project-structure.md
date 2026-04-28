@@ -146,7 +146,7 @@ It currently supports:
 - one immutable root node at `0,0` per signed-in user
 - mouse drag navigation across the canvas
 - one-finger touch drag navigation across the canvas on mobile devices
-- two-finger touch pinch zoom across the canvas on mobile devices, centered on the pinch midpoint
+- two-finger touch pinch zoom across the canvas on mobile devices, centered on the live pinch midpoint
 - trackpad scroll panning across the canvas
 - cursor-centered zoom with the mouse wheel
 - visual theme switching

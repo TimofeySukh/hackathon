@@ -27,10 +27,8 @@ type TouchPoint = {
 type PinchGesture = {
   firstPointerId: number
   secondPointerId: number
-  startDistance: number
-  startScale: number
-  worldX: number
-  worldY: number
+  previousDistance: number
+  previousMidpoint: Offset
 }
 
 type ConnectionDrag = {
@@ -882,8 +880,6 @@ function App() {
     if (!firstPoint || !secondPoint) return null
 
     return {
-      firstPoint,
-      secondPoint,
       midpoint: {
         x: (firstPoint.clientX + secondPoint.clientX) / 2,
         y: (firstPoint.clientY + secondPoint.clientY) / 2,
@@ -903,20 +899,11 @@ function App() {
     cancelActiveDragForPinch()
     closeTransientUi()
 
-    const view = viewportRef.current
-    const { left, top } = viewport.getBoundingClientRect()
-    const midpointX = pair.midpoint.x - left
-    const midpointY = pair.midpoint.y - top
-    const centerX = viewport.clientWidth / 2
-    const centerY = viewport.clientHeight / 2
-
     pinchGestureRef.current = {
       firstPointerId,
       secondPointerId,
-      startDistance: pair.distance,
-      startScale: view.scale,
-      worldX: (midpointX - centerX - view.offset.x) / view.scale,
-      worldY: (midpointY - centerY - view.offset.y) / view.scale,
+      previousDistance: pair.distance,
+      previousMidpoint: pair.midpoint,
     }
 
     setSelectedConnectionId(null)
@@ -933,19 +920,32 @@ function App() {
     if (!pair || pair.distance < 4) return false
 
     const { left, top } = viewport.getBoundingClientRect()
-    const midpointX = pair.midpoint.x - left
-    const midpointY = pair.midpoint.y - top
+    const previousMidpointX = gesture.previousMidpoint.x - left
+    const previousMidpointY = gesture.previousMidpoint.y - top
+    const currentMidpointX = pair.midpoint.x - left
+    const currentMidpointY = pair.midpoint.y - top
     const centerX = viewport.clientWidth / 2
     const centerY = viewport.clientHeight / 2
-    const nextScale = clampScale(gesture.startScale * (pair.distance / gesture.startDistance))
+    const view = pendingViewportRef.current ?? viewportRef.current
+    const rawScaleDelta = pair.distance / gesture.previousDistance
+    const scaleDelta = clamp(rawScaleDelta, 0.86, 1.16)
+    const nextScale = clampScale(view.scale * scaleDelta)
+    const worldX = (previousMidpointX - centerX - view.offset.x) / view.scale
+    const worldY = (previousMidpointY - centerY - view.offset.y) / view.scale
 
     queueViewportUpdate(
       {
-        x: midpointX - centerX - gesture.worldX * nextScale,
-        y: midpointY - centerY - gesture.worldY * nextScale,
+        x: currentMidpointX - centerX - worldX * nextScale,
+        y: currentMidpointY - centerY - worldY * nextScale,
       },
       nextScale,
     )
+
+    pinchGestureRef.current = {
+      ...gesture,
+      previousDistance: pair.distance,
+      previousMidpoint: pair.midpoint,
+    }
 
     return true
   }, [getTouchPointPair, queueViewportUpdate])
@@ -1452,6 +1452,8 @@ function App() {
 
     const handleGestureChange = (event: Event) => {
       event.preventDefault()
+
+      if (touchPointersRef.current.size > 0) return
 
       const gestureEvent = event as GestureEventLike
       const scaleDelta = gestureEvent.scale / gestureScaleRef.current
