@@ -2031,6 +2031,7 @@ function App() {
 
   const selectConnection = useCallback((connectionId: string, event: ReactPointerEvent<SVGPathElement>) => {
     if (!isGraphReady) return
+    if (event.pointerType === 'touch') return
 
     event.preventDefault()
     event.stopPropagation()

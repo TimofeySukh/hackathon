@@ -1405,6 +1405,12 @@ input[type='search']::-webkit-search-results-decoration {
   stroke: rgba(38, 140, 97, 0.72);
 }
 
+@media (pointer: coarse) {
+  .graph-edge-hit {
+    pointer-events: none;
+  }
+}
+
 .connection-menu {
   position: absolute;
   z-index: 6;
