@@ -71,6 +71,7 @@ The React entry point. It mounts the app into the root DOM node.
 Contains the board experience:
 
 - Supabase-backed account controls
+- unsigned local graph state for editing before login
 - LinkedIn archive-request instruction menu and LinkedIn export zip import flow
 - theme state
 - mouse drag navigation state
@@ -146,6 +147,7 @@ The board is not an editor yet.
 It currently supports:
 
 - Google sign-in and sign-out when Supabase is configured
+- editable unsigned local board state before sign-in
 - one personal board record per signed-in user
 - one immutable root node at `0,0` per signed-in user
 - mouse drag navigation across the canvas
@@ -168,7 +170,7 @@ It currently supports:
 - connection line selection is disabled for coarse touch pointers so mobile pan gestures are not interrupted by the delete menu
 - a compact top bar with a capped-width search field, circular tags/account/theme controls, and exclusive overlay behavior
 - a keyboard-first inspector that treats `#tag` in the name field as a tag command and uses one capture textarea for new notes
-- local people search while typing plus natural-language AI search on Enter
+- local people search while typing plus natural-language AI search on Enter when signed in
 - drag repositioning for non-root nodes
 - persisted node renaming
 - grid movement through background offset changes

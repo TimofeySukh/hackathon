@@ -426,6 +426,36 @@ const ANONYMOUS_ROOT: PersonNode = {
   updated_at: new Date(0).toISOString(),
 }
 
+const ANONYMOUS_BOARD = {
+  id: 'anonymous-board',
+  user_id: 'anonymous-user',
+  title: 'Local board',
+  created_at: new Date(0).toISOString(),
+  updated_at: new Date(0).toISOString(),
+}
+
+function createLocalId(prefix: string) {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return `${prefix}-${crypto.randomUUID()}`
+  }
+
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+function createDefaultLocalTags(): Tag[] {
+  const timestamp = new Date(0).toISOString()
+
+  return DEFAULT_TAGS.map((tag) => ({
+    id: `local-tag-${normalizeTagName(tag.name).toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+    user_id: 'anonymous-user',
+    name: tag.name,
+    normalized_name: normalizeTagName(tag.name).toLowerCase(),
+    color: tag.color,
+    created_at: timestamp,
+    updated_at: timestamp,
+  }))
+}
+
 type GraphEdgeProps = {
   edge: Connection
   fromNode: PersonNode
@@ -466,7 +496,6 @@ type GraphNodeProps = {
   isSelected: boolean
   tagColor: string | null
   showLabel: boolean
-  isGraphReady: boolean
   connectionModifierLabel: string
   onPointerDown: (node: PersonNode, event: ReactPointerEvent<HTMLButtonElement>) => void
   onClick: (node: PersonNode) => void
@@ -477,7 +506,6 @@ const GraphNodeCard = memo(function GraphNodeCard({
   isSelected,
   tagColor,
   showLabel,
-  isGraphReady,
   connectionModifierLabel,
   onPointerDown,
   onClick,
@@ -496,11 +524,9 @@ const GraphNodeCard = memo(function GraphNodeCard({
         type="button"
         className="graph-node__button"
         title={
-          isGraphReady
-            ? node.is_root
-              ? `Hold ${connectionModifierLabel} and drag to connect`
-              : `Drag to move. Hold ${connectionModifierLabel} and drag to connect.`
-            : 'Sign in with Google to edit'
+          node.is_root
+            ? `Hold ${connectionModifierLabel} and drag to connect`
+            : `Drag to move. Hold ${connectionModifierLabel} and drag to connect.`
         }
         onPointerDown={(event) => onPointerDown(node, event)}
         onClick={(event) => {
@@ -529,18 +555,18 @@ function App() {
     connections,
     status: graphStatus,
     error: graphError,
-    createPerson,
-    updatePerson,
-    movePerson,
-    deletePerson,
-    createConnection,
-    deleteConnection,
-    createTag,
-    deleteTag,
-    updateTag,
-    createNote,
-    updateNote,
-    deleteNote,
+    createPerson: createRemotePerson,
+    updatePerson: updateRemotePerson,
+    movePerson: moveRemotePerson,
+    deletePerson: deleteRemotePerson,
+    createConnection: createRemoteConnection,
+    deleteConnection: deleteRemoteConnection,
+    createTag: createRemoteTag,
+    deleteTag: deleteRemoteTag,
+    updateTag: updateRemoteTag,
+    createNote: createRemoteNote,
+    updateNote: updateRemoteNote,
+    deleteNote: deleteRemoteNote,
   } = useBoardGraph(session?.user ?? null)
 
   const [theme, setTheme] = useState<Theme>(() => {
@@ -588,7 +614,10 @@ function App() {
   const [aiSearchResults, setAiSearchResults] = useState<SearchResult[]>([])
   const [aiSearchStatus, setAiSearchStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [aiSearchError, setAiSearchError] = useState<string | null>(null)
-  const [isLoginPromptOpen, setIsLoginPromptOpen] = useState(false)
+  const [localPeople, setLocalPeople] = useState<PersonNode[]>([ANONYMOUS_ROOT])
+  const [localTags, setLocalTags] = useState<Tag[]>(() => createDefaultLocalTags())
+  const [localNotes, setLocalNotes] = useState<PersonNote[]>([])
+  const [localConnections, setLocalConnections] = useState<Connection[]>([])
   const connectionModifierLabel = IS_MAC_PLATFORM ? 'Command' : 'Control'
 
   const boardRef = useRef<HTMLElement | null>(null)
@@ -637,18 +666,24 @@ function App() {
   })
 
   const isAuthenticated = status === 'authenticated' && Boolean(session?.user)
-  const isGraphReady = isAuthenticated && graphStatus === 'ready' && Boolean(board)
+  const isRemoteGraphReady = isAuthenticated && graphStatus === 'ready' && Boolean(board)
+  const activeBoard = isRemoteGraphReady ? board : ANONYMOUS_BOARD
+  const activePeople = isRemoteGraphReady ? people : localPeople
+  const activeTags = isRemoteGraphReady ? tags : localTags
+  const activeNotes = isRemoteGraphReady ? notes : localNotes
+  const activeConnections = isRemoteGraphReady ? connections : localConnections
+  const isGraphReady = isRemoteGraphReady || !isAuthenticated
   const boardNodes = useMemo(
     () =>
-      (isGraphReady ? people : [ANONYMOUS_ROOT]).map((node) => {
+      activePeople.map((node) => {
         const dragPosition = draggedPositions[node.id]
         return dragPosition ? { ...node, ...dragPosition } : node
       }),
-    [draggedPositions, isGraphReady, people],
+    [activePeople, draggedPositions],
   )
   const boardConnections = useMemo(
-    () => (isGraphReady ? connections : []),
-    [connections, isGraphReady],
+    () => activeConnections,
+    [activeConnections],
   )
   const nodesById = useMemo(
     () => Object.fromEntries(boardNodes.map((node) => [node.id, node])) as Record<string, PersonNode>,
@@ -656,30 +691,23 @@ function App() {
   )
   const tagMenuItems = useMemo<TagMenuItem[]>(
     () =>
-      isGraphReady
-        ? tags.map((tag) => ({
+      activeTags.map((tag) => ({
             id: tag.id,
             name: tag.name,
             color: normalizeTagColor(tagColorDrafts[tag.id] ?? tag.color ?? DEFAULT_TAG_COLOR),
             isPersisted: true,
-          }))
-        : DEFAULT_TAGS.map((tag) => ({
-            id: `default-${tag.name}`,
-            name: tag.name,
-            color: tag.color,
-            isPersisted: false,
           })),
-    [isGraphReady, tagColorDrafts, tags],
+    [activeTags, tagColorDrafts],
   )
   const tagColorById = useMemo(
     () =>
       Object.fromEntries(
-        tags.map((tag) => [
+        activeTags.map((tag) => [
           tag.id,
           normalizeTagColor(tagColorDrafts[tag.id] ?? tag.color ?? DEFAULT_TAG_COLOR),
         ]),
       ) as Record<string, string>,
-    [tagColorDrafts, tags],
+    [activeTags, tagColorDrafts],
   )
   const visibleTagIds = useMemo(
     () => new Set(tagMenuItems.filter((tag) => !hiddenTagIds[tag.id]).map((tag) => tag.id)),
@@ -728,26 +756,26 @@ function App() {
   }, [inspectorNodeId, visibleNodesById])
 
   const inspectorNodeNotes = useMemo(
-    () => notes.filter((note) => note.person_id === inspectorNode?.id),
-    [inspectorNode?.id, notes],
+    () => activeNotes.filter((note) => note.person_id === inspectorNode?.id),
+    [activeNotes, inspectorNode?.id],
   )
   const tagsById = useMemo(
-    () => Object.fromEntries(tags.map((tag) => [tag.id, tag])) as Record<string, Tag>,
-    [tags],
+    () => Object.fromEntries(activeTags.map((tag) => [tag.id, tag])) as Record<string, Tag>,
+    [activeTags],
   )
   const selectedInspectorTag = inspectorNode?.tag_id ? tagsById[inspectorNode.tag_id] ?? null : null
   const filteredInspectorTags = useMemo(() => {
     const normalizedDraft = tagDraft.trim().toLowerCase()
-    if (!normalizedDraft) return tags
+    if (!normalizedDraft) return activeTags
 
-    return tags.filter((tag) => tag.name.toLowerCase().includes(normalizedDraft))
-  }, [tagDraft, tags])
+    return activeTags.filter((tag) => tag.name.toLowerCase().includes(normalizedDraft))
+  }, [activeTags, tagDraft])
   const canCreateInspectorTag = useMemo(() => {
     const normalizedDraft = normalizeTagName(tagDraft)
     if (!normalizedDraft || !isGraphReady) return false
 
-    return !tags.some((tag) => normalizeTagName(tag.name).toLowerCase() === normalizedDraft.toLowerCase())
-  }, [isGraphReady, tagDraft, tags])
+    return !activeTags.some((tag) => normalizeTagName(tag.name).toLowerCase() === normalizedDraft.toLowerCase())
+  }, [activeTags, isGraphReady, tagDraft])
   const tagPickerOptions = useMemo<TagPickerOption[]>(() => {
     const nextOptions: TagPickerOption[] = []
 
@@ -782,7 +810,7 @@ function App() {
   const notesByPersonId = useMemo(() => {
     const nextNotesByPersonId: Record<string, PersonNote[]> = {}
 
-    for (const note of notes) {
+    for (const note of activeNotes) {
       if (!nextNotesByPersonId[note.person_id]) {
         nextNotesByPersonId[note.person_id] = []
       }
@@ -790,12 +818,12 @@ function App() {
     }
 
     return nextNotesByPersonId
-  }, [notes])
+  }, [activeNotes])
   const searchResults: SearchResult[] = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase()
     if (!normalizedQuery) return []
 
-    return (isGraphReady ? people : [ANONYMOUS_ROOT])
+    return activePeople
       .map((node) => {
         const matches: string[] = []
         let score = 0
@@ -843,17 +871,250 @@ function App() {
         return (left.node.name || '').localeCompare(right.node.name || '')
       })
       .slice(0, 8)
-  }, [isGraphReady, notesByPersonId, people, searchQuery, tagsById])
+  }, [activePeople, notesByPersonId, searchQuery, tagsById])
   const visibleSearchResults = aiSearchQuery === searchQuery.trim() ? aiSearchResults : searchResults
 
   const error = authError ?? graphError
 
-  const requestLogin = useCallback(() => {
-    if (status === 'authenticated' || status === 'loading') return false
+  const createPerson = useCallback(async (input: { name: string; tagId?: string | null; x: number; y: number }) => {
+    if (isRemoteGraphReady) {
+      return createRemotePerson(input)
+    }
 
-    setIsLoginPromptOpen(true)
-    return true
-  }, [status])
+    const timestamp = new Date().toISOString()
+    const person: PersonNode = {
+      id: createLocalId('local-person'),
+      board_id: ANONYMOUS_BOARD.id,
+      owner_user_id: ANONYMOUS_BOARD.user_id,
+      name: input.name,
+      tag_id: input.tagId ?? null,
+      x: input.x,
+      y: input.y,
+      is_root: false,
+      created_at: timestamp,
+      updated_at: timestamp,
+    }
+    setLocalPeople((currentPeople) => [...currentPeople, person])
+    return person
+  }, [createRemotePerson, isRemoteGraphReady])
+
+  const updatePerson = useCallback(async (input: { id: string; name?: string; tag_id?: string | null }) => {
+    if (isRemoteGraphReady) {
+      return updateRemotePerson(input)
+    }
+
+    const timestamp = new Date().toISOString()
+    let updatedPerson: PersonNode | null = null
+    setLocalPeople((currentPeople) =>
+      currentPeople.map((person) => {
+        if (person.id !== input.id) return person
+
+        updatedPerson = {
+          ...person,
+          ...(input.name !== undefined ? { name: input.name } : {}),
+          ...(input.tag_id !== undefined ? { tag_id: input.tag_id } : {}),
+          updated_at: timestamp,
+        }
+        return updatedPerson
+      }),
+    )
+
+    if (!updatedPerson) throw new Error('Person was not found.')
+    return updatedPerson
+  }, [isRemoteGraphReady, updateRemotePerson])
+
+  const movePerson = useCallback(async (id: string, x: number, y: number) => {
+    if (isRemoteGraphReady) {
+      return moveRemotePerson(id, x, y)
+    }
+
+    const timestamp = new Date().toISOString()
+    let updatedPerson: PersonNode | null = null
+    setLocalPeople((currentPeople) =>
+      currentPeople.map((person) => {
+        if (person.id !== id || person.is_root) return person
+
+        updatedPerson = {
+          ...person,
+          x,
+          y,
+          updated_at: timestamp,
+        }
+        return updatedPerson
+      }),
+    )
+
+    if (!updatedPerson) throw new Error('Person was not found.')
+    return updatedPerson
+  }, [isRemoteGraphReady, moveRemotePerson])
+
+  const deletePerson = useCallback(async (id: string) => {
+    if (isRemoteGraphReady) {
+      return deleteRemotePerson(id)
+    }
+
+    setLocalPeople((currentPeople) => currentPeople.filter((person) => person.id !== id || person.is_root))
+    setLocalNotes((currentNotes) => currentNotes.filter((note) => note.person_id !== id))
+    setLocalConnections((currentConnections) =>
+      currentConnections.filter((connection) => connection.person_a_id !== id && connection.person_b_id !== id),
+    )
+  }, [deleteRemotePerson, isRemoteGraphReady])
+
+  const createConnection = useCallback(async (firstPersonId: string, secondPersonId: string) => {
+    if (isRemoteGraphReady) {
+      return createRemoteConnection(firstPersonId, secondPersonId)
+    }
+
+    if (firstPersonId === secondPersonId) {
+      throw new Error('Cannot connect a person to themselves.')
+    }
+
+    const [personAId, personBId] =
+      firstPersonId < secondPersonId ? [firstPersonId, secondPersonId] : [secondPersonId, firstPersonId]
+    const existingConnection = localConnections.find(
+      (connection) => connection.person_a_id === personAId && connection.person_b_id === personBId,
+    )
+    if (existingConnection) return existingConnection
+
+    const connection: Connection = {
+      id: createLocalId('local-connection'),
+      board_id: ANONYMOUS_BOARD.id,
+      owner_user_id: ANONYMOUS_BOARD.user_id,
+      person_a_id: personAId,
+      person_b_id: personBId,
+      created_at: new Date().toISOString(),
+    }
+    setLocalConnections((currentConnections) => [...currentConnections, connection])
+    return connection
+  }, [createRemoteConnection, isRemoteGraphReady, localConnections])
+
+  const deleteConnection = useCallback(async (id: string) => {
+    if (isRemoteGraphReady) {
+      return deleteRemoteConnection(id)
+    }
+
+    setLocalConnections((currentConnections) => currentConnections.filter((connection) => connection.id !== id))
+  }, [deleteRemoteConnection, isRemoteGraphReady])
+
+  async function createTag(name: string) {
+    if (isRemoteGraphReady) {
+      return createRemoteTag(name)
+    }
+
+    const normalizedName = normalizeTagName(name)
+    const existingTag = localTags.find(
+      (tag) => normalizeTagName(tag.name).toLowerCase() === normalizedName.toLowerCase(),
+    )
+    if (existingTag) return existingTag
+
+    const timestamp = new Date().toISOString()
+    const tag: Tag = {
+      id: createLocalId('local-tag'),
+      user_id: ANONYMOUS_BOARD.user_id,
+      name: normalizedName,
+      normalized_name: normalizedName.toLowerCase(),
+      color: DEFAULT_TAG_COLOR,
+      created_at: timestamp,
+      updated_at: timestamp,
+    }
+    setLocalTags((currentTags) => [...currentTags, tag])
+    return tag
+  }
+
+  async function updateTag(input: { id: string; name?: string; color?: string }) {
+    if (isRemoteGraphReady) {
+      return updateRemoteTag(input)
+    }
+
+    const timestamp = new Date().toISOString()
+    let updatedTag: Tag | null = null
+    setLocalTags((currentTags) =>
+      currentTags.map((tag) => {
+        if (tag.id !== input.id) return tag
+
+        const nextName = input.name !== undefined ? normalizeTagName(input.name) : tag.name
+        updatedTag = {
+          ...tag,
+          name: nextName,
+          normalized_name: normalizeTagName(nextName).toLowerCase(),
+          ...(input.color !== undefined ? { color: normalizeTagColor(input.color) } : {}),
+          updated_at: timestamp,
+        }
+        return updatedTag
+      }),
+    )
+
+    if (!updatedTag) throw new Error('Tag was not found.')
+    return updatedTag
+  }
+
+  async function deleteTag(id: string) {
+    if (isRemoteGraphReady) {
+      return deleteRemoteTag(id)
+    }
+
+    setLocalTags((currentTags) => currentTags.filter((tag) => tag.id !== id))
+    setLocalPeople((currentPeople) =>
+      currentPeople.map((person) => (person.tag_id === id ? { ...person, tag_id: null } : person)),
+    )
+  }
+
+  async function createNote(
+    title: string,
+    body: string,
+    personId: string,
+    options?: { syncAi?: boolean },
+  ) {
+    if (isRemoteGraphReady) {
+      return createRemoteNote(title, body, personId, options)
+    }
+
+    const timestamp = new Date().toISOString()
+    const note: PersonNote = {
+      id: createLocalId('local-note'),
+      person_id: personId,
+      owner_user_id: ANONYMOUS_BOARD.user_id,
+      title,
+      body,
+      created_at: timestamp,
+      updated_at: timestamp,
+    }
+    setLocalNotes((currentNotes) => [...currentNotes, note])
+    return note
+  }
+
+  async function updateNote(input: { id: string; title?: string; body?: string }) {
+    if (isRemoteGraphReady) {
+      return updateRemoteNote(input)
+    }
+
+    const timestamp = new Date().toISOString()
+    let updatedNote: PersonNote | null = null
+    setLocalNotes((currentNotes) =>
+      currentNotes.map((note) => {
+        if (note.id !== input.id) return note
+
+        updatedNote = {
+          ...note,
+          ...(input.title !== undefined ? { title: input.title } : {}),
+          ...(input.body !== undefined ? { body: input.body } : {}),
+          updated_at: timestamp,
+        }
+        return updatedNote
+      }),
+    )
+
+    if (!updatedNote) throw new Error('Note was not found.')
+    return updatedNote
+  }
+
+  async function deleteNote(id: string) {
+    if (isRemoteGraphReady) {
+      return deleteRemoteNote(id)
+    }
+
+    setLocalNotes((currentNotes) => currentNotes.filter((note) => note.id !== id))
+  }
 
   useEffect(() => {
     connectionDragStateRef.current = connectionDrag
@@ -1594,8 +1855,6 @@ function App() {
     if (!event.isPrimary) return
 
     event.stopPropagation()
-    if (requestLogin()) return
-
     boardDragRef.current.active = false
     setIsDraggingBoard(false)
     setSelectedNodeId(node.id)
@@ -1653,7 +1912,7 @@ function App() {
     }
     connectionDragStateRef.current = nextConnectionDrag
     setConnectionDrag(nextConnectionDrag)
-  }, [beginTouchPinch, isGraphReady, multiSelectedNodeIdSet, multiSelectedNodeIds.length, nodesById, requestLogin, visibleBoardNodes])
+  }, [beginTouchPinch, isGraphReady, multiSelectedNodeIdSet, multiSelectedNodeIds.length, nodesById, visibleBoardNodes])
 
   const markTrackpadPanActive = useCallback(() => {
     trackpadPanRef.current.active = true
@@ -2241,7 +2500,6 @@ function App() {
   }
 
   function openLinkedInUpload() {
-    if (requestLogin()) return
     setIsLinkedInMenuOpen(false)
     setIsLinkedInGuideOpen(false)
     setIsLinkedInUploadOpen(true)
@@ -2276,6 +2534,11 @@ function App() {
   async function handleAiSearch() {
     const query = searchQuery.trim()
     if (!query || !isGraphReady) return
+    if (!isAuthenticated) {
+      setAiSearchStatus('error')
+      setAiSearchError('Sign in to use AI search.')
+      return
+    }
 
     setAiSearchStatus('loading')
     setAiSearchError(null)
@@ -2430,7 +2693,6 @@ function App() {
   }, [closeTransientUi, isGraphReady])
 
   const handleNodeClick = useCallback((node: PersonNode) => {
-    if (requestLogin()) return
     if (suppressNodeClickRef.current) {
       suppressNodeClickRef.current = false
       return
@@ -2443,7 +2705,7 @@ function App() {
     }
     setMultiSelectedNodeIds([])
     openInspectorForNode(node)
-  }, [inspectorNodeId, openInspectorForNode, requestLogin])
+  }, [inspectorNodeId, openInspectorForNode])
 
   const previewPath = connectionDrag
     ? getLinkPath(nodesById[connectionDrag.fromId], {
@@ -2461,48 +2723,6 @@ function App() {
 
   return (
     <main className={`app-shell theme-${theme}`}>
-      {isLoginPromptOpen ? (
-        <div className="login-prompt" role="presentation" onMouseDown={() => setIsLoginPromptOpen(false)}>
-          <section
-            className="login-prompt__dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="login-prompt-title"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <p className="login-prompt__eyebrow">Login Required</p>
-            <h2 id="login-prompt-title" className="login-prompt__title">
-              {status === 'unconfigured' ? 'Connect Supabase to unlock editing' : 'Sign in to edit your board'}
-            </h2>
-            <p className="login-prompt__body">
-              {status === 'unconfigured'
-                ? 'Google sign-in is not configured in this environment yet, so editing and saving are unavailable here.'
-                : 'You need an account to move nodes, create connections, edit notes, and save tags.'}
-            </p>
-            <div className="login-prompt__actions">
-              <button
-                type="button"
-                className="login-prompt__button login-prompt__button--ghost"
-                onClick={() => setIsLoginPromptOpen(false)}
-              >
-                Not now
-              </button>
-              <button
-                type="button"
-                className="login-prompt__button"
-                onClick={() => {
-                  setIsLoginPromptOpen(false)
-                  void signInWithGoogle()
-                }}
-                disabled={status === 'loading' || status === 'unconfigured'}
-              >
-                {status === 'unconfigured' ? 'Sign-in unavailable' : 'Sign in with Google'}
-              </button>
-            </div>
-          </section>
-        </div>
-      ) : null}
-
       {isLinkedInUploadOpen ? (
         <div
           className="linkedin-upload"
@@ -2743,10 +2963,8 @@ function App() {
                   type="button"
                   className="tags-menu__new"
                   onClick={() => {
-                    if (requestLogin()) return
                     void handleCreateMenuTag()
                   }}
-                  disabled={status === 'loading' || status === 'unconfigured'}
                 >
                   + New tag
                 </button>
@@ -2792,7 +3010,6 @@ function App() {
                     type="button"
                     className="linkedin-menu__action"
                     onClick={openLinkedInUpload}
-                    disabled={status === 'loading' || status === 'unconfigured'}
                   >
                     Sync your LinkedIn connections
                   </button>
@@ -2834,7 +3051,6 @@ function App() {
                 className="search-panel__input"
                 value={searchQuery}
                 onFocus={() => {
-                  requestLogin()
                   setIsSearchOpen(true)
                   setIsTagsMenuOpen(false)
                   setIsLinkedInMenuOpen(false)
@@ -2862,13 +3078,18 @@ function App() {
               <div id="people-search-panel" className="search-panel__dropdown">
               {isGraphReady ? (
                 <div className="search-panel__hint">
-                  <span>{aiSearchStatus === 'loading' ? 'Asking AI...' : 'Press Enter for AI search.'}</span>
+                  <span>
+                    {aiSearchStatus === 'loading'
+                      ? 'Asking AI...'
+                      : isAuthenticated
+                        ? 'Press Enter for AI search.'
+                        : 'Local search works without sign-in. Sign in for AI search.'}
+                  </span>
                   {searchQuery.trim() ? (
                     <button
                       type="button"
                       className="search-panel__ai-button"
                       onClick={() => {
-                        if (requestLogin()) return
                         void handleAiSearch()
                       }}
                       disabled={aiSearchStatus === 'loading'}
@@ -2956,7 +3177,7 @@ function App() {
                     <div className="account-panel__text">
                       <span className="account-panel__label">{session.user.email}</span>
                       <span className="account-panel__meta">
-                        {graphStatus === 'loading' ? 'Loading your graph' : board?.title ?? 'Personal board'}
+                        {graphStatus === 'loading' ? 'Loading your graph' : activeBoard?.title ?? 'Personal board'}
                       </span>
                     </div>
                     <button type="button" className="account-panel__button" onClick={signOut}>
@@ -3389,7 +3610,6 @@ function App() {
               isSelected={node.id === selectedNode?.id || multiSelectedNodeIdSet.has(node.id)}
               tagColor={node.tag_id ? tagColorById[node.tag_id] : null}
               showLabel
-              isGraphReady={isGraphReady}
               connectionModifierLabel={connectionModifierLabel}
               onPointerDown={startNodeInteraction}
               onClick={handleNodeClick}

@@ -17,12 +17,13 @@ A persisted social graph board built with React, Vite, and TypeScript.
 - No drawing tools or side panels
 - Theme switcher in the top-right corner
 - Optional Google login through Supabase
+- Editable unsigned local board state before signing in
 - One personal board record for each signed-in user
 - One immutable root node at `0,0` for each signed-in user
 - Persistent people, colored tags, notes, and undirected connections in Supabase
 - Compact top bar with a rounded search field plus circular tags, account, and theme controls that close other overlays when opened
 - The selected inspector tag keeps a visible color accent even when the picker is closed
-- A login popup appears when signed-out users try to edit the board
+- Signed-out users can edit a local in-memory board without a required login
 - Minimal selected-person inspector with a Notion-like large name field, a single-tag chip flow, and keyboard-first note capture
 - Typing `#` inside the name field opens tag selection and removes the `#tag` token from the saved name after applying the tag
 - New notes are captured in one textarea and saved on blur or with `Cmd/Ctrl + Enter`, using the first line as the rendered title

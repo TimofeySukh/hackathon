@@ -10,6 +10,7 @@ Runtime boundaries:
 - Vite owns local development and production bundling.
 - CSS owns the visual board surface, theme tokens, and responsive layout.
 - The browser owns theme persistence through `localStorage`.
+- The browser owns unsigned local graph state for users who have not signed in.
 - Supabase owns Google authentication and user-owned graph records.
 - Supabase Edge Functions own server-side AI provider calls for AI note enrichment and people search.
 - Gemini owns the primary LLM execution path for structured summary generation and natural-language people search ranking.
@@ -23,8 +24,8 @@ The backend boundary remains intentionally narrow: Supabase Auth provides identi
 ## Current Frontend Shape
 
 - `src/main.tsx` mounts the React app.
-- `src/App.tsx` contains the board interaction model and selected-person inspector.
-- `src/App.tsx` also contains the people search overlay with local matching while typing and AI search on Enter.
+- `src/App.tsx` contains the board interaction model, unsigned local graph state, and selected-person inspector.
+- `src/App.tsx` also contains the people search overlay with local matching while typing and signed-in AI search on Enter.
 - `src/lib/supabase.ts` creates the browser Supabase client from Vite environment variables.
 - `src/lib/useAuth.ts` owns session loading, Google sign-in, and sign-out.
 - `src/lib/useBoardGraph.ts` owns board graph loading, frontend mutation state, and debounced AI note refresh scheduling.
@@ -51,6 +52,7 @@ Current scope:
 - dark/light theme switching
 - very dense point-grid spatial reference
 - Google sign-in through Supabase
+- editable unsigned local graph state before sign-in
 - one private personal board record per signed-in user
 - one immutable root person at `0,0` for each signed-in user
 - persistent people nodes with saved coordinates
@@ -76,6 +78,7 @@ Out of scope for the current version:
 - Link implementation work back to the relevant Linear issue.
 - Preserve the clean-board product principle from `docs/product-vision.md`.
 - Keep all graph rows user-owned and protected by RLS keyed to `auth.uid()`.
+- Keep unsigned local graph data out of Supabase until the user signs in and an explicit migration path exists.
 - Keep Gemini and OpenRouter API keys out of the browser and only inside Supabase Edge Function secrets.
 - Keep `SUPABASE_SERVICE_ROLE_KEY` out of browser-exposed `VITE_` variables and only in local MCP env files or shell env.
 - Keep the root person immutable in position and deletion semantics.

@@ -15,6 +15,7 @@ Current app behavior:
 - switch between dark and light themes
 - persist the selected theme in `localStorage`
 - optionally sign in with Google through Supabase
+- edit an unsigned local in-memory board without a required login
 - open a LinkedIn menu with visual instructions for requesting a LinkedIn data archive
 - sync LinkedIn connections by dragging or selecting a LinkedIn export zip and importing only `Connections.csv`
 - create one personal board record for each signed-in user
@@ -22,13 +23,13 @@ Current app behavior:
 - persist people, colored tags, notes, and undirected connections in Supabase
 - open the top-left Tags menu to create tags, rename them, and choose tag colors from presets or a custom picker
 - scroll the top-left Tags menu when the tag list or open color palette exceeds the viewport
-- show a login popup when signed-out users try to edit the board
+- keep signed-out edits local to the current browser session unless the user signs in
 - allow one separate AI summary row per person in Supabase
 - debounce note create and note update events for 3 seconds before triggering AI enrichment
 - call a Supabase Edge Function that sends person context to Gemini with OpenRouter fallback and rewrites `person_ai_notes`
 - edit the selected person in the node-anchored inspector that opens on single click
 - autosave person names shortly after typing or when the name field loses focus
-- open a people search layer, match locally while typing, and run natural-language AI search on Enter
+- open a people search layer, match locally while typing, and run natural-language AI search on Enter when signed in
 - drag a right-click selection box to select multiple people, then drag one of them to move the group
 - use a mobile layout with the search field and account/theme controls at the top and the Tags control docked near the bottom-left safe area
 - avoid selecting connection lines on coarse touch pointers so mobile board panning does not accidentally open the delete-connection menu
@@ -192,7 +193,7 @@ Other-device checklist:
 3. Open the network URL from the other device.
 4. If macOS shows a firewall prompt for Node.js, allow incoming connections.
 
-If the Supabase variables are missing, the app still opens as an anonymous board and disables Google sign-in.
+If the Supabase variables are missing, the app still opens as an editable anonymous local board and disables Google sign-in.
 
 Teammate quick-start:
 

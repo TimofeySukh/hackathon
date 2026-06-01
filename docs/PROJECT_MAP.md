@@ -13,11 +13,12 @@ The current product is intentionally narrow:
 - a top-left LinkedIn menu with archive-request instructions and `Connections.csv` zip import
 - a very dense CSS-rendered point grid
 - Supabase-backed Google login
+- editable unsigned local board state when the user is not signed in
 - one personal board record per signed-in user
 - persistent people nodes, reusable colored tags, notes, and undirected connections per signed-in user
 - a top-left Tags menu for creating tags, renaming them, changing tag colors, and toggling tag visibility on the board
 - a node-anchored inspector for editing the selected person that opens on single click
-- a people search layer that matches locally while typing and can run AI search on Enter
+- a people search layer that matches locally while typing and can run AI search on Enter when signed in
 - no collaboration yet
 
 ## Active Work
