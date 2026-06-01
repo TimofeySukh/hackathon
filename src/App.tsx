@@ -2151,87 +2151,6 @@ function App() {
 
       <div className="top-bar">
         <div className="top-bar__left">
-          <div ref={linkedInMenuRef} className="linkedin-menu">
-            <button
-              type="button"
-              className="top-bar__icon-button linkedin-menu__toggle"
-              onClick={() => {
-                const nextIsOpen = !isLinkedInMenuOpen
-                setIsLinkedInMenuOpen(nextIsOpen)
-                setIsTagsMenuOpen(false)
-                setIsAccountMenuOpen(false)
-                setIsSearchOpen(false)
-                setActiveColorTagId(null)
-                if (nextIsOpen) {
-                  setIsLinkedInGuideOpen(false)
-                  closeInspectorUi()
-                }
-              }}
-              aria-expanded={isLinkedInMenuOpen}
-              aria-label="LinkedIn connection menu"
-            >
-              <span className="linkedin-menu__logo" aria-hidden="true">
-                in
-              </span>
-            </button>
-
-            {isLinkedInMenuOpen ? (
-              <section className="linkedin-menu__panel" aria-label="LinkedIn connection sync">
-                <div className="linkedin-menu__actions">
-                  <button
-                    type="button"
-                    className="linkedin-menu__action"
-                    onClick={() => setIsLinkedInGuideOpen(true)}
-                  >
-                    How to sync your Linkedin connections
-                  </button>
-                  <button
-                    type="button"
-                    className="linkedin-menu__action"
-                    disabled
-                    title="Archive import is not implemented yet."
-                  >
-                    Sync your Linkedin connections
-                  </button>
-                </div>
-
-                {isLinkedInGuideOpen ? (
-                  <div className="linkedin-menu__guide">
-                    <div className="linkedin-menu__steps">
-                      {LINKEDIN_SYNC_STEPS.map((step, stepIndex) => (
-                        <article key={step.title} className="linkedin-menu__step">
-                          <div className="linkedin-menu__step-copy">
-                            <span className="linkedin-menu__step-index">{stepIndex + 1}</span>
-                            <div>
-                              <h3 className="linkedin-menu__step-title">{step.title}</h3>
-                              <p className="linkedin-menu__step-body">{step.body}</p>
-                            </div>
-                          </div>
-                          <img className="linkedin-menu__step-image" src={step.image} alt="" loading="lazy" />
-                        </article>
-                      ))}
-                    </div>
-                    <p className="linkedin-menu__wait-note">
-                      Wait up to 24 hours. LinkedIn will email you when the archive is ready. After
-                      you receive it, return to this connection menu and press Sync your Linkedin
-                      connections.
-                    </p>
-                    <button
-                      type="button"
-                      className="linkedin-menu__close"
-                      onClick={() => {
-                        setIsLinkedInGuideOpen(false)
-                        setIsLinkedInMenuOpen(false)
-                      }}
-                    >
-                      Close menu
-                    </button>
-                  </div>
-                ) : null}
-              </section>
-            ) : null}
-          </div>
-
           <div ref={tagsMenuRef} className="tags-menu">
             <button
               type="button"
@@ -2412,6 +2331,77 @@ function App() {
                 >
                   + New tag
                 </button>
+              </section>
+            ) : null}
+          </div>
+
+          <div ref={linkedInMenuRef} className="linkedin-menu">
+            <button
+              type="button"
+              className="top-bar__icon-button linkedin-menu__toggle"
+              onClick={() => {
+                const nextIsOpen = !isLinkedInMenuOpen
+                setIsLinkedInMenuOpen(nextIsOpen)
+                setIsTagsMenuOpen(false)
+                setIsAccountMenuOpen(false)
+                setIsSearchOpen(false)
+                setActiveColorTagId(null)
+                if (nextIsOpen) {
+                  setIsLinkedInGuideOpen(false)
+                  closeInspectorUi()
+                }
+              }}
+              aria-expanded={isLinkedInMenuOpen}
+              aria-label="LinkedIn connection menu"
+            >
+              <span className="linkedin-menu__logo" aria-hidden="true">
+                in
+              </span>
+            </button>
+
+            {isLinkedInMenuOpen ? (
+              <section className="linkedin-menu__panel" aria-label="LinkedIn connection sync">
+                <div className="linkedin-menu__actions">
+                  <button
+                    type="button"
+                    className="linkedin-menu__action"
+                    onClick={() => setIsLinkedInGuideOpen(true)}
+                  >
+                    How to sync your Linkedin connections
+                  </button>
+                  <button
+                    type="button"
+                    className="linkedin-menu__action"
+                    disabled
+                    title="Archive import is not implemented yet."
+                  >
+                    Sync your Linkedin connections
+                  </button>
+                </div>
+
+                {isLinkedInGuideOpen ? (
+                  <div className="linkedin-menu__guide">
+                    <div className="linkedin-menu__steps">
+                      {LINKEDIN_SYNC_STEPS.map((step, stepIndex) => (
+                        <article key={step.title} className="linkedin-menu__step">
+                          <div className="linkedin-menu__step-copy">
+                            <span className="linkedin-menu__step-index">{stepIndex + 1}</span>
+                            <div>
+                              <h3 className="linkedin-menu__step-title">{step.title}</h3>
+                              <p className="linkedin-menu__step-body">{step.body}</p>
+                            </div>
+                          </div>
+                          <img className="linkedin-menu__step-image" src={step.image} alt="" loading="lazy" />
+                        </article>
+                      ))}
+                    </div>
+                    <p className="linkedin-menu__wait-note">
+                      Wait up to 24 hours. LinkedIn will email you when the archive is ready. After
+                      you receive it, return to this connection menu and press Sync your Linkedin
+                      connections.
+                    </p>
+                  </div>
+                ) : null}
               </section>
             ) : null}
           </div>
