@@ -71,6 +71,7 @@ The React entry point. It mounts the app into the root DOM node.
 Contains the board experience:
 
 - Supabase-backed account controls
+- LinkedIn archive-request instruction menu for future connection sync
 - theme state
 - mouse drag navigation state
 - board zoom state
@@ -119,6 +120,7 @@ Contains the complete visual system for:
 
 - dark and light themes
 - account controls
+- LinkedIn sync instruction menu
 - people search panel with rounded results and dismissible overlay behavior
 - very dense point-grid background
 - dense board grid styling and layered graph presentation

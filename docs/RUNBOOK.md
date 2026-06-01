@@ -15,6 +15,7 @@ Current app behavior:
 - switch between dark and light themes
 - persist the selected theme in `localStorage`
 - optionally sign in with Google through Supabase
+- open a LinkedIn menu with visual instructions for requesting a LinkedIn data archive before future connection sync
 - create one personal board record for each signed-in user
 - create one immutable root person at `0,0` for each signed-in user
 - persist people, colored tags, notes, and undirected connections in Supabase

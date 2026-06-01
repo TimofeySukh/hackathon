@@ -123,6 +123,28 @@ type TagPickerOption =
 
 const THEME_STORAGE_KEY = 'hackathon-theme'
 const TAG_COLOR_STORAGE_KEY = 'hackathon-tag-colors'
+const LINKEDIN_SYNC_STEPS = [
+  {
+    title: 'Open Settings & Privacy',
+    body: 'First, open your LinkedIn profile menu and go to Settings & Privacy.',
+    image: '/linkedin-sync/settings-privacy.png',
+  },
+  {
+    title: 'Open Data privacy',
+    body: 'In Settings, select Data privacy.',
+    image: '/linkedin-sync/data-privacy.png',
+  },
+  {
+    title: 'Open Download my data',
+    body: 'In the data section, press Download your data.',
+    image: '/linkedin-sync/download-data.png',
+  },
+  {
+    title: 'Request the larger archive',
+    body: 'Select the larger data archive, then press Request archive.',
+    image: '/linkedin-sync/request-archive.png',
+  },
+]
 const MIN_SCALE = 0.2
 const MAX_SCALE = 2.5
 const GRID_GAP = 12
@@ -303,6 +325,8 @@ function App() {
   const [isTagPickerOpen, setIsTagPickerOpen] = useState(false)
   const [activeTagOptionIndex, setActiveTagOptionIndex] = useState(0)
   const [isTagsMenuOpen, setIsTagsMenuOpen] = useState(false)
+  const [isLinkedInMenuOpen, setIsLinkedInMenuOpen] = useState(false)
+  const [isLinkedInGuideOpen, setIsLinkedInGuideOpen] = useState(false)
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
   const [activeColorTagId, setActiveColorTagId] = useState<string | null>(null)
   const [tagColorDrafts, setTagColorDrafts] = useState<Record<string, string>>(() =>
@@ -328,6 +352,7 @@ function App() {
   const boardSurfaceRef = useRef<HTMLDivElement | null>(null)
   const graphLayerRef = useRef<HTMLDivElement | null>(null)
   const tagsMenuRef = useRef<HTMLDivElement | null>(null)
+  const linkedInMenuRef = useRef<HTMLDivElement | null>(null)
   const searchPanelRef = useRef<HTMLDivElement | null>(null)
   const accountPanelRef = useRef<HTMLDivElement | null>(null)
   const inspectorPanelRef = useRef<HTMLElement | null>(null)
@@ -616,6 +641,7 @@ function App() {
 
   const closeTransientUi = useCallback(() => {
     setIsTagsMenuOpen(false)
+    setIsLinkedInMenuOpen(false)
     setIsAccountMenuOpen(false)
     setIsSearchOpen(false)
     setIsTagPickerOpen(false)
@@ -634,6 +660,7 @@ function App() {
 
       const isInsideTopBar =
         tagsMenuRef.current?.contains(target) ||
+        linkedInMenuRef.current?.contains(target) ||
         searchPanelRef.current?.contains(target) ||
         accountPanelRef.current?.contains(target)
 
@@ -2124,6 +2151,87 @@ function App() {
 
       <div className="top-bar">
         <div className="top-bar__left">
+          <div ref={linkedInMenuRef} className="linkedin-menu">
+            <button
+              type="button"
+              className="top-bar__icon-button linkedin-menu__toggle"
+              onClick={() => {
+                const nextIsOpen = !isLinkedInMenuOpen
+                setIsLinkedInMenuOpen(nextIsOpen)
+                setIsTagsMenuOpen(false)
+                setIsAccountMenuOpen(false)
+                setIsSearchOpen(false)
+                setActiveColorTagId(null)
+                if (nextIsOpen) {
+                  setIsLinkedInGuideOpen(false)
+                  closeInspectorUi()
+                }
+              }}
+              aria-expanded={isLinkedInMenuOpen}
+              aria-label="LinkedIn connection menu"
+            >
+              <span className="linkedin-menu__logo" aria-hidden="true">
+                in
+              </span>
+            </button>
+
+            {isLinkedInMenuOpen ? (
+              <section className="linkedin-menu__panel" aria-label="LinkedIn connection sync">
+                <div className="linkedin-menu__actions">
+                  <button
+                    type="button"
+                    className="linkedin-menu__action"
+                    onClick={() => setIsLinkedInGuideOpen(true)}
+                  >
+                    How to sync your Linkedin connections
+                  </button>
+                  <button
+                    type="button"
+                    className="linkedin-menu__action"
+                    disabled
+                    title="Archive import is not implemented yet."
+                  >
+                    Sync your Linkedin connections
+                  </button>
+                </div>
+
+                {isLinkedInGuideOpen ? (
+                  <div className="linkedin-menu__guide">
+                    <div className="linkedin-menu__steps">
+                      {LINKEDIN_SYNC_STEPS.map((step, stepIndex) => (
+                        <article key={step.title} className="linkedin-menu__step">
+                          <div className="linkedin-menu__step-copy">
+                            <span className="linkedin-menu__step-index">{stepIndex + 1}</span>
+                            <div>
+                              <h3 className="linkedin-menu__step-title">{step.title}</h3>
+                              <p className="linkedin-menu__step-body">{step.body}</p>
+                            </div>
+                          </div>
+                          <img className="linkedin-menu__step-image" src={step.image} alt="" loading="lazy" />
+                        </article>
+                      ))}
+                    </div>
+                    <p className="linkedin-menu__wait-note">
+                      Wait up to 24 hours. LinkedIn will email you when the archive is ready. After
+                      you receive it, return to this connection menu and press Sync your Linkedin
+                      connections.
+                    </p>
+                    <button
+                      type="button"
+                      className="linkedin-menu__close"
+                      onClick={() => {
+                        setIsLinkedInGuideOpen(false)
+                        setIsLinkedInMenuOpen(false)
+                      }}
+                    >
+                      Close menu
+                    </button>
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
+          </div>
+
           <div ref={tagsMenuRef} className="tags-menu">
             <button
               type="button"
@@ -2131,6 +2239,8 @@ function App() {
               onClick={() => {
                 const nextIsOpen = !isTagsMenuOpen
                 setIsTagsMenuOpen(nextIsOpen)
+                setIsLinkedInMenuOpen(false)
+                setIsLinkedInGuideOpen(false)
                 setIsAccountMenuOpen(false)
                 setIsSearchOpen(false)
                 setActiveColorTagId(null)
@@ -2318,6 +2428,8 @@ function App() {
                   requestLogin()
                   setIsSearchOpen(true)
                   setIsTagsMenuOpen(false)
+                  setIsLinkedInMenuOpen(false)
+                  setIsLinkedInGuideOpen(false)
                   setIsAccountMenuOpen(false)
                   setActiveColorTagId(null)
                   closeInspectorUi()
@@ -2403,6 +2515,8 @@ function App() {
                 const nextIsOpen = !isAccountMenuOpen
                 setIsAccountMenuOpen(nextIsOpen)
                 setIsTagsMenuOpen(false)
+                setIsLinkedInMenuOpen(false)
+                setIsLinkedInGuideOpen(false)
                 setIsSearchOpen(false)
                 if (nextIsOpen) {
                   closeInspectorUi()

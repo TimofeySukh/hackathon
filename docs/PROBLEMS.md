@@ -25,7 +25,7 @@ When working on the project:
 
 - Status: Open
 - Reported gap: the product does not sync people or relationship data with LinkedIn.
-- Notes: needs product and integration scoping, including auth, import direction, data fields, and API availability.
+- Notes: the app now has a menu that explains how to request a LinkedIn data archive, but archive upload/import and real sync are not implemented. Needs product and integration scoping, including auth, import direction, data fields, and API availability.
 
 ### Data storage depends only on Supabase
 
