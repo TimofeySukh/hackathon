@@ -15,7 +15,35 @@ When working on the project:
 
 ## Open Problems
 
-No known open problems are currently documented here.
+### Windows laptops cannot add new nodes
+
+- Status: Open
+- Reported behavior: the button or gesture for adding a new node does not work on Windows laptops.
+- Notes: needs reproduction details, including browser, input device, and whether the expected action is modifier-drag, a button, or another control.
+
+### No LinkedIn sync
+
+- Status: Open
+- Reported gap: the product does not sync people or relationship data with LinkedIn.
+- Notes: needs product and integration scoping, including auth, import direction, data fields, and API availability.
+
+### Data storage depends only on Supabase
+
+- Status: Open
+- Reported concern: storing project data only in Supabase may be a weak product or architecture choice.
+- Notes: needs an architecture decision covering portability, backup/export, vendor lock-in, offline access, and any second storage target.
+
+### Icon sizes differ across browsers
+
+- Status: Open
+- Reported behavior: icon sizing is inconsistent between browsers.
+- Notes: needs cross-browser reproduction and CSS normalization for icon dimensions, line height, and button layout.
+
+### Landing page is missing
+
+- Status: Open
+- Reported gap: the project needs a landing page.
+- Notes: needs product requirements for public messaging, target audience, routing, auth entry points, and how the landing page coexists with the board-first app.
 
 ## Resolved Problems
 
