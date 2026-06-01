@@ -24,8 +24,8 @@ When working on the project:
 ### No LinkedIn sync
 
 - Status: Open
-- Reported gap: the product does not sync people or relationship data with LinkedIn.
-- Notes: the app now has a menu that explains how to request a LinkedIn data archive, but archive upload/import and real sync are not implemented. Needs product and integration scoping, including auth, import direction, data fields, and API availability.
+- Reported gap: the product does not sync people or relationship data directly with LinkedIn.
+- Notes: the app can now import `Connections.csv` from a LinkedIn data export zip, create LinkedIn-tagged people, create source notes, and connect imported people to the root person. Direct LinkedIn API sync is still not implemented and needs product and integration scoping, including auth, import direction, data fields, and API availability.
 
 ### Data storage depends only on Supabase
 
@@ -44,6 +44,12 @@ When working on the project:
 - Status: Open
 - Reported gap: the project needs a landing page.
 - Notes: needs product requirements for public messaging, target audience, routing, auth entry points, and how the landing page coexists with the board-first app.
+
+### npm audit reports transitive vulnerabilities
+
+- Status: Open
+- Reported behavior: `npm audit --audit-level=high` fails with 7 reported vulnerabilities, including a high-severity `fast-uri` advisory and moderate advisories in transitive packages such as `brace-expansion`, `hono`, `ip-address`, `qs`, and `ws`.
+- Notes: `npm audit fix` is suggested by npm, but the dependency tree update should be reviewed separately from feature work.
 
 ## Resolved Problems
 

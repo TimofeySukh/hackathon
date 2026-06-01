@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   CSSProperties,
+  DragEvent as ReactDragEvent,
   KeyboardEvent as ReactKeyboardEvent,
   PointerEvent as ReactPointerEvent,
   WheelEvent as ReactWheelEvent,
@@ -74,6 +75,21 @@ type SearchResult = {
   source: 'local' | 'ai'
 }
 
+type LinkedInConnectionRow = {
+  firstName: string
+  lastName: string
+  url: string
+  email: string
+  company: string
+  position: string
+  connectedOn: string
+}
+
+type LinkedInImportStatus = {
+  state: 'idle' | 'loading' | 'success' | 'error'
+  message: string | null
+}
+
 type BoardStyle = CSSProperties & {
   '--board-offset-x': string
   '--board-offset-y': string
@@ -123,6 +139,7 @@ type TagPickerOption =
 
 const THEME_STORAGE_KEY = 'hackathon-theme'
 const TAG_COLOR_STORAGE_KEY = 'hackathon-tag-colors'
+const LINKEDIN_TAG_NAME = 'LinkedIn'
 const LINKEDIN_SYNC_STEPS = [
   {
     title: 'Open Settings & Privacy',
@@ -162,6 +179,226 @@ const INSPECTOR_ANCHOR_GAP = 40
 const INSPECTOR_VIEWPORT_MARGIN = 16
 const TRACKPAD_PAN_IDLE_MS = 320
 const IS_MAC_PLATFORM = /Mac|iPhone|iPad|iPod/i.test(window.navigator.platform)
+const LINKEDIN_RING_CAPACITIES = [10, 40]
+const LINKEDIN_RING_RADIUS = 260
+const LINKEDIN_RING_STEP = 190
+const LINKEDIN_GRID_SPACING = 170
+
+function getLinkedInRingCapacity(ringIndex: number) {
+  if (ringIndex < LINKEDIN_RING_CAPACITIES.length) {
+    return LINKEDIN_RING_CAPACITIES[ringIndex]
+  }
+
+  return 100 + (ringIndex - 2) * 50
+}
+
+function parseCsvRows(csv: string) {
+  const rows: string[][] = []
+  let row: string[] = []
+  let cell = ''
+  let isQuoted = false
+
+  for (let index = 0; index < csv.length; index += 1) {
+    const character = csv[index]
+    const nextCharacter = csv[index + 1]
+
+    if (character === '"') {
+      if (isQuoted && nextCharacter === '"') {
+        cell += '"'
+        index += 1
+        continue
+      }
+
+      isQuoted = !isQuoted
+      continue
+    }
+
+    if (character === ',' && !isQuoted) {
+      row.push(cell)
+      cell = ''
+      continue
+    }
+
+    if ((character === '\n' || character === '\r') && !isQuoted) {
+      if (character === '\r' && nextCharacter === '\n') {
+        index += 1
+      }
+      row.push(cell)
+      if (row.some((value) => value.trim())) {
+        rows.push(row)
+      }
+      row = []
+      cell = ''
+      continue
+    }
+
+    cell += character
+  }
+
+  row.push(cell)
+  if (row.some((value) => value.trim())) {
+    rows.push(row)
+  }
+
+  return rows
+}
+
+function normalizeLinkedInValue(value: string | undefined) {
+  return (value ?? '').replace(/^\uFEFF/, '').trim()
+}
+
+function parseLinkedInConnectionsCsv(csv: string): LinkedInConnectionRow[] {
+  const rows = parseCsvRows(csv)
+  const headerIndex = rows.findIndex((row) =>
+    normalizeLinkedInValue(row[0]).toLowerCase() === 'first name' &&
+    normalizeLinkedInValue(row[1]).toLowerCase() === 'last name',
+  )
+
+  if (headerIndex < 0) {
+    throw new Error('Connections.csv does not contain the expected LinkedIn connections header.')
+  }
+
+  const headers = rows[headerIndex].map((header) => normalizeLinkedInValue(header).toLowerCase())
+  const columnIndex = (name: string) => headers.indexOf(name.toLowerCase())
+  const firstNameIndex = columnIndex('first name')
+  const lastNameIndex = columnIndex('last name')
+  const urlIndex = columnIndex('url')
+  const emailIndex = columnIndex('email address')
+  const companyIndex = columnIndex('company')
+  const positionIndex = columnIndex('position')
+  const connectedOnIndex = columnIndex('connected on')
+
+  return rows.slice(headerIndex + 1).map((row) => ({
+    firstName: normalizeLinkedInValue(row[firstNameIndex]),
+    lastName: normalizeLinkedInValue(row[lastNameIndex]),
+    url: normalizeLinkedInValue(row[urlIndex]),
+    email: normalizeLinkedInValue(row[emailIndex]),
+    company: normalizeLinkedInValue(row[companyIndex]),
+    position: normalizeLinkedInValue(row[positionIndex]),
+    connectedOn: normalizeLinkedInValue(row[connectedOnIndex]),
+  })).filter((connection) => connection.firstName || connection.lastName || connection.url)
+}
+
+async function readLinkedInConnectionsFromArchive(file: File) {
+  const { BlobReader, TextWriter, ZipReader } = await import('@zip.js/zip.js')
+  const zipReader = new ZipReader(new BlobReader(file))
+
+  try {
+    const entries = await zipReader.getEntries()
+    const connectionsEntry = entries.find((entry) =>
+      !entry.directory && entry.filename.toLowerCase().endsWith('connections.csv'),
+    )
+
+    if (!connectionsEntry || !('getData' in connectionsEntry)) {
+      throw new Error('Connections.csv was not found in this LinkedIn archive.')
+    }
+
+    const csv = await connectionsEntry.getData(new TextWriter())
+    return parseLinkedInConnectionsCsv(csv)
+  } finally {
+    await zipReader.close()
+  }
+}
+
+function getLinkedInConnectionName(connection: LinkedInConnectionRow) {
+  return normalizeTagName(`${connection.firstName} ${connection.lastName}`)
+}
+
+function getLinkedInNoteBody(connection: LinkedInConnectionRow) {
+  return [
+    connection.position ? `Position/headline: ${connection.position}` : '',
+    connection.company ? `Company: ${connection.company}` : '',
+    connection.url ? `LinkedIn: ${connection.url}` : '',
+    connection.email ? `Email: ${connection.email}` : '',
+    connection.connectedOn ? `Connected on: ${connection.connectedOn}` : '',
+    'Source: LinkedIn Connections.csv',
+  ].filter(Boolean).join('\n')
+}
+
+function extractLinkedInUrlsFromNotes(notes: PersonNote[]) {
+  const urls = new Set<string>()
+
+  for (const note of notes) {
+    const match = note.body.match(/LinkedIn:\s*(\S+)/i)
+    if (match?.[1]) {
+      urls.add(match[1].toLowerCase())
+    }
+  }
+
+  return urls
+}
+
+function getQuadrantKey(position: Offset) {
+  if (position.x >= 0 && position.y < 0) return 'top-right'
+  if (position.x < 0 && position.y < 0) return 'top-left'
+  if (position.x < 0 && position.y >= 0) return 'bottom-left'
+  return 'bottom-right'
+}
+
+type QuadrantKey = ReturnType<typeof getQuadrantKey>
+
+function getRingSlotPosition(slotIndex: number, angleStart: number, angleEnd: number) {
+  const capacityScale = Math.abs(angleEnd - angleStart) / (Math.PI * 2)
+  let remainingSlot = slotIndex
+  let ringIndex = 0
+
+  const getScaledCapacity = (targetRingIndex: number) =>
+    Math.max(1, Math.ceil(getLinkedInRingCapacity(targetRingIndex) * capacityScale))
+
+  while (remainingSlot >= getScaledCapacity(ringIndex)) {
+    remainingSlot -= getScaledCapacity(ringIndex)
+    ringIndex += 1
+  }
+
+  const capacity = getScaledCapacity(ringIndex)
+  const radius = LINKEDIN_RING_RADIUS + ringIndex * LINKEDIN_RING_STEP
+  const progress = capacity === 1 ? 0.5 : (remainingSlot + 0.5) / capacity
+  const angle = angleStart + (angleEnd - angleStart) * progress
+
+  return {
+    x: Math.cos(angle) * radius,
+    y: Math.sin(angle) * radius,
+  }
+}
+
+function getLinkedInImportPositions(count: number, people: PersonNode[]) {
+  const existingPeople = people.filter((person) => !person.is_root)
+
+  if (existingPeople.length === 0) {
+    return Array.from({ length: count }, (_, index) => getRingSlotPosition(index, 0, Math.PI * 2))
+  }
+
+  const occupiedQuadrants = new Set<QuadrantKey>(existingPeople.map((person) => getQuadrantKey(person)))
+  const quadrants = [
+    { key: 'bottom-right', start: 0, end: Math.PI / 2 },
+    { key: 'bottom-left', start: Math.PI / 2, end: Math.PI },
+    { key: 'top-left', start: Math.PI, end: Math.PI * 1.5 },
+    { key: 'top-right', start: Math.PI * 1.5, end: Math.PI * 2 },
+  ] satisfies Array<{ key: QuadrantKey; start: number; end: number }>
+  const emptyQuadrants = quadrants.filter((quadrant) => !occupiedQuadrants.has(quadrant.key))
+
+  if (emptyQuadrants.length > 0) {
+    const quadrantSlotCounts = new Map<QuadrantKey, number>()
+
+    return Array.from({ length: count }, (_, index) => {
+      const quadrant = emptyQuadrants[index % emptyQuadrants.length]
+      const slotIndex = quadrantSlotCounts.get(quadrant.key) ?? 0
+      quadrantSlotCounts.set(quadrant.key, slotIndex + 1)
+      return getRingSlotPosition(slotIndex, quadrant.start, quadrant.end)
+    })
+  }
+
+  const maxX = Math.max(0, ...existingPeople.map((person) => person.x))
+  const maxY = Math.max(0, ...existingPeople.map((person) => person.y))
+  const columns = Math.max(1, Math.ceil(Math.sqrt(count)))
+  const startX = maxX + LINKEDIN_GRID_SPACING
+  const startY = maxY + LINKEDIN_GRID_SPACING
+
+  return Array.from({ length: count }, (_, index) => ({
+    x: startX + (index % columns) * LINKEDIN_GRID_SPACING,
+    y: startY + Math.floor(index / columns) * LINKEDIN_GRID_SPACING,
+  }))
+}
 
 function isLikelyTrackpadPan(event: WheelEvent) {
   if (event.ctrlKey) return false
@@ -327,6 +564,12 @@ function App() {
   const [isTagsMenuOpen, setIsTagsMenuOpen] = useState(false)
   const [isLinkedInMenuOpen, setIsLinkedInMenuOpen] = useState(false)
   const [isLinkedInGuideOpen, setIsLinkedInGuideOpen] = useState(false)
+  const [isLinkedInUploadOpen, setIsLinkedInUploadOpen] = useState(false)
+  const [isLinkedInDragActive, setIsLinkedInDragActive] = useState(false)
+  const [linkedInImportStatus, setLinkedInImportStatus] = useState<LinkedInImportStatus>({
+    state: 'idle',
+    message: null,
+  })
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
   const [activeColorTagId, setActiveColorTagId] = useState<string | null>(null)
   const [tagColorDrafts, setTagColorDrafts] = useState<Record<string, string>>(() =>
@@ -353,6 +596,7 @@ function App() {
   const graphLayerRef = useRef<HTMLDivElement | null>(null)
   const tagsMenuRef = useRef<HTMLDivElement | null>(null)
   const linkedInMenuRef = useRef<HTMLDivElement | null>(null)
+  const linkedInFileInputRef = useRef<HTMLInputElement | null>(null)
   const searchPanelRef = useRef<HTMLDivElement | null>(null)
   const accountPanelRef = useRef<HTMLDivElement | null>(null)
   const inspectorPanelRef = useRef<HTMLElement | null>(null)
@@ -1906,6 +2150,116 @@ function App() {
     return createdNote
   }
 
+  async function importLinkedInArchive(file: File) {
+    if (!isGraphReady) {
+      setLinkedInImportStatus({
+        state: 'error',
+        message: 'Sign in and wait for your board to load before importing LinkedIn connections.',
+      })
+      return
+    }
+
+    setLinkedInImportStatus({
+      state: 'loading',
+      message: 'Reading LinkedIn archive...',
+    })
+
+    try {
+      const rootPerson = people.find((person) => person.is_root)
+      if (!rootPerson) {
+        throw new Error('Root person is not available.')
+      }
+
+      const rows = await readLinkedInConnectionsFromArchive(file)
+      const existingLinkedInUrls = extractLinkedInUrlsFromNotes(notes)
+      const existingNames = new Set(
+        people.map((person) => normalizeTagName(person.name).toLowerCase()).filter(Boolean),
+      )
+      const seenImportKeys = new Set<string>()
+      const connectionsToCreate = rows.filter((connection) => {
+        const name = getLinkedInConnectionName(connection)
+        const normalizedName = name.toLowerCase()
+        const normalizedUrl = connection.url.toLowerCase()
+        const importKey = normalizedUrl || `${normalizedName}:${connection.company.toLowerCase()}`
+
+        if (!name || seenImportKeys.has(importKey)) return false
+        if (normalizedUrl && existingLinkedInUrls.has(normalizedUrl)) return false
+        if (!normalizedUrl && existingNames.has(normalizedName)) return false
+
+        seenImportKeys.add(importKey)
+        return true
+      })
+
+      if (connectionsToCreate.length === 0) {
+        setLinkedInImportStatus({
+          state: 'success',
+          message: `No new LinkedIn connections to import. ${rows.length} rows were already present or empty.`,
+        })
+        return
+      }
+
+      const linkedInTag =
+        tags.find((tag) => normalizeTagName(tag.name).toLowerCase() === LINKEDIN_TAG_NAME.toLowerCase()) ??
+        await createTag(LINKEDIN_TAG_NAME)
+      const positions = getLinkedInImportPositions(connectionsToCreate.length, people)
+      let importedCount = 0
+
+      for (const [index, connection] of connectionsToCreate.entries()) {
+        const person = await createPerson({
+          name: getLinkedInConnectionName(connection),
+          tagId: linkedInTag.id,
+          x: positions[index].x,
+          y: positions[index].y,
+        })
+
+        await createNote('LinkedIn connection', getLinkedInNoteBody(connection), person.id, {
+          syncAi: false,
+        })
+        await createConnection(rootPerson.id, person.id)
+        importedCount += 1
+        setLinkedInImportStatus({
+          state: 'loading',
+          message: `Imported ${importedCount} of ${connectionsToCreate.length} LinkedIn connections...`,
+        })
+      }
+
+      setLinkedInImportStatus({
+        state: 'success',
+        message: `Imported ${importedCount} LinkedIn connections. Skipped ${rows.length - importedCount} existing or empty rows.`,
+      })
+    } catch (error) {
+      setLinkedInImportStatus({
+        state: 'error',
+        message: error instanceof Error ? error.message : 'Unable to import LinkedIn connections.',
+      })
+    } finally {
+      if (linkedInFileInputRef.current) {
+        linkedInFileInputRef.current.value = ''
+      }
+      setIsLinkedInDragActive(false)
+    }
+  }
+
+  function openLinkedInUpload() {
+    if (requestLogin()) return
+    setIsLinkedInMenuOpen(false)
+    setIsLinkedInGuideOpen(false)
+    setIsLinkedInUploadOpen(true)
+    setLinkedInImportStatus({ state: 'idle', message: null })
+  }
+
+  function handleLinkedInFileSelection(file: File | undefined) {
+    if (!file || linkedInImportStatus.state === 'loading') return
+    void importLinkedInArchive(file)
+  }
+
+  function handleLinkedInDrop(event: ReactDragEvent<HTMLDivElement>) {
+    event.preventDefault()
+    event.stopPropagation()
+    setIsLinkedInDragActive(false)
+    handleLinkedInFileSelection(event.dataTransfer.files[0])
+  }
+
   async function handleCreateNoteFromDraft(refocusComposer = true) {
     const createdNote = await createInspectorNote(newNoteText)
     if (!createdNote) return
@@ -2149,6 +2503,71 @@ function App() {
         </div>
       ) : null}
 
+      {isLinkedInUploadOpen ? (
+        <div
+          className="linkedin-upload"
+          role="presentation"
+          onMouseDown={() => {
+            if (linkedInImportStatus.state !== 'loading') {
+              setIsLinkedInUploadOpen(false)
+            }
+          }}
+        >
+          <section
+            className="linkedin-upload__dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="linkedin-upload-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <h2 id="linkedin-upload-title" className="linkedin-upload__title">
+              Sync your LinkedIn connections
+            </h2>
+            <div
+              className={`linkedin-upload__dropzone${isLinkedInDragActive ? ' is-active' : ''}`}
+              onDragEnter={(event) => {
+                event.preventDefault()
+                setIsLinkedInDragActive(true)
+              }}
+              onDragOver={(event) => {
+                event.preventDefault()
+                setIsLinkedInDragActive(true)
+              }}
+              onDragLeave={(event) => {
+                event.preventDefault()
+                setIsLinkedInDragActive(false)
+              }}
+              onDrop={handleLinkedInDrop}
+            >
+              <input
+                ref={linkedInFileInputRef}
+                className="linkedin-upload__input"
+                type="file"
+                accept=".zip,application/zip,application/x-zip-compressed"
+                onChange={(event) => handleLinkedInFileSelection(event.target.files?.[0])}
+                disabled={linkedInImportStatus.state === 'loading'}
+              />
+              <button
+                type="button"
+                className="linkedin-upload__select"
+                onClick={() => linkedInFileInputRef.current?.click()}
+                disabled={linkedInImportStatus.state === 'loading'}
+              >
+                Drag and drop or select
+              </button>
+              <p className="linkedin-upload__hint">
+                Use the complete LinkedIn data export zip. Only Connections.csv will be imported.
+              </p>
+            </div>
+            {linkedInImportStatus.message ? (
+              <p className={`linkedin-upload__status is-${linkedInImportStatus.state}`}>
+                {linkedInImportStatus.message}
+              </p>
+            ) : null}
+          </section>
+        </div>
+      ) : null}
+
       <div className="top-bar">
         <div className="top-bar__left">
           <div ref={tagsMenuRef} className="tags-menu">
@@ -2367,15 +2786,15 @@ function App() {
                     className="linkedin-menu__action"
                     onClick={() => setIsLinkedInGuideOpen(true)}
                   >
-                    How to sync your Linkedin connections
+                    How to sync your LinkedIn connections
                   </button>
                   <button
                     type="button"
                     className="linkedin-menu__action"
-                    disabled
-                    title="Archive import is not implemented yet."
+                    onClick={openLinkedInUpload}
+                    disabled={status === 'loading' || status === 'unconfigured'}
                   >
-                    Sync your Linkedin connections
+                    Sync your LinkedIn connections
                   </button>
                 </div>
 
@@ -2397,7 +2816,7 @@ function App() {
                     </div>
                     <p className="linkedin-menu__wait-note">
                       Wait up to 24 hours. LinkedIn will email you when the archive is ready. After
-                      you receive it, return to this connection menu and press Sync your Linkedin
+                      you receive it, return to this connection menu and press Sync your LinkedIn
                       connections.
                     </p>
                   </div>

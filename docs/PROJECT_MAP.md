@@ -10,7 +10,7 @@ The current product is intentionally narrow:
 - mouse drag navigation
 - one-finger touch drag navigation on mobile devices
 - a dark/light theme toggle
-- a top-left LinkedIn menu with archive-request instructions for future connection sync
+- a top-left LinkedIn menu with archive-request instructions and `Connections.csv` zip import
 - a very dense CSS-rendered point grid
 - Supabase-backed Google login
 - one personal board record per signed-in user

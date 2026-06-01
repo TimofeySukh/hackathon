@@ -378,7 +378,7 @@ export function useBoardGraph(user: User | null) {
         throw error
       }
     },
-    async createNote(title: string, body: string, personId: string) {
+    async createNote(title: string, body: string, personId: string, options?: { syncAi?: boolean }) {
       try {
         const { userId } = ensureUserAndBoard()
         const note = await createNote({
@@ -388,7 +388,9 @@ export function useBoardGraph(user: User | null) {
           body,
         })
         applyNote(note)
-        schedulePersonAiSync(note.person_id)
+        if (options?.syncAi !== false) {
+          schedulePersonAiSync(note.person_id)
+        }
         return note
       } catch (error) {
         setError(error)
