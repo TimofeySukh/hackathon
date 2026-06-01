@@ -22,6 +22,8 @@ Project-scoped agent skills. The current installed skills provide Supabase workf
 
 Detailed product and structure documentation.
 
+`docs/PROBLEMS.md` tracks known open and resolved problems that should remain visible across work sessions.
+
 ### `mcp/`
 
 Project-local MCP server files.

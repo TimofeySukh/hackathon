@@ -7,12 +7,14 @@ This repo follows the harness guidance in `docs/`.
 - [Project map](docs/PROJECT_MAP.md)
 - [Runbook](docs/RUNBOOK.md)
 - [Architecture](docs/ARCHITECTURE.md)
+- [Problems](docs/PROBLEMS.md)
 
 ## Rules
 
 - Keep all user-facing text, comments, and documentation in English.
 - Treat `docs/` as the source of truth for project knowledge.
 - Update the relevant doc when behavior, structure, or commands change.
+- Check `docs/PROBLEMS.md` before work and update it when a new problem appears or an old problem is resolved.
 - Always create a commit after making changes.
 - Always restart the local server after making changes.
 - Keep this file short. Add project detail to `docs/`, not here.

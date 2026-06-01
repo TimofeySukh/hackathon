@@ -589,6 +589,17 @@ server.registerResource(
 )
 
 server.registerResource(
+  'problems',
+  'hackathon://docs/problems',
+  {
+    title: 'Problems',
+    description: 'Known open and resolved project problems.',
+    mimeType: 'text/markdown',
+  },
+  async (uri) => readStaticResource(uri.href, 'docs/PROBLEMS.md'),
+)
+
+server.registerResource(
   'mcp-setup',
   'hackathon://mcp/setup',
   {
