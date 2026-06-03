@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 
 import type { BoardGraphPayload, Connection, PersonAiNote, PersonNode, PersonNote, Tag } from './graphTypes'
@@ -8,6 +8,7 @@ import {
   createPerson,
   createTag,
   deleteConnection,
+  deleteGraphData,
   deleteNote,
   deletePerson,
   deleteTag,
@@ -45,38 +46,15 @@ const EMPTY_GRAPH_STATE: GraphState = {
   error: null,
 }
 
-const PERSON_AI_SYNC_DEBOUNCE_MS = 3000
-
 export function useBoardGraph(user: User | null) {
   const [graphState, setGraphState] = useState<GraphState>(EMPTY_GRAPH_STATE)
-  const personAiSyncTimersRef = useRef(new Map<string, number>())
   const personAiSyncInFlightRef = useRef(new Set<string>())
-  const personAiSyncQueuedRef = useRef(new Set<string>())
-
-  const clearScheduledPersonAiSync = useCallback((personId?: string) => {
-    if (personId) {
-      const timerId = personAiSyncTimersRef.current.get(personId)
-      if (timerId !== undefined) {
-        window.clearTimeout(timerId)
-        personAiSyncTimersRef.current.delete(personId)
-      }
-      return
-    }
-
-    for (const timerId of personAiSyncTimersRef.current.values()) {
-      window.clearTimeout(timerId)
-    }
-    personAiSyncTimersRef.current.clear()
-  }, [])
 
   useEffect(() => {
     const personAiSyncInFlight = personAiSyncInFlightRef.current
-    const personAiSyncQueued = personAiSyncQueuedRef.current
 
     if (!user) {
-      clearScheduledPersonAiSync()
       personAiSyncInFlight.clear()
-      personAiSyncQueued.clear()
       return
     }
 
@@ -118,11 +96,9 @@ export function useBoardGraph(user: User | null) {
 
     return () => {
       isMounted = false
-      clearScheduledPersonAiSync()
       personAiSyncInFlight.clear()
-      personAiSyncQueued.clear()
     }
-  }, [clearScheduledPersonAiSync, user])
+  }, [user])
 
   const visibleState = user ? graphState : EMPTY_GRAPH_STATE
 
@@ -186,7 +162,6 @@ export function useBoardGraph(user: User | null) {
 
   const syncPersonAiNote = async (personId: string) => {
     if (personAiSyncInFlightRef.current.has(personId)) {
-      personAiSyncQueuedRef.current.add(personId)
       return
     }
 
@@ -229,25 +204,40 @@ export function useBoardGraph(user: User | null) {
       }
     } finally {
       personAiSyncInFlightRef.current.delete(personId)
-      if (personAiSyncQueuedRef.current.has(personId)) {
-        personAiSyncQueuedRef.current.delete(personId)
-        schedulePersonAiSync(personId)
-      }
     }
-  }
-
-  const schedulePersonAiSync = (personId: string) => {
-    clearScheduledPersonAiSync(personId)
-    const timerId = window.setTimeout(() => {
-      personAiSyncTimersRef.current.delete(personId)
-      void syncPersonAiNote(personId)
-    }, PERSON_AI_SYNC_DEBOUNCE_MS)
-
-    personAiSyncTimersRef.current.set(personId, timerId)
   }
 
   return {
     ...visibleState,
+    async refreshPersonAiNote(personId: string) {
+      try {
+        await syncPersonAiNote(personId)
+      } catch (error) {
+        setError(error)
+        throw error
+      }
+    },
+    async deleteCurrentGraphData() {
+      try {
+        const { userId } = ensureUserAndBoard()
+        await deleteGraphData(userId)
+        setGraphState((currentState) => ({
+          ...currentState,
+          tags: [],
+          notes: [],
+          personAiNotes: [],
+          connections: [],
+          people: currentState.people.filter((person) => person.is_root).map((person) => ({
+            ...person,
+            tag_id: null,
+          })),
+          error: null,
+        }))
+      } catch (error) {
+        setError(error)
+        throw error
+      }
+    },
     async createTag(name: string) {
       try {
         const { userId } = ensureUserAndBoard()
@@ -330,9 +320,7 @@ export function useBoardGraph(user: User | null) {
     },
     async deletePerson(id: string) {
       try {
-        clearScheduledPersonAiSync(id)
         personAiSyncInFlightRef.current.delete(id)
-        personAiSyncQueuedRef.current.delete(id)
         await deletePerson(id)
         setGraphState((currentState) => ({
           ...currentState,
@@ -379,6 +367,8 @@ export function useBoardGraph(user: User | null) {
       }
     },
     async createNote(title: string, body: string, personId: string, options?: { syncAi?: boolean }) {
+      void options
+
       try {
         const { userId } = ensureUserAndBoard()
         const note = await createNote({
@@ -388,9 +378,6 @@ export function useBoardGraph(user: User | null) {
           body,
         })
         applyNote(note)
-        if (options?.syncAi !== false) {
-          schedulePersonAiSync(note.person_id)
-        }
         return note
       } catch (error) {
         setError(error)
@@ -401,7 +388,6 @@ export function useBoardGraph(user: User | null) {
       try {
         const note = await updateNote(input)
         applyNote(note)
-        schedulePersonAiSync(note.person_id)
         return note
       } catch (error) {
         setError(error)

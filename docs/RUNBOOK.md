@@ -18,6 +18,7 @@ Current app behavior:
 - edit an unsigned local in-memory board without a required login
 - open a LinkedIn menu with visual instructions for requesting a LinkedIn data archive
 - sync LinkedIn connections by dragging or selecting a LinkedIn export zip and importing only `Connections.csv`
+- import LinkedIn email addresses and profile URLs only when those opt-in fields are selected in the import dialog
 - create one personal board record for each signed-in user
 - create one immutable root person at `0,0` for each signed-in user
 - persist people, colored tags, notes, and undirected connections in Supabase
@@ -25,11 +26,13 @@ Current app behavior:
 - scroll the top-left Tags menu when the tag list or open color palette exceeds the viewport
 - keep signed-out edits local to the current browser session unless the user signs in
 - allow one separate AI summary row per person in Supabase
-- debounce note create and note update events for 3 seconds before triggering AI enrichment
-- call a Supabase Edge Function that sends person context to Gemini with OpenRouter fallback and rewrites `person_ai_notes`
+- refresh the selected person's AI summary manually from the inspector
+- call a Supabase Edge Function that sends sanitized selected-person context to Gemini with OpenRouter fallback and rewrites `person_ai_notes`
 - edit the selected person in the node-anchored inspector that opens on single click
 - autosave person names shortly after typing or when the name field loses focus
 - open a people search layer, match locally while typing, and run natural-language AI search on Enter when signed in
+- limit AI search to up to 40 browser-selected candidate people and sanitize email addresses and URLs before provider calls
+- export graph data, delete graph data, or delete account data from the account menu
 - drag a right-click selection box to select multiple people, then drag one of them to move the group
 - use a mobile layout with the search field and account/theme controls at the top and the Tags control docked near the bottom-left safe area
 - avoid selecting connection lines on coarse touch pointers so mobile board panning does not accidentally open the delete-connection menu
@@ -248,9 +251,10 @@ Deploy functions before testing AI features:
 ```bash
 supabase functions deploy sync-person-ai-note
 supabase functions deploy search-people-ai
+supabase functions deploy delete-account-data
 ```
 
-`supabase/config.toml` sets AI functions to `verify_jwt = false` at the Supabase gateway because each function performs its own user-token validation with `supabase.auth.getUser()`. Do not remove the in-function authorization checks.
+`supabase/config.toml` keeps user-called functions on `verify_jwt = true` at the Supabase gateway. The functions still validate the caller with `supabase.auth.getUser()` and keep owner checks in the handler.
 
 Required AI function secrets:
 
@@ -389,9 +393,12 @@ Manual verification:
 25. Open the search layer and verify that typing a person name, tag, or note text returns local matching people.
 26. Press Enter with a natural-language query and verify AI search returns ranked people with reasons.
 27. Click a search result and verify the board recenters on that person and opens the inspector.
-28. After creating a note, wait at least 3 seconds and confirm a `person_ai_notes` row for that person reaches `status = 'created'`.
-29. Edit an existing note, blur the input, wait at least 3 seconds, and confirm the same `person_ai_notes` row updates its `updated_at`, `summary`, and `structured_summary`.
-30. Sign out and confirm the anonymous board state returns.
+28. Press Refresh in the selected person's AI summary panel and confirm a `person_ai_notes` row for that person moves through `pending` and reaches `status = 'created'`.
+29. Edit an existing note, blur the input, confirm the AI summary does not refresh automatically, then press Refresh and confirm the same `person_ai_notes` row updates its `updated_at`, `summary`, and `structured_summary`.
+30. Open the LinkedIn import dialog and confirm email addresses and profile URLs are opt-in fields that default off.
+31. Export graph data from the account menu and confirm a JSON file downloads.
+32. Delete graph data from the account menu and confirm people, notes, tags, connections, and AI summaries are cleared while the root person remains.
+33. Sign out and confirm the anonymous board state returns.
 
 Supabase verification:
 
@@ -399,9 +406,10 @@ Supabase verification:
 2. Confirm a single row exists in `boards` for the signed-in user.
 3. Confirm a single root row exists in `people` for the signed-in user with `is_root = true`, `x = 0`, and `y = 0`.
 4. Confirm `tags`, `notes`, `person_ai_notes`, and `connections` rows are created for user actions.
-5. Confirm `person_ai_notes.status` moves through `pending` and then `created` after note create or update.
+5. Confirm `person_ai_notes.status` moves through `pending` and then `created` after pressing the selected person's AI summary Refresh button.
 6. Confirm `person_ai_notes.structured_summary` contains the keys `summary`, `traits`, `interests`, `relationship_context`, and `open_questions`.
 7. Confirm row-level security prevents reading or updating another user's board data.
+8. Run `supabase/tests/security_regression_checks.sql` against the live database to verify RLS is enabled and `anon` has no direct privileges on graph tables.
 
 ## Team Workflow
 
@@ -436,5 +444,5 @@ Supabase verification:
 
 - `npm run build`
 - `npm run lint`
-- Manual browser check of drag navigation, wheel and trackpad navigation, theme persistence, persisted graph editing, debounced AI note sync, and AI people search
+- Manual browser check of drag navigation, wheel and trackpad navigation, theme persistence, persisted graph editing, manual AI note refresh, AI people search, and account data controls
 - Manual Supabase auth check when credentials and Google OAuth are configured

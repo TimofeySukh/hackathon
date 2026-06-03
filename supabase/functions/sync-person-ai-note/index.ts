@@ -2,21 +2,30 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { generatePersonSummaryWithFallback, type PersonAiStructuredSummary } from '../_shared/ai.ts'
+import { createCorsHeaders } from '../_shared/cors.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-}
+const MAX_NOTE_TEXT_LENGTH = 1200
 
-function jsonResponse(body: unknown, status = 200) {
+function jsonResponse(req: Request, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      ...corsHeaders,
+      ...createCorsHeaders(req),
       'Content-Type': 'application/json',
     },
   })
+}
+
+function sanitizeAiText(value: unknown) {
+  if (typeof value !== 'string') return ''
+
+  return value
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[email removed]')
+    .replace(/\bhttps?:\/\/\S+/gi, '[url removed]')
+    .replace(/\blinkedin\.com\/\S+/gi, '[url removed]')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, MAX_NOTE_TEXT_LENGTH)
 }
 
 function getRequiredEnv(name: string) {
@@ -69,17 +78,17 @@ async function writePersonAiNoteState(
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers: createCorsHeaders(req) })
   }
 
   if (req.method !== 'POST') {
-    return jsonResponse({ error: 'Method not allowed.' }, 405)
+    return jsonResponse(req, { error: 'Method not allowed.' }, 405)
   }
 
   const authHeader = req.headers.get('Authorization')
 
   if (!authHeader) {
-    return jsonResponse({ error: 'Missing authorization header.' }, 401)
+    return jsonResponse(req, { error: 'Missing authorization header.' }, 401)
   }
 
   const supabaseUrl = getRequiredEnv('SUPABASE_URL')
@@ -107,7 +116,7 @@ Deno.serve(async (req) => {
     } = await supabase.auth.getUser(token)
 
     if (userError || !user) {
-      return jsonResponse({ error: 'Invalid user session.' }, 401)
+      return jsonResponse(req, { error: 'Invalid user session.' }, 401)
     }
 
     ownerUserId = user.id
@@ -115,7 +124,7 @@ Deno.serve(async (req) => {
     const body = (await req.json()) as { person_id?: unknown }
 
     if (typeof body.person_id !== 'string' || !body.person_id.trim()) {
-      return jsonResponse({ error: 'person_id is required.' }, 400)
+      return jsonResponse(req, { error: 'person_id is required.' }, 400)
     }
 
     personId = body.person_id
@@ -131,7 +140,7 @@ Deno.serve(async (req) => {
     }
 
     if (!person || person.owner_user_id !== user.id) {
-      return jsonResponse({ error: 'Person not found.' }, 404)
+      return jsonResponse(req, { error: 'Person not found.' }, 404)
     }
 
     const { data: notes, error: notesError } = await supabase
@@ -164,11 +173,15 @@ Deno.serve(async (req) => {
     const structuredSummary = await generatePersonSummaryWithFallback({
       person: {
         id: person.id,
-        name: person.name,
+        name: sanitizeAiText(person.name),
         tag_id: person.tag_id,
-        tag_name: tagName,
+        tag_name: tagName ? sanitizeAiText(tagName) : null,
       },
-      notes: notes ?? [],
+      notes: (notes ?? []).map((note) => ({
+        ...note,
+        title: sanitizeAiText(note.title),
+        body: sanitizeAiText(note.body),
+      })),
     })
 
     await writePersonAiNoteState(supabase, {
@@ -180,7 +193,7 @@ Deno.serve(async (req) => {
       errorMessage: null,
     })
 
-    return jsonResponse({ ok: true })
+    return jsonResponse(req, { ok: true })
   } catch (error) {
     if (personId && ownerUserId) {
       try {
@@ -192,12 +205,13 @@ Deno.serve(async (req) => {
         })
       } catch {
         return jsonResponse(
+          req,
           { error: error instanceof Error ? error.message : 'Unable to sync AI note.' },
           500,
         )
       }
     }
 
-    return jsonResponse({ error: error instanceof Error ? error.message : 'Unable to sync AI note.' }, 500)
+    return jsonResponse(req, { error: error instanceof Error ? error.message : 'Unable to sync AI note.' }, 500)
   }
 })

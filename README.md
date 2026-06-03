@@ -22,11 +22,15 @@ A persisted social graph board built with React, Vite, and TypeScript.
 - One immutable root node at `0,0` for each signed-in user
 - Persistent people, colored tags, notes, and undirected connections in Supabase
 - Compact top bar with a rounded search field plus circular tags, account, and theme controls that close other overlays when opened
+- Account menu export, graph deletion, and account-data deletion controls
 - The selected inspector tag keeps a visible color accent even when the picker is closed
 - Signed-out users can edit a local in-memory board without a required login
 - Minimal selected-person inspector with a Notion-like large name field, a single-tag chip flow, and keyboard-first note capture
 - Typing `#` inside the name field opens tag selection and removes the `#tag` token from the saved name after applying the tag
 - New notes are captured in one textarea and saved on blur or with `Cmd/Ctrl + Enter`, using the first line as the rendered title
+- AI summaries refresh manually from the selected-person inspector instead of after every note edit
+- AI search sends only up to 40 browser-selected candidates and strips email addresses and URLs before provider calls
+- LinkedIn import defaults to name, company, position, and connected date; email addresses and profile URLs are opt-in
 - Newly created people open their inspector automatically
 - Single-click a person to open that inspector directly on the board
 - Opening the inspector pans the board enough to keep it visible and opens it at a consistent size before later zoom changes affect it

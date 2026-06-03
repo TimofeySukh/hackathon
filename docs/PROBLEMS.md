@@ -31,7 +31,13 @@ When working on the project:
 
 - Status: Open
 - Reported concern: storing project data only in Supabase may be a weak product or architecture choice.
-- Notes: `docs/SECURITY.md` now records the target direction: signed-out local exploration, explicit cloud sync, export, deletion, minimized imported fields, and possible client-side encryption for sensitive note bodies. Implementation work is still open.
+- Notes: `docs/SECURITY.md` now records the target direction: signed-out local exploration, explicit cloud sync, export, deletion, minimized imported fields, and possible client-side encryption for sensitive note bodies. The app now has graph export, graph deletion, account-data deletion, minimized LinkedIn import, and reduced AI provider context. Broader storage architecture work is still open.
+
+### Live Supabase security checks still need execution
+
+- Status: Open
+- Reported gap: local repository checks now include `supabase/tests/security_regression_checks.sql`, but Supabase CLI is not installed in this environment and live advisors/grants have not been executed here.
+- Notes: run Supabase advisors against the live project, run the SQL security checks, and extend them with user A/user B mutation tests when a seeded auth-user harness is available.
 
 ### Icon sizes differ across browsers
 

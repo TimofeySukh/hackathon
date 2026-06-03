@@ -11,7 +11,7 @@ The app has two storage modes:
 
 Signed-in data currently stored in Supabase includes profiles, boards, people, tags, notes, AI summaries, and connections. This is sensitive relationship data. Treat it as private user data.
 
-LinkedIn archive import is parsed in the browser. The archive itself is not uploaded as a file. Imported connection fields are saved only after the app creates people and source notes from the selected `Connections.csv` data.
+LinkedIn archive import is parsed in the browser. The archive itself is not uploaded as a file. The default import stores the contact name, company, position, connected date, and source marker. Email addresses and LinkedIn profile URLs are opt-in fields in the import dialog.
 
 ## Supabase Controls
 
@@ -25,16 +25,20 @@ Current database controls:
 
 Current Edge Function controls:
 
-- AI Edge Functions are configured with `verify_jwt = false` at the Supabase gateway
+- user-called Edge Functions are configured with `verify_jwt = true` at the Supabase gateway
 - each AI function validates the caller with `supabase.auth.getUser()`
 - each AI function performs owner checks before reading or writing graph data
+- Edge Function CORS is restricted to the production origin, local development origins, private-LAN Vite origins, and any explicitly configured `ALLOWED_ORIGINS`
 - AI provider keys stay in Supabase function secrets, not browser-exposed `VITE_` variables
+- AI search accepts at most 40 candidate people chosen by the browser from the current graph state
+- AI search and AI summary functions strip email addresses and URLs from note, person, tag, and cached-summary text before sending context to the AI provider
+- AI summaries refresh only when the user presses the selected person's AI summary refresh action; note create and update events no longer trigger automatic AI refresh
 
 Required follow-up hardening:
 
 - run Supabase advisors against the live project
 - verify table grants in the live database, especially that `anon` does not have unnecessary table privileges
-- add SQL regression checks or integration tests proving that user A cannot read or mutate user B graph rows
+- run `supabase/tests/security_regression_checks.sql` against the live project and extend it with user A/user B mutation checks when a test harness with seeded auth users is available
 - keep `SUPABASE_SERVICE_ROLE_KEY` only in local MCP/server environments
 
 ## Production Web Controls
@@ -64,6 +68,8 @@ The product value depends on search across relationship data, so removing cloud 
 - keep imported source archives client-side
 - store only normalized contact fields that the product actually uses
 - expose clear sync status and last-updated timestamps
+
+The app now provides graph export, graph deletion, and account-data deletion controls from the account menu. Account-data deletion clears graph rows, AI summaries, tags, profile fields, and root-person identity fields while preserving the Auth user record because the current root-person trigger intentionally blocks root deletion.
 
 This preserves searchable cloud data while reducing hidden retention and user surprise.
 

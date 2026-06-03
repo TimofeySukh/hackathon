@@ -10,7 +10,7 @@ The current product is intentionally narrow:
 - mouse drag navigation
 - one-finger touch drag navigation on mobile devices
 - a dark/light theme toggle
-- a top-left LinkedIn menu with archive-request instructions and `Connections.csv` zip import
+- a top-left LinkedIn menu with archive-request instructions and minimized `Connections.csv` zip import
 - a very dense CSS-rendered point grid
 - Supabase-backed Google login
 - editable unsigned local board state when the user is not signed in
@@ -18,7 +18,8 @@ The current product is intentionally narrow:
 - persistent people nodes, reusable colored tags, notes, and undirected connections per signed-in user
 - a top-left Tags menu for creating tags, renaming them, changing tag colors, and toggling tag visibility on the board
 - a node-anchored inspector for editing the selected person that opens on single click
-- a people search layer that matches locally while typing and can run AI search on Enter when signed in
+- a people search layer that matches locally while typing and can run candidate-limited AI search on Enter when signed in
+- account menu graph export, graph deletion, and account-data deletion controls
 - no collaboration yet
 
 ## Active Work
@@ -73,6 +74,7 @@ Completed tasks can remain listed here when they explain repository history. Liv
 - `skills-lock.json`: lockfile for installed project agent skills.
 - `supabase/migrations/`: database schema and row-level security migrations.
 - `supabase/functions/`: server-side Supabase Edge Functions for Gemini/OpenRouter AI note sync and AI people search.
+- `supabase/tests/security_regression_checks.sql`: SQL security posture checks for live RLS and grants verification.
 
 ## Ownership
 

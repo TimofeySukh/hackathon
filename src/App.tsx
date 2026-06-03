@@ -8,8 +8,8 @@ import type {
 } from 'react'
 
 import { useAuth } from './lib/useAuth'
-import { normalizeTagName, searchPeopleWithAi } from './lib/graphStorage'
-import type { Connection, PersonNode, PersonNote, Tag } from './lib/graphTypes'
+import { deleteAccountData, normalizeTagName, searchPeopleWithAi } from './lib/graphStorage'
+import type { Connection, PersonAiNote, PersonNode, PersonNote, Tag } from './lib/graphTypes'
 import { DEFAULT_TAG_COLOR, DEFAULT_TAGS, hexToRgb, normalizeTagColor } from './lib/tagPalette'
 import { useBoardGraph } from './lib/useBoardGraph'
 
@@ -90,6 +90,11 @@ type LinkedInImportStatus = {
   message: string | null
 }
 
+type LinkedInImportOptions = {
+  includeEmail: boolean
+  includeUrl: boolean
+}
+
 type BoardStyle = CSSProperties & {
   '--board-offset-x': string
   '--board-offset-y': string
@@ -140,6 +145,11 @@ type TagPickerOption =
 const THEME_STORAGE_KEY = 'hackathon-theme'
 const TAG_COLOR_STORAGE_KEY = 'hackathon-tag-colors'
 const LINKEDIN_TAG_NAME = 'LinkedIn'
+const DEFAULT_LINKEDIN_IMPORT_OPTIONS: LinkedInImportOptions = {
+  includeEmail: false,
+  includeUrl: false,
+}
+const AI_SEARCH_CANDIDATE_LIMIT = 40
 const LINKEDIN_SYNC_STEPS = [
   {
     title: 'Open Settings & Privacy',
@@ -304,28 +314,35 @@ function getLinkedInConnectionName(connection: LinkedInConnectionRow) {
   return normalizeTagName(`${connection.firstName} ${connection.lastName}`)
 }
 
-function getLinkedInNoteBody(connection: LinkedInConnectionRow) {
+function getLinkedInNoteBody(connection: LinkedInConnectionRow, options: LinkedInImportOptions) {
   return [
     connection.position ? `Position/headline: ${connection.position}` : '',
     connection.company ? `Company: ${connection.company}` : '',
-    connection.url ? `LinkedIn: ${connection.url}` : '',
-    connection.email ? `Email: ${connection.email}` : '',
+    options.includeUrl && connection.url ? `LinkedIn: ${connection.url}` : '',
+    options.includeEmail && connection.email ? `Email: ${connection.email}` : '',
     connection.connectedOn ? `Connected on: ${connection.connectedOn}` : '',
+    `Imported LinkedIn name: ${getLinkedInConnectionName(connection)}`,
     'Source: LinkedIn Connections.csv',
   ].filter(Boolean).join('\n')
 }
 
-function extractLinkedInUrlsFromNotes(notes: PersonNote[]) {
+function extractLinkedInImportKeysFromNotes(notes: PersonNote[]) {
   const urls = new Set<string>()
+  const names = new Set<string>()
 
   for (const note of notes) {
     const match = note.body.match(/LinkedIn:\s*(\S+)/i)
     if (match?.[1]) {
       urls.add(match[1].toLowerCase())
     }
+
+    const sourceMatch = note.body.match(/Imported LinkedIn name:\s*(.+)/i)
+    if (sourceMatch?.[1]) {
+      names.add(normalizeTagName(sourceMatch[1]).toLowerCase())
+    }
   }
 
-  return urls
+  return { names, urls }
 }
 
 function getQuadrantKey(position: Offset) {
@@ -552,6 +569,7 @@ function App() {
     people,
     tags,
     notes,
+    personAiNotes,
     connections,
     status: graphStatus,
     error: graphError,
@@ -567,6 +585,8 @@ function App() {
     createNote: createRemoteNote,
     updateNote: updateRemoteNote,
     deleteNote: deleteRemoteNote,
+    refreshPersonAiNote,
+    deleteCurrentGraphData,
   } = useBoardGraph(session?.user ?? null)
 
   const [theme, setTheme] = useState<Theme>(() => {
@@ -596,6 +616,9 @@ function App() {
     state: 'idle',
     message: null,
   })
+  const [linkedInImportOptions, setLinkedInImportOptions] = useState<LinkedInImportOptions>(
+    DEFAULT_LINKEDIN_IMPORT_OPTIONS,
+  )
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
   const [activeColorTagId, setActiveColorTagId] = useState<string | null>(null)
   const [tagColorDrafts, setTagColorDrafts] = useState<Record<string, string>>(() =>
@@ -671,6 +694,10 @@ function App() {
   const activePeople = isRemoteGraphReady ? people : localPeople
   const activeTags = isRemoteGraphReady ? tags : localTags
   const activeNotes = isRemoteGraphReady ? notes : localNotes
+  const activePersonAiNotes = useMemo(
+    () => (isRemoteGraphReady ? personAiNotes : []),
+    [isRemoteGraphReady, personAiNotes],
+  )
   const activeConnections = isRemoteGraphReady ? connections : localConnections
   const isGraphReady = isRemoteGraphReady || !isAuthenticated
   const boardNodes = useMemo(
@@ -758,6 +785,10 @@ function App() {
   const inspectorNodeNotes = useMemo(
     () => activeNotes.filter((note) => note.person_id === inspectorNode?.id),
     [activeNotes, inspectorNode?.id],
+  )
+  const inspectorPersonAiNote = useMemo<PersonAiNote | null>(
+    () => activePersonAiNotes.find((note) => note.person_id === inspectorNode?.id) ?? null,
+    [activePersonAiNotes, inspectorNode?.id],
   )
   const tagsById = useMemo(
     () => Object.fromEntries(activeTags.map((tag) => [tag.id, tag])) as Record<string, Tag>,
@@ -871,6 +902,58 @@ function App() {
         return (left.node.name || '').localeCompare(right.node.name || '')
       })
       .slice(0, 8)
+  }, [activePeople, notesByPersonId, searchQuery, tagsById])
+  const aiSearchCandidateIds = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase()
+
+    if (!normalizedQuery) {
+      return activePeople
+        .slice()
+        .sort((left, right) => right.updated_at.localeCompare(left.updated_at))
+        .slice(0, AI_SEARCH_CANDIDATE_LIMIT)
+        .map((node) => node.id)
+    }
+
+    const scoredPeople = activePeople.map((node) => {
+      let score = 0
+      const tagName = node.tag_id ? tagsById[node.tag_id]?.name ?? '' : ''
+      const personNotes = notesByPersonId[node.id] ?? []
+      const normalizedName = node.name.trim().toLowerCase()
+      const normalizedTag = tagName.toLowerCase()
+
+      if (normalizedName.includes(normalizedQuery)) {
+        score += normalizedName.startsWith(normalizedQuery) ? 8 : 5
+      }
+
+      if (normalizedTag.includes(normalizedQuery)) {
+        score += normalizedTag.startsWith(normalizedQuery) ? 5 : 3
+      }
+
+      for (const note of personNotes) {
+        const normalizedTitle = note.title.toLowerCase()
+        const normalizedBody = note.body.toLowerCase()
+
+        if (normalizedTitle.includes(normalizedQuery)) score += 2
+        if (normalizedBody.includes(normalizedQuery)) score += 1
+      }
+
+      return { node, score }
+    })
+
+    const matches = scoredPeople
+      .filter((entry) => entry.score > 0)
+      .sort((left, right) => {
+        if (right.score !== left.score) return right.score - left.score
+        return right.node.updated_at.localeCompare(left.node.updated_at)
+      })
+
+    const fallback = scoredPeople
+      .filter((entry) => entry.score === 0)
+      .sort((left, right) => right.node.updated_at.localeCompare(left.node.updated_at))
+
+    return [...matches, ...fallback]
+      .slice(0, AI_SEARCH_CANDIDATE_LIMIT)
+      .map((entry) => entry.node.id)
   }, [activePeople, notesByPersonId, searchQuery, tagsById])
   const visibleSearchResults = aiSearchQuery === searchQuery.trim() ? aiSearchResults : searchResults
 
@@ -2410,7 +2493,7 @@ function App() {
   }
 
   async function importLinkedInArchive(file: File) {
-    if (!isGraphReady) {
+    if (!isRemoteGraphReady) {
       setLinkedInImportStatus({
         state: 'error',
         message: 'Sign in and wait for your board to load before importing LinkedIn connections.',
@@ -2430,7 +2513,7 @@ function App() {
       }
 
       const rows = await readLinkedInConnectionsFromArchive(file)
-      const existingLinkedInUrls = extractLinkedInUrlsFromNotes(notes)
+      const existingLinkedInImportKeys = extractLinkedInImportKeysFromNotes(notes)
       const existingNames = new Set(
         people.map((person) => normalizeTagName(person.name).toLowerCase()).filter(Boolean),
       )
@@ -2442,7 +2525,8 @@ function App() {
         const importKey = normalizedUrl || `${normalizedName}:${connection.company.toLowerCase()}`
 
         if (!name || seenImportKeys.has(importKey)) return false
-        if (normalizedUrl && existingLinkedInUrls.has(normalizedUrl)) return false
+        if (normalizedUrl && existingLinkedInImportKeys.urls.has(normalizedUrl)) return false
+        if (existingLinkedInImportKeys.names.has(normalizedName)) return false
         if (!normalizedUrl && existingNames.has(normalizedName)) return false
 
         seenImportKeys.add(importKey)
@@ -2471,7 +2555,7 @@ function App() {
           y: positions[index].y,
         })
 
-        await createNote('LinkedIn connection', getLinkedInNoteBody(connection), person.id, {
+        await createNote('LinkedIn connection', getLinkedInNoteBody(connection, linkedInImportOptions), person.id, {
           syncAi: false,
         })
         await createConnection(rootPerson.id, person.id)
@@ -2544,7 +2628,7 @@ function App() {
     setAiSearchError(null)
 
     try {
-      const results = await searchPeopleWithAi(query)
+      const results = await searchPeopleWithAi(query, aiSearchCandidateIds)
       const nextAiSearchResults: SearchResult[] = []
 
       for (const result of results) {
@@ -2663,6 +2747,74 @@ function App() {
     await handleDeleteSelectedNode(inspectorNode.id)
   }
 
+  function handleExportGraph() {
+    const exportedAt = new Date().toISOString()
+    const payload = {
+      format: 'hackathon-board-graph',
+      version: 1,
+      exported_at: exportedAt,
+      storage_mode: isRemoteGraphReady ? 'supabase' : 'local',
+      board: activeBoard,
+      people: activePeople,
+      tags: activeTags,
+      notes: activeNotes,
+      person_ai_notes: activePersonAiNotes,
+      connections: activeConnections,
+    }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: 'application/json',
+    })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+
+    link.href = url
+    link.download = `hackathon-board-export-${exportedAt.slice(0, 10)}.json`
+    document.body.append(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  async function handleDeleteGraphData() {
+    const shouldDelete = window.confirm(
+      'Delete this graph data? This removes people, notes, tags, connections, and AI summaries from this board.',
+    )
+    if (!shouldDelete) return
+
+    if (isRemoteGraphReady) {
+      await deleteCurrentGraphData()
+      setInspectorNodeId(null)
+      setSelectedNodeId(null)
+      return
+    }
+
+    setLocalPeople([ANONYMOUS_ROOT])
+    setLocalTags(createDefaultLocalTags())
+    setLocalNotes([])
+    setLocalConnections([])
+    setInspectorNodeId(null)
+    setSelectedNodeId(null)
+  }
+
+  async function handleDeleteAccountData() {
+    if (!isAuthenticated) return
+
+    const shouldDelete = window.confirm(
+      'Delete your account data? This removes your graph and profile, then deletes the authenticated user account.',
+    )
+    if (!shouldDelete) return
+
+    await deleteAccountData()
+    await signOut()
+    setIsAccountMenuOpen(false)
+  }
+
+  async function handleRefreshPersonAiNote() {
+    if (!inspectorNode || !isRemoteGraphReady) return
+
+    await refreshPersonAiNote(inspectorNode.id)
+  }
+
   function focusNode(node: PersonNode) {
     const nextScale = viewportRef.current.scale
     queueViewportUpdate(
@@ -2776,8 +2928,42 @@ function App() {
                 Drag and drop or select
               </button>
               <p className="linkedin-upload__hint">
-                Use the complete LinkedIn data export zip. Only Connections.csv will be imported.
+                Use the complete LinkedIn data export zip. The archive file is read in the browser;
+                only Connections.csv rows are imported.
               </p>
+            </div>
+            <div className="linkedin-upload__field-options" aria-label="LinkedIn import fields">
+              <p className="linkedin-upload__field-options-title">
+                Default import saves name, company, position, and connected date.
+              </p>
+              <label className="linkedin-upload__field-option">
+                <input
+                  type="checkbox"
+                  checked={linkedInImportOptions.includeEmail}
+                  onChange={(event) =>
+                    setLinkedInImportOptions((currentOptions) => ({
+                      ...currentOptions,
+                      includeEmail: event.target.checked,
+                    }))
+                  }
+                  disabled={linkedInImportStatus.state === 'loading'}
+                />
+                <span>Also save email addresses</span>
+              </label>
+              <label className="linkedin-upload__field-option">
+                <input
+                  type="checkbox"
+                  checked={linkedInImportOptions.includeUrl}
+                  onChange={(event) =>
+                    setLinkedInImportOptions((currentOptions) => ({
+                      ...currentOptions,
+                      includeUrl: event.target.checked,
+                    }))
+                  }
+                  disabled={linkedInImportStatus.state === 'loading'}
+                />
+                <span>Also save LinkedIn profile URLs</span>
+              </label>
             </div>
             {linkedInImportStatus.message ? (
               <p className={`linkedin-upload__status is-${linkedInImportStatus.state}`}>
@@ -3183,6 +3369,20 @@ function App() {
                     <button type="button" className="account-panel__button" onClick={signOut}>
                       Sign out
                     </button>
+                    <div className="account-panel__divider" />
+                    <button type="button" className="account-panel__button" onClick={handleExportGraph}>
+                      Export graph
+                    </button>
+                    <button type="button" className="account-panel__button" onClick={() => void handleDeleteGraphData()}>
+                      Delete graph data
+                    </button>
+                    <button
+                      type="button"
+                      className="account-panel__button account-panel__button--danger"
+                      onClick={() => void handleDeleteAccountData()}
+                    >
+                      Delete account data
+                    </button>
                   </>
                 ) : (
                   <>
@@ -3203,6 +3403,13 @@ function App() {
                       disabled={status === 'loading' || status === 'unconfigured'}
                     >
                       Sign in with Google
+                    </button>
+                    <div className="account-panel__divider" />
+                    <button type="button" className="account-panel__button" onClick={handleExportGraph}>
+                      Export local graph
+                    </button>
+                    <button type="button" className="account-panel__button" onClick={() => void handleDeleteGraphData()}>
+                      Clear local graph
                     </button>
                   </>
                 )}
@@ -3441,6 +3648,43 @@ function App() {
               ) : null}
             </div>
           </div>
+
+          {isRemoteGraphReady ? (
+            <section className="ai-summary-panel" aria-label="AI person summary">
+              <div className="ai-summary-panel__header">
+                <div className="ai-summary-panel__text">
+                  <span className="ai-summary-panel__label">AI summary</span>
+                  <span className="ai-summary-panel__meta">
+                    {inspectorPersonAiNote?.status === 'pending'
+                      ? 'Refreshing selected person'
+                      : inspectorPersonAiNote?.updated_at
+                        ? `Updated ${new Date(inspectorPersonAiNote.updated_at).toLocaleDateString()}`
+                        : 'Not created yet'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="ai-summary-panel__button"
+                  onClick={() => {
+                    void handleRefreshPersonAiNote()
+                  }}
+                  disabled={inspectorPersonAiNote?.status === 'pending'}
+                >
+                  {inspectorPersonAiNote?.status === 'pending' ? 'Working...' : 'Refresh'}
+                </button>
+              </div>
+              {inspectorPersonAiNote?.summary ? (
+                <p className="ai-summary-panel__summary">{inspectorPersonAiNote.summary}</p>
+              ) : (
+                <p className="ai-summary-panel__summary">
+                  Refresh sends this person, tag, and notes to AI. Search uses only selected candidates.
+                </p>
+              )}
+              {inspectorPersonAiNote?.error_message ? (
+                <p className="ai-summary-panel__error">{inspectorPersonAiNote.error_message}</p>
+              ) : null}
+            </section>
+          ) : null}
 
           <div className="note-list">
             {inspectorNodeNotes.map((note) => {

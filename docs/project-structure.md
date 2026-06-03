@@ -50,7 +50,11 @@ Supabase database migrations for profiles, personal boards, persisted graph data
 
 ### `supabase/functions/`
 
-Supabase Edge Functions. `sync-person-ai-note` sends person note context through the shared Gemini/OpenRouter AI provider layer and upserts `person_ai_notes`. `search-people-ai` sends graph candidates through the same provider layer and returns ranked natural-language search results.
+Supabase Edge Functions. `sync-person-ai-note` sends sanitized selected-person note context through the shared Gemini/OpenRouter AI provider layer and upserts `person_ai_notes`. `search-people-ai` sends sanitized context for up to 40 browser-selected candidates through the same provider layer and returns ranked natural-language search results. `delete-account-data` clears graph rows, AI summaries, profile fields, and root-person identity fields for the signed-in user.
+
+### `supabase/tests/`
+
+SQL security checks for live RLS and grants verification.
 
 ### `src/`
 
@@ -72,7 +76,7 @@ Contains the board experience:
 
 - Supabase-backed account controls
 - unsigned local graph state for editing before login
-- LinkedIn archive-request instruction menu and LinkedIn export zip import flow
+- LinkedIn archive-request instruction menu and minimized LinkedIn export zip import flow
 - theme state
 - mouse drag navigation state
 - board zoom state
@@ -92,7 +96,7 @@ Shared low-level helpers.
 
 - `supabase.ts` creates the browser Supabase client from Vite environment variables.
 - `useAuth.ts` owns session loading, Google OAuth sign-in, and sign-out.
-- `useBoardGraph.ts` owns board graph loading, mutation state, and debounced AI note refresh scheduling per person.
+- `useBoardGraph.ts` owns board graph loading, mutation state, graph-data deletion, and manual AI note refresh per person.
 - `graphStorage.ts` owns Supabase CRUD calls for persisted graph data, `person_ai_notes`, and AI Edge Function invocation.
 - `graphTypes.ts` defines shared profile, board, person, note, AI note, tag, and connection interfaces, including the structured AI summary shape.
 - `userWorkspace.ts` upserts profile data and ensures one personal board plus root person for the signed-in user.
@@ -157,7 +161,7 @@ It currently supports:
 - cursor-centered zoom with the mouse wheel
 - visual theme switching
 - persistent social graph nodes connected by lines
-- one separate AI summary record per person in the database with `status`, plain-text `summary`, structured JSON data, and sync error state
+- one manually refreshed AI summary record per person in the database with `status`, plain-text `summary`, structured JSON data, and sync error state
 - modifier-drag to connect two existing nodes by releasing on another node hit area: `Command` on macOS, `Control` elsewhere
 - modifier-drag to create node growth from any existing node with an immediate connecting line: `Command` on macOS, `Control` elsewhere
 - selected-node detail cards with a large name field, searchable tag selection/creation/deletion, compact auto-saving notes, and person deletion
@@ -170,7 +174,8 @@ It currently supports:
 - connection line selection is disabled for coarse touch pointers so mobile pan gestures are not interrupted by the delete menu
 - a compact top bar with a capped-width search field, circular tags/account/theme controls, and exclusive overlay behavior
 - a keyboard-first inspector that treats `#tag` in the name field as a tag command and uses one capture textarea for new notes
-- local people search while typing plus natural-language AI search on Enter when signed in
+- local people search while typing plus candidate-limited natural-language AI search on Enter when signed in
+- graph export, graph deletion, and account-data deletion controls in the account menu
 - drag repositioning for non-root nodes
 - persisted node renaming
 - grid movement through background offset changes

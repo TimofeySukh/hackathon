@@ -464,6 +464,43 @@ export async function deleteNote(id: string) {
   if (error) throw error
 }
 
+export async function deleteGraphData(userId: string) {
+  const client = requireSupabase()
+
+  const [connectionsResult, notesResult, personAiNotesResult] = await Promise.all([
+    client.from('connections').delete().eq('owner_user_id', userId),
+    client.from('notes').delete().eq('owner_user_id', userId),
+    client.from('person_ai_notes').delete().eq('owner_user_id', userId),
+  ])
+
+  if (connectionsResult.error) throw connectionsResult.error
+  if (notesResult.error) throw notesResult.error
+  if (personAiNotesResult.error) throw personAiNotesResult.error
+
+  const peopleResult = await client
+    .from('people')
+    .delete()
+    .eq('owner_user_id', userId)
+    .eq('is_root', false)
+
+  if (peopleResult.error) throw peopleResult.error
+
+  const tagsResult = await client.from('tags').delete().eq('user_id', userId)
+
+  if (tagsResult.error) throw tagsResult.error
+}
+
+export async function deleteAccountData() {
+  const client = requireSupabase()
+  const { error } = await client.functions.invoke('delete-account-data', {
+    body: {},
+  })
+
+  if (error) {
+    throw new Error(await readFunctionError(error))
+  }
+}
+
 export async function getPersonAiNote(personId: string) {
   const client = requireSupabase()
   const { data, error } = await client.from('person_ai_notes').select('*').eq('person_id', personId).maybeSingle()
@@ -510,11 +547,12 @@ export async function invokePersonAiNoteSync(personId: string) {
   }
 }
 
-export async function searchPeopleWithAi(query: string): Promise<AiPeopleSearchResult[]> {
+export async function searchPeopleWithAi(query: string, candidateIds: string[]): Promise<AiPeopleSearchResult[]> {
   const client = requireSupabase()
   const { data, error } = await client.functions.invoke('search-people-ai', {
     body: {
       query,
+      candidate_ids: candidateIds,
     },
   })
 

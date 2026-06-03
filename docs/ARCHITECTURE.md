@@ -29,13 +29,15 @@ The backend boundary remains intentionally narrow: Supabase Auth provides identi
 - `src/App.tsx` also contains the people search overlay with local matching while typing and signed-in AI search on Enter.
 - `src/lib/supabase.ts` creates the browser Supabase client from Vite environment variables.
 - `src/lib/useAuth.ts` owns session loading, Google sign-in, and sign-out.
-- `src/lib/useBoardGraph.ts` owns board graph loading, frontend mutation state, and debounced AI note refresh scheduling.
+- `src/lib/useBoardGraph.ts` owns board graph loading, frontend mutation state, and manual AI note refresh.
 - `src/lib/graphStorage.ts` owns Supabase CRUD for graph data, `person_ai_notes`, and Edge Function invocation.
 - `src/lib/userWorkspace.ts` upserts the user profile and ensures a single personal board plus root node.
 - `mcp/server.mjs` exposes repo docs as MCP resources and the persisted graph model as MCP tools and dynamic resources.
 - `supabase/functions/_shared/ai.ts` calls Gemini first and falls back to OpenRouter for structured AI responses.
-- `supabase/functions/sync-person-ai-note/index.ts` authenticates the caller, loads person context, calls the shared AI provider layer, and upserts `person_ai_notes`.
-- `supabase/functions/search-people-ai/index.ts` authenticates the caller, builds candidate context, calls the shared AI provider layer, and returns ranked people.
+- `supabase/functions/_shared/cors.ts` restricts browser Edge Function CORS to production, local development, private-LAN Vite origins, and configured allow-list origins.
+- `supabase/functions/sync-person-ai-note/index.ts` authenticates the caller, loads sanitized selected-person context, calls the shared AI provider layer, and upserts `person_ai_notes`.
+- `supabase/functions/search-people-ai/index.ts` authenticates the caller, builds sanitized context for up to 40 browser-selected candidates, calls the shared AI provider layer, and returns ranked people.
+- `supabase/functions/delete-account-data/index.ts` clears the signed-in user's graph rows, AI summaries, profile fields, and root-person identity fields without deleting the Auth user.
 - `src/index.css` contains the full visual system.
 
 The board is simulated by shifting layered CSS backgrounds according to a camera offset. The app does not store board objects or draw on a canvas element.
@@ -59,7 +61,7 @@ Current scope:
 - persistent people nodes with saved coordinates
 - one reusable user-owned tag per person
 - multiple notes per person
-- at most one separate AI summary record per person with a top-level text summary plus structured JSON fields
+- at most one manually refreshed AI summary record per person with a top-level text summary plus structured JSON fields
 - undirected person-to-person connections
 - a people search overlay over names, tags, notes, and AI-generated search explanations
 
@@ -82,6 +84,7 @@ Out of scope for the current version:
 - Keep unsigned local graph data out of Supabase until the user signs in and an explicit migration path exists.
 - Keep Gemini and OpenRouter API keys out of the browser and only inside Supabase Edge Function secrets.
 - Keep `SUPABASE_SERVICE_ROLE_KEY` out of browser-exposed `VITE_` variables and only in local MCP env files or shell env.
+- Keep AI provider context minimized: no automatic note-triggered summary refresh, no full-graph AI search, and strip email addresses and URLs before provider calls.
 - Keep security-sensitive storage, deployment, AI, and authentication decisions reflected in `docs/SECURITY.md`.
 - Keep the root person immutable in position and deletion semantics.
 - Keep Google OAuth redirect/origin configuration aligned with the real deployed frontend origins.

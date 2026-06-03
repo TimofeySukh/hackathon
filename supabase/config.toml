@@ -1,5 +1,8 @@
 [functions.sync-person-ai-note]
-verify_jwt = false
+verify_jwt = true
 
 [functions.search-people-ai]
-verify_jwt = false
+verify_jwt = true
+
+[functions.delete-account-data]
+verify_jwt = true
