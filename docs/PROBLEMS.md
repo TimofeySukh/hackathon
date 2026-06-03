@@ -31,7 +31,7 @@ When working on the project:
 
 - Status: Open
 - Reported concern: storing project data only in Supabase may be a weak product or architecture choice.
-- Notes: needs an architecture decision covering portability, backup/export, vendor lock-in, offline access, and any second storage target.
+- Notes: `docs/SECURITY.md` now records the target direction: signed-out local exploration, explicit cloud sync, export, deletion, minimized imported fields, and possible client-side encryption for sensitive note bodies. Implementation work is still open.
 
 ### Icon sizes differ across browsers
 
@@ -45,12 +45,10 @@ When working on the project:
 - Reported gap: the project needs a landing page.
 - Notes: needs product requirements for public messaging, target audience, routing, auth entry points, and how the landing page coexists with the board-first app.
 
-### npm audit reports transitive vulnerabilities
-
-- Status: Open
-- Reported behavior: `npm audit --audit-level=high` fails with 7 reported vulnerabilities, including a high-severity `fast-uri` advisory and moderate advisories in transitive packages such as `brace-expansion`, `hono`, `ip-address`, `qs`, and `ws`.
-- Notes: `npm audit fix` is suggested by npm, but the dependency tree update should be reviewed separately from feature work.
-
 ## Resolved Problems
 
-No resolved problems are currently documented here.
+### npm audit reports transitive vulnerabilities
+
+- Status: Resolved
+- Reported behavior: `npm audit --audit-level=high` failed with 7 reported vulnerabilities, including a high-severity `fast-uri` advisory and moderate advisories in transitive packages such as `brace-expansion`, `hono`, `ip-address`, `qs`, and `ws`.
+- Resolution: ran `npm audit fix`, updated transitive dependency versions in `package-lock.json`, and verified `npm audit --audit-level=high` reports 0 vulnerabilities.

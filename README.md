@@ -109,5 +109,6 @@ The goal is to make relationship mapping feel clean, compact, and pleasant to gr
 
 - Project rules: [AGENTS.md](./AGENTS.md)
 - Known problems: [docs/PROBLEMS.md](./docs/PROBLEMS.md)
+- Security model: [docs/SECURITY.md](./docs/SECURITY.md)
 - Product direction: [docs/product-vision.md](./docs/product-vision.md)
 - Project structure: [docs/project-structure.md](./docs/project-structure.md)

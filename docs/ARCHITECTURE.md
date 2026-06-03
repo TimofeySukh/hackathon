@@ -13,6 +13,7 @@ Runtime boundaries:
 - The browser owns unsigned local graph state for users who have not signed in.
 - Supabase owns Google authentication and user-owned graph records.
 - Supabase Edge Functions own server-side AI provider calls for AI note enrichment and people search.
+- `docs/SECURITY.md` owns the security, privacy, data-minimization, and hardening model.
 - Gemini owns the primary LLM execution path for structured summary generation and natural-language people search ranking.
 - OpenRouter owns the fallback LLM execution path when Gemini quota or availability errors occur.
 - The local MCP server owns agent-facing project documentation resources plus service-role scoped board graph tooling.
@@ -81,6 +82,7 @@ Out of scope for the current version:
 - Keep unsigned local graph data out of Supabase until the user signs in and an explicit migration path exists.
 - Keep Gemini and OpenRouter API keys out of the browser and only inside Supabase Edge Function secrets.
 - Keep `SUPABASE_SERVICE_ROLE_KEY` out of browser-exposed `VITE_` variables and only in local MCP env files or shell env.
+- Keep security-sensitive storage, deployment, AI, and authentication decisions reflected in `docs/SECURITY.md`.
 - Keep the root person immutable in position and deletion semantics.
 - Keep Google OAuth redirect/origin configuration aligned with the real deployed frontend origins.
 

@@ -8,6 +8,7 @@ This repo follows the harness guidance in `docs/`.
 - [Runbook](docs/RUNBOOK.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Problems](docs/PROBLEMS.md)
+- [Security](docs/SECURITY.md)
 
 ## Rules
 

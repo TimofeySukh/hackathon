@@ -139,6 +139,7 @@ Files:
 
 - `deploy/social-datanode-live/auto-deploy/social-datanode-live-autodeploy.sh`
 - `deploy/social-datanode-live/auto-deploy/social-datanode-live-autodeploy.cron`
+- `deploy/social-datanode-live/nginx.conf`
 
 What it does:
 
@@ -147,6 +148,7 @@ What it does:
 - only runs `npm ci`, `npm run build`, and `docker compose up -d --build` when `main` changed
 - stores the last deployed commit SHA on the server to avoid unnecessary rebuilds
 - loads optional build-time Vite variables from `$HOME/apps/social-datanode-live-autodeploy/deploy.env` before `npm run build`
+- serves the SPA with security headers, no-cache HTML, immutable hashed assets, and hidden-dotfile blocking from `deploy/social-datanode-live/nginx.conf`
 
 Create the server-only build env file before the first production build:
 
