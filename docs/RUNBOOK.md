@@ -4,6 +4,8 @@
 
 The repository contains a React, Vite, and TypeScript social graph board app.
 
+On branch `codex/material-circles-prototype`, `npm run dev` opens a frontend-only Material circles design prototype instead of the Supabase-backed graph UI. The prototype uses hard-coded local sample data and is documented in `docs/material-circles-prototype.md`.
+
 Current app behavior:
 
 - open a full-window board

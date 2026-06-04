@@ -4,6 +4,8 @@
 
 This repository contains a React, Vite, and TypeScript social graph board app.
 
+On branch `codex/material-circles-prototype`, the visible app screen is temporarily replaced by a frontend-only Material circles design prototype. See `docs/material-circles-prototype.md`.
+
 The current product is intentionally narrow:
 
 - a full-window board surface
