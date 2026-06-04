@@ -72,7 +72,7 @@ button {
   left: 18px;
   right: 18px;
   display: grid;
-  grid-template-columns: auto minmax(220px, 480px) auto;
+  grid-template-columns: auto minmax(220px, 480px) auto auto;
   align-items: center;
   gap: 14px;
   pointer-events: none;
@@ -91,6 +91,7 @@ button {
 }
 
 .brand-lockup {
+  justify-self: start;
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -193,6 +194,47 @@ button {
   color: rgba(24, 35, 31, 0.62);
   font-size: 13px;
   font-weight: 760;
+}
+
+.command-group {
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  height: 48px;
+  gap: 6px;
+  border: 1px solid var(--chrome-border);
+  border-radius: 999px;
+  background: var(--chrome-bg);
+  box-shadow: var(--shadow-soft);
+  padding: 5px;
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  pointer-events: auto;
+}
+
+.command-group button,
+.panel-actions button,
+.panel-secondary-action {
+  min-height: 38px;
+  border-radius: 999px;
+  background: #26352e;
+  color: #fff;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 820;
+  cursor: pointer;
+  box-shadow: 0 12px 26px rgba(38, 53, 46, 0.16);
+}
+
+.command-group button:first-child {
+  background: #fff;
+  color: #26352e;
+}
+
+.command-group button:hover,
+.panel-actions button:hover,
+.panel-secondary-action:hover {
+  transform: translateY(-1px);
 }
 
 .relationship-board {
@@ -302,6 +344,14 @@ button {
     0 34px 90px rgba(76, 80, 73, 0.23);
 }
 
+.circle-group.has-selected-person {
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.74),
+    0 0 0 8px rgba(255, 255, 255, 0.42),
+    0 0 0 12px rgba(38, 53, 46, 0.08),
+    0 34px 90px rgba(76, 80, 73, 0.23);
+}
+
 .circle-group.is-muted {
   opacity: 0.28;
   filter: saturate(0.45);
@@ -366,6 +416,19 @@ button {
   transform: translate(-50%, -50%);
   pointer-events: auto;
   cursor: pointer;
+  touch-action: none;
+}
+
+.person-node:hover,
+.person-node.is-selected {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow:
+    0 0 0 4px rgba(38, 53, 46, 0.08),
+    0 18px 38px rgba(78, 83, 76, 0.18);
+}
+
+.person-node:active {
+  cursor: grabbing;
 }
 
 .person-node.is-match {
@@ -527,6 +590,63 @@ button {
   margin: 20px 0;
 }
 
+.panel-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.panel-actions button {
+  flex: 1 1 0;
+  background: rgba(38, 53, 46, 0.08);
+  color: #26352e;
+  box-shadow: none;
+}
+
+.panel-actions button:first-child {
+  background: #26352e;
+  color: #fff;
+}
+
+.person-editor {
+  display: grid;
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.person-editor label {
+  display: grid;
+  gap: 7px;
+  color: rgba(24, 35, 31, 0.54);
+  font-size: 12px;
+  font-weight: 820;
+}
+
+.person-editor input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid rgba(24, 35, 31, 0.09);
+  border-radius: 16px;
+  outline: 0;
+  background: rgba(255, 255, 255, 0.58);
+  padding: 0 13px;
+  color: #18231f;
+  font-size: 14px;
+  font-weight: 720;
+}
+
+.person-editor input:focus {
+  border-color: rgba(38, 53, 46, 0.28);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.panel-secondary-action {
+  width: 100%;
+  background: rgba(38, 53, 46, 0.08);
+  color: #26352e;
+  box-shadow: none;
+}
+
 .panel-stats span {
   display: grid;
   gap: 3px;
@@ -676,6 +796,12 @@ button {
 
   .toolbar-group {
     grid-column: 2;
+  }
+
+  .command-group {
+    grid-column: 1 / -1;
+    justify-self: start;
+    max-width: calc(100vw - 36px);
   }
 
   .inspector-panel {

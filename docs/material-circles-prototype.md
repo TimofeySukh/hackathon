@@ -22,6 +22,12 @@ The intended product model is:
 - Mouse wheel zooms the board.
 - Circles can be dragged.
 - Circles can be resized from their bottom-right handles.
+- People can be dragged inside their current circle.
+- Dropping a person onto another circle moves them into that circle.
+- Clicking a person opens a person card in the inspector.
+- The person card supports local name and role editing.
+- The top toolbar and circle inspector can add a person to the selected circle.
+- The top toolbar and circle inspector can create a new empty circle.
 - The right inspector updates when a circle is selected.
 - Search dims non-matching circles and highlights matching people.
 

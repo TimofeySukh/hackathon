@@ -31,6 +31,16 @@ type DragState =
   | { type: 'pan'; pointerId: number; startX: number; startY: number; originX: number; originY: number }
   | { type: 'group'; pointerId: number; groupId: string; startX: number; startY: number; originX: number; originY: number }
   | {
+      type: 'person'
+      pointerId: number
+      groupId: string
+      personId: string
+      startX: number
+      startY: number
+      originX: number
+      originY: number
+    }
+  | {
       type: 'resize'
       pointerId: number
       groupId: string
@@ -39,6 +49,8 @@ type DragState =
       originWidth: number
       originHeight: number
     }
+
+const toneCycle: CircleGroup['tone'][] = ['coral', 'blue', 'violet', 'green', 'amber']
 
 const initialGroups: CircleGroup[] = [
   {
@@ -125,11 +137,13 @@ function App() {
   const boardRef = useRef<HTMLDivElement | null>(null)
   const [groups, setGroups] = useState(initialGroups)
   const [selectedGroupId, setSelectedGroupId] = useState('hackathon')
+  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [camera, setCamera] = useState<Camera>({ x: -180, y: -40, scale: 0.68 })
   const [dragState, setDragState] = useState<DragState | null>(null)
 
   const selectedGroup = groups.find((group) => group.id === selectedGroupId) ?? groups[0]
+  const selectedPersonContext = getPersonContext(groups, selectedPersonId)
   const isCollapsed = camera.scale < 0.56
   const lowerQuery = query.trim().toLowerCase()
 
@@ -176,6 +190,7 @@ function App() {
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
     setSelectedGroupId(group.id)
+    setSelectedPersonId(null)
     setDragState({
       type: 'group',
       pointerId: event.pointerId,
@@ -187,10 +202,27 @@ function App() {
     })
   }
 
+  function startPersonDrag(event: PointerEvent<HTMLButtonElement>, group: CircleGroup, person: Person) {
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    setSelectedGroupId(group.id)
+    setDragState({
+      type: 'person',
+      pointerId: event.pointerId,
+      groupId: group.id,
+      personId: person.id,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: person.x,
+      originY: person.y,
+    })
+  }
+
   function startResize(event: PointerEvent<HTMLButtonElement>, group: CircleGroup) {
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
     setSelectedGroupId(group.id)
+    setSelectedPersonId(null)
     setDragState({
       type: 'resize',
       pointerId: event.pointerId,
@@ -224,6 +256,29 @@ function App() {
       return
     }
 
+    if (dragState.type === 'person') {
+      const dx = (event.clientX - dragState.startX) / camera.scale
+      const dy = (event.clientY - dragState.startY) / camera.scale
+      const originGroup = groups.find((group) => group.id === dragState.groupId)
+      if (!originGroup) return
+
+      const nextPersonX = dragState.originX + dx / originGroup.width
+      const nextPersonY = dragState.originY + dy / originGroup.height
+      setGroups((current) =>
+        current.map((group) =>
+          group.id === dragState.groupId
+            ? {
+                ...group,
+                people: group.people.map((person) =>
+                  person.id === dragState.personId ? { ...person, x: nextPersonX, y: nextPersonY } : person,
+                ),
+              }
+            : group,
+        ),
+      )
+      return
+    }
+
     const dx = (event.clientX - dragState.startX) / camera.scale
     const dy = (event.clientY - dragState.startY) / camera.scale
     setGroups((current) =>
@@ -240,13 +295,140 @@ function App() {
   }
 
   function stopDrag(event: PointerEvent<HTMLDivElement>) {
-    if (dragState?.pointerId === event.pointerId) {
+    if (dragState?.pointerId !== event.pointerId) return
+
+    if (dragState.type === 'person') {
+      const distance = Math.hypot(event.clientX - dragState.startX, event.clientY - dragState.startY)
+      const worldPoint = getWorldPoint(event.clientX, event.clientY, camera, boardRef.current)
+      const targetGroup = groups.find((group) => isPointInsideGroup(worldPoint, group))
+
+      if (distance < 6) {
+        setSelectedPersonId(dragState.personId)
+      } else if (targetGroup && targetGroup.id !== dragState.groupId) {
+        movePersonToGroup(dragState.personId, dragState.groupId, targetGroup.id, worldPoint)
+      } else {
+        clampPersonToGroup(dragState.personId, dragState.groupId)
+      }
+    }
+
+    if (dragState.type !== 'person') {
+      setSelectedPersonId(null)
+    }
+
+    if (dragState.pointerId === event.pointerId) {
       setDragState(null)
     }
   }
 
   function setZoom(scale: number) {
     setCamera((current) => ({ ...current, scale: clamp(scale, 0.38, 1.35) }))
+  }
+
+  function addPersonToSelectedGroup() {
+    const personNumber = selectedGroup.people.length + 1
+    const person: Person = {
+      id: `person-${Date.now()}`,
+      name: `New person ${personNumber}`,
+      role: 'new contact',
+      initials: createInitials(`New person ${personNumber}`),
+      x: clamp(0.34 + (personNumber % 3) * 0.16, 0.16, 0.84),
+      y: clamp(0.36 + (personNumber % 4) * 0.12, 0.22, 0.78),
+    }
+    setGroups((current) =>
+      current.map((group) => {
+        if (group.id !== selectedGroup.id) return group
+        return { ...group, people: [...group.people, person] }
+      }),
+    )
+    setSelectedPersonId(person.id)
+  }
+
+  function addCircleGroup() {
+    const rect = boardRef.current?.getBoundingClientRect()
+    const centerPoint = rect
+      ? getWorldPoint(rect.left + rect.width / 2, rect.top + rect.height / 2, camera, boardRef.current)
+      : { x: 0, y: 0 }
+    const groupNumber = groups.length + 1
+    const nextGroup: CircleGroup = {
+      id: `group-${Date.now()}`,
+      name: `New circle ${groupNumber}`,
+      tone: toneCycle[groups.length % toneCycle.length],
+      x: centerPoint.x - 180,
+      y: centerPoint.y - 140,
+      width: 360,
+      height: 280,
+      people: [],
+    }
+    setGroups((current) => [...current, nextGroup])
+    setSelectedGroupId(nextGroup.id)
+    setSelectedPersonId(null)
+  }
+
+  function updateSelectedPerson(nextFields: Partial<Pick<Person, 'name' | 'role'>>) {
+    if (!selectedPersonContext) return
+    setGroups((current) =>
+      current.map((group) =>
+        group.id === selectedPersonContext.group.id
+          ? {
+              ...group,
+              people: group.people.map((person) =>
+                person.id === selectedPersonContext.person.id
+                  ? {
+                      ...person,
+                      ...nextFields,
+                      initials: nextFields.name ? createInitials(nextFields.name) : person.initials,
+                    }
+                  : person,
+              ),
+            }
+          : group,
+      ),
+    )
+  }
+
+  function movePersonToGroup(personId: string, fromGroupId: string, toGroupId: string, worldPoint: { x: number; y: number }) {
+    setGroups((current) => {
+      const fromGroup = current.find((group) => group.id === fromGroupId)
+      const person = fromGroup?.people.find((entry) => entry.id === personId)
+      if (!person) return current
+
+      return current.map((group) => {
+        if (group.id === fromGroupId) {
+          return { ...group, people: group.people.filter((entry) => entry.id !== personId) }
+        }
+        if (group.id === toGroupId) {
+          return {
+            ...group,
+            people: [
+              ...group.people,
+              {
+                ...person,
+                x: clamp((worldPoint.x - group.x) / group.width, 0.12, 0.88),
+                y: clamp((worldPoint.y - group.y) / group.height, 0.18, 0.82),
+              },
+            ],
+          }
+        }
+        return group
+      })
+    })
+    setSelectedGroupId(toGroupId)
+    setSelectedPersonId(personId)
+  }
+
+  function clampPersonToGroup(personId: string, groupId: string) {
+    setGroups((current) =>
+      current.map((group) =>
+        group.id === groupId
+          ? {
+              ...group,
+              people: group.people.map((person) =>
+                person.id === personId ? { ...person, x: clamp(person.x, 0.12, 0.88), y: clamp(person.y, 0.18, 0.82) } : person,
+              ),
+            }
+          : group,
+      ),
+    )
   }
 
   return (
@@ -274,6 +456,14 @@ function App() {
           <span>{Math.round(camera.scale * 100)}%</span>
           <button type="button" onClick={() => setZoom(camera.scale + 0.12)} aria-label="Zoom in">
             +
+          </button>
+        </div>
+        <div className="command-group" aria-label="Create controls">
+          <button type="button" onClick={addPersonToSelectedGroup}>
+            + Person
+          </button>
+          <button type="button" onClick={addCircleGroup}>
+            + Circle
           </button>
         </div>
       </header>
@@ -323,6 +513,7 @@ function App() {
                   'circle-group',
                   `circle-group--${group.tone}`,
                   selectedGroupId === group.id ? 'is-selected' : '',
+                  selectedPersonContext?.group.id === group.id ? 'has-selected-person' : '',
                   matchesGroup ? '' : 'is-muted',
                   isCollapsed ? 'is-collapsed' : '',
                 ].join(' ')}
@@ -344,9 +535,11 @@ function App() {
                       type="button"
                       className={[
                         'person-node',
+                        selectedPersonContext?.person.id === person.id ? 'is-selected' : '',
                         lowerQuery && `${person.name} ${person.role}`.toLowerCase().includes(lowerQuery) ? 'is-match' : '',
                       ].join(' ')}
                       style={{ left: `${person.x * 100}%`, top: `${person.y * 100}%` }}
+                      onPointerDown={(event) => startPersonDrag(event, group, person)}
                     >
                       <span className="person-node__avatar">{person.initials}</span>
                       <span className="person-node__copy">
@@ -373,34 +566,76 @@ function App() {
         </div>
       </section>
 
-      <aside className="inspector-panel" aria-label="Selected circle details">
-        <div>
-          <p className="panel-kicker">Selected circle</p>
-          <h1>{selectedGroup.name}</h1>
-          <p>
-            Move the circle to reorganize the map. Resize it when a real-life context needs more space. People stay
-            attached to their circle.
-          </p>
-        </div>
-        <div className="panel-stats">
-          <span>
-            <strong>{selectedGroup.people.length}</strong>
-            People
-          </span>
-          <span>
-            <strong>{Math.round(selectedGroup.width)}px</strong>
-            Width
-          </span>
-        </div>
-        <div className="people-list">
-          {selectedGroup.people.map((person) => (
-            <button type="button" key={person.id}>
-              <span>{person.initials}</span>
-              <strong>{person.name}</strong>
-              <small>{person.role}</small>
+      <aside className="inspector-panel" aria-label="Selected details">
+        {selectedPersonContext ? (
+          <>
+            <div>
+              <p className="panel-kicker">Person card</p>
+              <h1>{selectedPersonContext.person.name}</h1>
+              <p>
+                This card opens from a person click. Drag the person around the circle, or drop them into another
+                circle to change context.
+              </p>
+            </div>
+            <div className="person-editor">
+              <label>
+                Name
+                <input
+                  value={selectedPersonContext.person.name}
+                  onChange={(event) => updateSelectedPerson({ name: event.target.value })}
+                />
+              </label>
+              <label>
+                Role
+                <input
+                  value={selectedPersonContext.person.role}
+                  onChange={(event) => updateSelectedPerson({ role: event.target.value })}
+                />
+              </label>
+            </div>
+            <button className="panel-secondary-action" type="button" onClick={() => setSelectedPersonId(null)}>
+              Back to {selectedPersonContext.group.name}
             </button>
-          ))}
-        </div>
+          </>
+        ) : (
+          <>
+            <div>
+              <p className="panel-kicker">Selected circle</p>
+              <h1>{selectedGroup.name}</h1>
+              <p>
+                Move the circle to reorganize the map. Resize it when a real-life context needs more space. People stay
+                attached to their circle.
+              </p>
+            </div>
+            <div className="panel-actions">
+              <button type="button" onClick={addPersonToSelectedGroup}>
+                + Add person
+              </button>
+              <button type="button" onClick={addCircleGroup}>
+                + New circle
+              </button>
+            </div>
+            <div className="panel-stats">
+              <span>
+                <strong>{selectedGroup.people.length}</strong>
+                People
+              </span>
+              <span>
+                <strong>{Math.round(selectedGroup.width)}px</strong>
+                Width
+              </span>
+            </div>
+            <div className="people-list">
+              {selectedGroup.people.map((person) => (
+                <button type="button" key={person.id} onClick={() => setSelectedPersonId(person.id)}>
+                  <span>{person.initials}</span>
+                  <strong>{person.name}</strong>
+                  <small>{person.role}</small>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </aside>
 
       <div className="legend-strip" aria-label="Circle legend">
@@ -409,7 +644,10 @@ function App() {
             type="button"
             key={group.id}
             className={`legend-chip legend-chip--${group.tone}${selectedGroupId === group.id ? ' is-active' : ''}`}
-            onClick={() => setSelectedGroupId(group.id)}
+            onClick={() => {
+              setSelectedGroupId(group.id)
+              setSelectedPersonId(null)
+            }}
           >
             {group.name}
           </button>
@@ -424,6 +662,39 @@ function centerOf(group: CircleGroup) {
     x: group.x + group.width / 2,
     y: group.y + group.height / 2,
   }
+}
+
+function getPersonContext(groups: CircleGroup[], personId: string | null) {
+  if (!personId) return null
+
+  for (const group of groups) {
+    const person = group.people.find((entry) => entry.id === personId)
+    if (person) return { group, person }
+  }
+
+  return null
+}
+
+function getWorldPoint(clientX: number, clientY: number, camera: Camera, boardElement: HTMLElement | null) {
+  const rect = boardElement?.getBoundingClientRect()
+  return {
+    x: (clientX - (rect?.left ?? 0) - camera.x) / camera.scale,
+    y: (clientY - (rect?.top ?? 0) - camera.y) / camera.scale,
+  }
+}
+
+function isPointInsideGroup(point: { x: number; y: number }, group: CircleGroup) {
+  return point.x >= group.x && point.x <= group.x + group.width && point.y >= group.y && point.y <= group.y + group.height
+}
+
+function createInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return 'NP'
+  return parts
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase()
 }
 
 function clamp(value: number, min: number, max: number) {
