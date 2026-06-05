@@ -23,11 +23,18 @@ The intended product model is:
 - Circles can be dragged.
 - Circles can be resized from their bottom-right handles.
 - People can be dragged inside their current circle.
-- Dropping a person onto another circle moves them into that circle.
+- People are now global objects with group memberships instead of being owned by exactly one circle.
+- Dropping a person into an overlap auto-attaches every circle containing that point.
+- Dragging a person outside their primary circle expands and warps that circle instead of snapping the person back.
 - Clicking a person opens a person card in the inspector.
 - The person card supports local name and role editing.
+- The person card supports manual membership toggles for every circle.
+- The person card can place a person into any circle without removing their other memberships.
 - The top toolbar and circle inspector can add a person to the selected circle.
 - The top toolbar and circle inspector can create a new empty circle.
+- The circle inspector supports editing the circle name and color.
+- Soft relationship ribbons show relationships without drawing hard person-to-person graph lines.
+- The person card lists soft relationships as navigable relationship cues.
 - The right inspector updates when a circle is selected.
 - Search dims non-matching circles and highlights matching people.
 
@@ -38,6 +45,7 @@ The visual direction is calm and product-focused:
 - light, soft spatial canvas instead of green-black hacker styling
 - subtle dot grid for orientation
 - translucent organic rounded circles inspired by Material You shapes
+- overlapping blobs use translucent fills and multiply blending so the overlap reads as a mixed color
 - restrained color clustering by relationship context
 - compact person nodes that remain readable inside each circle
 
