@@ -57,12 +57,12 @@ const initialPeople: Person[] = [
   { id: 'maria', name: 'Maria', role: 'mom', initials: 'MA', x: -680, y: -88, memberships: ['family'] },
   { id: 'alex', name: 'Alex', role: 'brother', initials: 'AL', x: -565, y: -84, memberships: ['family'] },
   { id: 'nina', name: 'Nina', role: 'cousin', initials: 'NI', x: -612, y: 16, memberships: ['family'] },
-  { id: 'emma', name: 'Emma', role: 'designer', initials: 'EM', x: -330, y: 285, memberships: ['school', 'hackathon'] },
-  { id: 'jonas', name: 'Jonas', role: 'math', initials: 'JO', x: -235, y: 240, memberships: ['school'] },
+  { id: 'emma', name: 'Emma', role: 'designer', initials: 'EM', x: -330, y: 285, memberships: ['school', 'copenhagen'] },
+  { id: 'jonas', name: 'Jonas', role: 'math', initials: 'JO', x: -235, y: 240, memberships: ['school', 'copenhagen'] },
   { id: 'sara', name: 'Sara', role: 'events', initials: 'SA', x: -125, y: 290, memberships: ['school', 'copenhagen'] },
   { id: 'liam', name: 'Liam', role: 'frontend', initials: 'LI', x: -150, y: -120, memberships: ['hackathon'] },
   { id: 'maya', name: 'Maya', role: 'pitch', initials: 'MY', x: 90, y: -116, memberships: ['hackathon', 'copenhagen'] },
-  { id: 'noah', name: 'Noah', role: 'backend', initials: 'NO', x: -5, y: -42, memberships: ['hackathon', 'work'] },
+  { id: 'noah', name: 'Noah', role: 'backend', initials: 'NO', x: -182, y: -42, memberships: ['hackathon', 'work'] },
   { id: 'vera', name: 'Vera', role: 'mentor', initials: 'VE', x: 150, y: 26, memberships: ['hackathon', 'work', 'copenhagen'] },
   { id: 'oliver', name: 'Oliver', role: 'pm', initials: 'OL', x: 265, y: 185, memberships: ['work'] },
   { id: 'freja', name: 'Freja', role: 'data', initials: 'FR', x: 445, y: 145, memberships: ['work', 'copenhagen'] },
@@ -86,6 +86,7 @@ function App() {
   const groupById = useMemo(() => Object.fromEntries(groups.map((group) => [group.id, group])), [groups])
   const lowerQuery = query.trim().toLowerCase()
   const isCollapsed = camera.scale < 0.52
+  const absorbedGroupIds = useMemo(() => getAbsorbedGroupIds(groups, people), [groups, people])
 
   const sharedMemberships = useMemo(
     () => people.filter((person) => person.memberships.length > 1),
@@ -320,7 +321,7 @@ function App() {
         <div className="board-plane" style={{ transform: `translate3d(${camera.x}px, ${camera.y}px, 0) scale(${camera.scale})` }}>
           <svg className="blob-svg" viewBox="-2200 -2200 4400 4400" aria-hidden="true">
             <g className="blob-mix-layer">
-              {groups.map((group) => (
+              {groups.filter((group) => !absorbedGroupIds.has(group.id)).map((group) => (
                 <path
                   key={group.id}
                   className={`blob-path blob-path--${group.tone}${selectedGroupId === group.id ? ' is-selected' : ''}`}
@@ -329,7 +330,7 @@ function App() {
               ))}
             </g>
             <g className="blob-outline-layer">
-              {groups.map((group) => (
+              {groups.filter((group) => !absorbedGroupIds.has(group.id)).map((group) => (
                 <path key={group.id} className={`blob-outline blob-outline--${group.tone}`} d={createBlobPath(group, people)} />
               ))}
             </g>
@@ -345,6 +346,7 @@ function App() {
                   'blob-group',
                   `blob-group--${group.tone}`,
                   selectedGroupId === group.id ? 'is-selected' : '',
+                  absorbedGroupIds.has(group.id) ? 'is-absorbed' : '',
                   matchesGroup ? '' : 'is-muted',
                   isCollapsed ? 'is-collapsed' : '',
                 ].join(' ')}
@@ -482,8 +484,8 @@ function App() {
 }
 
 function createBlobPath(group: BlobGroup, people: Person[]) {
-  const points = Array.from({ length: 28 }, (_, index) => {
-    const angle = (Math.PI * 2 * index) / 28
+  const points = Array.from({ length: 24 }, (_, index) => {
+    const angle = (Math.PI * 2 * index) / 24
     const radius = getSlimeRadius(group, people, angle)
     return {
       x: group.x + Math.cos(angle) * radius,
@@ -512,8 +514,8 @@ function getSlimeRadius(group: BlobGroup, people: Person[], angle: number) {
   const members = people.filter((person) => person.memberships.includes(group.id))
   const baseWave =
     1 +
-    Math.sin(angle * 9 + group.wobble * 8) * 0.075 +
-    Math.sin(angle * 15 + group.wobble * 13) * 0.04
+    Math.sin(angle * 8 + group.wobble * 8) * 0.035 +
+    Math.sin(angle * 13 + group.wobble * 13) * 0.018
   let radius = group.minRadius * baseWave
 
   for (const member of members) {
@@ -523,8 +525,23 @@ function getSlimeRadius(group: BlobGroup, people: Person[], angle: number) {
     if (projection <= 0) continue
 
     const perpendicularDistance = Math.abs(dx * normalX + dy * normalY)
-    const pull = Math.max(0, 1 - perpendicularDistance / 96)
-    radius = Math.max(radius, projection + 58 * pull + 34)
+    const pull = Math.max(0, 1 - perpendicularDistance / 118)
+    radius = Math.max(radius, projection + 50 * pull + 40)
+  }
+
+  const outsiders = people.filter((person) => !person.memberships.includes(group.id))
+  for (const outsider of outsiders) {
+    const dx = outsider.x - group.x
+    const dy = outsider.y - group.y
+    const projection = dx * directionX + dy * directionY
+    if (projection <= group.minRadius * 0.55) continue
+
+    const perpendicularDistance = Math.abs(dx * normalX + dy * normalY)
+    const avoid = Math.max(0, 1 - perpendicularDistance / 126)
+    if (avoid <= 0) continue
+
+    const cap = projection - 64 - avoid * 46
+    radius = Math.min(radius, Math.max(group.minRadius * 0.62, cap))
   }
 
   return radius
@@ -544,6 +561,35 @@ function midpoint(first: { x: number; y: number }, second: { x: number; y: numbe
     x: (first.x + second.x) / 2,
     y: (first.y + second.y) / 2,
   }
+}
+
+function getAbsorbedGroupIds(groups: BlobGroup[], people: Person[]) {
+  const membersByGroup = new Map(
+    groups.map((group) => [
+      group.id,
+      people.filter((person) => person.memberships.includes(group.id)).map((person) => person.id),
+    ]),
+  )
+  const absorbedIds = new Set<string>()
+
+  for (const group of groups) {
+    const members = membersByGroup.get(group.id) ?? []
+    if (members.length === 0) continue
+
+    for (const candidateParent of groups) {
+      if (candidateParent.id === group.id) continue
+      const parentMembers = membersByGroup.get(candidateParent.id) ?? []
+      if (parentMembers.length <= members.length) continue
+
+      const parentMemberSet = new Set(parentMembers)
+      if (members.every((personId) => parentMemberSet.has(personId))) {
+        absorbedIds.add(group.id)
+        break
+      }
+    }
+  }
+
+  return absorbedIds
 }
 
 function getWorldPoint(clientX: number, clientY: number, camera: Camera, boardElement: HTMLElement | null) {

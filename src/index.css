@@ -331,6 +331,27 @@ button {
   opacity: 0.35;
 }
 
+.blob-group.is-absorbed {
+  opacity: 0.58;
+}
+
+.blob-group.is-absorbed .blob-group__drag-layer {
+  width: 154px;
+  height: 82px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.38);
+  transform: translate(-18px, 10px);
+}
+
+.blob-group.is-absorbed .blob-group__title {
+  font-size: 17px;
+}
+
+.blob-group.is-absorbed .blob-group__count {
+  top: 22px;
+  font-size: 11px;
+}
+
 .blob-group__drag-layer {
   position: absolute;
   left: -88px;

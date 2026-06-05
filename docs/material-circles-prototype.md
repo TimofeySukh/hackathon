@@ -26,6 +26,8 @@ The intended product model is:
 - People are now global objects with group memberships instead of being owned by exactly one circle.
 - Dropping a person into an overlap auto-attaches every circle containing that point.
 - Groups are shrink-to-content scalloped slime blobs derived from their member positions, not fixed-diameter circles.
+- A smaller group whose members are fully contained by a larger group is visually absorbed by the larger group.
+- Slime blobs avoid expanding across nearby people who are not members of that group.
 - Dragging a person outside their primary circle pulls and warps that circle instead of snapping the person back.
 - Dragging a circle moves all people with that circle membership.
 - People render as compact avatar-like blobs instead of full pill cards.
