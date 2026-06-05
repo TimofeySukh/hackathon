@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, PointerEvent } from 'react'
 
+import { useAuth } from './lib/useAuth'
+import { supabase } from './lib/supabase'
+import type { PersonNode, Tag } from './lib/graphTypes'
+
 type Tone = 'coral' | 'blue' | 'violet' | 'green' | 'amber'
 
 type BlobGroup = {
@@ -47,19 +51,19 @@ const toneCycle: Tone[] = ['coral', 'blue', 'violet', 'green', 'amber']
 
 const initialGroups: BlobGroup[] = [
   { id: 'family', name: 'Family', tone: 'coral', x: -620, y: -70, minRadius: 96, wobble: 0.28 },
-  { id: 'school', name: 'School', tone: 'blue', x: -250, y: 260, minRadius: 106, wobble: 0.18 },
+  { id: 'school', name: 'School', tone: 'blue', x: -250, y: 155, minRadius: 86, wobble: 0.18 },
   { id: 'hackathon', name: 'Hackathon', tone: 'violet', x: -80, y: -130, minRadius: 112, wobble: 0.34 },
   { id: 'work', name: 'Work', tone: 'green', x: 350, y: 210, minRadius: 104, wobble: 0.24 },
-  { id: 'copenhagen', name: 'Copenhagen', tone: 'amber', x: 360, y: -115, minRadius: 100, wobble: 0.2 },
+  { id: 'copenhagen', name: 'Copenhagen', tone: 'amber', x: 210, y: -80, minRadius: 112, wobble: 0.2 },
 ]
 
 const initialPeople: Person[] = [
   { id: 'maria', name: 'Maria', role: 'mom', initials: 'MA', x: -680, y: -88, memberships: ['family'] },
   { id: 'alex', name: 'Alex', role: 'brother', initials: 'AL', x: -565, y: -84, memberships: ['family'] },
   { id: 'nina', name: 'Nina', role: 'cousin', initials: 'NI', x: -612, y: 16, memberships: ['family'] },
-  { id: 'emma', name: 'Emma', role: 'designer', initials: 'EM', x: -330, y: 285, memberships: ['school', 'copenhagen'] },
-  { id: 'jonas', name: 'Jonas', role: 'math', initials: 'JO', x: -235, y: 240, memberships: ['school', 'copenhagen'] },
-  { id: 'sara', name: 'Sara', role: 'events', initials: 'SA', x: -125, y: 290, memberships: ['school', 'copenhagen'] },
+  { id: 'emma', name: 'Emma', role: 'designer', initials: 'EM', x: -330, y: 190, memberships: ['school', 'copenhagen'] },
+  { id: 'jonas', name: 'Jonas', role: 'math', initials: 'JO', x: -235, y: 135, memberships: ['school', 'copenhagen'] },
+  { id: 'sara', name: 'Sara', role: 'events', initials: 'SA', x: -125, y: 185, memberships: ['school', 'copenhagen'] },
   { id: 'liam', name: 'Liam', role: 'frontend', initials: 'LI', x: -150, y: -120, memberships: ['hackathon'] },
   { id: 'maya', name: 'Maya', role: 'pitch', initials: 'MY', x: 90, y: -116, memberships: ['hackathon', 'copenhagen'] },
   { id: 'noah', name: 'Noah', role: 'backend', initials: 'NO', x: -182, y: -42, memberships: ['hackathon', 'work'] },
@@ -72,6 +76,7 @@ const initialPeople: Person[] = [
 ]
 
 function App() {
+  const { session, status: authStatus, error: authError, signInWithGoogle } = useAuth()
   const boardRef = useRef<HTMLDivElement | null>(null)
   const [groups, setGroups] = useState(initialGroups)
   const [people, setPeople] = useState(initialPeople)
@@ -80,6 +85,8 @@ function App() {
   const [query, setQuery] = useState('')
   const [camera, setCamera] = useState<Camera>({ x: -165, y: -20, scale: 0.72 })
   const [dragState, setDragState] = useState<DragState | null>(null)
+  const [liveDataStatus, setLiveDataStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  const [liveDataMessage, setLiveDataMessage] = useState<string | null>(null)
 
   const selectedGroup = groups.find((group) => group.id === selectedGroupId) ?? groups[0]
   const selectedPerson = people.find((person) => person.id === selectedPersonId) ?? null
@@ -277,6 +284,61 @@ function App() {
     setSelectedGroupId(groupId)
   }
 
+  async function loadExistingBoardReadOnly() {
+    if (!supabase) {
+      setLiveDataStatus('error')
+      setLiveDataMessage('Supabase is not configured for this environment.')
+      return
+    }
+
+    if (!session?.user) {
+      await signInWithGoogle()
+      return
+    }
+
+    setLiveDataStatus('loading')
+    setLiveDataMessage('Loading existing board without writing to the database.')
+
+    try {
+      const boardResult = await supabase
+        .from('boards')
+        .select('id,title')
+        .eq('user_id', session.user.id)
+        .limit(1)
+        .maybeSingle()
+
+      if (boardResult.error) throw boardResult.error
+      if (!boardResult.data) {
+        setLiveDataStatus('error')
+        setLiveDataMessage('No existing board was found for this user.')
+        return
+      }
+
+      const [peopleResult, tagsResult] = await Promise.all([
+        supabase.from('people').select('*').eq('board_id', boardResult.data.id),
+        supabase.from('tags').select('*').eq('user_id', session.user.id),
+      ])
+
+      if (peopleResult.error) throw peopleResult.error
+      if (tagsResult.error) throw tagsResult.error
+
+      const imported = mapExistingBoardToSlimePrototype(
+        (peopleResult.data ?? []) as PersonNode[],
+        (tagsResult.data ?? []) as Tag[],
+      )
+      setGroups(imported.groups)
+      setPeople(imported.people)
+      setSelectedGroupId(imported.groups[0]?.id ?? 'imported')
+      setSelectedPersonId(imported.people[0]?.id ?? null)
+      setCamera({ x: -80, y: -20, scale: 0.72 })
+      setLiveDataStatus('ready')
+      setLiveDataMessage(`Loaded ${imported.people.length} people from existing board. Edits here are local only.`)
+    } catch (error) {
+      setLiveDataStatus('error')
+      setLiveDataMessage(error instanceof Error ? error.message : 'Unable to load existing board.')
+    }
+  }
+
   return (
     <main className="prototype-shell">
       <header className="top-chrome">
@@ -306,6 +368,9 @@ function App() {
           <button type="button" onClick={addCircleGroup}>
             + Circle
           </button>
+          <button type="button" onClick={() => void loadExistingBoardReadOnly()} disabled={liveDataStatus === 'loading'}>
+            {authStatus === 'authenticated' ? 'Use live data' : 'Sign in'}
+          </button>
         </div>
       </header>
 
@@ -328,10 +393,20 @@ function App() {
                   d={createBlobPath(group, people)}
                 />
               ))}
+              {groups.filter((group) => absorbedGroupIds.has(group.id)).map((group) => (
+                <path
+                  key={`${group.id}-inner`}
+                  className={`blob-path blob-path--inner blob-path--${group.tone}${selectedGroupId === group.id ? ' is-selected' : ''}`}
+                  d={createBlobPath(group, people)}
+                />
+              ))}
             </g>
             <g className="blob-outline-layer">
               {groups.filter((group) => !absorbedGroupIds.has(group.id)).map((group) => (
                 <path key={group.id} className={`blob-outline blob-outline--${group.tone}`} d={createBlobPath(group, people)} />
+              ))}
+              {groups.filter((group) => absorbedGroupIds.has(group.id)).map((group) => (
+                <path key={`${group.id}-inner-outline`} className={`blob-outline blob-outline--inner blob-outline--${group.tone}`} d={createBlobPath(group, people)} />
               ))}
             </g>
           </svg>
@@ -447,6 +522,12 @@ function App() {
               <button type="button" onClick={addPersonToSelectedGroup}>+ Add person</button>
               <button type="button" onClick={addCircleGroup}>+ New circle</button>
             </div>
+            <div className="live-data-panel">
+              <button type="button" onClick={() => void loadExistingBoardReadOnly()} disabled={liveDataStatus === 'loading'}>
+                {authStatus === 'authenticated' ? 'Use existing board data' : 'Sign in for existing data'}
+              </button>
+              {liveDataMessage || authError ? <p>{liveDataMessage ?? authError}</p> : null}
+            </div>
             <div className="panel-stats">
               <span><strong>{people.filter((person) => person.memberships.includes(selectedGroup.id)).length}</strong>People</span>
               <span><strong>{sharedMemberships.length}</strong>Shared</span>
@@ -484,8 +565,9 @@ function App() {
 }
 
 function createBlobPath(group: BlobGroup, people: Person[]) {
-  const points = Array.from({ length: 24 }, (_, index) => {
-    const angle = (Math.PI * 2 * index) / 24
+  const pointCount = getAdaptivePointCount(group, people)
+  const points = Array.from({ length: pointCount }, (_, index) => {
+    const angle = (Math.PI * 2 * index) / pointCount
     const radius = getSlimeRadius(group, people, angle)
     return {
       x: group.x + Math.cos(angle) * radius,
@@ -504,6 +586,15 @@ function createBlobPath(group: BlobGroup, people: Person[]) {
 
   segments.push('Z')
   return segments.join(' ')
+}
+
+function getAdaptivePointCount(group: BlobGroup, people: Person[]) {
+  const members = people.filter((person) => person.memberships.includes(group.id))
+  const maxDistance = members.reduce((largestDistance, person) => {
+    return Math.max(largestDistance, Math.hypot(person.x - group.x, person.y - group.y))
+  }, group.minRadius)
+
+  return clamp(Math.round(maxDistance / 18) + members.length * 2 + 14, 20, 52)
 }
 
 function getSlimeRadius(group: BlobGroup, people: Person[], angle: number) {
@@ -590,6 +681,105 @@ function getAbsorbedGroupIds(groups: BlobGroup[], people: Person[]) {
   }
 
   return absorbedIds
+}
+
+function mapExistingBoardToSlimePrototype(sourcePeople: PersonNode[], sourceTags: Tag[]) {
+  const visiblePeople = sourcePeople.filter((person) => !person.is_root)
+  const fallbackGroupId = 'imported-untagged'
+  const usedTagIds = new Set(visiblePeople.map((person) => person.tag_id).filter((tagId): tagId is string => Boolean(tagId)))
+  const importedTags = sourceTags.filter((tag) => usedTagIds.has(tag.id))
+  const groupsSource = importedTags.length > 0
+    ? importedTags
+    : [{ id: fallbackGroupId, name: 'People', color: '#4f7fcf' } as Pick<Tag, 'id' | 'name' | 'color'>]
+
+  const normalizedPositions = normalizeImportedPositions(visiblePeople)
+  const people: Person[] = visiblePeople.map((person, index) => {
+    const position = normalizedPositions.get(person.id) ?? { x: index * 54, y: 0 }
+    const membership = person.tag_id && usedTagIds.has(person.tag_id) ? person.tag_id : groupsSource[0].id
+
+    return {
+      id: person.id,
+      name: person.name.trim() || 'Unnamed person',
+      role: person.is_root ? 'root' : 'contact',
+      initials: createInitials(person.name || 'Unnamed person'),
+      x: position.x,
+      y: position.y,
+      memberships: [membership],
+    }
+  })
+
+  const groups: BlobGroup[] = groupsSource.map((tag, index) => {
+    const members = people.filter((person) => person.memberships.includes(tag.id))
+    const centroid = getCentroid(members)
+    return {
+      id: tag.id,
+      name: tag.name,
+      tone: toneFromColor(tag.color, index),
+      x: centroid.x,
+      y: centroid.y,
+      minRadius: 84 + Math.min(34, members.length * 4),
+      wobble: 0.12 + (index % 4) * 0.06,
+    }
+  })
+
+  return { groups, people }
+}
+
+function normalizeImportedPositions(sourcePeople: PersonNode[]) {
+  const positions = new Map<string, { x: number; y: number }>()
+  if (sourcePeople.length === 0) return positions
+
+  const minX = Math.min(...sourcePeople.map((person) => person.x))
+  const maxX = Math.max(...sourcePeople.map((person) => person.x))
+  const minY = Math.min(...sourcePeople.map((person) => person.y))
+  const maxY = Math.max(...sourcePeople.map((person) => person.y))
+  const centerX = (minX + maxX) / 2
+  const centerY = (minY + maxY) / 2
+  const width = Math.max(1, maxX - minX)
+  const height = Math.max(1, maxY - minY)
+  const scale = Math.min(0.72, 860 / width, 560 / height)
+
+  for (const person of sourcePeople) {
+    positions.set(person.id, {
+      x: (person.x - centerX) * scale,
+      y: (person.y - centerY) * scale,
+    })
+  }
+
+  return positions
+}
+
+function getCentroid(people: Person[]) {
+  if (people.length === 0) return { x: 0, y: 0 }
+  return {
+    x: people.reduce((sum, person) => sum + person.x, 0) / people.length,
+    y: people.reduce((sum, person) => sum + person.y, 0) / people.length,
+  }
+}
+
+function toneFromColor(color: string | undefined, fallbackIndex: number): Tone {
+  if (!color) return toneCycle[fallbackIndex % toneCycle.length]
+
+  const normalized = color.replace('#', '')
+  if (normalized.length !== 6) return toneCycle[fallbackIndex % toneCycle.length]
+
+  const red = Number.parseInt(normalized.slice(0, 2), 16)
+  const green = Number.parseInt(normalized.slice(2, 4), 16)
+  const blue = Number.parseInt(normalized.slice(4, 6), 16)
+  if ([red, green, blue].some((value) => Number.isNaN(value))) return toneCycle[fallbackIndex % toneCycle.length]
+
+  const candidates: Array<{ tone: Tone; rgb: [number, number, number] }> = [
+    { tone: 'coral', rgb: [217, 109, 92] },
+    { tone: 'blue', rgb: [79, 127, 207] },
+    { tone: 'violet', rgb: [118, 87, 201] },
+    { tone: 'green', rgb: [69, 143, 99] },
+    { tone: 'amber', rgb: [185, 128, 45] },
+  ]
+
+  return candidates.reduce((best, candidate) => {
+    const distance = Math.hypot(red - candidate.rgb[0], green - candidate.rgb[1], blue - candidate.rgb[2])
+    return distance < best.distance ? { tone: candidate.tone, distance } : best
+  }, { tone: toneCycle[fallbackIndex % toneCycle.length], distance: Number.POSITIVE_INFINITY }).tone
 }
 
 function getWorldPoint(clientX: number, clientY: number, camera: Camera, boardElement: HTMLElement | null) {

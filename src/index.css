@@ -207,6 +207,14 @@ button {
   cursor: pointer;
 }
 
+.command-group button:disabled,
+.panel-actions button:disabled,
+.panel-secondary-action:disabled,
+.live-data-panel button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
 .command-group button:first-child,
 .panel-actions button:last-child {
   background: #fff;
@@ -252,6 +260,10 @@ button {
   opacity: 0.38;
 }
 
+.blob-path--inner {
+  opacity: 0.18;
+}
+
 .blob-path--coral {
   fill: #ff927f;
 }
@@ -276,6 +288,11 @@ button {
   fill: none;
   stroke-width: 1.8;
   stroke-linejoin: round;
+}
+
+.blob-outline--inner {
+  stroke-width: 2.2;
+  stroke-dasharray: 8 10;
 }
 
 .blob-outline--coral {
@@ -682,6 +699,29 @@ button {
 
 .panel-actions button {
   flex: 1 1 0;
+}
+
+.live-data-panel {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.live-data-panel button {
+  min-height: 38px;
+  border-radius: 999px;
+  background: rgba(38, 53, 46, 0.08);
+  color: #26352e;
+  font-size: 13px;
+  font-weight: 820;
+  cursor: pointer;
+}
+
+.live-data-panel p {
+  margin: 0;
+  color: rgba(24, 35, 31, 0.54);
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .panel-stats {

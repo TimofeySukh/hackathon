@@ -27,6 +27,8 @@ The intended product model is:
 - Dropping a person into an overlap auto-attaches every circle containing that point.
 - Groups are shrink-to-content scalloped slime blobs derived from their member positions, not fixed-diameter circles.
 - A smaller group whose members are fully contained by a larger group is visually absorbed by the larger group.
+- Absorbed groups still render as inner circles/outlines so the subset remains visible inside the larger set.
+- Blob paths use an adaptive point count based on member spread and density.
 - Slime blobs avoid expanding across nearby people who are not members of that group.
 - Dragging a person outside their primary circle pulls and warps that circle instead of snapping the person back.
 - Dragging a circle moves all people with that circle membership.
@@ -39,6 +41,7 @@ The intended product model is:
 - The top toolbar and circle inspector can create a new empty circle.
 - The circle inspector supports editing the circle name and color.
 - Person-to-person relationship lines are intentionally hidden in this prototype iteration.
+- Existing Supabase board data can be loaded through a read-only adapter. It reads existing boards, people, and tags with `select` calls only and does not write, migrate, or persist edits from this prototype UI.
 - The right inspector updates when a circle is selected.
 - Search dims non-matching circles and highlights matching people.
 
