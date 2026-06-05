@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { PointerEvent } from 'react'
+import type { CSSProperties, PointerEvent } from 'react'
 
 type Tone = 'coral' | 'blue' | 'violet' | 'green' | 'amber'
 
@@ -9,8 +9,7 @@ type BlobGroup = {
   tone: Tone
   x: number
   y: number
-  rx: number
-  ry: number
+  minRadius: number
   wobble: number
 }
 
@@ -24,13 +23,6 @@ type Person = {
   memberships: string[]
 }
 
-type Relationship = {
-  from: string
-  to: string
-  label: string
-  strength: number
-}
-
 type Camera = {
   x: number
   y: number
@@ -39,18 +31,26 @@ type Camera = {
 
 type DragState =
   | { type: 'pan'; pointerId: number; startX: number; startY: number; originX: number; originY: number }
-  | { type: 'group'; pointerId: number; groupId: string; startX: number; startY: number; originX: number; originY: number }
-  | { type: 'resize'; pointerId: number; groupId: string; startX: number; startY: number; originRx: number; originRy: number }
+  | {
+      type: 'group'
+      pointerId: number
+      groupId: string
+      startX: number
+      startY: number
+      originX: number
+      originY: number
+      originPeople: Record<string, { x: number; y: number }>
+    }
   | { type: 'person'; pointerId: number; personId: string; startX: number; startY: number; originX: number; originY: number }
 
 const toneCycle: Tone[] = ['coral', 'blue', 'violet', 'green', 'amber']
 
 const initialGroups: BlobGroup[] = [
-  { id: 'family', name: 'Family', tone: 'coral', x: -620, y: -70, rx: 205, ry: 165, wobble: 0.28 },
-  { id: 'school', name: 'School', tone: 'blue', x: -250, y: 260, rx: 235, ry: 170, wobble: 0.18 },
-  { id: 'hackathon', name: 'Hackathon', tone: 'violet', x: -80, y: -130, rx: 270, ry: 185, wobble: 0.34 },
-  { id: 'work', name: 'Work', tone: 'green', x: 350, y: 210, rx: 240, ry: 185, wobble: 0.24 },
-  { id: 'copenhagen', name: 'Copenhagen', tone: 'amber', x: 360, y: -115, rx: 225, ry: 160, wobble: 0.2 },
+  { id: 'family', name: 'Family', tone: 'coral', x: -620, y: -70, minRadius: 96, wobble: 0.28 },
+  { id: 'school', name: 'School', tone: 'blue', x: -250, y: 260, minRadius: 106, wobble: 0.18 },
+  { id: 'hackathon', name: 'Hackathon', tone: 'violet', x: -80, y: -130, minRadius: 112, wobble: 0.34 },
+  { id: 'work', name: 'Work', tone: 'green', x: 350, y: 210, minRadius: 104, wobble: 0.24 },
+  { id: 'copenhagen', name: 'Copenhagen', tone: 'amber', x: 360, y: -115, minRadius: 100, wobble: 0.2 },
 ]
 
 const initialPeople: Person[] = [
@@ -71,19 +71,10 @@ const initialPeople: Person[] = [
   { id: 'mikkel', name: 'Mikkel', role: 'coffee', initials: 'MI', x: 430, y: -88, memberships: ['copenhagen'] },
 ]
 
-const initialRelationships: Relationship[] = [
-  { from: 'maya', to: 'vera', label: 'pitch mentor', strength: 0.9 },
-  { from: 'noah', to: 'oliver', label: 'built together', strength: 0.7 },
-  { from: 'emma', to: 'sara', label: 'events', strength: 0.55 },
-  { from: 'freja', to: 'ida', label: 'data intro', strength: 0.65 },
-  { from: 'vera', to: 'freja', label: 'knows well', strength: 0.62 },
-]
-
 function App() {
   const boardRef = useRef<HTMLDivElement | null>(null)
   const [groups, setGroups] = useState(initialGroups)
   const [people, setPeople] = useState(initialPeople)
-  const [relationships] = useState(initialRelationships)
   const [selectedGroupId, setSelectedGroupId] = useState('hackathon')
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>('maya')
   const [query, setQuery] = useState('')
@@ -93,7 +84,6 @@ function App() {
   const selectedGroup = groups.find((group) => group.id === selectedGroupId) ?? groups[0]
   const selectedPerson = people.find((person) => person.id === selectedPersonId) ?? null
   const groupById = useMemo(() => Object.fromEntries(groups.map((group) => [group.id, group])), [groups])
-  const personById = useMemo(() => Object.fromEntries(people.map((person) => [person.id, person])), [people])
   const lowerQuery = query.trim().toLowerCase()
   const isCollapsed = camera.scale < 0.52
 
@@ -137,15 +127,20 @@ function App() {
     event.currentTarget.setPointerCapture(event.pointerId)
     setSelectedGroupId(group.id)
     setSelectedPersonId(null)
-    setDragState({ type: 'group', pointerId: event.pointerId, groupId: group.id, startX: event.clientX, startY: event.clientY, originX: group.x, originY: group.y })
-  }
-
-  function startResize(event: PointerEvent<HTMLButtonElement>, group: BlobGroup) {
-    event.stopPropagation()
-    event.currentTarget.setPointerCapture(event.pointerId)
-    setSelectedGroupId(group.id)
-    setSelectedPersonId(null)
-    setDragState({ type: 'resize', pointerId: event.pointerId, groupId: group.id, startX: event.clientX, startY: event.clientY, originRx: group.rx, originRy: group.ry })
+    setDragState({
+      type: 'group',
+      pointerId: event.pointerId,
+      groupId: group.id,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: group.x,
+      originY: group.y,
+      originPeople: Object.fromEntries(
+        people
+          .filter((person) => person.memberships.includes(group.id))
+          .map((person) => [person.id, { x: person.x, y: person.y }]),
+      ),
+    })
   }
 
   function startPersonDrag(event: PointerEvent<HTMLButtonElement>, person: Person) {
@@ -167,17 +162,15 @@ function App() {
       const dx = (event.clientX - dragState.startX) / camera.scale
       const dy = (event.clientY - dragState.startY) / camera.scale
       setGroups((current) => current.map((group) => (group.id === dragState.groupId ? { ...group, x: dragState.originX + dx, y: dragState.originY + dy } : group)))
-      return
-    }
-
-    if (dragState.type === 'resize') {
-      const dx = (event.clientX - dragState.startX) / camera.scale
-      const dy = (event.clientY - dragState.startY) / camera.scale
-      setGroups((current) =>
-        current.map((group) =>
-          group.id === dragState.groupId
-            ? { ...group, rx: Math.max(135, dragState.originRx + dx), ry: Math.max(120, dragState.originRy + dy) }
-            : group,
+      setPeople((current) =>
+        current.map((person) =>
+          dragState.originPeople[person.id]
+            ? {
+                ...person,
+                x: dragState.originPeople[person.id].x + dx,
+                y: dragState.originPeople[person.id].y + dy,
+              }
+            : person,
         ),
       )
       return
@@ -194,15 +187,11 @@ function App() {
     if (dragState.type === 'person') {
       const draggedPerson = people.find((person) => person.id === dragState.personId)
       if (draggedPerson) {
-        const containingGroups = groups.filter((group) => isPointInsideBlob(draggedPerson, group)).map((group) => group.id)
-        const nextMemberships = containingGroups.length > 0 ? containingGroups : draggedPerson.memberships
+        const containingGroups = groups.filter((group) => isPointInsideBlob(draggedPerson, group, people)).map((group) => group.id)
+        const nextMemberships = unique([...draggedPerson.memberships, ...containingGroups])
         const primaryGroupId = nextMemberships[0] ?? selectedGroupId
 
         setPeople((current) => current.map((person) => (person.id === draggedPerson.id ? { ...person, memberships: nextMemberships } : person)))
-
-        if (containingGroups.length === 0) {
-          setGroups((current) => current.map((group) => (group.id === primaryGroupId ? expandBlobToInclude(group, draggedPerson) : group)))
-        }
         setSelectedGroupId(primaryGroupId)
       }
     }
@@ -217,8 +206,8 @@ function App() {
       name: `New person ${personNumber}`,
       role: 'new contact',
       initials: createInitials(`New person ${personNumber}`),
-      x: selectedGroup.x + selectedGroup.rx * 0.12,
-      y: selectedGroup.y + selectedGroup.ry * 0.08,
+      x: selectedGroup.x + selectedGroup.minRadius * 0.36,
+      y: selectedGroup.y,
       memberships: [selectedGroup.id],
     }
     setPeople((current) => [...current, person])
@@ -235,8 +224,7 @@ function App() {
       tone: toneCycle[groups.length % toneCycle.length],
       x: centerPoint.x,
       y: centerPoint.y,
-      rx: 190,
-      ry: 145,
+      minRadius: 88,
       wobble: 0.12 + (groups.length % 4) * 0.08,
     }
     setGroups((current) => [...current, group])
@@ -281,20 +269,12 @@ function App() {
     setPeople((current) =>
       current.map((person) =>
         person.id === selectedPerson.id
-          ? { ...person, x: group.x + group.rx * 0.08, y: group.y, memberships: unique([...person.memberships, groupId]) }
+          ? { ...person, x: group.x + group.minRadius * 0.32, y: group.y, memberships: unique([...person.memberships, groupId]) }
           : person,
       ),
     )
     setSelectedGroupId(groupId)
   }
-
-  const visibleRelationships = relationships.filter((relationship) => {
-    if (!selectedPerson) return true
-    return relationship.from === selectedPerson.id || relationship.to === selectedPerson.id
-  })
-  const selectedPersonRelationships = selectedPerson
-    ? relationships.filter((relationship) => relationship.from === selectedPerson.id || relationship.to === selectedPerson.id)
-    : []
 
   return (
     <main className="prototype-shell">
@@ -339,32 +319,18 @@ function App() {
       >
         <div className="board-plane" style={{ transform: `translate3d(${camera.x}px, ${camera.y}px, 0) scale(${camera.scale})` }}>
           <svg className="blob-svg" viewBox="-2200 -2200 4400 4400" aria-hidden="true">
-            <defs>
-              <filter id="soft-ribbon" x="-20%" y="-20%" width="140%" height="140%">
-                <feGaussianBlur stdDeviation="7" />
-              </filter>
-            </defs>
-            <g className="relationship-ribbons">
-              {visibleRelationships.map((relationship) => {
-                const from = personById[relationship.from]
-                const to = personById[relationship.to]
-                if (!from || !to) return null
-                const path = getSoftRelationshipPath(from, to, relationship.strength)
-                return <path key={`${relationship.from}-${relationship.to}`} d={path} />
-              })}
-            </g>
             <g className="blob-mix-layer">
               {groups.map((group) => (
                 <path
                   key={group.id}
                   className={`blob-path blob-path--${group.tone}${selectedGroupId === group.id ? ' is-selected' : ''}`}
-                  d={createBlobPath(group)}
+                  d={createBlobPath(group, people)}
                 />
               ))}
             </g>
             <g className="blob-outline-layer">
               {groups.map((group) => (
-                <path key={group.id} className={`blob-outline blob-outline--${group.tone}`} d={createBlobPath(group)} />
+                <path key={group.id} className={`blob-outline blob-outline--${group.tone}`} d={createBlobPath(group, people)} />
               ))}
             </g>
           </svg>
@@ -388,7 +354,6 @@ function App() {
                   <span className="blob-group__title">{group.name}</span>
                   <span className="blob-group__count">{members.length} people</span>
                 </button>
-                <button className="resize-handle" type="button" style={{ transform: `translate(${group.rx * 0.77}px, ${group.ry * 0.72}px)` }} onPointerDown={(event) => startResize(event, group)} aria-label={`Resize ${group.name}`} />
               </article>
             )
           })}
@@ -405,10 +370,6 @@ function App() {
                 onPointerDown={(event) => startPersonDrag(event, person)}
               >
                 <span className="person-node__avatar" style={getToneStyle(primaryGroup?.tone)}>{person.initials}</span>
-                <span className="person-node__copy">
-                  <strong>{person.name}</strong>
-                  <small>{person.role}</small>
-                </span>
                 <span className="person-node__chips">
                   {person.memberships.slice(0, 3).map((groupId) => {
                     const group = groupById[groupId]
@@ -458,22 +419,6 @@ function App() {
                 </button>
               ))}
             </div>
-            {selectedPersonRelationships.length > 0 ? (
-              <div className="relationship-list" aria-label="Soft relationships">
-                <p className="panel-kicker">Soft relationships</p>
-                {selectedPersonRelationships.map((relationship) => {
-                  const otherPersonId = relationship.from === selectedPerson.id ? relationship.to : relationship.from
-                  const otherPerson = personById[otherPersonId]
-                  if (!otherPerson) return null
-                  return (
-                    <button key={`${relationship.from}-${relationship.to}`} type="button" onClick={() => setSelectedPersonId(otherPerson.id)}>
-                      <span>{relationship.label}</span>
-                      <strong>{otherPerson.name}</strong>
-                    </button>
-                  )
-                })}
-              </div>
-            ) : null}
             <button className="panel-secondary-action" type="button" onClick={() => setSelectedPersonId(null)}>
               Back to circle
             </button>
@@ -536,48 +481,69 @@ function App() {
   )
 }
 
-function createBlobPath(group: BlobGroup) {
-  const { x, y, rx, ry, wobble } = group
-  const top = ry * (1 + wobble * 0.12)
-  const right = rx * (1 - wobble * 0.08)
-  const bottom = ry * (1 - wobble * 0.1)
-  const left = rx * (1 + wobble * 0.1)
-  const c = 0.56
+function createBlobPath(group: BlobGroup, people: Person[]) {
+  const points = Array.from({ length: 28 }, (_, index) => {
+    const angle = (Math.PI * 2 * index) / 28
+    const radius = getSlimeRadius(group, people, angle)
+    return {
+      x: group.x + Math.cos(angle) * radius,
+      y: group.y + Math.sin(angle) * radius,
+    }
+  })
+  const first = midpoint(points[points.length - 1], points[0])
+  const segments = [`M ${first.x} ${first.y}`]
 
-  return [
-    `M ${x} ${y - top}`,
-    `C ${x + right * c} ${y - top * (1 + wobble * 0.18)}, ${x + right * (1 + wobble * 0.12)} ${y - right * 0.3}, ${x + right} ${y}`,
-    `C ${x + right * (1 - wobble * 0.12)} ${y + bottom * c}, ${x + rx * 0.32} ${y + bottom * (1 + wobble * 0.16)}, ${x} ${y + bottom}`,
-    `C ${x - left * c} ${y + bottom * (1 - wobble * 0.12)}, ${x - left * (1 + wobble * 0.18)} ${y + ry * 0.24}, ${x - left} ${y}`,
-    `C ${x - left * (1 - wobble * 0.08)} ${y - top * c}, ${x - rx * 0.34} ${y - top * (1 + wobble * 0.12)}, ${x} ${y - top}`,
-    'Z',
-  ].join(' ')
-}
-
-function isPointInsideBlob(point: { x: number; y: number }, group: BlobGroup) {
-  const dx = (point.x - group.x) / (group.rx * (1 + group.wobble * 0.14))
-  const dy = (point.y - group.y) / (group.ry * (1 + group.wobble * 0.12))
-  return dx * dx + dy * dy <= 1
-}
-
-function expandBlobToInclude(group: BlobGroup, point: { x: number; y: number }) {
-  const dx = Math.abs(point.x - group.x)
-  const dy = Math.abs(point.y - group.y)
-  return {
-    ...group,
-    rx: Math.max(group.rx, dx + 86),
-    ry: Math.max(group.ry, dy + 70),
-    wobble: clamp(group.wobble + 0.05, 0.12, 0.42),
+  for (let index = 0; index < points.length; index += 1) {
+    const current = points[index]
+    const next = points[(index + 1) % points.length]
+    const mid = midpoint(current, next)
+    segments.push(`Q ${current.x} ${current.y} ${mid.x} ${mid.y}`)
   }
+
+  segments.push('Z')
+  return segments.join(' ')
 }
 
-function getSoftRelationshipPath(from: Person, to: Person, strength: number) {
-  const dx = to.x - from.x
-  const dy = to.y - from.y
-  const lift = Math.max(70, Math.hypot(dx, dy) * 0.18) * (strength > 0.7 ? 1 : -1)
-  const midX = (from.x + to.x) / 2
-  const midY = (from.y + to.y) / 2
-  return `M ${from.x} ${from.y} Q ${midX - dy * 0.08} ${midY + lift + dx * 0.05} ${to.x} ${to.y}`
+function getSlimeRadius(group: BlobGroup, people: Person[], angle: number) {
+  const directionX = Math.cos(angle)
+  const directionY = Math.sin(angle)
+  const normalX = -directionY
+  const normalY = directionX
+  const members = people.filter((person) => person.memberships.includes(group.id))
+  const baseWave =
+    1 +
+    Math.sin(angle * 9 + group.wobble * 8) * 0.075 +
+    Math.sin(angle * 15 + group.wobble * 13) * 0.04
+  let radius = group.minRadius * baseWave
+
+  for (const member of members) {
+    const dx = member.x - group.x
+    const dy = member.y - group.y
+    const projection = dx * directionX + dy * directionY
+    if (projection <= 0) continue
+
+    const perpendicularDistance = Math.abs(dx * normalX + dy * normalY)
+    const pull = Math.max(0, 1 - perpendicularDistance / 96)
+    radius = Math.max(radius, projection + 58 * pull + 34)
+  }
+
+  return radius
+}
+
+function isPointInsideBlob(point: { x: number; y: number }, group: BlobGroup, people: Person[]) {
+  const dx = point.x - group.x
+  const dy = point.y - group.y
+  const distance = Math.hypot(dx, dy)
+  if (distance === 0) return true
+  const angle = Math.atan2(dy, dx)
+  return distance <= getSlimeRadius(group, people, angle) + 10
+}
+
+function midpoint(first: { x: number; y: number }, second: { x: number; y: number }) {
+  return {
+    x: (first.x + second.x) / 2,
+    y: (first.y + second.y) / 2,
+  }
 }
 
 function getWorldPoint(clientX: number, clientY: number, camera: Camera, boardElement: HTMLElement | null) {
@@ -589,7 +555,7 @@ function getWorldPoint(clientX: number, clientY: number, camera: Camera, boardEl
 }
 
 function getToneStyle(tone?: Tone) {
-  return tone ? ({ '--person-tone': `var(--tone-${tone})` } as React.CSSProperties) : undefined
+  return tone ? ({ '--person-tone': `var(--tone-${tone})` } as CSSProperties) : undefined
 }
 
 function createInitials(name: string) {

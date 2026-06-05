@@ -244,20 +244,12 @@ button {
   pointer-events: none;
 }
 
-.relationship-ribbons path {
-  fill: none;
-  stroke: rgba(39, 50, 45, 0.22);
-  stroke-width: 26;
-  stroke-linecap: round;
-  filter: url('#soft-ribbon');
-}
-
 .blob-mix-layer {
   mix-blend-mode: multiply;
 }
 
 .blob-path {
-  opacity: 0.34;
+  opacity: 0.38;
 }
 
 .blob-path--coral {
@@ -282,7 +274,8 @@ button {
 
 .blob-outline {
   fill: none;
-  stroke-width: 1.6;
+  stroke-width: 1.8;
+  stroke-linejoin: round;
 }
 
 .blob-outline--coral {
@@ -340,11 +333,11 @@ button {
 
 .blob-group__drag-layer {
   position: absolute;
-  left: -120px;
-  top: -100px;
+  left: -88px;
+  top: -70px;
   z-index: 2;
-  width: 240px;
-  height: 170px;
+  width: 176px;
+  height: 140px;
   border-radius: 50%;
   background: transparent;
   cursor: grab;
@@ -394,16 +387,19 @@ button {
   --person-tone: #26352e;
   position: absolute;
   z-index: 6;
-  display: inline-flex;
-  align-items: center;
-  min-width: 132px;
-  max-width: 178px;
-  min-height: 48px;
-  padding: 6px 10px 6px 6px;
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.86);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: 0 14px 32px rgba(78, 83, 76, 0.14);
+  border-radius: 44% 56% 51% 49% / 46% 42% 58% 54%;
+  background:
+    radial-gradient(circle at 30% 22%, rgba(255, 255, 255, 0.95), transparent 28%),
+    rgba(255, 255, 255, 0.62);
+  box-shadow:
+    0 11px 24px rgba(78, 83, 76, 0.14),
+    inset 0 1px 1px rgba(255, 255, 255, 0.8);
   cursor: grab;
   touch-action: none;
 }
@@ -423,20 +419,18 @@ button {
 .person-node__avatar {
   display: grid;
   flex: 0 0 auto;
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   place-items: center;
-  border-radius: 50%;
+  border-radius: 47% 53% 45% 55% / 52% 44% 56% 48%;
   color: #fff;
   background: var(--person-tone);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 820;
 }
 
 .person-node__copy {
-  min-width: 0;
-  margin-left: 9px;
-  text-align: left;
+  display: none;
 }
 
 .person-node strong,
@@ -462,15 +456,16 @@ button {
 
 .person-node__chips {
   position: absolute;
-  right: 8px;
-  bottom: -5px;
+  left: 50%;
+  bottom: -7px;
   display: flex;
   gap: 2px;
+  transform: translateX(-50%);
 }
 
 .membership-dot {
-  width: 9px;
-  height: 9px;
+  width: 8px;
+  height: 8px;
   border: 1px solid #fff;
   border-radius: 50%;
 }

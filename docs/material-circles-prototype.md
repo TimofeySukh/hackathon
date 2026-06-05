@@ -25,7 +25,10 @@ The intended product model is:
 - People can be dragged inside their current circle.
 - People are now global objects with group memberships instead of being owned by exactly one circle.
 - Dropping a person into an overlap auto-attaches every circle containing that point.
-- Dragging a person outside their primary circle expands and warps that circle instead of snapping the person back.
+- Groups are shrink-to-content scalloped slime blobs derived from their member positions, not fixed-diameter circles.
+- Dragging a person outside their primary circle pulls and warps that circle instead of snapping the person back.
+- Dragging a circle moves all people with that circle membership.
+- People render as compact avatar-like blobs instead of full pill cards.
 - Clicking a person opens a person card in the inspector.
 - The person card supports local name and role editing.
 - The person card supports manual membership toggles for every circle.
@@ -33,8 +36,7 @@ The intended product model is:
 - The top toolbar and circle inspector can add a person to the selected circle.
 - The top toolbar and circle inspector can create a new empty circle.
 - The circle inspector supports editing the circle name and color.
-- Soft relationship ribbons show relationships without drawing hard person-to-person graph lines.
-- The person card lists soft relationships as navigable relationship cues.
+- Person-to-person relationship lines are intentionally hidden in this prototype iteration.
 - The right inspector updates when a circle is selected.
 - Search dims non-matching circles and highlights matching people.
 
