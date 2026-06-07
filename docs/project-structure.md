@@ -68,23 +68,15 @@ The React entry point. It mounts the app into the root DOM node.
 
 ### `src/App.tsx`
 
-Contains the board experience:
+Contains the current visible performance prototype:
 
-- Supabase-backed account controls
-- unsigned local graph state for editing before login
-- LinkedIn archive-request instruction menu and LinkedIn export zip import flow
-- theme state
-- mouse drag navigation state
-- board zoom state
-- top-left tag menu state
-- board viewport and camera state
-- selected-person inspector state
-- people search overlay state
-- persisted social graph node and connection rendering
-- drag node repositioning
-- platform-native modifier drag for node connection creation: `Command` on macOS, `Control` elsewhere
-- theme toggle
-- infinite board surface positioning
+- deterministic 5,000-person orbit generation
+- one Canvas 2D graph rendering layer
+- camera refs for pan and zoom without per-frame React point rendering
+- capped device pixel ratio for high-DPI performance
+- spatial index based hover and click hit testing
+- local generated-person search and centering
+- lightweight React toolbar, stats panel, and selected-person panel
 
 ### `src/lib/`
 
@@ -117,28 +109,24 @@ Supabase browser configuration reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBL
 
 ### `src/index.css`
 
-Contains the complete visual system for:
+Contains the visual system for:
 
-- dark and light themes
-- account controls
-- LinkedIn sync instruction and upload menu
-- people search panel with rounded results and dismissible overlay behavior
-- very dense point-grid background
-- dense board grid styling and layered graph presentation
-- compact graph node styling
-- top-left tag menu and color palette styling
-- graph edge styling and preview connection styling
+- the full-window graph shell
+- canvas overlay chrome
+- search and zoom toolbar controls
+- render statistics panel
+- selected-person detail panel
 - responsive layout behavior
 
 ## Current Technical Shape
 
-The application is intentionally minimal:
+The current visible prototype is intentionally minimal:
 
 - React for state and rendering
 - Vite for development and builds
 - TypeScript for maintainability
 - Supabase for Google auth and private user-owned records
-- Custom CSS-based board rendering
+- Canvas 2D for rendering thousands of graph points in one layer
 
 ## Interaction Model
 
@@ -146,37 +134,16 @@ The board is not an editor yet.
 
 It currently supports:
 
-- Google sign-in and sign-out when Supabase is configured
-- editable unsigned local board state before sign-in
-- one personal board record per signed-in user
-- one immutable root node at `0,0` per signed-in user
-- mouse drag navigation across the canvas
-- one-finger touch drag navigation across the canvas on mobile devices
-- two-finger touch pinch zoom across the canvas on mobile devices, centered on the live pinch midpoint
-- trackpad scroll panning across the canvas
-- cursor-centered zoom with the mouse wheel
-- visual theme switching
-- persistent social graph nodes connected by lines
-- one separate AI summary record per person in the database with `status`, plain-text `summary`, structured JSON data, and sync error state
-- modifier-drag to connect two existing nodes by releasing on another node hit area: `Command` on macOS, `Control` elsewhere
-- modifier-drag to create node growth from any existing node with an immediate connecting line: `Command` on macOS, `Control` elsewhere
-- selected-node detail cards with a large name field, searchable tag selection/creation/deletion, compact auto-saving notes, and person deletion
-- single-click opening for the node-anchored inspector
-- a scrollable top-left tag menu that supports long tag lists and lower-row color palette editing
-- automatic board panning to keep the node-anchored inspector inside the viewport
-- inspector opening at a consistent size regardless of current zoom, then scaling with later zoom changes
-- continued trackpad panning over the inspector when the gesture starts on the board
-- connection line selection with a widened hit target, inline deletion, and Backspace deletion
-- connection line selection is disabled for coarse touch pointers so mobile pan gestures are not interrupted by the delete menu
-- a compact top bar with a capped-width search field, circular tags/account/theme controls, and exclusive overlay behavior
-- a keyboard-first inspector that treats `#tag` in the name field as a tag command and uses one capture textarea for new notes
-- local people search while typing plus natural-language AI search on Enter when signed in
-- drag repositioning for non-root nodes
-- persisted node renaming
-- grid movement through background offset changes
-- mobile-safe control placement with the primary search/account/theme row at the top and the Tags menu docked near the bottom-left edge
+- 5,000 generated people on many orbit rings around the center
+- drawing all generated people every frame on a single canvas layer
+- mouse and touch pointer panning
+- cursor-centered mouse-wheel zoom
+- toolbar zoom and reset controls
+- local search by generated person name or number
+- click selection and hover labels through a spatial hit index
+- stats that report people count, drawn count, last frame time, and renderer
 
-The visual board is simulated by shifting layered CSS backgrounds based on the current camera offset.
+The visible graph is not currently connected to Supabase persistence.
 
 ## Extension Strategy
 

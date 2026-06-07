@@ -1,41 +1,19 @@
 # Hackathon Board
 
-A persisted social graph board built with React, Vite, and TypeScript.
+A social graph board prototype built with React, Vite, TypeScript, and Canvas 2D.
 
 ## Current Experience
 
-- A single central node as the starting point of the graph
-- Create a new node by dragging a connection out from any existing node
-- If you drop on another node, the two existing nodes connect directly
-- Curved lines between connected nodes
-- New nodes appear immediately with an empty inline name field
-- Compact obsidian-like nodes with labels
-- Infinite canvas-style navigation by dragging with the mouse
-- Infinite canvas-style navigation by dragging with one finger on touch devices
-- Infinite canvas-style navigation by scrolling on a trackpad
-- Cursor-centered zoom in and out with the mouse wheel
-- No drawing tools or side panels
-- Theme switcher in the top-right corner
-- Optional Google login through Supabase
-- Editable unsigned local board state before signing in
-- One personal board record for each signed-in user
-- One immutable root node at `0,0` for each signed-in user
-- Persistent people, colored tags, notes, and undirected connections in Supabase
-- Compact top bar with a rounded search field plus circular tags, account, and theme controls that close other overlays when opened
-- The selected inspector tag keeps a visible color accent even when the picker is closed
-- Signed-out users can edit a local in-memory board without a required login
-- Minimal selected-person inspector with a Notion-like large name field, a single-tag chip flow, and keyboard-first note capture
-- Typing `#` inside the name field opens tag selection and removes the `#tag` token from the saved name after applying the tag
-- New notes are captured in one textarea and saved on blur or with `Cmd/Ctrl + Enter`, using the first line as the rendered title
-- Newly created people open their inspector automatically
-- Single-click a person to open that inspector directly on the board
-- Opening the inspector pans the board enough to keep it visible and opens it at a consistent size before later zoom changes affect it
-- Click the widened connection-line target to delete it from the inline menu or with Backspace
-- Drag a person to move them with their connected lines
-- Hold `Command` on macOS, or `Control` on other platforms, and drag a person to create a connection
-- Dark green-black theme inspired by the provided reference
-- Light theme designed to match the same visual language
-- High-contrast point grid across the board
+- A full-window Canvas 2D graph surface
+- 5,000 generated people rendered at once
+- Deterministic orbit layout around the center
+- Pointer drag panning
+- Cursor-centered mouse-wheel zoom
+- Toolbar zoom and reset controls
+- Local generated-person search
+- Click and hover hit testing through a spatial index
+- Lightweight React stats and selected-person panels
+- No visible Supabase, auth, LinkedIn import, notes, AI search, or tag management UI in the current performance prototype
 
 ## Local Development
 
@@ -46,7 +24,9 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open the local or network Vite URL in your browser. Fill in the Supabase values in `.env.local` to enable Google login.
+Open the local or network Vite URL in your browser. The current visible prototype runs without Supabase variables because it generates its 5,000 people locally.
+
+Fill in the Supabase values in `.env.local` only when working on the persisted data layer, MCP data tools, or future screens that use authentication.
 
 If you want the local project MCP server to read and mutate live board data, also create:
 
@@ -101,9 +81,9 @@ For multi-device login, deploy the frontend on one stable server origin and add 
 
 ## Product Direction
 
-This version is intentionally focused on social graph building rather than generic whiteboarding.
+This version is intentionally focused on proving that a dense social graph can load and stay interactive before the product UI is rebuilt around persisted data.
 
-The goal is to make relationship mapping feel clean, compact, and pleasant to grow directly from each node.
+The likely product direction is React for application chrome and a dedicated graph renderer for the graph layer.
 
 ## Documentation
 

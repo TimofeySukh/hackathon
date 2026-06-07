@@ -4,37 +4,21 @@
 
 The repository contains a React, Vite, and TypeScript social graph board app.
 
-Current app behavior:
+Current visible prototype behavior:
 
-- open a full-window board
-- drag with the mouse to move across the point grid
-- drag with one finger on touch devices to move across the point grid
-- pinch with two fingers on touch devices to zoom and pan around the live gesture midpoint while keeping one-finger board panning responsive
-- scroll on a trackpad to pan the board
-- zoom toward the cursor with the mouse wheel
-- switch between dark and light themes
-- persist the selected theme in `localStorage`
-- optionally sign in with Google through Supabase
-- edit an unsigned local in-memory board without a required login
-- open a LinkedIn menu with visual instructions for requesting a LinkedIn data archive
-- sync LinkedIn connections by dragging or selecting a LinkedIn export zip and importing only `Connections.csv`
-- create one personal board record for each signed-in user
-- create one immutable root person at `0,0` for each signed-in user
-- persist people, colored tags, notes, and undirected connections in Supabase
-- open the top-left Tags menu to create tags, rename them, and choose tag colors from presets or a custom picker
-- scroll the top-left Tags menu when the tag list or open color palette exceeds the viewport
-- keep signed-out edits local to the current browser session unless the user signs in
-- allow one separate AI summary row per person in Supabase
-- debounce note create and note update events for 3 seconds before triggering AI enrichment
-- call a Supabase Edge Function that sends person context to Gemini with OpenRouter fallback and rewrites `person_ai_notes`
-- edit the selected person in the node-anchored inspector that opens on single click
-- autosave person names shortly after typing or when the name field loses focus
-- open a people search layer, match locally while typing, and run natural-language AI search on Enter when signed in
-- drag a right-click selection box to select multiple people, then drag one of them to move the group
-- use a mobile layout with the search field and account/theme controls at the top and the Tags control docked near the bottom-left safe area
-- avoid selecting connection lines on coarse touch pointers so mobile board panning does not accidentally open the delete-connection menu
-- simplify some heavy visual effects while dragging and on very dense boards to keep navigation responsive
-- avoid browser-fragile `color-mix()` styling for tag accents and disable heavy blur compositing on Firefox
+- opens a full-window Canvas 2D graph
+- generates 5,000 deterministic people locally
+- places generated people across many orbit rings around the center
+- draws all generated people every frame on one canvas layer
+- caps canvas device pixel ratio to reduce high-DPI fill cost
+- keeps pan, zoom, hover, and search interaction state outside React's render loop where possible
+- pans with pointer drag
+- zooms toward the cursor with the mouse wheel
+- zooms and resets from the top toolbar
+- searches generated people by name or number and centers the matched person
+- uses a spatial index for hover and click hit testing
+- shows lightweight React panels for render stats and selected-person details
+- does not show the Supabase-backed persisted board, auth, LinkedIn import, notes, AI search, or tag management UI in this prototype screen
 
 There is no multiplayer or drawing toolset yet.
 

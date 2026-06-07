@@ -51,6 +51,12 @@ When working on the project:
 - Reported behavior: `npm audit --audit-level=high` fails with 7 reported vulnerabilities, including a high-severity `fast-uri` advisory and moderate advisories in transitive packages such as `brace-expansion`, `hono`, `ip-address`, `qs`, and `ws`.
 - Notes: `npm audit fix` is suggested by npm, but the dependency tree update should be reviewed separately from feature work.
 
+### Production graph renderer is undecided
+
+- Status: Open
+- Reported need: the app needs to support thousands of visible people while loading and interacting smoothly.
+- Notes: the current visible screen is a 5,000-person Canvas 2D performance prototype with generated orbit data. Before rebuilding persisted product flows, decide whether the production graph layer should stay custom Canvas 2D or move to a WebGL graph renderer such as Sigma.js, with React reserved for app chrome.
+
 ## Resolved Problems
 
 No resolved problems are currently documented here.

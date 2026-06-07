@@ -4,22 +4,19 @@
 
 This repository contains a React, Vite, and TypeScript social graph board app.
 
-The current product is intentionally narrow:
+The current visible prototype is intentionally narrow:
 
-- a full-window board surface
-- mouse drag navigation
-- one-finger touch drag navigation on mobile devices
-- a dark/light theme toggle
-- a top-left LinkedIn menu with archive-request instructions and `Connections.csv` zip import
-- a very dense CSS-rendered point grid
-- Supabase-backed Google login
-- editable unsigned local board state when the user is not signed in
-- one personal board record per signed-in user
-- persistent people nodes, reusable colored tags, notes, and undirected connections per signed-in user
-- a top-left Tags menu for creating tags, renaming them, changing tag colors, and toggling tag visibility on the board
-- a node-anchored inspector for editing the selected person that opens on single click
-- a people search layer that matches locally while typing and can run AI search on Enter when signed in
-- no collaboration yet
+- a full-window Canvas 2D graph surface
+- deterministic generation of 5,000 people
+- many orbit rings around the center for repeatable layout stress testing
+- mouse and touch pointer panning
+- cursor-centered mouse-wheel zoom
+- toolbar zoom and reset controls
+- search by generated person name or number
+- hover and selected-person hit testing through a spatial index
+- lightweight stats and selected-person panels rendered by React
+- all graph points rendered imperatively on one canvas layer
+- no visible Supabase, auth, persistence, LinkedIn sync, notes, or collaboration UI in the current prototype screen
 
 ## Active Work
 
@@ -61,7 +58,7 @@ Completed tasks can remain listed here when they explain repository history. Liv
 - `mcp/server.mjs`: local MCP server that exposes project docs and board graph tooling.
 - `scripts/seed-demo-user.mjs`: idempotent demo-data seed for one user's board with reusable people, notes, AI summaries, and connections.
 - `src/main.tsx`: React entry point.
-- `src/App.tsx`: current board behavior.
+- `src/App.tsx`: current 5,000-person canvas performance prototype.
 - `src/lib/supabase.ts`: browser Supabase client configuration.
 - `src/lib/useAuth.ts`: session and Google sign-in state.
 - `src/lib/useBoardGraph.ts`: board graph loading and mutation state.
@@ -79,7 +76,7 @@ Task ownership is tracked in Linear. Code ownership is not split by directory ye
 
 ## Next Steps
 
-- Keep the persisted board interaction stable while product scope is finalized.
+- Keep the 5,000-person performance prototype easy to compare against future graph renderer choices.
 - Check `docs/PROBLEMS.md` before starting work, add newly discovered durable problems, and mark fixed problems as resolved.
 - Link any implementation task or pull request back to the relevant Linear issue.
 - Update `docs/product-vision.md` when product scope changes.
