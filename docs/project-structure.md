@@ -70,21 +70,18 @@ The React entry point. It mounts the app into the root DOM node.
 
 Contains the board experience:
 
-- Supabase-backed account controls
-- unsigned local graph state for editing before login
-- LinkedIn archive-request instruction menu and LinkedIn export zip import flow
-- theme state
-- mouse drag navigation state
-- board zoom state
-- top-left tag menu state
-- board viewport and camera state
-- selected-person inspector state
-- people search overlay state
-- persisted social graph node and connection rendering
-- drag node repositioning
-- platform-native modifier drag for node connection creation: `Command` on macOS, `Control` elsewhere
-- theme toggle
-- infinite board surface positioning
+- local seed graph state for circles and people
+- a central `You` circle
+- external connected circles and nested subset circles
+- circle-center branch creation by dragging a plus handle
+- a creation menu for people, nested subset circles, and external connected circles
+- people as endpoint nodes that cannot create outgoing branches
+- selected-circle and selected-person inspector state
+- local renaming of selected objects
+- demo-person insertion into the selected circle
+- circle-center repositioning for non-root circles
+- pan and zoom camera state
+- curved SVG links between circle centers, circles, and people
 
 ### `src/lib/`
 
@@ -119,15 +116,14 @@ Supabase browser configuration reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBL
 
 Contains the complete visual system for:
 
-- dark and light themes
-- account controls
-- LinkedIn sync instruction and upload menu
-- people search panel with rounded results and dismissible overlay behavior
-- very dense point-grid background
-- dense board grid styling and layered graph presentation
-- compact graph node styling
-- top-left tag menu and color palette styling
-- graph edge styling and preview connection styling
+- the light grid board surface
+- dashed relationship circle boundaries
+- circle center nodes and branch handles
+- compact person tiles
+- curved graph edge styling and draft connection styling
+- top toolbar controls
+- creation menu
+- selected-item inspector
 - responsive layout behavior
 
 ## Current Technical Shape
@@ -137,46 +133,31 @@ The application is intentionally minimal:
 - React for state and rendering
 - Vite for development and builds
 - TypeScript for maintainability
-- Supabase for Google auth and private user-owned records
-- Custom CSS-based board rendering
+- local browser-session state for the visible prototype
+- existing Supabase data-layer files remain available for future persisted product work
 
 ## Interaction Model
 
-The board is not an editor yet.
+The branch is a local interface prototype, not a persisted editor yet.
 
 It currently supports:
 
-- Google sign-in and sign-out when Supabase is configured
-- editable unsigned local board state before sign-in
-- one personal board record per signed-in user
-- one immutable root node at `0,0` per signed-in user
-- mouse drag navigation across the canvas
-- one-finger touch drag navigation across the canvas on mobile devices
-- two-finger touch pinch zoom across the canvas on mobile devices, centered on the live pinch midpoint
-- trackpad scroll panning across the canvas
+- a central root circle named `You`
+- seeded connected group circles
+- seeded nested subset circles
+- seeded people inside circles and subsets
+- creating a person by dragging from a circle-center plus handle and choosing the person option
+- creating a nested subset circle by dragging from a circle-center plus handle and choosing the subset option
+- creating a connected external circle by dragging from a circle-center plus handle and choosing the external circle option
+- selecting and renaming circles or people in the inspector
+- adding three demo people to the selected circle
+- moving non-root circle centers
+- mouse drag navigation across empty board space
 - cursor-centered zoom with the mouse wheel
-- visual theme switching
-- persistent social graph nodes connected by lines
-- one separate AI summary record per person in the database with `status`, plain-text `summary`, structured JSON data, and sync error state
-- modifier-drag to connect two existing nodes by releasing on another node hit area: `Command` on macOS, `Control` elsewhere
-- modifier-drag to create node growth from any existing node with an immediate connecting line: `Command` on macOS, `Control` elsewhere
-- selected-node detail cards with a large name field, searchable tag selection/creation/deletion, compact auto-saving notes, and person deletion
-- single-click opening for the node-anchored inspector
-- a scrollable top-left tag menu that supports long tag lists and lower-row color palette editing
-- automatic board panning to keep the node-anchored inspector inside the viewport
-- inspector opening at a consistent size regardless of current zoom, then scaling with later zoom changes
-- continued trackpad panning over the inspector when the gesture starts on the board
-- connection line selection with a widened hit target, inline deletion, and Backspace deletion
-- connection line selection is disabled for coarse touch pointers so mobile pan gestures are not interrupted by the delete menu
-- a compact top bar with a capped-width search field, circular tags/account/theme controls, and exclusive overlay behavior
-- a keyboard-first inspector that treats `#tag` in the name field as a tag command and uses one capture textarea for new notes
-- local people search while typing plus natural-language AI search on Enter when signed in
-- drag repositioning for non-root nodes
-- persisted node renaming
-- grid movement through background offset changes
-- mobile-safe control placement with the primary search/account/theme row at the top and the Tags menu docked near the bottom-left edge
+- toolbar zoom buttons and reset
+- local state only for the current browser session
 
-The visual board is simulated by shifting layered CSS backgrounds based on the current camera offset.
+The visual board uses CSS grid backgrounds, React DOM nodes for graph objects, and SVG paths for links.
 
 ## Extension Strategy
 

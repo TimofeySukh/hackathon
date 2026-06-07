@@ -1,41 +1,21 @@
 # Hackathon Board
 
-A persisted social graph board built with React, Vite, and TypeScript.
+A local social circle graph prototype built with React, Vite, and TypeScript.
 
 ## Current Experience
 
-- A single central node as the starting point of the graph
-- Create a new node by dragging a connection out from any existing node
-- If you drop on another node, the two existing nodes connect directly
-- Curved lines between connected nodes
-- New nodes appear immediately with an empty inline name field
-- Compact obsidian-like nodes with labels
-- Infinite canvas-style navigation by dragging with the mouse
-- Infinite canvas-style navigation by dragging with one finger on touch devices
-- Infinite canvas-style navigation by scrolling on a trackpad
-- Cursor-centered zoom in and out with the mouse wheel
-- No drawing tools or side panels
-- Theme switcher in the top-right corner
-- Optional Google login through Supabase
-- Editable unsigned local board state before signing in
-- One personal board record for each signed-in user
-- One immutable root node at `0,0` for each signed-in user
-- Persistent people, colored tags, notes, and undirected connections in Supabase
-- Compact top bar with a rounded search field plus circular tags, account, and theme controls that close other overlays when opened
-- The selected inspector tag keeps a visible color accent even when the picker is closed
-- Signed-out users can edit a local in-memory board without a required login
-- Minimal selected-person inspector with a Notion-like large name field, a single-tag chip flow, and keyboard-first note capture
-- Typing `#` inside the name field opens tag selection and removes the `#tag` token from the saved name after applying the tag
-- New notes are captured in one textarea and saved on blur or with `Cmd/Ctrl + Enter`, using the first line as the rendered title
-- Newly created people open their inspector automatically
-- Single-click a person to open that inspector directly on the board
-- Opening the inspector pans the board enough to keep it visible and opens it at a consistent size before later zoom changes affect it
-- Click the widened connection-line target to delete it from the inline menu or with Backspace
-- Drag a person to move them with their connected lines
-- Hold `Command` on macOS, or `Control` on other platforms, and drag a person to create a connection
-- Dark green-black theme inspired by the provided reference
-- Light theme designed to match the same visual language
-- High-contrast point grid across the board
+- A central `You` circle as the source of the relationship map
+- Larger connected circles around the center for groups such as friends, market, and Pandora
+- Nested subset circles inside a parent circle, including a product-team subset inside Pandora
+- People placed either directly inside a circle or inside a nested subset
+- Curved visual links from circle centers to connected circles and people
+- Drag the small plus handle from a circle center to create a person, a nested subset circle, or a connected external circle
+- People are endpoints; only circle centers can create new outgoing branches
+- Select circles or people to inspect and rename them
+- Add three demo people to the selected circle from the inspector
+- Drag non-root circle centers to reposition circles
+- Pan the board by dragging empty space and zoom with the mouse wheel or toolbar
+- Local browser-session state only; no backend, database, auth, or Supabase calls are used by this prototype screen
 
 ## Local Development
 
@@ -46,7 +26,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open the local or network Vite URL in your browser. Fill in the Supabase values in `.env.local` to enable Google login.
+Open the local or network Vite URL in your browser. This branch's visible prototype runs entirely locally and does not require Supabase values.
 
 If you want the local project MCP server to read and mutate live board data, also create:
 

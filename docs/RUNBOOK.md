@@ -4,37 +4,22 @@
 
 The repository contains a React, Vite, and TypeScript social graph board app.
 
-Current app behavior:
+Current visible prototype behavior:
 
-- open a full-window board
-- drag with the mouse to move across the point grid
-- drag with one finger on touch devices to move across the point grid
-- pinch with two fingers on touch devices to zoom and pan around the live gesture midpoint while keeping one-finger board panning responsive
-- scroll on a trackpad to pan the board
-- zoom toward the cursor with the mouse wheel
-- switch between dark and light themes
-- persist the selected theme in `localStorage`
-- optionally sign in with Google through Supabase
-- edit an unsigned local in-memory board without a required login
-- open a LinkedIn menu with visual instructions for requesting a LinkedIn data archive
-- sync LinkedIn connections by dragging or selecting a LinkedIn export zip and importing only `Connections.csv`
-- create one personal board record for each signed-in user
-- create one immutable root person at `0,0` for each signed-in user
-- persist people, colored tags, notes, and undirected connections in Supabase
-- open the top-left Tags menu to create tags, rename them, and choose tag colors from presets or a custom picker
-- scroll the top-left Tags menu when the tag list or open color palette exceeds the viewport
-- keep signed-out edits local to the current browser session unless the user signs in
-- allow one separate AI summary row per person in Supabase
-- debounce note create and note update events for 3 seconds before triggering AI enrichment
-- call a Supabase Edge Function that sends person context to Gemini with OpenRouter fallback and rewrites `person_ai_notes`
-- edit the selected person in the node-anchored inspector that opens on single click
-- autosave person names shortly after typing or when the name field loses focus
-- open a people search layer, match locally while typing, and run natural-language AI search on Enter when signed in
-- drag a right-click selection box to select multiple people, then drag one of them to move the group
-- use a mobile layout with the search field and account/theme controls at the top and the Tags control docked near the bottom-left safe area
-- avoid selecting connection lines on coarse touch pointers so mobile board panning does not accidentally open the delete-connection menu
-- simplify some heavy visual effects while dragging and on very dense boards to keep navigation responsive
-- avoid browser-fragile `color-mix()` styling for tag accents and disable heavy blur compositing on Firefox
+- opens a full-window relationship circle graph
+- starts with `You` as the central source circle
+- includes seeded connected circles for EU friends, Pandora, and a market circle
+- includes a nested product-team subset inside Pandora
+- draws curved links from circle centers to circles and people
+- creates people, nested subset circles, or external connected circles by dragging from a circle-center plus handle
+- keeps people as endpoints and circle centers as the only branch-creation sources
+- selects and renames circles or people in the inspector
+- adds three demo people to the selected circle
+- moves non-root circle centers by dragging their center node
+- pans by dragging empty board space
+- zooms toward the cursor with the mouse wheel and through the toolbar
+- stores all visible prototype state only in the current browser session
+- does not call Supabase, auth, database persistence, LinkedIn import, notes, or AI search from the visible screen
 
 There is no multiplayer or drawing toolset yet.
 
@@ -46,7 +31,7 @@ Install dependencies from the lockfile:
 npm ci
 ```
 
-Copy the local environment example and fill in the Supabase project values:
+The visible prototype does not require Supabase environment variables. Copy the local environment example only when working on the existing persisted data layer or MCP data tools:
 
 ```bash
 cp .env.example .env.local

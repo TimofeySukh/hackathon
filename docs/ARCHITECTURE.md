@@ -2,15 +2,14 @@
 
 ## Current Boundaries
 
-The repository currently has a single-screen frontend architecture.
+The repository currently has a single-screen frontend prototype architecture.
 
 Runtime boundaries:
 
-- React owns UI state and rendering.
+- React owns the visible graph prototype state and rendering.
 - Vite owns local development and production bundling.
-- CSS owns the visual board surface, theme tokens, and responsive layout.
-- The browser owns theme persistence through `localStorage`.
-- The browser owns unsigned local graph state for users who have not signed in.
+- CSS owns the visual board surface, graph styling, panel styling, and responsive layout.
+- The browser owns in-memory graph state for the current session.
 - Supabase owns Google authentication and user-owned graph records.
 - Supabase Edge Functions own server-side AI provider calls for AI note enrichment and people search.
 - Gemini owns the primary LLM execution path for structured summary generation and natural-language people search ranking.
@@ -19,13 +18,12 @@ Runtime boundaries:
 - Linear owns task state, status, ownership, priority, and blockers.
 - `docs/` owns durable product and repository knowledge.
 
-The backend boundary remains intentionally narrow: Supabase Auth provides identity, Supabase Postgres stores one private board plus its graph data for each signed-in user, and Supabase Edge Functions call Gemini/OpenRouter without exposing provider API keys to the browser.
+The visible circle graph demo does not call Supabase or any backend. The existing data layer remains in the repository for persisted product work, but this branch's prototype screen is intentionally local-only.
 
 ## Current Frontend Shape
 
 - `src/main.tsx` mounts the React app.
-- `src/App.tsx` contains the board interaction model, unsigned local graph state, and selected-person inspector.
-- `src/App.tsx` also contains the people search overlay with local matching while typing and signed-in AI search on Enter.
+- `src/App.tsx` contains the local circle graph demo, including seed circles, people, pan and zoom camera state, circle-center branch creation, creation menu state, circle movement, and selected-item inspector state.
 - `src/lib/supabase.ts` creates the browser Supabase client from Vite environment variables.
 - `src/lib/useAuth.ts` owns session loading, Google sign-in, and sign-out.
 - `src/lib/useBoardGraph.ts` owns board graph loading, frontend mutation state, and debounced AI note refresh scheduling.
@@ -35,38 +33,36 @@ The backend boundary remains intentionally narrow: Supabase Auth provides identi
 - `supabase/functions/_shared/ai.ts` calls Gemini first and falls back to OpenRouter for structured AI responses.
 - `supabase/functions/sync-person-ai-note/index.ts` authenticates the caller, loads person context, calls the shared AI provider layer, and upserts `person_ai_notes`.
 - `supabase/functions/search-people-ai/index.ts` authenticates the caller, builds candidate context, calls the shared AI provider layer, and returns ranked people.
-- `src/index.css` contains the full visual system.
+- `src/index.css` contains the visible circle graph prototype styling, including the grid board, dashed circle boundaries, node controls, creation menu, toolbar, and inspector.
 
-The board is simulated by shifting layered CSS backgrounds according to a camera offset. The app does not store board objects or draw on a canvas element.
+The board is rendered with React DOM elements for nodes and dashed circle boundaries, plus SVG paths for curved links. The local camera transforms a world layer for pan and zoom.
 
 ## Current Product Boundaries
 
-The product is a navigable board foundation, not a whiteboard editor.
+The current branch is a navigable circle graph prototype, not a production persistence flow.
 
 Current scope:
 
-- mouse drag navigation
-- trackpad scroll panning
+- central `You` circle
+- connected external circles
+- nested subset circles inside parent circles
+- people inside circles and subsets
+- branch creation by dragging from a circle-center plus handle
+- a create menu for adding a person, nested subset circle, or connected external circle
+- circle and person selection
+- local renaming in the inspector
+- moving non-root circle centers
+- mouse drag navigation on empty space
 - cursor-centered mouse-wheel zoom
-- two-finger touch pinch zoom with gesture-midpoint anchoring
-- dark/light theme switching
-- very dense point-grid spatial reference
-- Google sign-in through Supabase
-- editable unsigned local graph state before sign-in
-- one private personal board record per signed-in user
-- one immutable root person at `0,0` for each signed-in user
-- persistent people nodes with saved coordinates
-- one reusable user-owned tag per person
-- multiple notes per person
-- at most one separate AI summary record per person with a top-level text summary plus structured JSON fields
-- undirected person-to-person connections
-- a people search overlay over names, tags, notes, and AI-generated search explanations
+- local browser-session state only
 
 Out of scope for the current version:
 
-- drawing tools
-- sticky notes or cards
-- camera state persistence
+- database persistence
+- authentication
+- Supabase writes
+- LinkedIn import
+- notes and AI search
 - multiplayer collaboration
 
 ## Invariants
