@@ -11,12 +11,13 @@ The current visible prototype is intentionally narrow:
 - seeded connected circles and nested subset circles
 - people placed inside parent circles or subsets
 - curved SVG links from circle centers to people and circles
-- branch creation by dragging from a circle-center plus handle
+- branch creation from a circle context menu or Shift-drag from a circle center
 - a create menu for choosing person, nested subset circle, or external connected circle
 - direct dragging for people and circle centers
 - circle subtree movement for contained people and nested circles
-- circle resizing from a boundary handle
-- automatic containment expansion through nested parent chains
+- circle resizing by dragging the circle edge
+- automatic containment fit, including shrink-back, through nested parent chains
+- in-page help text for the prototype controls
 - selection and renaming through a right-side inspector
 - local pan and zoom
 - browser-session-only state

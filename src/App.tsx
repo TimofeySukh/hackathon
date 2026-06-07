@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react'
+import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react'
 
 type CircleTone = 'blue' | 'red' | 'green' | 'amber' | 'violet'
 
@@ -10,6 +10,7 @@ type CircleNode = {
   x: number
   y: number
   radius: number
+  minRadius: number
   parentId: string | null
   connectedTo: string | null
   tone: CircleTone
@@ -97,6 +98,7 @@ const MIN_SCALE = 0.35
 const MAX_SCALE = 1.8
 const CONNECT_THRESHOLD = 40
 const MIN_CIRCLE_RADIUS = 72
+const EDGE_RESIZE_HIT_SIZE = 18
 const PERSON_CONTAINMENT_RADIUS = 62
 const CIRCLE_CONTAINMENT_PADDING = 28
 const DEFAULT_STATE: GraphState = {
@@ -108,6 +110,7 @@ const DEFAULT_STATE: GraphState = {
       x: 0,
       y: 0,
       radius: 126,
+      minRadius: 126,
       parentId: null,
       connectedTo: null,
       tone: 'blue',
@@ -119,6 +122,7 @@ const DEFAULT_STATE: GraphState = {
       x: 36,
       y: -430,
       radius: 250,
+      minRadius: 250,
       parentId: null,
       connectedTo: 'you',
       tone: 'blue',
@@ -130,6 +134,7 @@ const DEFAULT_STATE: GraphState = {
       x: -48,
       y: 450,
       radius: 270,
+      minRadius: 270,
       parentId: null,
       connectedTo: 'you',
       tone: 'red',
@@ -141,6 +146,7 @@ const DEFAULT_STATE: GraphState = {
       x: -56,
       y: 535,
       radius: 78,
+      minRadius: 78,
       parentId: 'pandora',
       connectedTo: 'pandora',
       tone: 'blue',
@@ -152,6 +158,7 @@ const DEFAULT_STATE: GraphState = {
       x: 510,
       y: 72,
       radius: 236,
+      minRadius: 236,
       parentId: null,
       connectedTo: 'you',
       tone: 'green',
@@ -311,7 +318,7 @@ function App() {
     })
   }
 
-  function startConnector(event: ReactPointerEvent<HTMLButtonElement>, circle: CircleNode) {
+  function startConnector(event: ReactPointerEvent<HTMLElement>, circle: CircleNode) {
     event.preventDefault()
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -326,8 +333,7 @@ function App() {
     })
   }
 
-  function startCircleMove(event: ReactPointerEvent<HTMLButtonElement>, circle: CircleNode) {
-    if (event.altKey) return
+  function startCircleMove(event: ReactPointerEvent<HTMLElement>, circle: CircleNode) {
     event.preventDefault()
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -339,6 +345,45 @@ function App() {
       originX: circle.x,
       originY: circle.y,
     }
+  }
+
+  function startCircleCenterDrag(event: ReactPointerEvent<HTMLButtonElement>, circle: CircleNode) {
+    if (event.shiftKey) {
+      startConnector(event, circle)
+      return
+    }
+
+    startCircleMove(event, circle)
+  }
+
+  function startCircleSurfaceDrag(event: ReactPointerEvent<HTMLElement>, circle: CircleNode) {
+    if (event.button !== 0) return
+
+    const world = screenToWorld({ x: event.clientX, y: event.clientY })
+    const distanceFromCenter = Math.hypot(world.x - circle.x, world.y - circle.y)
+    const edgeHitSize = EDGE_RESIZE_HIT_SIZE / camera.scale
+
+    if (Math.abs(distanceFromCenter - circle.radius) <= edgeHitSize) {
+      startCircleResize(event, circle)
+      return
+    }
+
+    setSelectedItem({ type: 'circle', id: circle.id })
+    startCircleMove(event, circle)
+  }
+
+  function openCircleCreateMenu(event: ReactMouseEvent<HTMLElement>, circle: CircleNode) {
+    event.preventDefault()
+    event.stopPropagation()
+    const world = screenToWorld({ x: event.clientX, y: event.clientY })
+    setSelectedItem({ type: 'circle', id: circle.id })
+    setCreateMenu({
+      sourceCircleId: circle.id,
+      x: world.x,
+      y: world.y,
+      screenX: event.clientX,
+      screenY: event.clientY,
+    })
   }
 
   function startPersonMove(event: ReactPointerEvent<HTMLButtonElement>, person: PersonNode) {
@@ -357,7 +402,7 @@ function App() {
     }
   }
 
-  function startCircleResize(event: ReactPointerEvent<HTMLButtonElement>, circle: CircleNode) {
+  function startCircleResize(event: ReactPointerEvent<HTMLElement>, circle: CircleNode) {
     event.preventDefault()
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -417,6 +462,7 @@ function App() {
             x: createMenu.x,
             y: createMenu.y,
             radius: isNested ? 82 : 190,
+            minRadius: isNested ? 82 : 190,
             parentId: isNested ? source.id : null,
             connectedTo: source.id,
             tone: isNested ? 'violet' : nextTone(current.circles.length),
@@ -488,6 +534,15 @@ function App() {
         </div>
       </div>
 
+      <section className="help-panel" aria-label="How to use the prototype">
+        <strong>How it works</strong>
+        <span>Drag people or circles to move them.</span>
+        <span>Grab a circle edge to resize it.</span>
+        <span>Right-click a circle to add a person, subset, or connected circle.</span>
+        <span>Shift-drag from a circle center to create from the center.</span>
+        <span>Parent circles auto-fit their contents.</span>
+      </section>
+
       <div
         ref={surfaceRef}
         className="graph-surface"
@@ -523,45 +578,23 @@ function App() {
                 height: circle.radius * 2,
                 transform: `translate(${circle.x - circle.radius}px, ${circle.y - circle.radius}px)`,
               }}
-              onPointerDown={(event) => {
-                event.stopPropagation()
-                setSelectedItem({ type: 'circle', id: circle.id })
-              }}
+              onContextMenu={(event) => openCircleCreateMenu(event, circle)}
+              onPointerDown={(event) => startCircleSurfaceDrag(event, circle)}
             >
               <span className="circle__label">{circle.name}</span>
               <button
                 type="button"
                 className="circle-center"
                 style={{ left: circle.radius, top: circle.radius }}
-                onPointerDown={(event) => startCircleMove(event, circle)}
+                onPointerDown={(event) => startCircleCenterDrag(event, circle)}
                 onClick={(event) => {
                   event.stopPropagation()
                   setSelectedItem({ type: 'circle', id: circle.id })
                 }}
                 aria-label={`Select ${circle.name}`}
-                title="Drag to move this circle and its contents"
+                title="Drag to move. Shift-drag to create from this center."
               >
                 {circle.icon}
-              </button>
-              <button
-                type="button"
-                className="connector-handle"
-                style={{ left: circle.radius + 34, top: circle.radius - 8 }}
-                onPointerDown={(event) => startConnector(event, circle)}
-                aria-label={`Drag from ${circle.name} to create a person or circle`}
-                title="Drag to create"
-              >
-                <PlusIcon />
-              </button>
-              <button
-                type="button"
-                className="resize-handle"
-                style={{ left: circle.radius * 1.68, top: circle.radius * 1.68 }}
-                onPointerDown={(event) => startCircleResize(event, circle)}
-                aria-label={`Resize ${circle.name}`}
-                title="Drag to resize"
-              >
-                <ResizeIcon />
               </button>
             </section>
           ))}
@@ -645,7 +678,7 @@ function App() {
             </div>
           </dl>
         ) : null}
-        <p>Drag people or circle centers directly. Parent circles expand automatically when contained people or subset circles cross their boundary.</p>
+        <p>Drag objects directly. Right-click a circle for creation actions. Parent circles auto-fit as contained objects move.</p>
       </aside>
     </main>
   )
@@ -688,7 +721,9 @@ function resizeCircleFromPoint(state: GraphState, circleId: string, point: { x: 
   const requestedRadius = Math.max(MIN_CIRCLE_RADIUS, Math.hypot(point.x - circle.x, point.y - circle.y))
   return ensureContainment({
     ...state,
-    circles: state.circles.map((candidate) => (candidate.id === circleId ? { ...candidate, radius: requestedRadius } : candidate)),
+    circles: state.circles.map((candidate) =>
+      candidate.id === circleId ? { ...candidate, minRadius: requestedRadius, radius: requestedRadius } : candidate,
+    ),
   })
 }
 
@@ -701,7 +736,7 @@ function ensureContainment(state: GraphState): GraphState {
 
     const nextCircles = circles.map((circle) => {
       const requiredRadius = getRequiredCircleRadius(circle, circles, circlesById, state.people)
-      if (requiredRadius <= circle.radius) return circle
+      if (requiredRadius === circle.radius) return circle
 
       changed = true
       return { ...circle, radius: requiredRadius }
@@ -720,7 +755,7 @@ function getRequiredCircleRadius(
   circlesById: Map<string, CircleNode>,
   people: PersonNode[],
 ) {
-  let requiredRadius = Math.max(MIN_CIRCLE_RADIUS, circle.radius)
+  let requiredRadius = Math.max(MIN_CIRCLE_RADIUS, circle.minRadius)
 
   for (const person of people) {
     if (person.circleId !== circle.id) continue
@@ -805,14 +840,6 @@ function ResetIcon() {
   )
 }
 
-function PlusIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 5v14M5 12h14" />
-    </svg>
-  )
-}
-
 function PersonIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -835,15 +862,6 @@ function CircleIcon() {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="12" cy="12" r="8" />
       <path d="M4 12h16" />
-    </svg>
-  )
-}
-
-function ResizeIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M8 16h8V8" />
-      <path d="M16 8 7 17" />
     </svg>
   )
 }

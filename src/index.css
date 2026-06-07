@@ -81,6 +81,7 @@ svg {
 
 .brand,
 .toolbar__group,
+.help-panel,
 .inspector,
 .create-menu {
   border: 1px solid var(--panel-border);
@@ -126,9 +127,7 @@ svg {
   pointer-events: auto;
 }
 
-.toolbar__group button,
-.connector-handle,
-.resize-handle {
+.toolbar__group button {
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -145,10 +144,36 @@ svg {
   background: rgba(28, 37, 40, 0.07);
 }
 
+.help-panel {
+  position: absolute;
+  z-index: 9;
+  left: 16px;
+  bottom: 16px;
+  display: grid;
+  width: min(330px, calc(100vw - 32px));
+  gap: 6px;
+  border-radius: 14px;
+  padding: 14px 16px;
+  color: #1c2528;
+  pointer-events: none;
+}
+
+.help-panel strong {
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.help-panel span {
+  color: rgba(28, 37, 40, 0.68);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
 .toolbar svg,
-.create-menu svg,
-.connector-handle svg,
-.resize-handle svg {
+.create-menu svg {
   width: 19px;
   height: 19px;
   fill: none;
@@ -218,7 +243,12 @@ svg {
   border-radius: 50%;
   background: color-mix(in srgb, var(--circle-color) 4%, transparent);
   transform-origin: 0 0;
-  pointer-events: none;
+  cursor: grab;
+  pointer-events: auto;
+}
+
+.circle:active {
+  cursor: grabbing;
 }
 
 .circle--red {
@@ -260,7 +290,7 @@ svg {
   text-overflow: ellipsis;
   white-space: nowrap;
   box-shadow: 0 8px 20px rgba(28, 37, 40, 0.09);
-  pointer-events: auto;
+  pointer-events: none;
 }
 
 .circle-center {
@@ -284,47 +314,6 @@ svg {
 
 .circle-center:active {
   cursor: grabbing;
-}
-
-.connector-handle {
-  position: absolute;
-  width: 26px;
-  height: 26px;
-  transform: translate(-50%, -50%);
-  border: 2px solid #fff;
-  border-radius: 50%;
-  background: #111827;
-  color: #fff;
-  box-shadow: 0 10px 20px rgba(28, 37, 40, 0.2);
-  pointer-events: auto;
-}
-
-.connector-handle:hover {
-  background: #2563eb;
-}
-
-.resize-handle {
-  position: absolute;
-  width: 24px;
-  height: 24px;
-  transform: translate(-50%, -50%);
-  border: 2px solid #fff;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.92);
-  color: var(--circle-color);
-  box-shadow: 0 8px 18px rgba(28, 37, 40, 0.18);
-  pointer-events: auto;
-  cursor: nwse-resize;
-}
-
-.resize-handle:hover {
-  background: var(--circle-color);
-  color: #fff;
-}
-
-.resize-handle svg {
-  width: 15px;
-  height: 15px;
 }
 
 .person {
@@ -519,6 +508,10 @@ svg {
     right: 16px;
     bottom: 16px;
     width: auto;
+  }
+
+  .help-panel {
+    display: none;
   }
 
   .inspector input {

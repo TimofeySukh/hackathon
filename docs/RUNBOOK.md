@@ -11,16 +11,19 @@ Current visible prototype behavior:
 - includes seeded connected circles for EU friends, Pandora, and a market circle
 - includes a nested product-team subset inside Pandora
 - draws curved links from circle centers to circles and people
-- creates people, nested subset circles, or external connected circles by dragging from a circle-center plus handle
+- creates people, nested subset circles, or external connected circles from a circle context menu
+- supports Shift-drag from a circle center as a shortcut for creating from that center
 - keeps people as endpoints and circle centers as the only branch-creation sources
 - selects and renames circles or people in the inspector
 - adds three demo people to the selected circle
 - drags people directly
 - drags any circle center, including `You`
 - moves a dragged circle together with contained people and subset circles
-- resizes circles with the diagonal boundary handle
+- resizes circles by grabbing and dragging the circle edge
 - expands parent circles automatically when contained people or subset circles cross the current boundary
-- propagates containment expansion up nested circle chains
+- shrinks auto-expanded circles back toward their minimum size when contained objects move inward
+- propagates containment fitting up nested circle chains
+- shows in-page instructions for the prototype controls
 - pans by dragging empty board space
 - zooms toward the cursor with the mouse wheel and through the toolbar
 - stores all visible prototype state only in the current browser session

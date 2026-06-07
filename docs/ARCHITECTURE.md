@@ -47,16 +47,17 @@ Current scope:
 - connected external circles
 - nested subset circles inside parent circles
 - people inside circles and subsets
-- branch creation by dragging from a circle-center plus handle
+- branch creation through the circle context menu or Shift-drag from a circle center
 - a create menu for adding a person, nested subset circle, or connected external circle
 - circle and person selection
 - local renaming in the inspector
 - dragging people
 - dragging any circle center, including `You`
 - moving a circle subtree with all contained people and child circles
-- resizing circles with a boundary handle
-- automatic parent-circle radius expansion when contained objects cross the boundary
-- containment expansion that propagates from nested circles to their ancestors
+- resizing circles by grabbing the circle edge
+- automatic parent-circle radius expansion and shrink-back as contained objects move
+- containment fitting that propagates from nested circles to their ancestors
+- in-page help text for the prototype controls
 - mouse drag navigation on empty space
 - cursor-centered mouse-wheel zoom
 - local browser-session state only
