@@ -79,7 +79,11 @@ Contains the board experience:
 - selected-circle and selected-person inspector state
 - local renaming of selected objects
 - demo-person insertion into the selected circle
-- circle-center repositioning for non-root circles
+- person dragging
+- circle-center dragging for every circle, including `You`
+- subtree movement for contained people and child circles
+- circle resizing from a boundary handle
+- automatic containment expansion when people or child circles cross a parent boundary
 - pan and zoom camera state
 - curved SVG links between circle centers, circles, and people
 
@@ -151,7 +155,10 @@ It currently supports:
 - creating a connected external circle by dragging from a circle-center plus handle and choosing the external circle option
 - selecting and renaming circles or people in the inspector
 - adding three demo people to the selected circle
-- moving non-root circle centers
+- dragging people
+- moving every circle, including `You`, with its contained people and subset circles
+- resizing circles
+- automatic radius expansion through parent chains when contained objects cross boundaries
 - mouse drag navigation across empty board space
 - cursor-centered zoom with the mouse wheel
 - toolbar zoom buttons and reset

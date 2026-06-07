@@ -11,6 +11,10 @@ A local social circle graph prototype built with React, Vite, and TypeScript.
 - Curved visual links from circle centers to connected circles and people
 - Drag the small plus handle from a circle center to create a person, a nested subset circle, or a connected external circle
 - People are endpoints; only circle centers can create new outgoing branches
+- Drag people to reposition them inside their owning circle
+- Drag any circle center, including `You`, to move that circle and all contained people and subset circles together
+- Resize circles with the diagonal resize handle
+- Parent circles automatically expand when a contained person or subset circle crosses the current boundary
 - Select circles or people to inspect and rename them
 - Add three demo people to the selected circle from the inspector
 - Drag non-root circle centers to reposition circles

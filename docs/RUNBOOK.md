@@ -15,7 +15,12 @@ Current visible prototype behavior:
 - keeps people as endpoints and circle centers as the only branch-creation sources
 - selects and renames circles or people in the inspector
 - adds three demo people to the selected circle
-- moves non-root circle centers by dragging their center node
+- drags people directly
+- drags any circle center, including `You`
+- moves a dragged circle together with contained people and subset circles
+- resizes circles with the diagonal boundary handle
+- expands parent circles automatically when contained people or subset circles cross the current boundary
+- propagates containment expansion up nested circle chains
 - pans by dragging empty board space
 - zooms toward the cursor with the mouse wheel and through the toolbar
 - stores all visible prototype state only in the current browser session

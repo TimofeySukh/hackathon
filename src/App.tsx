@@ -79,9 +79,26 @@ type MoveCircleState = {
   originY: number
 }
 
+type MovePersonState = {
+  pointerId: number
+  personId: string
+  startX: number
+  startY: number
+  originX: number
+  originY: number
+}
+
+type ResizeCircleState = {
+  pointerId: number
+  circleId: string
+}
+
 const MIN_SCALE = 0.35
 const MAX_SCALE = 1.8
 const CONNECT_THRESHOLD = 40
+const MIN_CIRCLE_RADIUS = 72
+const PERSON_CONTAINMENT_RADIUS = 62
+const CIRCLE_CONTAINMENT_PADDING = 28
 const DEFAULT_STATE: GraphState = {
   circles: [
     {
@@ -172,7 +189,9 @@ function App() {
   const surfaceRef = useRef<HTMLDivElement | null>(null)
   const panRef = useRef<PanState | null>(null)
   const moveCircleRef = useRef<MoveCircleState | null>(null)
-  const [graph, setGraph] = useState(DEFAULT_STATE)
+  const movePersonRef = useRef<MovePersonState | null>(null)
+  const resizeCircleRef = useRef<ResizeCircleState | null>(null)
+  const [graph, setGraph] = useState(createInitialGraph)
   const [camera, setCamera] = useState<Camera>({ x: window.innerWidth / 2, y: window.innerHeight / 2, scale: 0.82 })
   const [connector, setConnector] = useState<DragConnector | null>(null)
   const [createMenu, setCreateMenu] = useState<CreateMenu | null>(null)
@@ -216,12 +235,27 @@ function App() {
     if (moving?.pointerId === event.pointerId) {
       const deltaX = (event.clientX - moving.startX) / camera.scale
       const deltaY = (event.clientY - moving.startY) / camera.scale
-      setGraph((current) => ({
-        ...current,
-        circles: current.circles.map((circle) =>
-          circle.id === moving.circleId ? { ...circle, x: moving.originX + deltaX, y: moving.originY + deltaY } : circle,
-        ),
-      }))
+      setGraph((current) => ensureContainment(moveCircleSubtree(current, moving.circleId, moving.originX + deltaX, moving.originY + deltaY)))
+    }
+
+    const movingPerson = movePersonRef.current
+    if (movingPerson?.pointerId === event.pointerId) {
+      const deltaX = (event.clientX - movingPerson.startX) / camera.scale
+      const deltaY = (event.clientY - movingPerson.startY) / camera.scale
+      setGraph((current) =>
+        ensureContainment({
+          ...current,
+          people: current.people.map((person) =>
+            person.id === movingPerson.personId ? { ...person, x: movingPerson.originX + deltaX, y: movingPerson.originY + deltaY } : person,
+          ),
+        }),
+      )
+    }
+
+    const resizing = resizeCircleRef.current
+    if (resizing?.pointerId === event.pointerId) {
+      const world = screenToWorld({ x: event.clientX, y: event.clientY })
+      setGraph((current) => resizeCircleFromPoint(current, resizing.circleId, world))
     }
 
     if (connector) {
@@ -237,6 +271,14 @@ function App() {
 
     if (moveCircleRef.current?.pointerId === event.pointerId) {
       moveCircleRef.current = null
+    }
+
+    if (movePersonRef.current?.pointerId === event.pointerId) {
+      movePersonRef.current = null
+    }
+
+    if (resizeCircleRef.current?.pointerId === event.pointerId) {
+      resizeCircleRef.current = null
     }
 
     if (!connector) return
@@ -285,7 +327,7 @@ function App() {
   }
 
   function startCircleMove(event: ReactPointerEvent<HTMLButtonElement>, circle: CircleNode) {
-    if (event.altKey || circle.id === 'you') return
+    if (event.altKey) return
     event.preventDefault()
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -299,6 +341,34 @@ function App() {
     }
   }
 
+  function startPersonMove(event: ReactPointerEvent<HTMLButtonElement>, person: PersonNode) {
+    event.preventDefault()
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    setCreateMenu(null)
+    setSelectedItem({ type: 'person', id: person.id })
+    movePersonRef.current = {
+      pointerId: event.pointerId,
+      personId: person.id,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: person.x,
+      originY: person.y,
+    }
+  }
+
+  function startCircleResize(event: ReactPointerEvent<HTMLButtonElement>, circle: CircleNode) {
+    event.preventDefault()
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    setCreateMenu(null)
+    setSelectedItem({ type: 'circle', id: circle.id })
+    resizeCircleRef.current = {
+      pointerId: event.pointerId,
+      circleId: circle.id,
+    }
+  }
+
   function createPerson() {
     if (!createMenu) return
 
@@ -306,21 +376,23 @@ function App() {
     if (!source) return
 
     const id = `person-${Date.now()}`
-    setGraph((current) => ({
-      ...current,
-      people: [
-        ...current.people,
-        {
-          id,
-          name: `New person ${current.people.length + 1}`,
-          role: `Inside ${source.name}`,
-          x: createMenu.x,
-          y: createMenu.y,
-          circleId: source.id,
-          avatar: makeAvatar(current.people.length + 1),
-        },
-      ],
-    }))
+    setGraph((current) =>
+      ensureContainment({
+        ...current,
+        people: [
+          ...current.people,
+          {
+            id,
+            name: `New person ${current.people.length + 1}`,
+            role: `Inside ${source.name}`,
+            x: createMenu.x,
+            y: createMenu.y,
+            circleId: source.id,
+            avatar: makeAvatar(current.people.length + 1),
+          },
+        ],
+      }),
+    )
     setSelectedItem({ type: 'person', id })
     setCreateMenu(null)
   }
@@ -333,23 +405,25 @@ function App() {
 
     const id = `circle-${Date.now()}`
     const isNested = mode === 'nested'
-    setGraph((current) => ({
-      ...current,
-      circles: [
-        ...current.circles,
-        {
-          id,
-          name: isNested ? `${source.name} subset` : 'New circle',
-          icon: isNested ? 'SUB' : 'C',
-          x: createMenu.x,
-          y: createMenu.y,
-          radius: isNested ? 82 : 190,
-          parentId: isNested ? source.id : null,
-          connectedTo: source.id,
-          tone: isNested ? 'violet' : nextTone(current.circles.length),
-        },
-      ],
-    }))
+    setGraph((current) =>
+      ensureContainment({
+        ...current,
+        circles: [
+          ...current.circles,
+          {
+            id,
+            name: isNested ? `${source.name} subset` : 'New circle',
+            icon: isNested ? 'SUB' : 'C',
+            x: createMenu.x,
+            y: createMenu.y,
+            radius: isNested ? 82 : 190,
+            parentId: isNested ? source.id : null,
+            connectedTo: source.id,
+            tone: isNested ? 'violet' : nextTone(current.circles.length),
+          },
+        ],
+      }),
+    )
     setSelectedItem({ type: 'circle', id })
     setCreateMenu(null)
   }
@@ -368,11 +442,11 @@ function App() {
       circleId: source.id,
       avatar: makeAvatar(nextIndex + index),
     }))
-    setGraph((current) => ({ ...current, people: [...current.people, ...points] }))
+    setGraph((current) => ensureContainment({ ...current, people: [...current.people, ...points] }))
   }
 
   function resetDemo() {
-    setGraph(DEFAULT_STATE)
+    setGraph(createInitialGraph())
     setSelectedItem({ type: 'circle', id: 'you' })
     setCreateMenu(null)
     setConnector(null)
@@ -465,7 +539,7 @@ function App() {
                   setSelectedItem({ type: 'circle', id: circle.id })
                 }}
                 aria-label={`Select ${circle.name}`}
-                title={circle.id === 'you' ? 'Central circle' : 'Drag to move this circle'}
+                title="Drag to move this circle and its contents"
               >
                 {circle.icon}
               </button>
@@ -479,6 +553,16 @@ function App() {
               >
                 <PlusIcon />
               </button>
+              <button
+                type="button"
+                className="resize-handle"
+                style={{ left: circle.radius * 1.68, top: circle.radius * 1.68 }}
+                onPointerDown={(event) => startCircleResize(event, circle)}
+                aria-label={`Resize ${circle.name}`}
+                title="Drag to resize"
+              >
+                <ResizeIcon />
+              </button>
             </section>
           ))}
 
@@ -488,9 +572,10 @@ function App() {
               type="button"
               className={`person ${selectedItem.type === 'person' && selectedItem.id === person.id ? 'is-selected' : ''}`}
               style={{ transform: `translate(${person.x}px, ${person.y}px)` }}
-              onPointerDown={(event) => event.stopPropagation()}
+              onPointerDown={(event) => startPersonMove(event, person)}
               onClick={() => setSelectedItem({ type: 'person', id: person.id })}
               aria-label={`Select ${person.name}`}
+              title="Drag to move this person"
             >
               <span>{person.avatar}</span>
               <strong>{person.name}</strong>
@@ -538,6 +623,10 @@ function App() {
                 <dt>Tone</dt>
                 <dd>{TONE_LABELS[selectedCircle.tone]}</dd>
               </div>
+              <div>
+                <dt>Radius</dt>
+                <dd>{Math.round(selectedCircle.radius)} px</dd>
+              </div>
             </dl>
             <button type="button" className="primary-action" onClick={addDemoCluster}>
               Add 3 demo people
@@ -556,7 +645,7 @@ function App() {
             </div>
           </dl>
         ) : null}
-        <p>Drag the small plus handle from any circle center. People are endpoints; circle centers can create the next connection.</p>
+        <p>Drag people or circle centers directly. Parent circles expand automatically when contained people or subset circles cross their boundary.</p>
       </aside>
     </main>
   )
@@ -564,6 +653,107 @@ function App() {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value))
+}
+
+function createInitialGraph() {
+  return ensureContainment({
+    circles: DEFAULT_STATE.circles.map((circle) => ({ ...circle })),
+    people: DEFAULT_STATE.people.map((person) => ({ ...person })),
+  })
+}
+
+function moveCircleSubtree(state: GraphState, circleId: string, nextX: number, nextY: number): GraphState {
+  const circle = state.circles.find((candidate) => candidate.id === circleId)
+  if (!circle) return state
+
+  const deltaX = nextX - circle.x
+  const deltaY = nextY - circle.y
+  const subtreeIds = getDescendantCircleIds(state.circles, circleId)
+  subtreeIds.add(circleId)
+
+  return {
+    circles: state.circles.map((candidate) =>
+      subtreeIds.has(candidate.id) ? { ...candidate, x: candidate.x + deltaX, y: candidate.y + deltaY } : candidate,
+    ),
+    people: state.people.map((person) =>
+      subtreeIds.has(person.circleId) ? { ...person, x: person.x + deltaX, y: person.y + deltaY } : person,
+    ),
+  }
+}
+
+function resizeCircleFromPoint(state: GraphState, circleId: string, point: { x: number; y: number }): GraphState {
+  const circle = state.circles.find((candidate) => candidate.id === circleId)
+  if (!circle) return state
+
+  const requestedRadius = Math.max(MIN_CIRCLE_RADIUS, Math.hypot(point.x - circle.x, point.y - circle.y))
+  return ensureContainment({
+    ...state,
+    circles: state.circles.map((candidate) => (candidate.id === circleId ? { ...candidate, radius: requestedRadius } : candidate)),
+  })
+}
+
+function ensureContainment(state: GraphState): GraphState {
+  let circles = state.circles
+
+  for (let pass = 0; pass < circles.length + 2; pass += 1) {
+    const circlesById = new Map(circles.map((circle) => [circle.id, circle]))
+    let changed = false
+
+    const nextCircles = circles.map((circle) => {
+      const requiredRadius = getRequiredCircleRadius(circle, circles, circlesById, state.people)
+      if (requiredRadius <= circle.radius) return circle
+
+      changed = true
+      return { ...circle, radius: requiredRadius }
+    })
+
+    circles = nextCircles
+    if (!changed) break
+  }
+
+  return { ...state, circles }
+}
+
+function getRequiredCircleRadius(
+  circle: CircleNode,
+  circles: CircleNode[],
+  circlesById: Map<string, CircleNode>,
+  people: PersonNode[],
+) {
+  let requiredRadius = Math.max(MIN_CIRCLE_RADIUS, circle.radius)
+
+  for (const person of people) {
+    if (person.circleId !== circle.id) continue
+    requiredRadius = Math.max(requiredRadius, Math.hypot(person.x - circle.x, person.y - circle.y) + PERSON_CONTAINMENT_RADIUS)
+  }
+
+  for (const childCircle of circles) {
+    if (childCircle.parentId !== circle.id) continue
+
+    const latestChild = circlesById.get(childCircle.id) ?? childCircle
+    requiredRadius = Math.max(
+      requiredRadius,
+      Math.hypot(latestChild.x - circle.x, latestChild.y - circle.y) + latestChild.radius + CIRCLE_CONTAINMENT_PADDING,
+    )
+  }
+
+  return Math.ceil(requiredRadius)
+}
+
+function getDescendantCircleIds(circles: CircleNode[], circleId: string) {
+  const descendants = new Set<string>()
+  const pending = [circleId]
+
+  while (pending.length > 0) {
+    const parentId = pending.pop()
+    for (const circle of circles) {
+      if (circle.parentId !== parentId || descendants.has(circle.id)) continue
+      descendants.add(circle.id)
+      pending.push(circle.id)
+    }
+  }
+
+  return descendants
 }
 
 function makeCurve(from: { x: number; y: number }, to: { x: number; y: number }) {
@@ -645,6 +835,15 @@ function CircleIcon() {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="12" cy="12" r="8" />
       <path d="M4 12h16" />
+    </svg>
+  )
+}
+
+function ResizeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M8 16h8V8" />
+      <path d="M16 8 7 17" />
     </svg>
   )
 }

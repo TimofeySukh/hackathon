@@ -127,7 +127,8 @@ svg {
 }
 
 .toolbar__group button,
-.connector-handle {
+.connector-handle,
+.resize-handle {
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -146,7 +147,8 @@ svg {
 
 .toolbar svg,
 .create-menu svg,
-.connector-handle svg {
+.connector-handle svg,
+.resize-handle svg {
   width: 19px;
   height: 19px;
   fill: none;
@@ -301,6 +303,30 @@ svg {
   background: #2563eb;
 }
 
+.resize-handle {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  transform: translate(-50%, -50%);
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--circle-color);
+  box-shadow: 0 8px 18px rgba(28, 37, 40, 0.18);
+  pointer-events: auto;
+  cursor: nwse-resize;
+}
+
+.resize-handle:hover {
+  background: var(--circle-color);
+  color: #fff;
+}
+
+.resize-handle svg {
+  width: 15px;
+  height: 15px;
+}
+
 .person {
   position: absolute;
   left: 0;
@@ -318,8 +344,12 @@ svg {
   background: rgba(255, 255, 255, 0.92);
   color: #1c2528;
   box-shadow: 0 9px 22px rgba(54, 61, 68, 0.12);
-  cursor: pointer;
+  cursor: grab;
   transform-origin: 0 0;
+}
+
+.person:active {
+  cursor: grabbing;
 }
 
 .person:hover,
