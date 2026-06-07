@@ -29,6 +29,7 @@ type DragState = {
 type RenderStats = {
   frameMs: number
   visibleCount: number
+  status: 'ready' | 'recovered'
 }
 
 const PEOPLE_COUNT = 5000
@@ -49,7 +50,9 @@ function App() {
   const selectedRef = useRef<PersonPoint | null>(null)
   const animationFrameRef = useRef<number | null>(null)
   const statsUpdateRef = useRef(0)
-  const [stats, setStats] = useState<RenderStats>({ frameMs: 0, visibleCount: PEOPLE_COUNT })
+  const visibleCountRef = useRef(0)
+  const renderStatusRef = useRef<RenderStats['status']>('ready')
+  const [stats, setStats] = useState<RenderStats>({ frameMs: 0, visibleCount: PEOPLE_COUNT, status: 'ready' })
   const [selectedPerson, setSelectedPerson] = useState<PersonPoint | null>(null)
   const [searchText, setSearchText] = useState('')
 
@@ -62,7 +65,7 @@ function App() {
     if (!canvas) return
 
     const startedAt = performance.now()
-    const context = canvas.getContext('2d', { alpha: false })
+    const context = canvas.getContext('2d')
     if (!context) return
 
     const camera = cameraRef.current
@@ -79,6 +82,7 @@ function App() {
       viewport,
       hoverPerson,
       selectedPerson: selectedRef.current,
+      visibleCountRef,
     })
 
     const now = performance.now()
@@ -86,7 +90,8 @@ function App() {
       statsUpdateRef.current = now
       setStats({
         frameMs: now - startedAt,
-        visibleCount: visiblePeople.length,
+        visibleCount: visibleCountRef.current,
+        status: renderStatusRef.current,
       })
     }
   }, [people, spatialIndex])
@@ -109,25 +114,72 @@ function App() {
     const canvas = canvasRef.current
     const shell = shellRef.current
     if (!canvas || !shell) return
+    const canvasElement = canvas
+    const shellElement = shell
+
+    function markRecovered() {
+      renderStatusRef.current = 'recovered'
+      setStats((current) => ({ ...current, status: 'recovered' }))
+    }
+
+    function cancelPendingAnimationFrame() {
+      if (animationFrameRef.current === null) return
+      window.cancelAnimationFrame(animationFrameRef.current)
+      animationFrameRef.current = null
+    }
+
+    function renderImmediately() {
+      cancelPendingAnimationFrame()
+      renderCanvas()
+    }
+
+    function recoverCanvas() {
+      resizeCanvas(canvasElement, shellElement)
+      markRecovered()
+      renderImmediately()
+    }
+
+    function handleContextLost(event: Event) {
+      event.preventDefault()
+      markRecovered()
+    }
+
+    function handleContextRestored() {
+      recoverCanvas()
+    }
+
+    function handleVisibilityChange() {
+      if (!document.hidden) recoverCanvas()
+    }
 
     const resizeObserver = new ResizeObserver(() => {
-      resizeCanvas(canvas, shell)
-      centerCamera(shell, worldBounds, cameraRef.current)
-      scheduleRender()
+      resizeCanvas(canvasElement, shellElement)
+      centerCamera(shellElement, worldBounds, cameraRef.current)
+      renderImmediately()
     })
 
-    resizeObserver.observe(shell)
-    resizeCanvas(canvas, shell)
-    centerCamera(shell, worldBounds, cameraRef.current)
-    scheduleRender()
+    resizeObserver.observe(shellElement)
+    canvasElement.addEventListener('contextlost', handleContextLost)
+    canvasElement.addEventListener('contextrestored', handleContextRestored)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    resizeCanvas(canvasElement, shellElement)
+    centerCamera(shellElement, worldBounds, cameraRef.current)
+    renderImmediately()
+    const initialRenderId = window.setTimeout(renderImmediately, 0)
+    const watchdogId = window.setInterval(renderImmediately, 1500)
 
     return () => {
       resizeObserver.disconnect()
+      canvasElement.removeEventListener('contextlost', handleContextLost)
+      canvasElement.removeEventListener('contextrestored', handleContextRestored)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.clearTimeout(initialRenderId)
+      window.clearInterval(watchdogId)
       if (animationFrameRef.current !== null) {
         window.cancelAnimationFrame(animationFrameRef.current)
       }
     }
-  }, [scheduleRender, worldBounds])
+  }, [renderCanvas, scheduleRender, worldBounds])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -313,7 +365,7 @@ function App() {
         </div>
         <div>
           <span>Renderer</span>
-          <strong>Canvas 2D</strong>
+          <strong>{stats.status === 'recovered' ? 'Canvas recovered' : 'Canvas 2D'}</strong>
         </div>
       </aside>
 
@@ -362,15 +414,18 @@ function drawScene(input: {
   viewport: { left: number; right: number; top: number; bottom: number }
   hoverPerson: PersonPoint | null
   selectedPerson: PersonPoint | null
+  visibleCountRef: { current: number }
 }) {
-  const { context, canvas, camera, people, viewport, hoverPerson, selectedPerson } = input
+  const { context, canvas, camera, people, viewport, hoverPerson, selectedPerson, visibleCountRef } = input
   const width = canvas.width
   const height = canvas.height
   const dpr = getCanvasDpr(canvas)
   const screenWidth = width / dpr
   const screenHeight = height / dpr
 
+  context.globalAlpha = 1
   context.setTransform(dpr, 0, 0, dpr, 0, 0)
+  context.clearRect(0, 0, screenWidth, screenHeight)
   context.fillStyle = '#f6f7f2'
   context.fillRect(0, 0, screenWidth, screenHeight)
   drawGrid(context, screenWidth, screenHeight, camera)
@@ -389,8 +444,10 @@ function drawScene(input: {
     bottom: viewport.bottom + worldPadding,
   }
 
+  let visibleCount = 0
   for (const person of people) {
     if (!isInViewport(person, paddedViewport)) continue
+    visibleCount += 1
 
     context.beginPath()
     context.fillStyle = person.color
@@ -398,6 +455,7 @@ function drawScene(input: {
     context.arc(person.x, person.y, lod.nodeRadius + person.radius, 0, Math.PI * 2)
     context.fill()
   }
+  visibleCountRef.current = visibleCount
 
   context.globalAlpha = 1
   drawFocusNode(context, selectedPerson, '#17231f', camera.scale)

@@ -12,6 +12,7 @@ Current visible prototype behavior:
 - draws all generated people every frame on one canvas layer
 - caps canvas device pixel ratio to reduce high-DPI fill cost
 - keeps pan, zoom, hover, and search interaction state outside React's render loop where possible
+- repaints the canvas from a watchdog timer and after context restore so the graph recovers if the browser clears the canvas backing store
 - pans with pointer drag
 - zooms toward the cursor with the mouse wheel
 - zooms and resets from the top toolbar

@@ -36,7 +36,7 @@ The backend boundary remains intentionally narrow: Supabase Auth provides identi
 - `supabase/functions/search-people-ai/index.ts` authenticates the caller, builds candidate context, calls the shared AI provider layer, and returns ranked people.
 - `src/index.css` contains the current prototype shell, toolbar, stats panel, and selected-person panel styling.
 
-The current visible graph is drawn imperatively on one Canvas 2D layer. React is intentionally kept out of the per-frame point rendering path.
+The current visible graph is drawn imperatively on one Canvas 2D layer. React is intentionally kept out of the per-frame point rendering path. Initial render, resize, context restore, visibility restore, and a lightweight watchdog timer can draw directly instead of waiting for `requestAnimationFrame`, so the graph recovers if the browser clears or pauses the canvas backing store.
 
 ## Current Product Boundaries
 
