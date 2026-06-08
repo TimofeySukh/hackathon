@@ -7,15 +7,17 @@ This repository contains a React, Vite, and TypeScript social graph board app pl
 The current visible prototype is intentionally narrow:
 
 - a full-window Canvas 2D graph surface
-- deterministic generation of 5,000 people
+- deterministic generation of 10,000 people
 - many orbit rings around the center for repeatable layout stress testing
 - mouse and touch pointer panning
+- pointer dragging for individual generated people
 - cursor-centered mouse-wheel zoom
 - toolbar zoom and reset controls
 - search by generated person name or number
 - hover and selected-person hit testing through a spatial index
 - lightweight stats and selected-person panels rendered by React
-- all graph points rendered imperatively on one canvas layer
+- graph points, center-to-person graph edges, and cached avatar sprites rendered imperatively on one canvas layer
+- zoom-based level of detail so distant views avoid drawing full avatar sprites for every visible point
 - no visible Supabase, auth, persistence, LinkedIn sync, notes, or collaboration UI in the current prototype screen
 
 ## Active Work
@@ -59,7 +61,7 @@ Completed tasks can remain listed here when they explain repository history. Liv
 - `mobile/`: Flutter client scaffold with Android, iOS, and web targets.
 - `scripts/seed-demo-user.mjs`: idempotent demo-data seed for one user's board with reusable people, notes, AI summaries, and connections.
 - `src/main.tsx`: React entry point.
-- `src/App.tsx`: current 5,000-person canvas performance prototype.
+- `src/App.tsx`: current 10,000-person canvas performance prototype with LOD avatar sprites, root edges, and draggable generated people.
 - `src/lib/supabase.ts`: browser Supabase client configuration.
 - `src/lib/useAuth.ts`: session and Google sign-in state.
 - `src/lib/useBoardGraph.ts`: board graph loading and mutation state.
@@ -77,7 +79,7 @@ Task ownership is tracked in Linear. Code ownership is not split by directory ye
 
 ## Next Steps
 
-- Keep the 5,000-person performance prototype easy to compare against future graph renderer choices.
+- Keep the 10,000-person performance prototype easy to compare against future graph renderer choices.
 - Check `docs/PROBLEMS.md` before starting work, add newly discovered durable problems, and mark fixed problems as resolved.
 - Link any implementation task or pull request back to the relevant Linear issue.
 - Update `docs/product-vision.md` when product scope changes.

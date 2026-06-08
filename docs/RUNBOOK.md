@@ -7,13 +7,15 @@ The repository contains a React, Vite, and TypeScript social graph board app plu
 Current visible prototype behavior:
 
 - opens a full-window Canvas 2D graph
-- generates 5,000 deterministic people locally
+- generates 10,000 deterministic people locally
 - places generated people across many orbit rings around the center
-- draws all generated people every frame on one canvas layer
+- draws generated people, center-to-person graph edges, and cached avatar sprites on one canvas layer
+- uses zoom-based level of detail: distant views draw lightweight dots and sampled edges; close views draw cached avatar sprites only when the visible set is small enough
 - caps canvas device pixel ratio to reduce high-DPI fill cost
 - keeps pan, zoom, hover, and search interaction state outside React's render loop where possible
 - repaints the canvas from a watchdog timer and after context restore so the graph recovers if the browser clears the canvas backing store
 - pans with pointer drag
+- drags individual people when the pointer starts on a person
 - zooms toward the cursor with the mouse wheel
 - zooms and resets from the top toolbar
 - searches generated people by name or number and centers the matched person

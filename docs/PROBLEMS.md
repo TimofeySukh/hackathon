@@ -55,7 +55,7 @@ When working on the project:
 
 - Status: Open
 - Reported need: the app needs to support thousands of visible people while loading and interacting smoothly.
-- Notes: the current visible screen is a 5,000-person Canvas 2D performance prototype with generated orbit data. Before rebuilding persisted product flows, decide whether the production graph layer should stay custom Canvas 2D or move to a WebGL graph renderer such as Sigma.js, with React reserved for app chrome.
+- Notes: the current visible screen is a 10,000-person Canvas 2D performance prototype with generated orbit data, zoom-based LOD, cached avatar sprites, root-to-person edges, and draggable nodes. Before rebuilding persisted product flows, decide whether the production graph layer should stay custom Canvas 2D or move to a WebGL graph renderer such as Sigma.js, with React reserved for app chrome.
 
 ## Resolved Problems
 

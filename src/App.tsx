@@ -10,6 +10,7 @@ type PersonPoint = {
   y: number
   radius: number
   color: string
+  avatarIndex: number
 }
 
 type Camera = {
@@ -19,25 +20,48 @@ type Camera = {
 }
 
 type DragState = {
+  type: 'pan'
   pointerId: number
   startX: number
   startY: number
   originX: number
   originY: number
+} | {
+  type: 'node'
+  pointerId: number
+  startWorldX: number
+  startWorldY: number
+  originX: number
+  originY: number
+  person: PersonPoint
 }
 
 type RenderStats = {
   frameMs: number
   visibleCount: number
+  iconCount: number
+  edgeCount: number
   status: 'ready' | 'recovered'
 }
 
-const PEOPLE_COUNT = 5000
-const ORBIT_COUNT = 44
-const MIN_SCALE = 0.12
+const PEOPLE_COUNT = 10000
+const ORBIT_COUNT = 58
+const MIN_SCALE = 0.08
 const MAX_SCALE = 3.2
 const NODE_COLORS = ['#ea6a5e', '#4f8fe8', '#8b68df', '#39a56a', '#d49a28', '#2aa7a0']
+const AVATAR_COLORS = ['#f36b5f', '#4f8fe8', '#7f66db', '#34a66f', '#dfa23a', '#24a7a0', '#f2c94c', '#2f80ed']
 const DPR_CAP = 1.75
+const ROOT_PERSON: PersonPoint = {
+  id: 0,
+  name: 'Central person',
+  orbit: -1,
+  angle: 0,
+  x: 0,
+  y: 0,
+  radius: 2,
+  color: '#17231f',
+  avatarIndex: 0,
+}
 
 function App() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -52,13 +76,25 @@ function App() {
   const statsUpdateRef = useRef(0)
   const visibleCountRef = useRef(0)
   const renderStatusRef = useRef<RenderStats['status']>('ready')
-  const [stats, setStats] = useState<RenderStats>({ frameMs: 0, visibleCount: PEOPLE_COUNT, status: 'ready' })
+  const [stats, setStats] = useState<RenderStats>({
+    frameMs: 0,
+    visibleCount: PEOPLE_COUNT,
+    iconCount: 0,
+    edgeCount: 0,
+    status: 'ready',
+  })
   const [selectedPerson, setSelectedPerson] = useState<PersonPoint | null>(null)
   const [searchText, setSearchText] = useState('')
 
   const people = useMemo(() => generateOrbitPeople(PEOPLE_COUNT), [])
   const spatialIndex = useMemo(() => createSpatialIndex(people), [people])
+  const spatialIndexRef = useRef(spatialIndex)
+  const avatarSprites = useMemo(() => createAvatarSprites(), [])
   const worldBounds = useMemo(() => getWorldBounds(people), [people])
+
+  useEffect(() => {
+    spatialIndexRef.current = spatialIndex
+  }, [spatialIndex])
 
   const renderCanvas = useCallback(() => {
     const canvas = canvasRef.current
@@ -71,7 +107,7 @@ function App() {
     const camera = cameraRef.current
     const viewport = getViewportWorldRect(canvas, camera)
     const visiblePeople = people
-    const hoverPerson = pointerRef.current ? pickPerson(pointerRef.current.x, pointerRef.current.y, camera, spatialIndex) : null
+    const hoverPerson = pointerRef.current ? pickPerson(pointerRef.current.x, pointerRef.current.y, camera, spatialIndexRef.current) : null
     hoverRef.current = hoverPerson
 
     drawScene({
@@ -82,6 +118,7 @@ function App() {
       viewport,
       hoverPerson,
       selectedPerson: selectedRef.current,
+      avatarSprites,
       visibleCountRef,
     })
 
@@ -91,10 +128,12 @@ function App() {
       setStats({
         frameMs: now - startedAt,
         visibleCount: visibleCountRef.current,
+        iconCount: Number(canvas.dataset.iconCount || '0'),
+        edgeCount: Number(canvas.dataset.edgeCount || '0'),
         status: renderStatusRef.current,
       })
     }
-  }, [people, spatialIndex])
+  }, [avatarSprites, people])
 
   const scheduleRender = useCallback(() => {
     if (animationFrameRef.current !== null) return
@@ -208,15 +247,26 @@ function App() {
     event.currentTarget.setPointerCapture(event.pointerId)
     pointerRef.current = getCanvasPoint(event)
 
-    const pickedPerson = pickPerson(pointerRef.current.x, pointerRef.current.y, cameraRef.current, spatialIndex)
+    const pickedPerson = pickPerson(pointerRef.current.x, pointerRef.current.y, cameraRef.current, spatialIndexRef.current)
     if (pickedPerson) {
       selectedRef.current = pickedPerson
       setSelectedPerson(pickedPerson)
+      const startWorld = screenToWorld(pointerRef.current.x, pointerRef.current.y, cameraRef.current)
+      dragRef.current = {
+        type: 'node',
+        pointerId: event.pointerId,
+        startWorldX: startWorld.x,
+        startWorldY: startWorld.y,
+        originX: pickedPerson.x,
+        originY: pickedPerson.y,
+        person: pickedPerson,
+      }
       scheduleRender()
       return
     }
 
     dragRef.current = {
+      type: 'pan',
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
@@ -230,16 +280,28 @@ function App() {
 
     const drag = dragRef.current
     if (drag && drag.pointerId === event.pointerId) {
-      cameraRef.current.x = drag.originX + event.clientX - drag.startX
-      cameraRef.current.y = drag.originY + event.clientY - drag.startY
+      if (drag.type === 'pan') {
+        cameraRef.current.x = drag.originX + event.clientX - drag.startX
+        cameraRef.current.y = drag.originY + event.clientY - drag.startY
+      } else {
+        const nextWorld = screenToWorld(pointerRef.current.x, pointerRef.current.y, cameraRef.current)
+        drag.person.x = drag.originX + nextWorld.x - drag.startWorldX
+        drag.person.y = drag.originY + nextWorld.y - drag.startWorldY
+      }
     }
 
     scheduleRender()
   }
 
   function handlePointerUp(event: PointerEvent<HTMLCanvasElement>) {
-    if (dragRef.current?.pointerId === event.pointerId) {
+    const drag = dragRef.current
+    if (drag?.pointerId === event.pointerId) {
+      if (drag.type === 'node') {
+        spatialIndexRef.current = createSpatialIndex(people)
+        setSelectedPerson({ ...drag.person })
+      }
       dragRef.current = null
+      scheduleRender()
     }
   }
 
@@ -304,13 +366,13 @@ function App() {
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         onPointerLeave={handlePointerLeave}
-        aria-label="Five thousand person orbit graph"
+        aria-label="Ten thousand person orbit graph with icons and draggable nodes"
       />
 
       <header className="graph-toolbar">
         <div className="brand-lockup" aria-label="Datanode performance graph">
           <span className="brand-mark">dn</span>
-          <span className="brand-text">Orbit graph</span>
+          <span className="brand-text">10k graph lab</span>
         </div>
 
         <label className="search-box">
@@ -360,6 +422,14 @@ function App() {
           <strong>{stats.visibleCount.toLocaleString('en-US')}</strong>
         </div>
         <div>
+          <span>Avatar sprites</span>
+          <strong>{stats.iconCount.toLocaleString('en-US')}</strong>
+        </div>
+        <div>
+          <span>Edges</span>
+          <strong>{stats.edgeCount.toLocaleString('en-US')}</strong>
+        </div>
+        <div>
           <span>Last frame</span>
           <strong>{stats.frameMs.toFixed(1)} ms</strong>
         </div>
@@ -397,8 +467,8 @@ function App() {
         ) : (
           <>
             <span className="panel-label">Ready</span>
-            <h1>5,000 people at once</h1>
-            <p>Pan, zoom, hover, and click. All person points are drawn every frame on one canvas layer.</p>
+            <h1>10,000 people at once</h1>
+            <p>Pan, zoom, hover, click, and drag people. Edges and avatar sprites are drawn on one canvas layer.</p>
           </>
         )}
       </aside>
@@ -414,9 +484,10 @@ function drawScene(input: {
   viewport: { left: number; right: number; top: number; bottom: number }
   hoverPerson: PersonPoint | null
   selectedPerson: PersonPoint | null
+  avatarSprites: HTMLCanvasElement[]
   visibleCountRef: { current: number }
 }) {
-  const { context, canvas, camera, people, viewport, hoverPerson, selectedPerson, visibleCountRef } = input
+  const { context, canvas, camera, people, viewport, hoverPerson, selectedPerson, avatarSprites, visibleCountRef } = input
   const width = canvas.width
   const height = canvas.height
   const dpr = getCanvasDpr(canvas)
@@ -434,6 +505,7 @@ function drawScene(input: {
   context.translate(camera.x, camera.y)
   context.scale(camera.scale, camera.scale)
   drawOrbitRings(context)
+  drawRootPerson(context, camera.scale)
 
   const lod = getLevelOfDetail(camera.scale)
   const worldPadding = 120 / camera.scale
@@ -444,17 +516,28 @@ function drawScene(input: {
     bottom: viewport.bottom + worldPadding,
   }
 
-  let visibleCount = 0
+  const visiblePeople: PersonPoint[] = []
   for (const person of people) {
     if (!isInViewport(person, paddedViewport)) continue
-    visibleCount += 1
-
-    context.beginPath()
-    context.fillStyle = person.color
-    context.globalAlpha = lod.nodeAlpha
-    context.arc(person.x, person.y, lod.nodeRadius + person.radius, 0, Math.PI * 2)
-    context.fill()
+    visiblePeople.push(person)
   }
+
+  let edgeCount = 0
+  if (lod.showEdges) {
+    edgeCount = drawRootEdges(context, visiblePeople, camera.scale, lod.edgeStride)
+  }
+
+  let iconCount = 0
+  if (lod.showAvatars && visiblePeople.length <= lod.avatarLimit) {
+    iconCount = drawAvatarNodes(context, visiblePeople, avatarSprites, camera.scale, selectedPerson, hoverPerson)
+  } else {
+    drawDotNodes(context, visiblePeople, lod)
+  }
+
+  drawRootPerson(context, camera.scale)
+  canvas.dataset.iconCount = String(iconCount)
+  canvas.dataset.edgeCount = String(edgeCount)
+  const visibleCount = visiblePeople.length
   visibleCountRef.current = visibleCount
 
   context.globalAlpha = 1
@@ -465,6 +548,80 @@ function drawScene(input: {
     drawLabels(context, [selectedPerson, hoverPerson].filter(Boolean) as PersonPoint[], camera.scale)
   }
 
+  context.restore()
+}
+
+function drawDotNodes(context: CanvasRenderingContext2D, people: PersonPoint[], lod: ReturnType<typeof getLevelOfDetail>) {
+  for (const person of people) {
+    context.beginPath()
+    context.fillStyle = person.color
+    context.globalAlpha = lod.nodeAlpha
+    context.arc(person.x, person.y, lod.nodeRadius + person.radius, 0, Math.PI * 2)
+    context.fill()
+  }
+}
+
+function drawAvatarNodes(
+  context: CanvasRenderingContext2D,
+  people: PersonPoint[],
+  avatarSprites: HTMLCanvasElement[],
+  scale: number,
+  selectedPerson: PersonPoint | null,
+  hoverPerson: PersonPoint | null,
+) {
+  const size = Math.max(22 / scale, 24)
+  const selectedId = selectedPerson?.id
+  const hoverId = hoverPerson?.id
+
+  for (const person of people) {
+    const half = size / 2
+    const sprite = avatarSprites[person.avatarIndex % avatarSprites.length]
+
+    context.globalAlpha = person.id === selectedId || person.id === hoverId ? 1 : 0.93
+    context.drawImage(sprite, person.x - half, person.y - half, size, size)
+  }
+
+  context.globalAlpha = 1
+  return people.length
+}
+
+function drawRootEdges(context: CanvasRenderingContext2D, people: PersonPoint[], scale: number, stride: number) {
+  const lineWidth = Math.max(0.42 / scale, 0.35)
+  let edgeCount = 0
+
+  context.save()
+  context.lineWidth = lineWidth
+  context.strokeStyle = scale < 0.34 ? 'rgba(23, 35, 31, 0.055)' : 'rgba(23, 35, 31, 0.09)'
+  context.beginPath()
+  for (let index = 0; index < people.length; index += stride) {
+    const person = people[index]
+    context.moveTo(ROOT_PERSON.x, ROOT_PERSON.y)
+    context.lineTo(person.x, person.y)
+    edgeCount += 1
+  }
+  context.stroke()
+  context.restore()
+
+  return edgeCount
+}
+
+function drawRootPerson(context: CanvasRenderingContext2D, scale: number) {
+  const radius = Math.max(15 / scale, 18)
+
+  context.save()
+  context.beginPath()
+  context.fillStyle = ROOT_PERSON.color
+  context.strokeStyle = 'rgba(255, 255, 255, 0.92)'
+  context.lineWidth = Math.max(4 / scale, 2)
+  context.arc(ROOT_PERSON.x, ROOT_PERSON.y, radius, 0, Math.PI * 2)
+  context.fill()
+  context.stroke()
+
+  context.fillStyle = '#ffffff'
+  context.font = `${Math.max(11 / scale, 9)}px Inter, system-ui, sans-serif`
+  context.textAlign = 'center'
+  context.textBaseline = 'middle'
+  context.fillText('dn', ROOT_PERSON.x, ROOT_PERSON.y)
   context.restore()
 }
 
@@ -551,6 +708,7 @@ function generateOrbitPeople(count: number) {
         y: Math.sin(angle) * finalRadius,
         radius: (id % 5) * 0.18,
         color: NODE_COLORS[(orbit + id) % NODE_COLORS.length],
+        avatarIndex: id % AVATAR_COLORS.length,
       })
       id += 1
     }
@@ -570,6 +728,7 @@ function generateOrbitPeople(count: number) {
       y: Math.sin(angle) * radius,
       radius: (id % 5) * 0.18,
       color: NODE_COLORS[id % NODE_COLORS.length],
+      avatarIndex: id % AVATAR_COLORS.length,
     })
     id += 1
   }
@@ -681,9 +840,50 @@ function getOrbitRadius(orbit: number) {
 }
 
 function getLevelOfDetail(scale: number) {
-  if (scale < 0.22) return { nodeRadius: 2.4 / scale, nodeAlpha: 0.76 }
-  if (scale < 0.62) return { nodeRadius: 2.1 / scale, nodeAlpha: 0.84 }
-  return { nodeRadius: 3.8 / scale, nodeAlpha: 0.92 }
+  if (scale < 0.18) {
+    return { nodeRadius: 1.65 / scale, nodeAlpha: 0.58, showAvatars: false, avatarLimit: 0, showEdges: true, edgeStride: 7 }
+  }
+  if (scale < 0.42) {
+    return { nodeRadius: 1.85 / scale, nodeAlpha: 0.72, showAvatars: false, avatarLimit: 0, showEdges: true, edgeStride: 3 }
+  }
+  if (scale < 0.78) {
+    return { nodeRadius: 2.2 / scale, nodeAlpha: 0.86, showAvatars: false, avatarLimit: 0, showEdges: true, edgeStride: 1 }
+  }
+  return { nodeRadius: 3.8 / scale, nodeAlpha: 0.92, showAvatars: true, avatarLimit: 1800, showEdges: true, edgeStride: 1 }
+}
+
+function createAvatarSprites() {
+  return AVATAR_COLORS.map((color, index) => {
+    const canvas = document.createElement('canvas')
+    const size = 64
+    const context = canvas.getContext('2d')
+    canvas.width = size
+    canvas.height = size
+
+    if (!context) return canvas
+
+    const accent = AVATAR_COLORS[(index + 3) % AVATAR_COLORS.length]
+    context.fillStyle = color
+    context.beginPath()
+    context.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2)
+    context.fill()
+
+    context.fillStyle = 'rgba(255, 255, 255, 0.92)'
+    context.beginPath()
+    context.arc(size / 2, 25, 11, 0, Math.PI * 2)
+    context.fill()
+    context.beginPath()
+    context.arc(size / 2, 55, 22, Math.PI, 0)
+    context.fill()
+
+    context.strokeStyle = accent
+    context.lineWidth = 4
+    context.beginPath()
+    context.arc(size / 2, size / 2, 29, 0, Math.PI * 2)
+    context.stroke()
+
+    return canvas
+  })
 }
 
 function getCanvasPoint(event: PointerEvent<HTMLCanvasElement>) {

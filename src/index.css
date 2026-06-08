@@ -209,17 +209,18 @@ button {
   left: 18px;
   bottom: 18px;
   display: grid;
-  grid-template-columns: repeat(4, minmax(112px, auto));
+  grid-template-columns: repeat(6, minmax(104px, auto));
   gap: 1px;
   overflow: hidden;
-  border-radius: 18px;
+  max-width: calc(100vw - 382px);
+  border-radius: 8px;
 }
 
 .stats-panel div {
   display: grid;
   gap: 4px;
-  min-width: 112px;
-  padding: 13px 15px;
+  min-width: 104px;
+  padding: 12px 13px;
   background: rgba(255, 255, 255, 0.45);
 }
 
@@ -234,7 +235,7 @@ button {
 }
 
 .stats-panel strong {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 820;
   line-height: 1;
 }
@@ -245,7 +246,7 @@ button {
   right: 18px;
   bottom: 18px;
   width: min(330px, calc(100vw - 36px));
-  border-radius: 22px;
+  border-radius: 8px;
   padding: 20px;
 }
 
@@ -308,7 +309,8 @@ button {
 
   .stats-panel {
     right: 18px;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-width: none;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .person-panel {
@@ -328,6 +330,7 @@ button {
     left: 12px;
     right: 12px;
     bottom: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .stats-panel div {

@@ -7,7 +7,7 @@ The repository currently has a single-screen frontend architecture.
 Runtime boundaries:
 
 - React owns UI chrome state and panel rendering.
-- Canvas 2D owns the current visible 5,000-person graph rendering layer.
+- Canvas 2D owns the current visible 10,000-person graph rendering layer.
 - Vite owns local development and production bundling.
 - CSS owns the visual shell, chrome tokens, and responsive layout.
 - The browser owns generated prototype graph state for the visible screen.
@@ -25,7 +25,7 @@ The backend boundary remains intentionally narrow: Supabase Auth provides identi
 ## Current Frontend Shape
 
 - `src/main.tsx` mounts the React app.
-- `src/App.tsx` contains the current 5,000-person canvas performance prototype, including deterministic orbit generation, imperative canvas rendering, camera refs, spatial hit testing, search, and selected-person panel state.
+- `src/App.tsx` contains the current 10,000-person canvas performance prototype, including deterministic orbit generation, imperative canvas rendering, zoom-based level of detail, cached avatar sprites, root-to-person edge drawing, node dragging, camera refs, spatial hit testing, search, and selected-person panel state.
 - `src/lib/supabase.ts` creates the browser Supabase client from Vite environment variables.
 - `src/lib/useAuth.ts` owns session loading, Google sign-in, and sign-out.
 - `src/lib/useBoardGraph.ts` owns board graph loading, frontend mutation state, and debounced AI note refresh scheduling.
@@ -46,10 +46,11 @@ The product is a navigable board foundation, not a whiteboard editor.
 
 Current visible prototype scope:
 
-- generate 5,000 people locally
+- generate 10,000 people locally
 - place them across many orbit rings around the center
-- render every person point on a single canvas layer
+- render visible person points, sampled graph edges, and cached avatar sprites on a single canvas layer
 - pan and cursor-centered zoom without React re-rendering each point
+- drag individual generated people and rebuild the local spatial index after the drag finishes
 - spatially indexed hover and click selection
 - local generated-person search
 - lightweight React chrome for controls, stats, and selection details
