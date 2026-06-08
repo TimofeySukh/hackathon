@@ -209,7 +209,7 @@ const MATERIAL_TONES: Record<CircleTone, { fill: string; border: string; text: s
 
 function getFlowerPath(cx: number, cy: number, r: number, petals: number, amplitude: number) {
   let path = ''
-  const points = 120
+  const points = 240
   for (let i = 0; i <= points; i++) {
     const angle = (i * 2 * Math.PI) / points
     const currentR = r + amplitude * Math.cos(petals * angle)
@@ -700,9 +700,10 @@ function App() {
                 <path
                   d={(() => {
                     const R = circle.radius;
-                    const amp = Math.max(4, R * 0.08);
+                    const amp = Math.max(4, R * 0.06);
                     const baseR = R - amp - 4;
-                    return getFlowerPath(R, R, baseR, 8, amp);
+                    const petals = Math.max(8, Math.round(R / 10));
+                    return getFlowerPath(R, R, baseR, petals, amp);
                   })()}
                   fill={MATERIAL_TONES[circle.tone].fill}
                   stroke={MATERIAL_TONES[circle.tone].border}

@@ -975,14 +975,15 @@ class WavyCirclePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
-    final amp = math.max(4.0, radius * 0.08);
+    final amp = math.max(4.0, radius * 0.06);
     final baseR = radius - amp - 4.0;
+    final int petals = math.max(8, (radius / 10.0).round());
 
     final path = Path();
-    const int pointsCount = 120;
+    const int pointsCount = 240;
     for (int i = 0; i <= pointsCount; i++) {
       final double angle = (i * 2 * math.pi) / pointsCount;
-      final double r = baseR + amp * math.cos(8 * angle);
+      final double r = baseR + amp * math.cos(petals * angle);
       final double x = center.dx + r * math.cos(angle);
       final double y = center.dy + r * math.sin(angle);
 
