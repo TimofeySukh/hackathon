@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -1788,12 +1789,12 @@ class CircleInteractiveWidget extends StatelessWidget {
               clipBehavior: Clip.antiAlias,
               alignment: Alignment.center,
               child: circle.imageUrl != null
-                  ? Image.network(
+                  ? _buildImageWidget(
                       circle.imageUrl!,
                       width: 40,
                       height: 40,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => Text(
+                      fallback: Text(
                         circle.icon,
                         style: const TextStyle(
                           color: Colors.white,
@@ -1857,12 +1858,12 @@ class PersonIconWidget extends StatelessWidget {
                           sides: person.sides,
                           amplitude: person.amplitude,
                         ),
-                        child: Image.network(
+                        child: _buildImageWidget(
                           person.imageUrl!,
                           width: 40,
                           height: 40,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                          fallback: const SizedBox.shrink(),
                         ),
                       )
                     : Center(
@@ -3253,4 +3254,35 @@ String makeAvatar(int index) {
 CircleTone nextTone(int index) {
   const tones = CircleTone.values;
   return tones[index % tones.length];
+}
+
+Widget _buildImageWidget(
+  String url, {
+  double? width,
+  double? height,
+  BoxFit fit = BoxFit.cover,
+  required Widget fallback,
+}) {
+  if (url.startsWith('data:image/') && url.contains('base64,')) {
+    try {
+      final base64String = url.substring(url.indexOf('base64,') + 7);
+      final bytes = base64.decode(base64String.trim());
+      return Image.memory(
+        bytes,
+        width: width,
+        height: height,
+        fit: fit,
+        errorBuilder: (_, _, _) => fallback,
+      );
+    } catch (e) {
+      return fallback;
+    }
+  }
+  return Image.network(
+    url,
+    width: width,
+    height: height,
+    fit: fit,
+    errorBuilder: (_, _, _) => fallback,
+  );
 }
