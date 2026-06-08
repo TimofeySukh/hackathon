@@ -30,6 +30,14 @@ Current visible prototype behavior:
 - stores all visible prototype state only in the current browser session
 - does not call Supabase, auth, database persistence, LinkedIn import, notes, or AI search from the visible screen
 
+Current Flutter prototype behavior in `flutter_board/`:
+
+- ports the circle graph board visual model to Flutter
+- keeps normal circles, real people, inspector UI, and controls as Flutter widgets
+- renders dense synthetic stress icons and their optional edges in a screen-space `CustomPaint` overlay instead of inside the transformed world stack
+- culls stress icons to the visible viewport and reuses rasterized avatar images
+- updates the stress FPS label through a `ValueNotifier` so the whole board does not rebuild every half second
+
 There is no multiplayer or drawing toolset yet.
 
 ## Local Setup
@@ -98,6 +106,22 @@ Start the development server:
 
 ```bash
 npm run dev
+```
+
+Run the Flutter circle graph prototype in Chrome:
+
+```bash
+cd flutter_board
+flutter run -d chrome
+```
+
+Run Flutter checks for the circle graph prototype:
+
+```bash
+cd flutter_board
+flutter analyze
+flutter test
+flutter build web
 ```
 
 Start the local project MCP server manually when you want to test it outside the app:

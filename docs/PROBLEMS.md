@@ -51,6 +51,12 @@ When working on the project:
 - Reported behavior: `npm audit --audit-level=high` fails with 7 reported vulnerabilities, including a high-severity `fast-uri` advisory and moderate advisories in transitive packages such as `brace-expansion`, `hono`, `ip-address`, `qs`, and `ws`.
 - Notes: `npm audit fix` is suggested by npm, but the dependency tree update should be reviewed separately from feature work.
 
+### Flutter release-mode stress FPS still needs device validation
+
+- Status: Open
+- Reported behavior: the Flutter circle graph prototype dropped to around 40 FPS on a small test set, around 10 FPS near 500 points while moving, and around 2 FPS above 1,000 points.
+- Notes: `flutter_board/lib/main.dart` now paints dense stress icons in a screen-space `CustomPaint` overlay, culls to the viewport, uses rasterized avatar images, removes synthetic stress edges from the transformed world `EdgePainter`, and updates FPS through a `ValueNotifier` instead of rebuilding the board. Validate the result in release/profile mode on the target device or browser because debug Flutter FPS can be misleading.
+
 ## Resolved Problems
 
 ### DOM/SVG icon stress ceiling was unknown

@@ -7,6 +7,7 @@ The repository currently has a single-screen frontend prototype architecture.
 Runtime boundaries:
 
 - React owns the visible graph prototype state and rendering.
+- Flutter owns the `flutter_board/` circle graph prototype implementation.
 - Vite owns local development and production bundling.
 - CSS owns the visual board surface, graph styling, panel styling, and responsive layout.
 - The browser owns in-memory graph state for the current session.
@@ -24,6 +25,7 @@ The visible circle graph demo does not call Supabase or any backend. The existin
 
 - `src/main.tsx` mounts the React app.
 - `src/App.tsx` contains the local circle graph demo, including seed circles, people, pan and zoom camera state, circle-center branch creation, creation menu state, circle movement, and selected-item inspector state.
+- `flutter_board/lib/main.dart` contains the Flutter circle graph prototype. Flutter widgets own normal circles, real people, controls, and inspector UI, while a screen-space `CustomPaint` overlay owns dense synthetic stress icons and their optional edges.
 - `src/lib/supabase.ts` creates the browser Supabase client from Vite environment variables.
 - `src/lib/useAuth.ts` owns session loading, Google sign-in, and sign-out.
 - `src/lib/useBoardGraph.ts` owns board graph loading, frontend mutation state, and debounced AI note refresh scheduling.
@@ -36,6 +38,8 @@ The visible circle graph demo does not call Supabase or any backend. The existin
 - `src/index.css` contains the visible circle graph prototype styling, including the grid board, dashed circle boundaries, node controls, creation menu, toolbar, and inspector.
 
 The board is rendered with React DOM elements for nodes and dashed circle boundaries, plus SVG paths for curved links. The local camera transforms a world layer for pan and zoom.
+
+The Flutter prototype uses `InteractiveViewer` for normal board pan and zoom. Dense stress icons are intentionally painted outside the transformed world stack in screen coordinates, using the `TransformationController` matrix only to convert world positions to viewport positions. This keeps the stress layer constrained to the screen-sized paint surface, avoids thousands of Flutter widgets for synthetic icons, culls offscreen icons, and reuses rasterized avatar images.
 
 ## Current Product Boundaries
 

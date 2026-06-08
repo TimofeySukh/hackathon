@@ -218,11 +218,13 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateMixin {
+class _MyHomePageState extends State<MyHomePage>
+    with SingleTickerProviderStateMixin {
   late List<CircleNode> circles;
   late List<PersonNode> people;
 
-  final TransformationController _transformationController = TransformationController();
+  final TransformationController _transformationController =
+      TransformationController();
 
   String? selectedCircleId;
   String? selectedPersonId;
@@ -243,10 +245,10 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
   bool showLabels = false;
 
   // FPS
-  int _fps = 0;
   int _frameCount = 0;
   late int _lastFpsTimestamp;
   Ticker? _fpsTicker;
+  final ValueNotifier<int> _fpsNotifier = ValueNotifier<int>(0);
 
   // Stress people cache
   List<PersonNode> _stressPeople = [];
@@ -255,7 +257,6 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
   final List<ui.Picture> _stressAvatarPictures = [];
   final List<ui.Image> _stressAvatarImages = [];
   final Map<String, TextPainter> _stressLabelCache = {};
-  bool _avatarImagesLoaded = false;
 
   @override
   void initState() {
@@ -272,9 +273,8 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
       _frameCount++;
       final now = DateTime.now().millisecondsSinceEpoch;
       if (now - _lastFpsTimestamp >= 500) {
-        setState(() {
-          _fps = ((_frameCount * 1000) / (now - _lastFpsTimestamp)).round();
-        });
+        _fpsNotifier.value = ((_frameCount * 1000) / (now - _lastFpsTimestamp))
+            .round();
         _frameCount = 0;
         _lastFpsTimestamp = now;
       }
@@ -299,6 +299,7 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
       img.dispose();
     }
     _fpsTicker?.dispose();
+    _fpsNotifier.dispose();
     _transformationController.dispose();
     super.dispose();
   }
@@ -345,7 +346,6 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
     if (mounted) {
       setState(() {
         _stressAvatarImages.addAll(images);
-        _avatarImagesLoaded = true;
       });
     }
   }
@@ -397,7 +397,10 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
       textDirection: TextDirection.ltr,
     );
     textPainter.layout();
-    textPainter.paint(canvas, Offset(20.0 - textPainter.width / 2, 20.0 - textPainter.height / 2));
+    textPainter.paint(
+      canvas,
+      Offset(20.0 - textPainter.width / 2, 20.0 - textPainter.height / 2),
+    );
 
     return recorder.endRecording();
   }
@@ -522,7 +525,15 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
     });
   }
 
-  void _updateCircleStyle(String circleId, {ShapeType? shapeType, int? sides, double? amplitude, String? imageUrl, bool clearImageUrl = false, CircleTone? tone}) {
+  void _updateCircleStyle(
+    String circleId, {
+    ShapeType? shapeType,
+    int? sides,
+    double? amplitude,
+    String? imageUrl,
+    bool clearImageUrl = false,
+    CircleTone? tone,
+  }) {
     setState(() {
       final index = circles.indexWhere((c) => c.id == circleId);
       if (index != -1) {
@@ -539,7 +550,14 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
     });
   }
 
-  void _updatePersonStyle(String personId, {ShapeType? shapeType, int? sides, double? amplitude, String? imageUrl, bool clearImageUrl = false}) {
+  void _updatePersonStyle(
+    String personId, {
+    ShapeType? shapeType,
+    int? sides,
+    double? amplitude,
+    String? imageUrl,
+    bool clearImageUrl = false,
+  }) {
     setState(() {
       final index = people.indexWhere((p) => p.id == personId);
       if (index != -1) {
@@ -566,18 +584,20 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
     setState(() {
       for (int i = 0; i < 3; i++) {
         final randomSides = math.Random().nextInt(5) + 8; // 8 to 12
-        people.add(PersonNode(
-          id: 'person-$time-$i',
-          name: names[i],
-          role: 'Added to ${source.name}',
-          x: source.x + offsets[i],
-          y: source.y + source.radius * 0.42 + i * 18.0,
-          circleId: source.id,
-          avatar: makeAvatar(nextIndex + i),
-          shapeType: ShapeType.polygon,
-          sides: randomSides,
-          amplitude: 2.0,
-        ));
+        people.add(
+          PersonNode(
+            id: 'person-$time-$i',
+            name: names[i],
+            role: 'Added to ${source.name}',
+            x: source.x + offsets[i],
+            y: source.y + source.radius * 0.42 + i * 18.0,
+            circleId: source.id,
+            avatar: makeAvatar(nextIndex + i),
+            shapeType: ShapeType.polygon,
+            sides: randomSides,
+            amplitude: 2.0,
+          ),
+        );
       }
       circles = ensureContainment(circles, people);
     });
@@ -598,7 +618,8 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
       createMenuWorldPos = null;
     });
 
-    final double distance = (localPos - Offset(circle.radius, circle.radius)).distance;
+    final double distance =
+        (localPos - Offset(circle.radius, circle.radius)).distance;
     final double scale = _transformationController.value.storage[0];
     final double edgeHitSize = 18.0 / scale;
 
@@ -708,20 +729,14 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
 
       circles = circles.map((candidate) {
         if (subtreeIds.contains(candidate.id)) {
-          return candidate.copyWith(
-            x: candidate.x + dx,
-            y: candidate.y + dy,
-          );
+          return candidate.copyWith(x: candidate.x + dx, y: candidate.y + dy);
         }
         return candidate;
       }).toList();
 
       people = people.map((person) {
         if (subtreeIds.contains(person.circleId)) {
-          return person.copyWith(
-            x: person.x + dx,
-            y: person.y + dy,
-          );
+          return person.copyWith(x: person.x + dx, y: person.y + dy);
         }
         return person;
       }).toList();
@@ -754,18 +769,20 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
     final randomSides = math.Random().nextInt(5) + 8; // 8 to 12
 
     setState(() {
-      people.add(PersonNode(
-        id: newId,
-        name: 'New person ${people.length + 1}',
-        role: 'Inside parent',
-        x: createMenuWorldPos!.dx,
-        y: createMenuWorldPos!.dy,
-        circleId: sourceId,
-        avatar: makeAvatar(people.length + 1),
-        shapeType: ShapeType.polygon,
-        sides: randomSides,
-        amplitude: 2.0,
-      ));
+      people.add(
+        PersonNode(
+          id: newId,
+          name: 'New person ${people.length + 1}',
+          role: 'Inside parent',
+          x: createMenuWorldPos!.dx,
+          y: createMenuWorldPos!.dy,
+          circleId: sourceId,
+          avatar: makeAvatar(people.length + 1),
+          shapeType: ShapeType.polygon,
+          sides: randomSides,
+          amplitude: 2.0,
+        ),
+      );
       circles = ensureContainment(circles, people);
       selectedPersonId = newId;
       selectedCircleId = null;
@@ -782,21 +799,23 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
     final sourceCircle = circles.firstWhere((c) => c.id == sourceId);
 
     setState(() {
-      circles.add(CircleNode(
-        id: newId,
-        name: isNested ? '${sourceCircle.name} subset' : 'New circle',
-        icon: isNested ? 'SUB' : 'C',
-        x: createMenuWorldPos!.dx,
-        y: createMenuWorldPos!.dy,
-        radius: isNested ? 82.0 : 190.0,
-        minRadius: isNested ? 82.0 : 190.0,
-        parentId: isNested ? sourceId : null,
-        connectedTo: sourceId,
-        tone: isNested ? CircleTone.violet : nextTone(circles.length),
-        shapeType: isNested ? ShapeType.polygon : ShapeType.wavy,
-        sides: isNested ? 6 : 12,
-        amplitude: isNested ? 4.0 : 8.0,
-      ));
+      circles.add(
+        CircleNode(
+          id: newId,
+          name: isNested ? '${sourceCircle.name} subset' : 'New circle',
+          icon: isNested ? 'SUB' : 'C',
+          x: createMenuWorldPos!.dx,
+          y: createMenuWorldPos!.dy,
+          radius: isNested ? 82.0 : 190.0,
+          minRadius: isNested ? 82.0 : 190.0,
+          parentId: isNested ? sourceId : null,
+          connectedTo: sourceId,
+          tone: isNested ? CircleTone.violet : nextTone(circles.length),
+          shapeType: isNested ? ShapeType.polygon : ShapeType.wavy,
+          sides: isNested ? 6 : 12,
+          amplitude: isNested ? 4.0 : 8.0,
+        ),
+      );
       circles = ensureContainment(circles, people);
       selectedCircleId = newId;
       selectedPersonId = null;
@@ -819,9 +838,7 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
     return IconButton(
       onPressed: onPressed,
       icon: Icon(icon, color: const Color(0xFF1C2528)),
-      style: IconButton.styleFrom(
-        hoverColor: const Color(0x121C2528),
-      ),
+      style: IconButton.styleFrom(hoverColor: const Color(0x121C2528)),
     );
   }
 
@@ -831,11 +848,23 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('• ', style: TextStyle(color: Color(0x8A1C2528), fontSize: 12, fontWeight: FontWeight.bold)),
+          const Text(
+            '• ',
+            style: TextStyle(
+              color: Color(0x8A1C2528),
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(color: Color(0xAD1C2528), fontSize: 12, fontWeight: FontWeight.w600, height: 1.35),
+              style: const TextStyle(
+                color: Color(0xAD1C2528),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                height: 1.35,
+              ),
             ),
           ),
         ],
@@ -846,9 +875,14 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
   @override
   Widget build(BuildContext context) {
     final circlesById = {for (final c in circles) c.id: c};
-    final selectedCircle = selectedCircleId != null ? circlesById[selectedCircleId] : null;
-    final selectedPerson = selectedPersonId != null ? people.firstWhere((p) => p.id == selectedPersonId, orElse: () => people.first) : null;
-    final actualSelectedPerson = selectedPersonId != null ? (people.any((p) => p.id == selectedPersonId) ? people.firstWhere((p) => p.id == selectedPersonId) : null) : null;
+    final selectedCircle = selectedCircleId != null
+        ? circlesById[selectedCircleId]
+        : null;
+    final actualSelectedPerson = selectedPersonId != null
+        ? (people.any((p) => p.id == selectedPersonId)
+              ? people.firstWhere((p) => p.id == selectedPersonId)
+              : null)
+        : null;
 
     int getDepth(String? circleId) {
       int depth = 0;
@@ -860,7 +894,8 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
       return depth;
     }
 
-    final sortedCircles = [...circles]..sort((a, b) => getDepth(a.parentId).compareTo(getDepth(b.parentId)));
+    final sortedCircles = [...circles]
+      ..sort((a, b) => getDepth(a.parentId).compareTo(getDepth(b.parentId)));
 
     return Scaffold(
       body: Stack(
@@ -887,9 +922,7 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
                   children: [
                     Positioned.fill(
                       child: RepaintBoundary(
-                        child: CustomPaint(
-                          painter: GridPainter(),
-                        ),
+                        child: CustomPaint(painter: GridPainter()),
                       ),
                     ),
                     // Pass 1: Circle fills and borders
@@ -920,11 +953,8 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
                             circles: circles,
                             circlesById: circlesById,
                             people: people,
-                            stressPeople: showEdges ? _stressPeople : [],
                             connectorStart: connectorStartPos,
                             connectorEnd: connectorEndPos,
-                            transformationController: _transformationController,
-                            viewportSize: MediaQuery.of(context).size,
                           ),
                         ),
                       ),
@@ -939,10 +969,16 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
                         height: size,
                         child: GestureDetector(
                           onSecondaryTapUp: (details) {
-                            _openCircleContextMenu(circle, details.globalPosition);
+                            _openCircleContextMenu(
+                              circle,
+                              details.globalPosition,
+                            );
                           },
                           onLongPressStart: (details) {
-                            _openCircleContextMenu(circle, details.globalPosition);
+                            _openCircleContextMenu(
+                              circle,
+                              details.globalPosition,
+                            );
                           },
                           onPanStart: (details) {
                             _startCircleDrag(circle, details.localPosition);
@@ -988,27 +1024,7 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
                         ),
                       );
                     }),
-                    // Pass 4: Stress people (canvas layer would be ideal; using CustomPaint)
-                    if (_stressPeople.isNotEmpty)
-                      Positioned.fill(
-                        child: IgnorePointer(
-                          child: RepaintBoundary(
-                            child: CustomPaint(
-                              painter: StressIconsPainter(
-                                people: _stressPeople,
-                                circlesById: circlesById,
-                                showLabels: showLabels,
-                                transformationController: _transformationController,
-                                viewportSize: MediaQuery.of(context).size,
-                                avatarPictures: _stressAvatarPictures,
-                                avatarImages: _stressAvatarImages,
-                                labelPainterProvider: _getOrCreateLabelPainter,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    // Pass 5: Real people icons
+                    // Pass 4: Real people icons
                     ...people.map((person) {
                       final parentCircle = circlesById[person.circleId];
                       final tone = parentCircle?.tone ?? CircleTone.blue;
@@ -1049,6 +1065,25 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
               ),
             ),
           ),
+          if (_stressPeople.isNotEmpty)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    painter: StressIconsPainter(
+                      people: _stressPeople,
+                      circlesById: circlesById,
+                      showEdges: showEdges,
+                      showLabels: showLabels,
+                      transformationController: _transformationController,
+                      avatarPictures: _stressAvatarPictures,
+                      avatarImages: _stressAvatarImages,
+                      labelPainterProvider: _getOrCreateLabelPainter,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           if (createMenuScreenPos != null)
             Positioned(
               left: _menuPositionX(createMenuScreenPos!.dx),
@@ -1069,13 +1104,23 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
               children: [
                 Container(
                   height: 44,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: const Color(0xFFC4C7C8), width: 1.5),
+                    border: Border.all(
+                      color: const Color(0xFFC4C7C8),
+                      width: 1.5,
+                    ),
                     boxShadow: const [
-                      BoxShadow(color: Color(0x14363D44), blurRadius: 48, offset: Offset(0, 18))
+                      BoxShadow(
+                        color: Color(0x14363D44),
+                        blurRadius: 48,
+                        offset: Offset(0, 18),
+                      ),
                     ],
                   ),
                   child: Row(
@@ -1091,13 +1136,21 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
                         alignment: Alignment.center,
                         child: const Text(
                           'DN',
-                          style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 10),
                       const Text(
                         'Circle graph board',
-                        style: TextStyle(color: Color(0xFF1C2528), fontSize: 14, fontWeight: FontWeight.w800),
+                        style: TextStyle(
+                          color: Color(0xFF1C2528),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ],
                   ),
@@ -1108,9 +1161,16 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: const Color(0xFFC4C7C8), width: 1.5),
+                    border: Border.all(
+                      color: const Color(0xFFC4C7C8),
+                      width: 1.5,
+                    ),
                     boxShadow: const [
-                      BoxShadow(color: Color(0x14363D44), blurRadius: 48, offset: Offset(0, 18))
+                      BoxShadow(
+                        color: Color(0x14363D44),
+                        blurRadius: 48,
+                        offset: Offset(0, 18),
+                      ),
                     ],
                   ),
                   child: Row(
@@ -1129,18 +1189,22 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
           Positioned(
             top: 76,
             right: 16,
-            child: StressPanelWidget(
-              fps: _fps,
-              stressCount: stressCount,
-              showEdges: showEdges,
-              showLabels: showLabels,
-              renderedIcons: people.length + _stressPeople.length,
-              renderedEdges: circles.where((c) => c.connectedTo != null).length +
-                  people.length +
-                  (showEdges ? _stressPeople.length : 0),
-              onCountChanged: _updateStressCount,
-              onShowEdgesChanged: (v) => setState(() => showEdges = v),
-              onShowLabelsChanged: (v) => setState(() => showLabels = v),
+            child: ValueListenableBuilder<int>(
+              valueListenable: _fpsNotifier,
+              builder: (context, fps, child) => StressPanelWidget(
+                fps: fps,
+                stressCount: stressCount,
+                showEdges: showEdges,
+                showLabels: showLabels,
+                renderedIcons: people.length + _stressPeople.length,
+                renderedEdges:
+                    circles.where((c) => c.connectedTo != null).length +
+                    people.length +
+                    (showEdges ? _stressPeople.length : 0),
+                onCountChanged: _updateStressCount,
+                onShowEdgesChanged: (v) => setState(() => showEdges = v),
+                onShowLabelsChanged: (v) => setState(() => showLabels = v),
+              ),
             ),
           ),
           // Help panel
@@ -1155,7 +1219,11 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: const Color(0xFFC4C7C8), width: 1.5),
                 boxShadow: const [
-                  BoxShadow(color: Color(0x14363D44), blurRadius: 48, offset: Offset(0, 18))
+                  BoxShadow(
+                    color: Color(0x14363D44),
+                    blurRadius: 48,
+                    offset: Offset(0, 18),
+                  ),
                 ],
               ),
               child: Column(
@@ -1164,7 +1232,12 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
                 children: [
                   const Text(
                     'HOW IT WORKS',
-                    style: TextStyle(color: Color(0xFF1C2528), fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 1.0),
+                    style: TextStyle(
+                      color: Color(0xFF1C2528),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.0,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   _helpRow('Drag people or circles to move them.'),
@@ -1242,7 +1315,14 @@ class CircleShapePainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
 
-    final path = getCustomNodePath(center.dx, center.dy, radius, circle.shapeType, circle.sides, circle.amplitude);
+    final path = getCustomNodePath(
+      center.dx,
+      center.dy,
+      radius,
+      circle.shapeType,
+      circle.sides,
+      circle.amplitude,
+    );
     final colors = materialTones[circle.tone]!;
 
     canvas.drawShadow(path, const Color(0x0F000000), 6.0, true);
@@ -1276,22 +1356,16 @@ class EdgePainter extends CustomPainter {
   final List<CircleNode> circles;
   final Map<String, CircleNode> circlesById;
   final List<PersonNode> people;
-  final List<PersonNode> stressPeople;
   final Offset? connectorStart;
   final Offset? connectorEnd;
-  final TransformationController transformationController;
-  final Size viewportSize;
 
   EdgePainter({
     required this.circles,
     required this.circlesById,
     required this.people,
-    this.stressPeople = const [],
     this.connectorStart,
     this.connectorEnd,
-    required this.transformationController,
-    required this.viewportSize,
-  }) : super(repaint: transformationController);
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1309,11 +1383,6 @@ class EdgePainter extends CustomPainter {
       ..strokeWidth = 1.5
       ..strokeCap = StrokeCap.round;
 
-    final stressPaint = Paint()
-      ..color = const Color(0x1F747E84)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
-
     final draftPaint = Paint()
       ..color = const Color(0xFF2563EB)
       ..style = PaintingStyle.stroke
@@ -1324,7 +1393,10 @@ class EdgePainter extends CustomPainter {
       final path = Path();
       path.moveTo(from.dx + shift, from.dy + shift);
       final double midX = (from.dx + to.dx) / 2;
-      final double lift = math.min(100.0, (to.dy - from.dy).abs() * 0.22 + 38.0);
+      final double lift = math.min(
+        100.0,
+        (to.dy - from.dy).abs() * 0.22 + 38.0,
+      );
       path.cubicTo(
         midX + shift,
         from.dy - lift + shift,
@@ -1340,46 +1412,21 @@ class EdgePainter extends CustomPainter {
       if (circle.connectedTo == null) continue;
       final source = circlesById[circle.connectedTo];
       if (source == null) continue;
-      drawCurve(Offset(source.x, source.y), Offset(circle.x, circle.y), circlePaint);
+      drawCurve(
+        Offset(source.x, source.y),
+        Offset(circle.x, circle.y),
+        circlePaint,
+      );
     }
 
     for (final person in people) {
       final circle = circlesById[person.circleId];
       if (circle == null) continue;
-      drawCurve(Offset(circle.x, circle.y), Offset(person.x, person.y), personPaint);
-    }
-
-    // Stress edges (straight lines, only drawn for viewport-culled visible people)
-    if (stressPeople.isNotEmpty) {
-      final youCircle = circlesById['you'];
-      if (youCircle != null) {
-        final path = Path();
-
-        final matrix = transformationController.value;
-        final double scale = matrix.storage[0];
-        final double tx = matrix.storage[12];
-        final double ty = matrix.storage[13];
-
-        final double left = -tx / scale;
-        final double top = -ty / scale;
-        final double right = (viewportSize.width - tx) / scale;
-        final double bottom = (viewportSize.height - ty) / scale;
-
-        final double padding = 48.0 / scale;
-
-        for (final person in stressPeople) {
-          final cx = person.x + shift;
-          final cy = person.y + shift;
-          if (cx >= left - padding &&
-              cx <= right + padding &&
-              cy >= top - padding &&
-              cy <= bottom + padding) {
-            path.moveTo(youCircle.x + shift, youCircle.y + shift);
-            path.lineTo(cx, cy);
-          }
-        }
-        canvas.drawPath(path, stressPaint);
-      }
+      drawCurve(
+        Offset(circle.x, circle.y),
+        Offset(person.x, person.y),
+        personPaint,
+      );
     }
 
     if (connectorStart != null && connectorEnd != null) {
@@ -1394,9 +1441,9 @@ class EdgePainter extends CustomPainter {
 class StressIconsPainter extends CustomPainter {
   final List<PersonNode> people;
   final Map<String, CircleNode> circlesById;
+  final bool showEdges;
   final bool showLabels;
   final TransformationController transformationController;
-  final Size viewportSize;
   final List<ui.Picture> avatarPictures;
   final List<ui.Image> avatarImages;
   final TextPainter Function(String) labelPainterProvider;
@@ -1404,9 +1451,9 @@ class StressIconsPainter extends CustomPainter {
   StressIconsPainter({
     required this.people,
     required this.circlesById,
+    required this.showEdges,
     required this.showLabels,
     required this.transformationController,
-    required this.viewportSize,
     required this.avatarPictures,
     required this.avatarImages,
     required this.labelPainterProvider,
@@ -1414,52 +1461,73 @@ class StressIconsPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    const double shift = halfWorldSize;
-
     final matrix = transformationController.value;
     final double scale = matrix.storage[0];
     final double tx = matrix.storage[12];
     final double ty = matrix.storage[13];
 
-    // Calculate viewport boundaries in Stack's coordinate space (0..5000)
-    final double left = -tx / scale;
-    final double top = -ty / scale;
-    final double right = (viewportSize.width - tx) / scale;
-    final double bottom = (viewportSize.height - ty) / scale;
+    final double left = -tx / scale - halfWorldSize;
+    final double top = -ty / scale - halfWorldSize;
+    final double right = (size.width - tx) / scale - halfWorldSize;
+    final double bottom = (size.height - ty) / scale - halfWorldSize;
 
     final double padding = showLabels ? (120.0 / scale) : (48.0 / scale);
+    final visiblePeople = <PersonNode>[];
 
-    // Viewport culling
-    final visiblePeople = people.where((person) {
-      final cx = person.x + shift;
-      final cy = person.y + shift;
-      return cx >= left - padding &&
-          cx <= right + padding &&
-          cy >= top - padding &&
-          cy <= bottom + padding;
-    }).toList();
+    for (final person in people) {
+      if (person.x >= left - padding &&
+          person.x <= right + padding &&
+          person.y >= top - padding &&
+          person.y <= bottom + padding) {
+        visiblePeople.add(person);
+      }
+    }
+
+    if (showEdges) {
+      final youCircle = circlesById['you'];
+      if (youCircle != null) {
+        final path = Path();
+        final double sx = (youCircle.x + halfWorldSize) * scale + tx;
+        final double sy = (youCircle.y + halfWorldSize) * scale + ty;
+
+        for (final person in visiblePeople) {
+          final double px = (person.x + halfWorldSize) * scale + tx;
+          final double py = (person.y + halfWorldSize) * scale + ty;
+          path.moveTo(sx, sy);
+          path.lineTo(px, py);
+        }
+
+        canvas.drawPath(
+          path,
+          Paint()
+            ..color = const Color(0x1F747E84)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.0,
+        );
+      }
+    }
 
     for (int i = 0; i < visiblePeople.length; i++) {
       final person = visiblePeople[i];
-      final cx = person.x + shift;
-      final cy = person.y + shift;
+      final double cx = (person.x + halfWorldSize) * scale + tx;
+      final double cy = (person.y + halfWorldSize) * scale + ty;
 
       // Extract the index of the person to match the avatar sprite index
       final idMatch = RegExp(r'\d+').firstMatch(person.id);
       final idNum = idMatch != null ? int.parse(idMatch.group(0)!) : i;
 
       // Use the rasterized image if loaded, otherwise fallback to picture
-      if (avatarImages.length > idNum % avatarImages.length) {
+      if (avatarImages.isNotEmpty) {
+        const double iconSize = 40.0;
         canvas.drawImage(
           avatarImages[idNum % avatarImages.length],
-          Offset(cx - 20.0, cy - 20.0),
+          Offset(cx - iconSize / 2, cy - iconSize / 2),
           Paint(),
         );
-      } else {
-        final picture = avatarPictures[idNum % avatarPictures.length];
+      } else if (avatarPictures.isNotEmpty) {
         canvas.save();
         canvas.translate(cx - 20.0, cy - 20.0);
-        canvas.drawPicture(picture);
+        canvas.drawPicture(avatarPictures[idNum % avatarPictures.length]);
         canvas.restore();
       }
 
@@ -1472,7 +1540,7 @@ class StressIconsPainter extends CustomPainter {
         final double y = cy + 18.0;
 
         final bgPaint = Paint()
-          ..color = Colors.white.withOpacity(0.86)
+          ..color = Colors.white.withValues(alpha: 0.86)
           ..style = PaintingStyle.fill;
 
         canvas.drawRRect(
@@ -1485,10 +1553,7 @@ class StressIconsPainter extends CustomPainter {
 
         labelPainter.paint(
           canvas,
-          Offset(
-            cx - labelPainter.width / 2,
-            y + 2.0,
-          ),
+          Offset(cx - labelPainter.width / 2, y + 2.0),
         );
       }
     }
@@ -1547,7 +1612,11 @@ class CircleInteractiveWidget extends StatelessWidget {
                 borderRadius: BorderRadius.circular(7),
                 border: Border.all(color: const Color(0xFFC4C7C8), width: 1.0),
                 boxShadow: const [
-                  BoxShadow(color: Color(0x171C2528), blurRadius: 20, offset: Offset(0, 8))
+                  BoxShadow(
+                    color: Color(0x171C2528),
+                    blurRadius: 20,
+                    offset: Offset(0, 8),
+                  ),
                 ],
               ),
               child: Text(
@@ -1577,8 +1646,16 @@ class CircleInteractiveWidget extends StatelessWidget {
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white, width: 3),
                 boxShadow: const [
-                  BoxShadow(color: Color(0x331C2528), blurRadius: 26, offset: Offset(0, 12)),
-                  BoxShadow(color: Color(0x141C2528), blurRadius: 1, offset: Offset(0, 0)),
+                  BoxShadow(
+                    color: Color(0x331C2528),
+                    blurRadius: 26,
+                    offset: Offset(0, 12),
+                  ),
+                  BoxShadow(
+                    color: Color(0x141C2528),
+                    blurRadius: 1,
+                    offset: Offset(0, 0),
+                  ),
                 ],
               ),
               clipBehavior: Clip.antiAlias,
@@ -1589,9 +1666,13 @@ class CircleInteractiveWidget extends StatelessWidget {
                       width: 40,
                       height: 40,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Text(
+                      errorBuilder: (_, _, _) => Text(
                         circle.icon,
-                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                     )
                   : Text(
@@ -1643,30 +1724,30 @@ class PersonIconWidget extends StatelessWidget {
                   isSelected: isSelected,
                 ),
                 child: person.imageUrl != null
-                  ? ClipPath(
-                      clipper: ShapeClipper(
-                        shapeType: person.shapeType,
-                        sides: person.sides,
-                        amplitude: person.amplitude,
-                      ),
-                      child: Image.network(
-                        person.imageUrl!,
-                        width: 40,
-                        height: 40,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                      ),
-                    )
-                  : Center(
-                      child: Text(
-                        person.avatar,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w900,
+                    ? ClipPath(
+                        clipper: ShapeClipper(
+                          shapeType: person.shapeType,
+                          sides: person.sides,
+                          amplitude: person.amplitude,
+                        ),
+                        child: Image.network(
+                          person.imageUrl!,
+                          width: 40,
+                          height: 40,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                        ),
+                      )
+                    : Center(
+                        child: Text(
+                          person.avatar,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ),
-                    ),
               ),
             ),
           ),
@@ -1674,13 +1755,15 @@ class PersonIconWidget extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.88),
+              color: Colors.white.withValues(alpha: 0.88),
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
               person.name,
               style: TextStyle(
-                color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF1C2528),
+                color: isSelected
+                    ? const Color(0xFF2563EB)
+                    : const Color(0xFF1C2528),
                 fontSize: 10,
                 fontWeight: FontWeight.w800,
               ),
@@ -1699,13 +1782,24 @@ class PersonAvatarPainter extends CustomPainter {
   final Color fillColor;
   final bool isSelected;
 
-  PersonAvatarPainter({required this.person, required this.fillColor, required this.isSelected});
+  PersonAvatarPainter({
+    required this.person,
+    required this.fillColor,
+    required this.isSelected,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2 - 1.0;
-    final path = getCustomNodePath(center.dx, center.dy, radius, person.shapeType, person.sides, person.amplitude);
+    final path = getCustomNodePath(
+      center.dx,
+      center.dy,
+      radius,
+      person.shapeType,
+      person.sides,
+      person.amplitude,
+    );
 
     final fillPaint = Paint()
       ..color = person.imageUrl != null ? fillColor : fillColor
@@ -1751,15 +1845,27 @@ class CreateContextMenuWidget extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFC4C7C8), width: 1.5),
         boxShadow: const [
-          BoxShadow(color: Color(0x1F363D44), blurRadius: 48, offset: Offset(0, 18))
+          BoxShadow(
+            color: Color(0x1F363D44),
+            blurRadius: 48,
+            offset: Offset(0, 18),
+          ),
         ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           _menuButton(Icons.person_add, 'Add person here', onAddPerson),
-          _menuButton(Icons.filter_center_focus, 'Add subset inside source circle', onAddNested),
-          _menuButton(Icons.add_circle_outline, 'Create connected circle outside', onAddExternal),
+          _menuButton(
+            Icons.filter_center_focus,
+            'Add subset inside source circle',
+            onAddNested,
+          ),
+          _menuButton(
+            Icons.add_circle_outline,
+            'Create connected circle outside',
+            onAddExternal,
+          ),
         ],
       ),
     );
@@ -1827,7 +1933,11 @@ class StressPanelWidget extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFC4C7C8), width: 1.5),
         boxShadow: const [
-          BoxShadow(color: Color(0x14363D44), blurRadius: 48, offset: Offset(0, 18))
+          BoxShadow(
+            color: Color(0x14363D44),
+            blurRadius: 48,
+            offset: Offset(0, 18),
+          ),
         ],
       ),
       child: Column(
@@ -1839,18 +1949,30 @@ class StressPanelWidget extends StatelessWidget {
             children: [
               const Text(
                 'Icon stress',
-                style: TextStyle(color: Color(0xFF1C2528), fontSize: 13, fontWeight: FontWeight.w900),
+                style: TextStyle(
+                  color: Color(0xFF1C2528),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
               Text(
                 '$fps FPS',
-                style: const TextStyle(color: Color(0xFF2563EB), fontSize: 13, fontWeight: FontWeight.w700),
+                style: const TextStyle(
+                  color: Color(0xFF2563EB),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 8),
           Text(
             '${stressCount.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} synthetic icons',
-            style: const TextStyle(color: Color(0xFF6B7280), fontSize: 11, fontWeight: FontWeight.w600),
+            style: const TextStyle(
+              color: Color(0xFF6B7280),
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           Slider(
             value: stressCount.toDouble(),
@@ -1861,10 +1983,11 @@ class StressPanelWidget extends StatelessWidget {
             inactiveColor: const Color(0xFFE5E7EB),
             onChanged: (v) => onCountChanged(v.round()),
           ),
-          Row(
+          Wrap(
+            spacing: 12,
+            runSpacing: 4,
             children: [
               _toggle('Edges', showEdges, onShowEdgesChanged),
-              const SizedBox(width: 16),
               _toggle('Labels', showLabels, onShowLabelsChanged),
             ],
           ),
@@ -1885,11 +2008,18 @@ class StressPanelWidget extends StatelessWidget {
           child: Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: const Color(0xFF2563EB),
+            activeThumbColor: const Color(0xFF2563EB),
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
         ),
-        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1C2528))),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF1C2528),
+          ),
+        ),
       ],
     );
   }
@@ -1900,10 +2030,20 @@ class StressPanelWidget extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Color(0xFF6B7280), fontSize: 11)),
           Text(
-            value.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},'),
-            style: const TextStyle(color: Color(0xFF1C2528), fontSize: 11, fontWeight: FontWeight.w700),
+            label,
+            style: const TextStyle(color: Color(0xFF6B7280), fontSize: 11),
+          ),
+          Text(
+            value.toString().replaceAllMapped(
+              RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+              (m) => '${m[1]},',
+            ),
+            style: const TextStyle(
+              color: Color(0xFF1C2528),
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),
@@ -1921,8 +2061,25 @@ class InspectorWidget extends StatefulWidget {
   final Map<String, CircleNode> circlesById;
   final List<PersonNode> peopleList;
   final List<CircleNode> circlesList;
-  final Function(String circleId, {ShapeType? shapeType, int? sides, double? amplitude, String? imageUrl, bool clearImageUrl, CircleTone? tone}) onUpdateCircleStyle;
-  final Function(String personId, {ShapeType? shapeType, int? sides, double? amplitude, String? imageUrl, bool clearImageUrl}) onUpdatePersonStyle;
+  final Function(
+    String circleId, {
+    ShapeType? shapeType,
+    int? sides,
+    double? amplitude,
+    String? imageUrl,
+    bool clearImageUrl,
+    CircleTone? tone,
+  })
+  onUpdateCircleStyle;
+  final Function(
+    String personId, {
+    ShapeType? shapeType,
+    int? sides,
+    double? amplitude,
+    String? imageUrl,
+    bool clearImageUrl,
+  })
+  onUpdatePersonStyle;
 
   const InspectorWidget({
     super.key,
@@ -1954,18 +2111,25 @@ class _InspectorWidgetState extends State<InspectorWidget> {
       text: widget.selectedCircle?.name ?? widget.selectedPerson?.name ?? '',
     );
     _imageUrlController = TextEditingController(
-      text: widget.selectedCircle?.imageUrl ?? widget.selectedPerson?.imageUrl ?? '',
+      text:
+          widget.selectedCircle?.imageUrl ??
+          widget.selectedPerson?.imageUrl ??
+          '',
     );
   }
 
   @override
   void didUpdateWidget(covariant InspectorWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final String currentText = widget.selectedCircle?.name ?? widget.selectedPerson?.name ?? '';
+    final String currentText =
+        widget.selectedCircle?.name ?? widget.selectedPerson?.name ?? '';
     if (_nameController.text != currentText) {
       _nameController.text = currentText;
     }
-    final String currentImageUrl = widget.selectedCircle?.imageUrl ?? widget.selectedPerson?.imageUrl ?? '';
+    final String currentImageUrl =
+        widget.selectedCircle?.imageUrl ??
+        widget.selectedPerson?.imageUrl ??
+        '';
     if (_imageUrlController.text != currentImageUrl) {
       _imageUrlController.text = currentImageUrl;
     }
@@ -1982,9 +2146,17 @@ class _InspectorWidgetState extends State<InspectorWidget> {
     final base64 = await pickImageBase64();
     if (base64 == null) return;
     if (widget.selectedCircle != null) {
-      widget.onUpdateCircleStyle(widget.selectedCircle!.id, imageUrl: base64, clearImageUrl: false);
+      widget.onUpdateCircleStyle(
+        widget.selectedCircle!.id,
+        imageUrl: base64,
+        clearImageUrl: false,
+      );
     } else if (widget.selectedPerson != null) {
-      widget.onUpdatePersonStyle(widget.selectedPerson!.id, imageUrl: base64, clearImageUrl: false);
+      widget.onUpdatePersonStyle(
+        widget.selectedPerson!.id,
+        imageUrl: base64,
+        clearImageUrl: false,
+      );
     }
   }
 
@@ -1999,13 +2171,19 @@ class _InspectorWidgetState extends State<InspectorWidget> {
 
     return Container(
       width: 320,
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height - 120),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height - 120,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFC4C7C8), width: 1.5),
         boxShadow: const [
-          BoxShadow(color: Color(0x14363D44), blurRadius: 48, offset: Offset(0, 18))
+          BoxShadow(
+            color: Color(0x14363D44),
+            blurRadius: 48,
+            offset: Offset(0, 18),
+          ),
         ],
       ),
       child: SingleChildScrollView(
@@ -2045,8 +2223,14 @@ class _InspectorWidgetState extends State<InspectorWidget> {
             ),
             const SizedBox(height: 14),
             if (isCircle) ...[
-              _detail('People', '${widget.peopleList.where((p) => p.circleId == widget.selectedCircle!.id).length}'),
-              _detail('Nested circles', '${widget.circlesList.where((c) => c.parentId == widget.selectedCircle!.id).length}'),
+              _detail(
+                'People',
+                '${widget.peopleList.where((p) => p.circleId == widget.selectedCircle!.id).length}',
+              ),
+              _detail(
+                'Nested circles',
+                '${widget.circlesList.where((c) => c.parentId == widget.selectedCircle!.id).length}',
+              ),
               _detail('Radius', '${widget.selectedCircle!.radius.round()} px'),
               const SizedBox(height: 10),
               // Tone selector
@@ -2058,7 +2242,10 @@ class _InspectorWidgetState extends State<InspectorWidget> {
                   final color = materialTones[tone]!.centerBg;
                   final isActive = widget.selectedCircle!.tone == tone;
                   return GestureDetector(
-                    onTap: () => widget.onUpdateCircleStyle(widget.selectedCircle!.id, tone: tone),
+                    onTap: () => widget.onUpdateCircleStyle(
+                      widget.selectedCircle!.id,
+                      tone: tone,
+                    ),
                     child: Container(
                       width: 28,
                       height: 28,
@@ -2066,11 +2253,18 @@ class _InspectorWidgetState extends State<InspectorWidget> {
                         color: color,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: isActive ? const Color(0xFF2563EB) : Colors.transparent,
+                          color: isActive
+                              ? const Color(0xFF2563EB)
+                              : Colors.transparent,
                           width: 3,
                         ),
                         boxShadow: isActive
-                            ? [BoxShadow(color: color.withOpacity(0.5), blurRadius: 8)]
+                            ? [
+                                BoxShadow(
+                                  color: color.withValues(alpha: 0.5),
+                                  blurRadius: 8,
+                                ),
+                              ]
                             : null,
                       ),
                     ),
@@ -2083,7 +2277,10 @@ class _InspectorWidgetState extends State<InspectorWidget> {
               const SizedBox(height: 6),
               _shapeDropdown(
                 value: widget.selectedCircle!.shapeType,
-                onChanged: (v) => widget.onUpdateCircleStyle(widget.selectedCircle!.id, shapeType: v),
+                onChanged: (v) => widget.onUpdateCircleStyle(
+                  widget.selectedCircle!.id,
+                  shapeType: v,
+                ),
                 forCircle: true,
               ),
               if (widget.selectedCircle!.shapeType != ShapeType.circle) ...[
@@ -2096,9 +2293,14 @@ class _InspectorWidgetState extends State<InspectorWidget> {
                   divisions: 57,
                   activeColor: const Color(0xFF2563EB),
                   inactiveColor: const Color(0xFFE5E7EB),
-                  onChanged: (v) => widget.onUpdateCircleStyle(widget.selectedCircle!.id, sides: v.round()),
+                  onChanged: (v) => widget.onUpdateCircleStyle(
+                    widget.selectedCircle!.id,
+                    sides: v.round(),
+                  ),
                 ),
-                _label('Amplitude / Rounding  (${widget.selectedCircle!.amplitude.toStringAsFixed(0)})'),
+                _label(
+                  'Amplitude / Rounding  (${widget.selectedCircle!.amplitude.toStringAsFixed(0)})',
+                ),
                 Slider(
                   value: widget.selectedCircle!.amplitude,
                   min: 0,
@@ -2106,7 +2308,10 @@ class _InspectorWidgetState extends State<InspectorWidget> {
                   divisions: 50,
                   activeColor: const Color(0xFF2563EB),
                   inactiveColor: const Color(0xFFE5E7EB),
-                  onChanged: (v) => widget.onUpdateCircleStyle(widget.selectedCircle!.id, amplitude: v),
+                  onChanged: (v) => widget.onUpdateCircleStyle(
+                    widget.selectedCircle!.id,
+                    amplitude: v,
+                  ),
                 ),
               ],
               const SizedBox(height: 10),
@@ -2118,8 +2323,14 @@ class _InspectorWidgetState extends State<InspectorWidget> {
                 decoration: InputDecoration(
                   isDense: true,
                   hintText: 'https://example.com/image.jpg',
-                  hintStyle: const TextStyle(fontSize: 12, color: Color(0xFFADB5BD)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  hintStyle: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFFADB5BD),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide: const BorderSide(color: Color(0xFFCED4DA)),
@@ -2133,7 +2344,11 @@ class _InspectorWidgetState extends State<InspectorWidget> {
                     borderSide: const BorderSide(color: Color(0xFF2563EB)),
                   ),
                 ),
-                onChanged: (v) => widget.onUpdateCircleStyle(widget.selectedCircle!.id, imageUrl: v.isEmpty ? null : v, clearImageUrl: v.isEmpty),
+                onChanged: (v) => widget.onUpdateCircleStyle(
+                  widget.selectedCircle!.id,
+                  imageUrl: v.isEmpty ? null : v,
+                  clearImageUrl: v.isEmpty,
+                ),
               ),
               const SizedBox(height: 8),
               _uploadButton(),
@@ -2159,13 +2374,19 @@ class _InspectorWidgetState extends State<InspectorWidget> {
               ),
             ] else ...[
               _detail('Role', widget.selectedPerson!.role),
-              _detail('Circle', widget.circlesById[widget.selectedPerson!.circleId]?.name ?? ''),
+              _detail(
+                'Circle',
+                widget.circlesById[widget.selectedPerson!.circleId]?.name ?? '',
+              ),
               const SizedBox(height: 10),
               _label('Shape Type'),
               const SizedBox(height: 6),
               _shapeDropdown(
                 value: widget.selectedPerson!.shapeType,
-                onChanged: (v) => widget.onUpdatePersonStyle(widget.selectedPerson!.id, shapeType: v),
+                onChanged: (v) => widget.onUpdatePersonStyle(
+                  widget.selectedPerson!.id,
+                  shapeType: v,
+                ),
                 forCircle: false,
               ),
               if (widget.selectedPerson!.shapeType != ShapeType.circle) ...[
@@ -2178,9 +2399,14 @@ class _InspectorWidgetState extends State<InspectorWidget> {
                   divisions: 17,
                   activeColor: const Color(0xFF2563EB),
                   inactiveColor: const Color(0xFFE5E7EB),
-                  onChanged: (v) => widget.onUpdatePersonStyle(widget.selectedPerson!.id, sides: v.round()),
+                  onChanged: (v) => widget.onUpdatePersonStyle(
+                    widget.selectedPerson!.id,
+                    sides: v.round(),
+                  ),
                 ),
-                _label('Amplitude / Rounding  (${widget.selectedPerson!.amplitude.toStringAsFixed(0)})'),
+                _label(
+                  'Amplitude / Rounding  (${widget.selectedPerson!.amplitude.toStringAsFixed(0)})',
+                ),
                 Slider(
                   value: widget.selectedPerson!.amplitude,
                   min: 0,
@@ -2188,7 +2414,10 @@ class _InspectorWidgetState extends State<InspectorWidget> {
                   divisions: 20,
                   activeColor: const Color(0xFF2563EB),
                   inactiveColor: const Color(0xFFE5E7EB),
-                  onChanged: (v) => widget.onUpdatePersonStyle(widget.selectedPerson!.id, amplitude: v),
+                  onChanged: (v) => widget.onUpdatePersonStyle(
+                    widget.selectedPerson!.id,
+                    amplitude: v,
+                  ),
                 ),
               ],
               const SizedBox(height: 10),
@@ -2200,8 +2429,14 @@ class _InspectorWidgetState extends State<InspectorWidget> {
                 decoration: InputDecoration(
                   isDense: true,
                   hintText: 'https://example.com/image.jpg',
-                  hintStyle: const TextStyle(fontSize: 12, color: Color(0xFFADB5BD)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  hintStyle: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFFADB5BD),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide: const BorderSide(color: Color(0xFFCED4DA)),
@@ -2215,7 +2450,11 @@ class _InspectorWidgetState extends State<InspectorWidget> {
                     borderSide: const BorderSide(color: Color(0xFF2563EB)),
                   ),
                 ),
-                onChanged: (v) => widget.onUpdatePersonStyle(widget.selectedPerson!.id, imageUrl: v.isEmpty ? null : v, clearImageUrl: v.isEmpty),
+                onChanged: (v) => widget.onUpdatePersonStyle(
+                  widget.selectedPerson!.id,
+                  imageUrl: v.isEmpty ? null : v,
+                  clearImageUrl: v.isEmpty,
+                ),
               ),
               const SizedBox(height: 8),
               _uploadButton(),
@@ -2238,7 +2477,11 @@ class _InspectorWidgetState extends State<InspectorWidget> {
   Widget _label(String text) {
     return Text(
       text,
-      style: const TextStyle(color: Color(0xFF6B7280), fontSize: 11, fontWeight: FontWeight.w700),
+      style: const TextStyle(
+        color: Color(0xFF6B7280),
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+      ),
     );
   }
 
@@ -2248,28 +2491,61 @@ class _InspectorWidgetState extends State<InspectorWidget> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Color(0x8A1C2528), fontSize: 12, fontWeight: FontWeight.bold)),
-          Text(value, style: const TextStyle(color: Color(0xFF1C2528), fontSize: 13, fontWeight: FontWeight.w900)),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0x8A1C2528),
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Color(0xFF1C2528),
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _shapeDropdown({required ShapeType value, required ValueChanged<ShapeType> onChanged, required bool forCircle}) {
+  Widget _shapeDropdown({
+    required ShapeType value,
+    required ValueChanged<ShapeType> onChanged,
+    required bool forCircle,
+  }) {
     return DropdownButton<ShapeType>(
       value: value,
       isDense: true,
       isExpanded: true,
       underline: Container(height: 1, color: const Color(0xFFCED4DA)),
-      style: const TextStyle(fontSize: 13, color: Color(0xFF1C2528), fontWeight: FontWeight.w600),
-      onChanged: (v) { if (v != null) onChanged(v); },
+      style: const TextStyle(
+        fontSize: 13,
+        color: Color(0xFF1C2528),
+        fontWeight: FontWeight.w600,
+      ),
+      onChanged: (v) {
+        if (v != null) onChanged(v);
+      },
       items: [
         if (forCircle)
-          const DropdownMenuItem(value: ShapeType.wavy, child: Text('Wavy (Flower)')),
-        const DropdownMenuItem(value: ShapeType.polygon, child: Text('Soft Polygon')),
+          const DropdownMenuItem(
+            value: ShapeType.wavy,
+            child: Text('Wavy (Flower)'),
+          ),
+        const DropdownMenuItem(
+          value: ShapeType.polygon,
+          child: Text('Soft Polygon'),
+        ),
         const DropdownMenuItem(value: ShapeType.circle, child: Text('Circle')),
         if (!forCircle)
-          const DropdownMenuItem(value: ShapeType.wavy, child: Text('Wavy (Flower)')),
+          const DropdownMenuItem(
+            value: ShapeType.wavy,
+            child: Text('Wavy (Flower)'),
+          ),
       ],
     );
   }
@@ -2295,7 +2571,14 @@ class _InspectorWidgetState extends State<InspectorWidget> {
 
 // ─── Shape math ──────────────────────────────────────────────────────────────
 
-Path getCustomNodePath(double cx, double cy, double r, ShapeType shapeType, int sides, double amplitude) {
+Path getCustomNodePath(
+  double cx,
+  double cy,
+  double r,
+  ShapeType shapeType,
+  int sides,
+  double amplitude,
+) {
   final path = Path();
   if (shapeType == ShapeType.circle || amplitude == 0.0) {
     final int points = math.max(120, (r * 2).round());
@@ -2337,19 +2620,18 @@ Path getCustomNodePath(double cx, double cy, double r, ShapeType shapeType, int 
   final double angleStep = (2 * math.pi) / sides;
   for (int i = 0; i < sides; i++) {
     final double angle = i * angleStep - math.pi / 2;
-    vertices.add(Offset(
-      cx + r * math.cos(angle),
-      cy + r * math.sin(angle),
-    ));
+    vertices.add(Offset(cx + r * math.cos(angle), cy + r * math.sin(angle)));
   }
 
   final List<Offset> midpoints = [];
   for (int i = 0; i < sides; i++) {
     final int next = (i + 1) % sides;
-    midpoints.add(Offset(
-      (vertices[i].dx + vertices[next].dx) / 2,
-      (vertices[i].dy + vertices[next].dy) / 2,
-    ));
+    midpoints.add(
+      Offset(
+        (vertices[i].dx + vertices[next].dx) / 2,
+        (vertices[i].dy + vertices[next].dy) / 2,
+      ),
+    );
   }
 
   for (int i = 0; i < sides; i++) {
@@ -2390,7 +2672,14 @@ class ShapeClipper extends CustomClipper<Path> {
   Path getClip(Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
-    return getCustomNodePath(center.dx, center.dy, radius, shapeType, sides, amplitude);
+    return getCustomNodePath(
+      center.dx,
+      center.dy,
+      radius,
+      shapeType,
+      sides,
+      amplitude,
+    );
   }
 
   @override
@@ -2424,7 +2713,8 @@ double getRequiredCircleRadius(
 
     final latestChild = circlesById[childCircle.id] ?? childCircle;
     final double dist = math.sqrt(
-      math.pow(latestChild.x - circle.x, 2) + math.pow(latestChild.y - circle.y, 2),
+      math.pow(latestChild.x - circle.x, 2) +
+          math.pow(latestChild.y - circle.y, 2),
     );
     requiredRadius = math.max(requiredRadius, dist + latestChild.radius + 28.0);
   }
@@ -2432,7 +2722,10 @@ double getRequiredCircleRadius(
   return requiredRadius.ceilToDouble();
 }
 
-List<CircleNode> ensureContainment(List<CircleNode> circles, List<PersonNode> people) {
+List<CircleNode> ensureContainment(
+  List<CircleNode> circles,
+  List<PersonNode> people,
+) {
   List<CircleNode> currentCircles = circles.map((c) => c.copyWith()).toList();
 
   for (int pass = 0; pass < currentCircles.length + 2; pass++) {
@@ -2441,7 +2734,12 @@ List<CircleNode> ensureContainment(List<CircleNode> circles, List<PersonNode> pe
 
     for (int i = 0; i < currentCircles.length; i++) {
       final circle = currentCircles[i];
-      final requiredRadius = getRequiredCircleRadius(circle, currentCircles, circlesById, people);
+      final requiredRadius = getRequiredCircleRadius(
+        circle,
+        currentCircles,
+        circlesById,
+        people,
+      );
       if (requiredRadius != circle.radius) {
         currentCircles[i] = circle.copyWith(radius: requiredRadius);
         changed = true;
@@ -2462,15 +2760,17 @@ List<PersonNode> generateStressPeople(int count) {
     final radius = 185.0 + ring * 15.0;
     final jitter = (seededRandom(i + 11) - 0.5) * 18.0;
 
-    people.add(PersonNode(
-      id: 'stress-$i',
-      name: 'Stress ${i + 1}',
-      role: '',
-      x: math.cos(angle) * (radius + jitter),
-      y: math.sin(angle) * (radius + jitter),
-      circleId: 'you',
-      avatar: makeAvatar(i),
-    ));
+    people.add(
+      PersonNode(
+        id: 'stress-$i',
+        name: 'Stress ${i + 1}',
+        role: '',
+        x: math.cos(angle) * (radius + jitter),
+        y: math.sin(angle) * (radius + jitter),
+        circleId: 'you',
+        avatar: makeAvatar(i),
+      ),
+    );
   }
   return people;
 }
@@ -2562,22 +2862,198 @@ List<CircleNode> createInitialGraphCircles() {
 
 List<PersonNode> createInitialGraphPeople() {
   return [
-    PersonNode(id: 'p1', name: 'Mia', role: 'Close friend', x: -62.0, y: -54.0, circleId: 'you', avatar: 'MI', shapeType: ShapeType.polygon, sides: 8, amplitude: 2.0),
-    PersonNode(id: 'p2', name: 'Noah', role: 'Founder friend', x: 58.0, y: -6.0, circleId: 'you', avatar: 'NO', shapeType: ShapeType.polygon, sides: 10, amplitude: 2.0),
-    PersonNode(id: 'p3', name: 'Ava', role: 'Design', x: 34.0, y: 67.0, circleId: 'you', avatar: 'AV', shapeType: ShapeType.polygon, sides: 11, amplitude: 2.0),
-    PersonNode(id: 'p4', name: 'Sofia', role: 'Portugal', x: 168.0, y: -472.0, circleId: 'eu-network', avatar: 'SO', shapeType: ShapeType.polygon, sides: 9, amplitude: 2.0),
-    PersonNode(id: 'p5', name: 'Lucas', role: 'Germany', x: 28.0, y: -610.0, circleId: 'eu-network', avatar: 'LU', shapeType: ShapeType.polygon, sides: 12, amplitude: 2.0),
-    PersonNode(id: 'p6', name: 'Emma', role: 'Finland', x: -112.0, y: -416.0, circleId: 'eu-network', avatar: 'EM', shapeType: ShapeType.polygon, sides: 8, amplitude: 2.0),
-    PersonNode(id: 'p7', name: 'Oscar', role: 'Denmark', x: 106.0, y: -302.0, circleId: 'eu-network', avatar: 'OC', shapeType: ShapeType.polygon, sides: 10, amplitude: 2.0),
-    PersonNode(id: 'p8', name: 'Olivia', role: 'Brand', x: -166.0, y: 335.0, circleId: 'pandora', avatar: 'OL', shapeType: ShapeType.polygon, sides: 11, amplitude: 2.0),
-    PersonNode(id: 'p9', name: 'Victor', role: 'Retail', x: 154.0, y: 360.0, circleId: 'pandora', avatar: 'VI', shapeType: ShapeType.polygon, sides: 9, amplitude: 2.0),
-    PersonNode(id: 'p10', name: 'Freja', role: 'Operations', x: -190.0, y: 575.0, circleId: 'pandora', avatar: 'FR', shapeType: ShapeType.polygon, sides: 12, amplitude: 2.0),
-    PersonNode(id: 'p11', name: 'Anton', role: 'PM', x: -92.0, y: 575.0, circleId: 'product-team', avatar: 'AN', shapeType: ShapeType.polygon, sides: 8, amplitude: 2.0),
-    PersonNode(id: 'p12', name: 'Nora', role: 'UX', x: -20.0, y: 591.0, circleId: 'product-team', avatar: 'NR', shapeType: ShapeType.polygon, sides: 10, amplitude: 2.0),
-    PersonNode(id: 'p13', name: 'Eli', role: 'Engineering', x: 50.0, y: 575.0, circleId: 'product-team', avatar: 'EL', shapeType: ShapeType.polygon, sides: 11, amplitude: 2.0),
-    PersonNode(id: 'p14', name: 'Karim', role: 'Investor', x: 645.0, y: -15.0, circleId: 'market', avatar: 'KA', shapeType: ShapeType.polygon, sides: 9, amplitude: 2.0),
-    PersonNode(id: 'p15', name: 'Lina', role: 'Media', x: 423.0, y: 4.0, circleId: 'market', avatar: 'LI', shapeType: ShapeType.polygon, sides: 12, amplitude: 2.0),
-    PersonNode(id: 'p16', name: 'Yara', role: 'Analyst', x: 580.0, y: 198.0, circleId: 'market', avatar: 'YA', shapeType: ShapeType.polygon, sides: 8, amplitude: 2.0),
+    PersonNode(
+      id: 'p1',
+      name: 'Mia',
+      role: 'Close friend',
+      x: -62.0,
+      y: -54.0,
+      circleId: 'you',
+      avatar: 'MI',
+      shapeType: ShapeType.polygon,
+      sides: 8,
+      amplitude: 2.0,
+    ),
+    PersonNode(
+      id: 'p2',
+      name: 'Noah',
+      role: 'Founder friend',
+      x: 58.0,
+      y: -6.0,
+      circleId: 'you',
+      avatar: 'NO',
+      shapeType: ShapeType.polygon,
+      sides: 10,
+      amplitude: 2.0,
+    ),
+    PersonNode(
+      id: 'p3',
+      name: 'Ava',
+      role: 'Design',
+      x: 34.0,
+      y: 67.0,
+      circleId: 'you',
+      avatar: 'AV',
+      shapeType: ShapeType.polygon,
+      sides: 11,
+      amplitude: 2.0,
+    ),
+    PersonNode(
+      id: 'p4',
+      name: 'Sofia',
+      role: 'Portugal',
+      x: 168.0,
+      y: -472.0,
+      circleId: 'eu-network',
+      avatar: 'SO',
+      shapeType: ShapeType.polygon,
+      sides: 9,
+      amplitude: 2.0,
+    ),
+    PersonNode(
+      id: 'p5',
+      name: 'Lucas',
+      role: 'Germany',
+      x: 28.0,
+      y: -610.0,
+      circleId: 'eu-network',
+      avatar: 'LU',
+      shapeType: ShapeType.polygon,
+      sides: 12,
+      amplitude: 2.0,
+    ),
+    PersonNode(
+      id: 'p6',
+      name: 'Emma',
+      role: 'Finland',
+      x: -112.0,
+      y: -416.0,
+      circleId: 'eu-network',
+      avatar: 'EM',
+      shapeType: ShapeType.polygon,
+      sides: 8,
+      amplitude: 2.0,
+    ),
+    PersonNode(
+      id: 'p7',
+      name: 'Oscar',
+      role: 'Denmark',
+      x: 106.0,
+      y: -302.0,
+      circleId: 'eu-network',
+      avatar: 'OC',
+      shapeType: ShapeType.polygon,
+      sides: 10,
+      amplitude: 2.0,
+    ),
+    PersonNode(
+      id: 'p8',
+      name: 'Olivia',
+      role: 'Brand',
+      x: -166.0,
+      y: 335.0,
+      circleId: 'pandora',
+      avatar: 'OL',
+      shapeType: ShapeType.polygon,
+      sides: 11,
+      amplitude: 2.0,
+    ),
+    PersonNode(
+      id: 'p9',
+      name: 'Victor',
+      role: 'Retail',
+      x: 154.0,
+      y: 360.0,
+      circleId: 'pandora',
+      avatar: 'VI',
+      shapeType: ShapeType.polygon,
+      sides: 9,
+      amplitude: 2.0,
+    ),
+    PersonNode(
+      id: 'p10',
+      name: 'Freja',
+      role: 'Operations',
+      x: -190.0,
+      y: 575.0,
+      circleId: 'pandora',
+      avatar: 'FR',
+      shapeType: ShapeType.polygon,
+      sides: 12,
+      amplitude: 2.0,
+    ),
+    PersonNode(
+      id: 'p11',
+      name: 'Anton',
+      role: 'PM',
+      x: -92.0,
+      y: 575.0,
+      circleId: 'product-team',
+      avatar: 'AN',
+      shapeType: ShapeType.polygon,
+      sides: 8,
+      amplitude: 2.0,
+    ),
+    PersonNode(
+      id: 'p12',
+      name: 'Nora',
+      role: 'UX',
+      x: -20.0,
+      y: 591.0,
+      circleId: 'product-team',
+      avatar: 'NR',
+      shapeType: ShapeType.polygon,
+      sides: 10,
+      amplitude: 2.0,
+    ),
+    PersonNode(
+      id: 'p13',
+      name: 'Eli',
+      role: 'Engineering',
+      x: 50.0,
+      y: 575.0,
+      circleId: 'product-team',
+      avatar: 'EL',
+      shapeType: ShapeType.polygon,
+      sides: 11,
+      amplitude: 2.0,
+    ),
+    PersonNode(
+      id: 'p14',
+      name: 'Karim',
+      role: 'Investor',
+      x: 645.0,
+      y: -15.0,
+      circleId: 'market',
+      avatar: 'KA',
+      shapeType: ShapeType.polygon,
+      sides: 9,
+      amplitude: 2.0,
+    ),
+    PersonNode(
+      id: 'p15',
+      name: 'Lina',
+      role: 'Media',
+      x: 423.0,
+      y: 4.0,
+      circleId: 'market',
+      avatar: 'LI',
+      shapeType: ShapeType.polygon,
+      sides: 12,
+      amplitude: 2.0,
+    ),
+    PersonNode(
+      id: 'p16',
+      name: 'Yara',
+      role: 'Analyst',
+      x: 580.0,
+      y: 198.0,
+      circleId: 'market',
+      avatar: 'YA',
+      shapeType: ShapeType.polygon,
+      sides: 8,
+      amplitude: 2.0,
+    ),
   ];
 }
 
