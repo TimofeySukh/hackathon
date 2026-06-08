@@ -251,12 +251,18 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
   // Stress people cache
   List<PersonNode> _stressPeople = [];
 
+  // Caches for stress rendering to prevent freezes
+  final List<ui.Picture> _stressAvatarPictures = [];
+  final Map<String, TextPainter> _stressLabelCache = {};
+
   @override
   void initState() {
     super.initState();
     circles = createInitialGraphCircles();
     people = createInitialGraphPeople();
     circles = ensureContainment(circles, people);
+
+    _initStressAvatarPictures();
 
     _lastFpsTimestamp = DateTime.now().millisecondsSinceEpoch;
     _fpsTicker = createTicker((duration) {
@@ -291,10 +297,105 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
     super.dispose();
   }
 
+  void _initStressAvatarPictures() {
+    const colors = [
+      Color(0xFF00629D),
+      Color(0xFFC00015),
+      Color(0xFF1E824A),
+      Color(0xFFD87A00),
+      Color(0xFF7F67BE),
+      Color(0xFF0F766E),
+      Color(0xFF4F46E5),
+      Color(0xFFBE185D),
+      Color(0xFFBE185D),
+    ];
+    for (int i = 0; i < colors.length; i++) {
+      final color = colors[i];
+      final avatar = makeAvatar(i);
+      _stressAvatarPictures.add(_recordAvatarPicture(color, avatar));
+    }
+  }
+
+  ui.Picture _recordAvatarPicture(Color color, String avatar) {
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder, const Rect.fromLTWH(0, 0, 40, 40));
+
+    final path = Path();
+    const int points = 72;
+    const double cx = 20.0;
+    const double cy = 20.0;
+    const double r = 13.0;
+    const double amp = 4.0;
+    const int petals = 6;
+    for (int i = 0; i <= points; i++) {
+      final angle = (i * 2 * math.pi) / points;
+      final currentR = r + amp * math.cos(petals * angle);
+      final x = cx + currentR * math.cos(angle);
+      final y = cy + currentR * math.sin(angle);
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+    path.close();
+
+    final fillPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final borderPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+
+    canvas.drawPath(path, fillPaint);
+    canvas.drawPath(path, borderPaint);
+
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: avatar,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 8,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    textPainter.paint(canvas, Offset(20.0 - textPainter.width / 2, 20.0 - textPainter.height / 2));
+
+    return recorder.endRecording();
+  }
+
+  TextPainter _getOrCreateLabelPainter(String name) {
+    var painter = _stressLabelCache[name];
+    if (painter == null) {
+      painter = TextPainter(
+        text: TextSpan(
+          text: name,
+          style: const TextStyle(
+            color: Color(0xFF1C2528),
+            fontSize: 9,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      );
+      painter.layout();
+      _stressLabelCache[name] = painter;
+    }
+    return painter;
+  }
+
   void _updateStressCount(int count) {
     setState(() {
       stressCount = count;
       _stressPeople = generateStressPeople(count);
+      // Clear label cache if count is reduced or cleared to avoid holding dead entries
+      if (count < _stressPeople.length) {
+        _stressLabelCache.clear();
+      }
     });
   }
 
@@ -783,6 +884,8 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
                           stressPeople: showEdges ? _stressPeople : [],
                           connectorStart: connectorStartPos,
                           connectorEnd: connectorEndPos,
+                          transformationController: _transformationController,
+                          viewportSize: MediaQuery.of(context).size,
                         ),
                       ),
                     ),
@@ -854,6 +957,10 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
                               people: _stressPeople,
                               circlesById: circlesById,
                               showLabels: showLabels,
+                              transformationController: _transformationController,
+                              viewportSize: MediaQuery.of(context).size,
+                              avatarPictures: _stressAvatarPictures,
+                              labelPainterProvider: _getOrCreateLabelPainter,
                             ),
                           ),
                         ),
@@ -1129,6 +1236,8 @@ class EdgePainter extends CustomPainter {
   final List<PersonNode> stressPeople;
   final Offset? connectorStart;
   final Offset? connectorEnd;
+  final TransformationController transformationController;
+  final Size viewportSize;
 
   EdgePainter({
     required this.circles,
@@ -1137,7 +1246,9 @@ class EdgePainter extends CustomPainter {
     this.stressPeople = const [],
     this.connectorStart,
     this.connectorEnd,
-  });
+    required this.transformationController,
+    required this.viewportSize,
+  }) : super(repaint: transformationController);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1195,14 +1306,34 @@ class EdgePainter extends CustomPainter {
       drawCurve(Offset(circle.x, circle.y), Offset(person.x, person.y), personPaint);
     }
 
-    // Stress edges (straight lines for performance)
+    // Stress edges (straight lines, only drawn for viewport-culled visible people)
     if (stressPeople.isNotEmpty) {
       final youCircle = circlesById['you'];
       if (youCircle != null) {
         final path = Path();
+
+        final matrix = transformationController.value;
+        final double scale = matrix.storage[0];
+        final double tx = matrix.storage[12];
+        final double ty = matrix.storage[13];
+
+        final double left = -tx / scale;
+        final double top = -ty / scale;
+        final double right = (viewportSize.width - tx) / scale;
+        final double bottom = (viewportSize.height - ty) / scale;
+
+        final double padding = 48.0 / scale;
+
         for (final person in stressPeople) {
-          path.moveTo(youCircle.x + shift, youCircle.y + shift);
-          path.lineTo(person.x + shift, person.y + shift);
+          final cx = person.x + shift;
+          final cy = person.y + shift;
+          if (cx >= left - padding &&
+              cx <= right + padding &&
+              cy >= top - padding &&
+              cy <= bottom + padding) {
+            path.moveTo(youCircle.x + shift, youCircle.y + shift);
+            path.lineTo(cx, cy);
+          }
         }
         canvas.drawPath(path, stressPaint);
       }
@@ -1221,96 +1352,92 @@ class StressIconsPainter extends CustomPainter {
   final List<PersonNode> people;
   final Map<String, CircleNode> circlesById;
   final bool showLabels;
-
-  static const List<Color> _colors = [
-    Color(0xFF00629D),
-    Color(0xFFC00015),
-    Color(0xFF1E824A),
-    Color(0xFFD87A00),
-    Color(0xFF7F67BE),
-    Color(0xFF0F766E),
-    Color(0xFF4F46E5),
-    Color(0xFFBE185D),
-  ];
+  final TransformationController transformationController;
+  final Size viewportSize;
+  final List<ui.Picture> avatarPictures;
+  final TextPainter Function(String) labelPainterProvider;
 
   StressIconsPainter({
     required this.people,
     required this.circlesById,
     required this.showLabels,
-  });
+    required this.transformationController,
+    required this.viewportSize,
+    required this.avatarPictures,
+    required this.labelPainterProvider,
+  }) : super(repaint: transformationController);
 
   @override
   void paint(Canvas canvas, Size size) {
     const double shift = halfWorldSize;
-    const double iconR = 13.0;
 
-    final fillPaint = Paint()..style = PaintingStyle.fill;
-    final borderPaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
+    final matrix = transformationController.value;
+    final double scale = matrix.storage[0];
+    final double tx = matrix.storage[12];
+    final double ty = matrix.storage[13];
 
-    for (int i = 0; i < people.length; i++) {
-      final person = people[i];
-      final color = _colors[i % _colors.length];
+    // Calculate viewport boundaries in Stack's coordinate space (0..5000)
+    final double left = -tx / scale;
+    final double top = -ty / scale;
+    final double right = (viewportSize.width - tx) / scale;
+    final double bottom = (viewportSize.height - ty) / scale;
+
+    final double padding = showLabels ? (120.0 / scale) : (48.0 / scale);
+
+    // Viewport culling
+    final visiblePeople = people.where((person) {
+      final cx = person.x + shift;
+      final cy = person.y + shift;
+      return cx >= left - padding &&
+          cx <= right + padding &&
+          cy >= top - padding &&
+          cy <= bottom + padding;
+    }).toList();
+
+    for (int i = 0; i < visiblePeople.length; i++) {
+      final person = visiblePeople[i];
       final cx = person.x + shift;
       final cy = person.y + shift;
 
-      // Draw flower shape
-      final path = _flowerPath(cx, cy, iconR, 6, 4.0);
-      fillPaint.color = color;
-      canvas.drawPath(path, fillPaint);
-      canvas.drawPath(path, borderPaint);
+      // Extract the index of the person to match the avatar sprite index
+      final idMatch = RegExp(r'\d+').firstMatch(person.id);
+      final idNum = idMatch != null ? int.parse(idMatch.group(0)!) : i;
+      final picture = avatarPictures[idNum % avatarPictures.length];
 
-      // Draw initials
-      final textPainter = TextPainter(
-        text: TextSpan(
-          text: person.avatar,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 8,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      );
-      textPainter.layout();
-      textPainter.paint(canvas, Offset(cx - textPainter.width / 2, cy - textPainter.height / 2));
+      canvas.save();
+      canvas.translate(cx - 20.0, cy - 20.0);
+      canvas.drawPicture(picture);
+      canvas.restore();
 
       if (showLabels) {
-        final labelPainter = TextPainter(
-          text: TextSpan(
-            text: person.name,
-            style: const TextStyle(
-              color: Color(0xFF1C2528),
-              fontSize: 9,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          textDirection: TextDirection.ltr,
-        );
-        labelPainter.layout();
-        labelPainter.paint(canvas, Offset(cx - labelPainter.width / 2, cy + iconR + 3));
-      }
-    }
-  }
+        final labelPainter = labelPainterProvider(person.name);
 
-  Path _flowerPath(double cx, double cy, double r, int petals, double amp) {
-    final path = Path();
-    const int points = 72;
-    for (int i = 0; i <= points; i++) {
-      final angle = (i * 2 * math.pi) / points;
-      final currentR = r + amp * math.cos(petals * angle);
-      final x = cx + currentR * math.cos(angle);
-      final y = cy + currentR * math.sin(angle);
-      if (i == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
+        final double labelWidth = labelPainter.width + 10.0;
+        final double labelHeight = labelPainter.height + 4.0;
+        final double x = cx - labelWidth / 2;
+        final double y = cy + 18.0;
+
+        final bgPaint = Paint()
+          ..color = Colors.white.withOpacity(0.86)
+          ..style = PaintingStyle.fill;
+
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromLTWH(x, y, labelWidth, labelHeight),
+            const Radius.circular(5.0),
+          ),
+          bgPaint,
+        );
+
+        labelPainter.paint(
+          canvas,
+          Offset(
+            cx - labelPainter.width / 2,
+            y + 2.0,
+          ),
+        );
       }
     }
-    path.close();
-    return path;
   }
 
   @override
