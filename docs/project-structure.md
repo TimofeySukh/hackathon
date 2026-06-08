@@ -28,6 +28,10 @@ Detailed product and structure documentation.
 
 Project-local MCP server files.
 
+### `mobile/`
+
+Flutter client scaffold with Android, iOS, and web platform targets. The current generated app lives in `mobile/lib/main.dart` and is not yet connected to the React prototype or Supabase data layer.
+
 ### `scripts/`
 
 Local maintenance and seeding utilities. `seed-board.mjs` can bulk-create fake people on a board and optionally connect them to the root node. `seed-demo-user.mjs` can populate one user's board with a repeatable demo cluster that includes people, notes, AI summaries, and connections.
@@ -118,6 +122,10 @@ Contains the visual system for:
 - selected-person detail panel
 - responsive layout behavior
 
+### `mobile/lib/main.dart`
+
+Generated Flutter starter app entry point for the `mobile/` client scaffold.
+
 ## Current Technical Shape
 
 The current visible prototype is intentionally minimal:
@@ -127,6 +135,7 @@ The current visible prototype is intentionally minimal:
 - TypeScript for maintainability
 - Supabase for Google auth and private user-owned records
 - Canvas 2D for rendering thousands of graph points in one layer
+- Flutter scaffold for future mobile and alternate web client work
 
 ## Interaction Model
 

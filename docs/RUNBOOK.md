@@ -2,7 +2,7 @@
 
 ## Status
 
-The repository contains a React, Vite, and TypeScript social graph board app.
+The repository contains a React, Vite, and TypeScript social graph board app plus a Flutter client scaffold in `mobile/`.
 
 Current visible prototype behavior:
 
@@ -89,6 +89,30 @@ Start the development server:
 
 ```bash
 npm run dev
+```
+
+Check the Flutter toolchain from the repository root:
+
+```bash
+npm run mobile:doctor
+```
+
+Run the Flutter client:
+
+```bash
+npm run mobile:run
+```
+
+Run the Flutter client in Chrome:
+
+```bash
+npm run mobile:web
+```
+
+Run Flutter tests:
+
+```bash
+npm run mobile:test
 ```
 
 Start the local project MCP server manually when you want to test it outside the app:

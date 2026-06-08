@@ -13,6 +13,7 @@ Runtime boundaries:
 - The browser owns generated prototype graph state for the visible screen.
 - Supabase owns Google authentication and user-owned graph records.
 - Supabase Edge Functions own server-side AI provider calls for AI note enrichment and people search.
+- Flutter owns the new `mobile/` client scaffold and generated mobile/web platform runners.
 - Gemini owns the primary LLM execution path for structured summary generation and natural-language people search ranking.
 - OpenRouter owns the fallback LLM execution path when Gemini quota or availability errors occur.
 - The local MCP server owns agent-facing project documentation resources plus service-role scoped board graph tooling.
@@ -35,6 +36,7 @@ The backend boundary remains intentionally narrow: Supabase Auth provides identi
 - `supabase/functions/sync-person-ai-note/index.ts` authenticates the caller, loads person context, calls the shared AI provider layer, and upserts `person_ai_notes`.
 - `supabase/functions/search-people-ai/index.ts` authenticates the caller, builds candidate context, calls the shared AI provider layer, and returns ranked people.
 - `src/index.css` contains the current prototype shell, toolbar, stats panel, and selected-person panel styling.
+- `mobile/lib/main.dart` contains the generated Flutter starter app. It is scaffolded but not yet wired to the graph model, Supabase, or the current React prototype behavior.
 
 The current visible graph is drawn imperatively on one Canvas 2D layer. React is intentionally kept out of the per-frame point rendering path. Initial render, resize, context restore, visibility restore, and a lightweight watchdog timer can draw directly instead of waiting for `requestAnimationFrame`, so the graph recovers if the browser clears or pauses the canvas backing store.
 
@@ -53,6 +55,8 @@ Current visible prototype scope:
 - lightweight React chrome for controls, stats, and selection details
 
 Persisted product capabilities remain in the repository data layer but are not exposed by the current prototype screen.
+
+The Flutter client is currently a separate scaffold. It does not replace the React/Vite prototype and does not share runtime state with it yet.
 
 Out of scope for the current version:
 
@@ -75,6 +79,7 @@ Out of scope for the current version:
 - Keep `SUPABASE_SERVICE_ROLE_KEY` out of browser-exposed `VITE_` variables and only in local MCP env files or shell env.
 - Keep the root person immutable in position and deletion semantics.
 - Keep Google OAuth redirect/origin configuration aligned with the real deployed frontend origins.
+- Keep generated Flutter platform code under `mobile/` until there is a deliberate shared-client architecture decision.
 
 ## When The Repo Grows
 

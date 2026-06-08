@@ -1,6 +1,6 @@
 # Hackathon Board
 
-A social graph board prototype built with React, Vite, TypeScript, and Canvas 2D.
+A social graph board prototype built with React, Vite, TypeScript, and Canvas 2D, with a Flutter client scaffold in `mobile/`.
 
 ## Current Experience
 
@@ -27,6 +27,15 @@ npm run dev
 Open the local or network Vite URL in your browser. The current visible prototype runs without Supabase variables because it generates its 5,000 people locally.
 
 Fill in the Supabase values in `.env.local` only when working on the persisted data layer, MCP data tools, or future screens that use authentication.
+
+Flutter client setup from the repository root:
+
+```bash
+npm run mobile:doctor
+npm run mobile:web
+```
+
+Use `npm run mobile:run` to pick another connected Flutter target.
 
 If you want the local project MCP server to read and mutate live board data, also create:
 
@@ -77,6 +86,10 @@ For multi-device login, deploy the frontend on one stable server origin and add 
 - `npm run build` creates a production build.
 - `npm run preview` previews the production build on all local network interfaces.
 - `npm run lint` runs ESLint.
+- `npm run mobile:doctor` checks the local Flutter toolchain.
+- `npm run mobile:run` runs the Flutter client on an available target.
+- `npm run mobile:web` runs the Flutter client in Chrome.
+- `npm run mobile:test` runs Flutter tests.
 - `npm run mcp:start` starts the local Hackathon board MCP server over stdio.
 
 ## Product Direction
