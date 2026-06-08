@@ -39,6 +39,12 @@ When working on the project:
 - Reported behavior: icon sizing is inconsistent between browsers.
 - Notes: needs cross-browser reproduction and CSS normalization for icon dimensions, line height, and button layout.
 
+### DOM/SVG icon stress ceiling is unknown
+
+- Status: Open
+- Reported need: the app needs evidence for how many icon nodes and graph edges the current DOM/SVG prototype can render smoothly.
+- Notes: the visible prototype now includes a local icon stress-test panel with a 0-10,000 synthetic icon slider, optional synthetic edges, optional labels, and live FPS. A Chrome run on the current Mac showed roughly 4 FPS while panning at 1,000 synthetic DOM/SVG icons with 1,000 synthetic SVG edges, roughly 3 FPS at 2,500, and 1-3 FPS at 5,000-10,000. This suggests the current DOM/SVG object-per-icon approach is not viable for thousands of visible interactive icons; use Canvas 2D or WebGL for the production graph layer.
+
 ### Landing page is missing
 
 - Status: Open
