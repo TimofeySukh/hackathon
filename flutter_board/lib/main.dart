@@ -253,7 +253,9 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
 
   // Caches for stress rendering to prevent freezes
   final List<ui.Picture> _stressAvatarPictures = [];
+  final List<ui.Image> _stressAvatarImages = [];
   final Map<String, TextPainter> _stressLabelCache = {};
+  bool _avatarImagesLoaded = false;
 
   @override
   void initState() {
@@ -263,6 +265,7 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
     circles = ensureContainment(circles, people);
 
     _initStressAvatarPictures();
+    _initStressAvatarImages();
 
     _lastFpsTimestamp = DateTime.now().millisecondsSinceEpoch;
     _fpsTicker = createTicker((duration) {
@@ -292,6 +295,9 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
 
   @override
   void dispose() {
+    for (final img in _stressAvatarImages) {
+      img.dispose();
+    }
     _fpsTicker?.dispose();
     _transformationController.dispose();
     super.dispose();
@@ -313,6 +319,34 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
       final color = colors[i];
       final avatar = makeAvatar(i);
       _stressAvatarPictures.add(_recordAvatarPicture(color, avatar));
+    }
+  }
+
+  Future<void> _initStressAvatarImages() async {
+    const colors = [
+      Color(0xFF00629D),
+      Color(0xFFC00015),
+      Color(0xFF1E824A),
+      Color(0xFFD87A00),
+      Color(0xFF7F67BE),
+      Color(0xFF0F766E),
+      Color(0xFF4F46E5),
+      Color(0xFFBE185D),
+      Color(0xFFBE185D),
+    ];
+    final List<Future<ui.Image>> futures = [];
+    for (int i = 0; i < colors.length; i++) {
+      final color = colors[i];
+      final avatar = makeAvatar(i);
+      final picture = _recordAvatarPicture(color, avatar);
+      futures.add(picture.toImage(40, 40));
+    }
+    final images = await Future.wait(futures);
+    if (mounted) {
+      setState(() {
+        _stressAvatarImages.addAll(images);
+        _avatarImagesLoaded = true;
+      });
     }
   }
 
@@ -852,8 +886,10 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
                 child: Stack(
                   children: [
                     Positioned.fill(
-                      child: CustomPaint(
-                        painter: GridPainter(),
+                      child: RepaintBoundary(
+                        child: CustomPaint(
+                          painter: GridPainter(),
+                        ),
                       ),
                     ),
                     // Pass 1: Circle fills and borders
@@ -865,10 +901,12 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
                         width: size,
                         height: size,
                         child: IgnorePointer(
-                          child: CustomPaint(
-                            painter: CircleShapePainter(
-                              circle: circle,
-                              isSelected: selectedCircleId == circle.id,
+                          child: RepaintBoundary(
+                            child: CustomPaint(
+                              painter: CircleShapePainter(
+                                circle: circle,
+                                isSelected: selectedCircleId == circle.id,
+                              ),
                             ),
                           ),
                         ),
@@ -876,16 +914,18 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
                     }),
                     // Pass 2: Edge layer
                     Positioned.fill(
-                      child: CustomPaint(
-                        painter: EdgePainter(
-                          circles: circles,
-                          circlesById: circlesById,
-                          people: people,
-                          stressPeople: showEdges ? _stressPeople : [],
-                          connectorStart: connectorStartPos,
-                          connectorEnd: connectorEndPos,
-                          transformationController: _transformationController,
-                          viewportSize: MediaQuery.of(context).size,
+                      child: RepaintBoundary(
+                        child: CustomPaint(
+                          painter: EdgePainter(
+                            circles: circles,
+                            circlesById: circlesById,
+                            people: people,
+                            stressPeople: showEdges ? _stressPeople : [],
+                            connectorStart: connectorStartPos,
+                            connectorEnd: connectorEndPos,
+                            transformationController: _transformationController,
+                            viewportSize: MediaQuery.of(context).size,
+                          ),
                         ),
                       ),
                     ),
@@ -952,15 +992,18 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
                     if (_stressPeople.isNotEmpty)
                       Positioned.fill(
                         child: IgnorePointer(
-                          child: CustomPaint(
-                            painter: StressIconsPainter(
-                              people: _stressPeople,
-                              circlesById: circlesById,
-                              showLabels: showLabels,
-                              transformationController: _transformationController,
-                              viewportSize: MediaQuery.of(context).size,
-                              avatarPictures: _stressAvatarPictures,
-                              labelPainterProvider: _getOrCreateLabelPainter,
+                          child: RepaintBoundary(
+                            child: CustomPaint(
+                              painter: StressIconsPainter(
+                                people: _stressPeople,
+                                circlesById: circlesById,
+                                showLabels: showLabels,
+                                transformationController: _transformationController,
+                                viewportSize: MediaQuery.of(context).size,
+                                avatarPictures: _stressAvatarPictures,
+                                avatarImages: _stressAvatarImages,
+                                labelPainterProvider: _getOrCreateLabelPainter,
+                              ),
                             ),
                           ),
                         ),
@@ -1355,6 +1398,7 @@ class StressIconsPainter extends CustomPainter {
   final TransformationController transformationController;
   final Size viewportSize;
   final List<ui.Picture> avatarPictures;
+  final List<ui.Image> avatarImages;
   final TextPainter Function(String) labelPainterProvider;
 
   StressIconsPainter({
@@ -1364,6 +1408,7 @@ class StressIconsPainter extends CustomPainter {
     required this.transformationController,
     required this.viewportSize,
     required this.avatarPictures,
+    required this.avatarImages,
     required this.labelPainterProvider,
   }) : super(repaint: transformationController);
 
@@ -1402,12 +1447,21 @@ class StressIconsPainter extends CustomPainter {
       // Extract the index of the person to match the avatar sprite index
       final idMatch = RegExp(r'\d+').firstMatch(person.id);
       final idNum = idMatch != null ? int.parse(idMatch.group(0)!) : i;
-      final picture = avatarPictures[idNum % avatarPictures.length];
 
-      canvas.save();
-      canvas.translate(cx - 20.0, cy - 20.0);
-      canvas.drawPicture(picture);
-      canvas.restore();
+      // Use the rasterized image if loaded, otherwise fallback to picture
+      if (avatarImages.length > idNum % avatarImages.length) {
+        canvas.drawImage(
+          avatarImages[idNum % avatarImages.length],
+          Offset(cx - 20.0, cy - 20.0),
+          Paint(),
+        );
+      } else {
+        final picture = avatarPictures[idNum % avatarPictures.length];
+        canvas.save();
+        canvas.translate(cx - 20.0, cy - 20.0);
+        canvas.drawPicture(picture);
+        canvas.restore();
+      }
 
       if (showLabels) {
         final labelPainter = labelPainterProvider(person.name);
@@ -1581,13 +1635,14 @@ class PersonIconWidget extends StatelessWidget {
           SizedBox(
             width: 40,
             height: 40,
-            child: CustomPaint(
-              painter: PersonAvatarPainter(
-                person: person,
-                fillColor: fillColor,
-                isSelected: isSelected,
-              ),
-              child: person.imageUrl != null
+            child: RepaintBoundary(
+              child: CustomPaint(
+                painter: PersonAvatarPainter(
+                  person: person,
+                  fillColor: fillColor,
+                  isSelected: isSelected,
+                ),
+                child: person.imageUrl != null
                   ? ClipPath(
                       clipper: ShapeClipper(
                         shapeType: person.shapeType,
@@ -1612,6 +1667,7 @@ class PersonIconWidget extends StatelessWidget {
                         ),
                       ),
                     ),
+              ),
             ),
           ),
           const SizedBox(height: 4),
