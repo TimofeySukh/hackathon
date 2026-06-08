@@ -33,10 +33,12 @@ Current visible prototype behavior:
 Current Flutter prototype behavior in `flutter_board/`:
 
 - ports the circle graph board visual model to Flutter
-- keeps normal circles, real people, inspector UI, and controls as Flutter widgets
+- keeps normal circles, inspector UI, and controls as Flutter widgets
+- renders real working people icons in a single canvas layer with painter hit testing and drag support, instead of creating one Flutter widget per person
 - renders dense synthetic stress icons and their optional edges in a screen-space `CustomPaint` overlay instead of inside the transformed world stack
 - culls stress icons through a spatial grid and renders visible avatars from a single sprite atlas
-- renders optional synthetic stress edges as raw line segments from the central circle to visible stress icons
+- renders real people edges and optional synthetic stress edges as batched raw line segments
+- preprocesses `flutter_board/assets/shared_person_avatar.png` into a small flower-clipped avatar sprite before rendering people and stress icons
 - keeps people icons on flower shapes by default, with normalized flower amplitude across small and large nodes
 - updates the stress FPS label through a `ValueNotifier` so the whole board does not rebuild every half second
 

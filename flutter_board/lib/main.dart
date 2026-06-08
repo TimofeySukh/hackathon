@@ -230,6 +230,7 @@ class _MyHomePageState extends State<MyHomePage>
 
   String? selectedCircleId;
   String? selectedPersonId;
+  String? draggingPersonId;
 
   Offset? createMenuWorldPos;
   Offset? createMenuScreenPos;
@@ -262,7 +263,9 @@ class _MyHomePageState extends State<MyHomePage>
   final List<ui.Picture> _stressAvatarPictures = [];
   final List<ui.Image> _stressAvatarImages = [];
   ui.Image? _stressAvatarAtlas;
+  ui.Image? _sharedPersonAvatar;
   final Map<String, TextPainter> _stressLabelCache = {};
+  final Map<String, TextPainter> _realPersonLabelCache = {};
 
   @override
   void initState() {
@@ -273,6 +276,7 @@ class _MyHomePageState extends State<MyHomePage>
 
     _initStressAvatarPictures();
     _initStressAvatarImages();
+    _initSharedPersonAvatar();
 
     _lastFpsTimestamp = DateTime.now().millisecondsSinceEpoch;
     _fpsTicker = createTicker((duration) {
@@ -306,10 +310,77 @@ class _MyHomePageState extends State<MyHomePage>
       img.dispose();
     }
     _stressAvatarAtlas?.dispose();
+    _sharedPersonAvatar?.dispose();
     _fpsTicker?.dispose();
     _fpsNotifier.dispose();
     _transformationController.dispose();
     super.dispose();
+  }
+
+  Future<void> _initSharedPersonAvatar() async {
+    final bytes = await rootBundle.load('assets/shared_person_avatar.png');
+    final codec = await ui.instantiateImageCodec(
+      bytes.buffer.asUint8List(),
+      targetWidth: 96,
+      targetHeight: 96,
+    );
+    final frame = await codec.getNextFrame();
+    final sprite = await _buildClippedPersonAvatar(frame.image);
+    frame.image.dispose();
+
+    if (mounted) {
+      setState(() => _sharedPersonAvatar = sprite);
+    } else {
+      sprite.dispose();
+    }
+  }
+
+  Future<ui.Image> _buildClippedPersonAvatar(ui.Image source) {
+    const double size = 40.0;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder, const Rect.fromLTWH(0, 0, size, size));
+    final path = getCustomNodePath(
+      size / 2,
+      size / 2,
+      size / 2 - 1.0,
+      ShapeType.wavy,
+      8,
+      1.0,
+    );
+
+    final double sourceSize = math.min(
+      source.width.toDouble(),
+      source.height.toDouble(),
+    );
+    final src = Rect.fromLTWH(
+      (source.width - sourceSize) / 2,
+      (source.height - sourceSize) / 2,
+      sourceSize,
+      sourceSize,
+    );
+    const dst = Rect.fromLTWH(0, 0, size, size);
+
+    canvas.save();
+    canvas.clipPath(path);
+    canvas.drawImageRect(
+      source,
+      src,
+      dst,
+      Paint()
+        ..isAntiAlias = true
+        ..filterQuality = FilterQuality.high,
+    );
+    canvas.restore();
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5,
+    );
+
+    final picture = recorder.endRecording();
+    return picture.toImage(size.round(), size.round());
   }
 
   void _initStressAvatarPictures() {
@@ -759,17 +830,69 @@ class _MyHomePageState extends State<MyHomePage>
     });
   }
 
-  void _updatePersonDrag(PersonNode person, Offset delta) {
+  PersonNode? _hitPersonAtWorldLayerPosition(Offset localPosition) {
+    final double worldX = localPosition.dx - halfWorldSize;
+    final double worldY = localPosition.dy - halfWorldSize;
+    final double scale = _transformationController.value.storage[0];
+    final double hitRadius = math.max(24.0, 30.0 / scale);
+
+    PersonNode? bestPerson;
+    double bestDistanceSq = hitRadius * hitRadius;
+
+    for (final person in people) {
+      final double dx = person.x - worldX;
+      final double dy = person.y - worldY;
+      final double distanceSq = dx * dx + dy * dy;
+      if (distanceSq <= bestDistanceSq) {
+        bestDistanceSq = distanceSq;
+        bestPerson = person;
+      }
+    }
+
+    return bestPerson;
+  }
+
+  void _startPeopleLayerDrag(DragStartDetails details) {
+    final person = _hitPersonAtWorldLayerPosition(details.localPosition);
+    if (person == null) return;
+
+    setState(() {
+      draggingPersonId = person.id;
+      selectedPersonId = person.id;
+      selectedCircleId = null;
+      createMenuWorldPos = null;
+    });
+  }
+
+  void _updatePeopleLayerDrag(DragUpdateDetails details) {
+    final personId = draggingPersonId;
+    if (personId == null) return;
+
     final double scale = _transformationController.value.storage[0];
     setState(() {
-      final index = people.indexWhere((p) => p.id == person.id);
+      final index = people.indexWhere((p) => p.id == personId);
       if (index != -1) {
         people[index] = people[index].copyWith(
-          x: people[index].x + delta.dx / scale,
-          y: people[index].y + delta.dy / scale,
+          x: people[index].x + details.delta.dx / scale,
+          y: people[index].y + details.delta.dy / scale,
         );
         circles = ensureContainment(circles, people);
       }
+    });
+  }
+
+  void _endPeopleLayerDrag() {
+    draggingPersonId = null;
+  }
+
+  void _selectPeopleLayerPerson(TapUpDetails details) {
+    final person = _hitPersonAtWorldLayerPosition(details.localPosition);
+    if (person == null) return;
+
+    setState(() {
+      selectedPersonId = person.id;
+      selectedCircleId = null;
+      createMenuWorldPos = null;
     });
   }
 
@@ -1078,42 +1201,27 @@ class _MyHomePageState extends State<MyHomePage>
                         ),
                       );
                     }),
-                    // Pass 4: Real people icons
-                    ...people.map((person) {
-                      final parentCircle = circlesById[person.circleId];
-                      final tone = parentCircle?.tone ?? CircleTone.blue;
-                      final colors = materialTones[tone]!;
-                      return Positioned(
-                        left: person.x - 20.0 + halfWorldSize,
-                        top: person.y - 20.0 + halfWorldSize,
-                        width: 100,
-                        height: 80,
+                    // Pass 4: Real people icons and hit testing
+                    Positioned.fill(
+                      child: RepaintBoundary(
                         child: GestureDetector(
-                          onPanStart: (details) {
-                            setState(() {
-                              selectedPersonId = person.id;
-                              selectedCircleId = null;
-                              createMenuWorldPos = null;
-                            });
-                          },
-                          onPanUpdate: (details) {
-                            _updatePersonDrag(person, details.delta);
-                          },
-                          child: PersonIconWidget(
-                            person: person,
-                            fillColor: colors.centerBg,
-                            isSelected: selectedPersonId == person.id,
-                            onSelect: () {
-                              setState(() {
-                                selectedPersonId = person.id;
-                                selectedCircleId = null;
-                                createMenuWorldPos = null;
-                              });
-                            },
+                          onTapUp: _selectPeopleLayerPerson,
+                          onPanStart: _startPeopleLayerDrag,
+                          onPanUpdate: _updatePeopleLayerDrag,
+                          onPanEnd: (_) => _endPeopleLayerDrag(),
+                          onPanCancel: _endPeopleLayerDrag,
+                          child: CustomPaint(
+                            painter: RealPeoplePainter(
+                              people: people,
+                              circlesById: circlesById,
+                              selectedPersonId: selectedPersonId,
+                              avatarImage: _sharedPersonAvatar,
+                              labelCache: _realPersonLabelCache,
+                            ),
                           ),
                         ),
-                      );
-                    }),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1134,6 +1242,7 @@ class _MyHomePageState extends State<MyHomePage>
                       avatarPictures: _stressAvatarPictures,
                       avatarImages: _stressAvatarImages,
                       avatarAtlas: _stressAvatarAtlas,
+                      sharedAvatarImage: _sharedPersonAvatar,
                       labelPainterProvider: _getOrCreateLabelPainter,
                     ),
                   ),
@@ -1475,14 +1584,26 @@ class EdgePainter extends CustomPainter {
       );
     }
 
-    for (final person in people) {
-      final circle = circlesById[person.circleId];
-      if (circle == null) continue;
-      drawCurve(
-        Offset(circle.x, circle.y),
-        Offset(person.x, person.y),
-        personPaint,
-      );
+    if (people.isNotEmpty) {
+      final edgePoints = Float32List(people.length * 4);
+      var cursor = 0;
+      for (final person in people) {
+        final circle = circlesById[person.circleId];
+        if (circle == null) continue;
+        edgePoints[cursor++] = circle.x + shift;
+        edgePoints[cursor++] = circle.y + shift;
+        edgePoints[cursor++] = person.x + shift;
+        edgePoints[cursor++] = person.y + shift;
+      }
+      if (cursor > 0) {
+        canvas.drawRawPoints(
+          ui.PointMode.lines,
+          cursor == edgePoints.length
+              ? edgePoints
+              : Float32List.sublistView(edgePoints, 0, cursor),
+          personPaint,
+        );
+      }
     }
 
     if (connectorStart != null && connectorEnd != null) {
@@ -1494,11 +1615,161 @@ class EdgePainter extends CustomPainter {
   bool shouldRepaint(covariant EdgePainter oldDelegate) => true;
 }
 
+class RealPeoplePainter extends CustomPainter {
+  final List<PersonNode> people;
+  final Map<String, CircleNode> circlesById;
+  final String? selectedPersonId;
+  final ui.Image? avatarImage;
+  final Map<String, TextPainter> labelCache;
+
+  RealPeoplePainter({
+    required this.people,
+    required this.circlesById,
+    required this.selectedPersonId,
+    required this.avatarImage,
+    required this.labelCache,
+  });
+
+  @override
+  bool? hitTest(Offset position) {
+    const double hitRadius = 30.0;
+    final double worldX = position.dx - halfWorldSize;
+    final double worldY = position.dy - halfWorldSize;
+
+    for (int i = people.length - 1; i >= 0; i--) {
+      final person = people[i];
+      final double dx = person.x - worldX;
+      final double dy = person.y - worldY;
+      if (dx * dx + dy * dy <= hitRadius * hitRadius) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const double iconSize = 40.0;
+    const double iconRadius = iconSize / 2;
+    final image = avatarImage;
+
+    for (final person in people) {
+      final double cx = person.x + halfWorldSize;
+      final double cy = person.y + halfWorldSize;
+      final bool selected = selectedPersonId == person.id;
+
+      if (image != null) {
+        canvas.drawImage(
+          image,
+          Offset(cx - iconRadius, cy - iconRadius),
+          Paint()
+            ..isAntiAlias = true
+            ..filterQuality = FilterQuality.medium,
+        );
+      } else {
+        final parentCircle = circlesById[person.circleId];
+        final tone = parentCircle?.tone ?? CircleTone.blue;
+        final colors = materialTones[tone]!;
+        final path = getCustomNodePath(
+          cx,
+          cy,
+          iconRadius - 1.0,
+          person.shapeType,
+          person.sides,
+          person.amplitude,
+        );
+        canvas.drawPath(
+          path,
+          Paint()
+            ..color = colors.centerBg
+            ..style = PaintingStyle.fill,
+        );
+        final initials = _labelPainter(
+          'avatar:${person.avatar}',
+          person.avatar,
+          const TextStyle(
+            color: Colors.white,
+            fontSize: 11,
+            fontWeight: FontWeight.w900,
+          ),
+        );
+        initials.paint(
+          canvas,
+          Offset(cx - initials.width / 2, cy - initials.height / 2),
+        );
+      }
+
+      final path = getCustomNodePath(
+        cx,
+        cy,
+        iconRadius - 1.0,
+        person.shapeType,
+        person.sides,
+        person.amplitude,
+      );
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = selected ? const Color(0xFF2563EB) : Colors.white
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = selected ? 2.5 : 1.5,
+      );
+
+      final label = _labelPainter(
+        'label:${person.name}:$selected',
+        person.name,
+        TextStyle(
+          color: selected ? const Color(0xFF2563EB) : const Color(0xFF1C2528),
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+        ),
+      );
+      final double labelWidth = label.width + 10.0;
+      final double labelHeight = label.height + 4.0;
+      final double labelX = cx - labelWidth / 2;
+      final double labelY = cy + 22.0;
+
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(labelX, labelY, labelWidth, labelHeight),
+          const Radius.circular(4.0),
+        ),
+        Paint()
+          ..color = Colors.white.withValues(alpha: 0.88)
+          ..style = PaintingStyle.fill,
+      );
+      label.paint(canvas, Offset(cx - label.width / 2, labelY + 2.0));
+    }
+  }
+
+  TextPainter _labelPainter(String key, String text, TextStyle style) {
+    final cached = labelCache[key];
+    if (cached != null) return cached;
+
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    labelCache[key] = painter;
+    return painter;
+  }
+
+  @override
+  bool shouldRepaint(covariant RealPeoplePainter oldDelegate) {
+    return oldDelegate.people != people ||
+        oldDelegate.circlesById != circlesById ||
+        oldDelegate.selectedPersonId != selectedPersonId ||
+        oldDelegate.avatarImage != avatarImage;
+  }
+}
+
 class StressRenderData {
   final List<PersonNode> people;
   final Float32List xs;
   final Float32List ys;
   final Uint8List avatarIndexes;
+  final Float32List edgeWorldPoints;
   final Map<int, List<int>> buckets;
   final double cellSize;
 
@@ -1507,6 +1778,7 @@ class StressRenderData {
     required this.xs,
     required this.ys,
     required this.avatarIndexes,
+    required this.edgeWorldPoints,
     required this.buckets,
     required this.cellSize,
   });
@@ -1517,6 +1789,7 @@ class StressRenderData {
       xs: Float32List(0),
       ys: Float32List(0),
       avatarIndexes: Uint8List(0),
+      edgeWorldPoints: Float32List(0),
       buckets: const {},
       cellSize: 320.0,
     );
@@ -1527,6 +1800,7 @@ class StressRenderData {
     final xs = Float32List(people.length);
     final ys = Float32List(people.length);
     final avatarIndexes = Uint8List(people.length);
+    final edgeWorldPoints = Float32List(people.length * 4);
     final buckets = <int, List<int>>{};
 
     for (int i = 0; i < people.length; i++) {
@@ -1534,6 +1808,11 @@ class StressRenderData {
       xs[i] = person.x;
       ys[i] = person.y;
       avatarIndexes[i] = i % 9;
+      final int edgeCursor = i * 4;
+      edgeWorldPoints[edgeCursor] = halfWorldSize;
+      edgeWorldPoints[edgeCursor + 1] = halfWorldSize;
+      edgeWorldPoints[edgeCursor + 2] = person.x + halfWorldSize;
+      edgeWorldPoints[edgeCursor + 3] = person.y + halfWorldSize;
 
       final int gx = (person.x / cellSize).floor();
       final int gy = (person.y / cellSize).floor();
@@ -1545,6 +1824,7 @@ class StressRenderData {
       xs: xs,
       ys: ys,
       avatarIndexes: avatarIndexes,
+      edgeWorldPoints: edgeWorldPoints,
       buckets: buckets,
       cellSize: cellSize,
     );
@@ -1596,11 +1876,11 @@ class StressIconsPainter extends CustomPainter {
   final List<ui.Picture> avatarPictures;
   final List<ui.Image> avatarImages;
   final ui.Image? avatarAtlas;
+  final ui.Image? sharedAvatarImage;
   final TextPainter Function(String) labelPainterProvider;
   final List<int> _visibleIndexes = <int>[];
   final List<ui.RSTransform> _atlasTransforms = <ui.RSTransform>[];
   final List<Rect> _atlasRects = <Rect>[];
-  Float32List _edgePoints = Float32List(0);
 
   StressIconsPainter({
     required this.data,
@@ -1612,6 +1892,7 @@ class StressIconsPainter extends CustomPainter {
     required this.avatarPictures,
     required this.avatarImages,
     required this.avatarAtlas,
+    required this.sharedAvatarImage,
     required this.labelPainterProvider,
   }) : super(repaint: transformationController);
 
@@ -1638,38 +1919,24 @@ class StressIconsPainter extends CustomPainter {
     if (_visibleIndexes.isEmpty) return;
 
     if (showEdges) {
-      final youCircle = circlesById['you'];
-      if (youCircle != null) {
-        final double sx = (youCircle.x + halfWorldSize) * scale + tx;
-        final double sy = (youCircle.y + halfWorldSize) * scale + ty;
-        final requiredPointLength = _visibleIndexes.length * 4;
-        if (_edgePoints.length != requiredPointLength) {
-          _edgePoints = Float32List(requiredPointLength);
-        }
-        var cursor = 0;
-
-        for (final index in _visibleIndexes) {
-          _edgePoints[cursor++] = sx;
-          _edgePoints[cursor++] = sy;
-          _edgePoints[cursor++] = (data.xs[index] + halfWorldSize) * scale + tx;
-          _edgePoints[cursor++] = (data.ys[index] + halfWorldSize) * scale + ty;
-        }
-
-        canvas.drawRawPoints(
-          ui.PointMode.lines,
-          _edgePoints,
-          Paint()
-            ..color = isNavigating
-                ? const Color(0x14747E84)
-                : const Color(0x24747E84)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.0
-            ..strokeCap = StrokeCap.round,
-        );
-      }
+      canvas.save();
+      canvas.translate(tx, ty);
+      canvas.scale(scale);
+      canvas.drawRawPoints(
+        ui.PointMode.lines,
+        data.edgeWorldPoints,
+        Paint()
+          ..color = isNavigating
+              ? const Color(0x14747E84)
+              : const Color(0x24747E84)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.0 / scale
+          ..strokeCap = StrokeCap.round,
+      );
+      canvas.restore();
     }
 
-    final atlas = avatarAtlas;
+    final atlas = sharedAvatarImage ?? avatarAtlas;
     if (atlas != null) {
       _atlasTransforms.clear();
       _atlasRects.clear();
@@ -1687,10 +1954,14 @@ class StressIconsPainter extends CustomPainter {
           ),
         );
 
-        final int avatarIndex = data.avatarIndexes[index];
-        final int column = avatarIndex % 3;
-        final int row = avatarIndex ~/ 3;
-        _atlasRects.add(Rect.fromLTWH(column * 40.0, row * 40.0, 40.0, 40.0));
+        if (sharedAvatarImage != null) {
+          _atlasRects.add(const Rect.fromLTWH(0, 0, 40.0, 40.0));
+        } else {
+          final int avatarIndex = data.avatarIndexes[index];
+          final int column = avatarIndex % 3;
+          final int row = avatarIndex ~/ 3;
+          _atlasRects.add(Rect.fromLTWH(column * 40.0, row * 40.0, 40.0, 40.0));
+        }
       }
 
       canvas.drawAtlas(
@@ -1767,6 +2038,7 @@ class StressIconsPainter extends CustomPainter {
         oldDelegate.showLabels != showLabels ||
         oldDelegate.isNavigating != isNavigating ||
         oldDelegate.avatarAtlas != avatarAtlas ||
+        oldDelegate.sharedAvatarImage != sharedAvatarImage ||
         oldDelegate.avatarImages != avatarImages;
   }
 }
