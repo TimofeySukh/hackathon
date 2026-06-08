@@ -60,7 +60,9 @@ Completed tasks can remain listed here when they explain repository history. Liv
 - `README.md`: top-level overview and local development commands.
 - `.env.mcp.example`: local-only MCP environment template for service-role access.
 - `.mcp.json`: project MCP configuration for the local Hackathon board stdio server.
+- `fixtures/linkedin/`: generated large LinkedIn import fixtures for performance testing.
 - `mcp/server.mjs`: local MCP server that exposes project docs and board graph tooling.
+- `scripts/generate-linkedin-connections.mjs`: generates reproducible `Connections.csv` and ZIP LinkedIn import fixtures.
 - `scripts/seed-demo-user.mjs`: idempotent demo-data seed for one user's board with reusable people, notes, AI summaries, and connections.
 - `src/main.tsx`: React entry point.
 - `src/App.tsx`: current board behavior.

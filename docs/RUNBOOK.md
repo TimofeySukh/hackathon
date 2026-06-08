@@ -134,6 +134,17 @@ npm run seed:demo-user -- --email <user-email>
 
 The demo seed is idempotent for the fixed contact set. Re-running it updates the seeded people, rebuilds their notes, and keeps the graph ready for search and live demos.
 
+Generate a large LinkedIn import fixture:
+
+```bash
+npm run generate:linkedin-fixture -- --count 10000
+```
+
+This writes:
+
+- `fixtures/linkedin/Connections-10000.csv` for inspecting the LinkedIn-compatible CSV rows.
+- `fixtures/linkedin/linkedin-connections-10000.zip` for drag-and-drop testing in the app, with an internal `Connections.csv` file.
+
 ## Production Auto-Deploy
 
 The `social.datanode.live` deployment can run a lightweight user-level auto-deploy loop on the server.

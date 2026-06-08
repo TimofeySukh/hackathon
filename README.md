@@ -102,6 +102,7 @@ For multi-device login, deploy the frontend on one stable server origin and add 
 - `npm run preview` previews the production build on all local network interfaces.
 - `npm run lint` runs ESLint.
 - `npm run mcp:start` starts the local Hackathon board MCP server over stdio.
+- `npm run generate:linkedin-fixture -- --count 10000` generates large LinkedIn import CSV and ZIP fixtures.
 
 ## Product Direction
 

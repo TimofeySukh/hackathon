@@ -51,6 +51,12 @@ When working on the project:
 - Reported gap: the project needs a landing page.
 - Notes: needs product requirements for public messaging, target audience, routing, auth entry points, and how the landing page coexists with the board-first app.
 
+### Large imported graphs are too slow
+
+- Status: Open
+- Reported behavior: 60-100 contacts load acceptably, but around 3000 contacts the board becomes extremely laggy.
+- Notes: the product target should support at least 10000 imported contacts. A reproducible LinkedIn fixture can be generated with `npm run generate:linkedin-fixture -- --count 10000`; it writes `fixtures/linkedin/Connections-10000.csv` and `fixtures/linkedin/linkedin-connections-10000.zip`. The current React/DOM/SVG rendering path needs virtualization or a canvas/WebGL graph layer before this target is realistic.
+
 ## Resolved Problems
 
 ### npm audit reports transitive vulnerabilities
