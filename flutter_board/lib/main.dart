@@ -1004,11 +1004,13 @@ class WavyCirclePainter extends CustomPainter {
       ..style = PaintingStyle.fill;
     canvas.drawPath(path, fillPaint);
 
-    final borderPaint = Paint()
-      ..color = colors.border
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = isSelected ? 3.5 : 2.0;
-    canvas.drawPath(path, borderPaint);
+    if (isSelected) {
+      final borderPaint = Paint()
+        ..color = colors.border
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3.5;
+      canvas.drawPath(path, borderPaint);
+    }
   }
 
   @override

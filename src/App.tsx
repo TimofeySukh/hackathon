@@ -227,6 +227,7 @@ function getFlowerPath(cx: number, cy: number, r: number, petals: number, amplit
 
 function App() {
   const surfaceRef = useRef<HTMLDivElement | null>(null)
+  const stressCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const panRef = useRef<PanState | null>(null)
   const moveCircleRef = useRef<MoveCircleState | null>(null)
   const movePersonRef = useRef<MovePersonState | null>(null)
@@ -241,6 +242,7 @@ function App() {
 
   const circlesById = useMemo(() => new Map(graph.circles.map((circle) => [circle.id, circle])), [graph.circles])
   const stressPeople = useMemo(() => generateStressPeople(stress.count), [stress.count])
+  const stressSprites = useMemo(() => createStressSprites(), [])
   const renderedPeopleCount = graph.people.length + stressPeople.length
   const renderedEdgeCount =
     graph.circles.filter((circle) => circle.connectedTo).length + graph.people.length + (stress.showEdges ? stressPeople.length : 0)
@@ -258,6 +260,26 @@ function App() {
   }, [graph.circles, circlesById])
   const selectedCircle = selectedItem.type === 'circle' ? circlesById.get(selectedItem.id) ?? null : null
   const selectedPerson = selectedItem.type === 'person' ? graph.people.find((person) => person.id === selectedItem.id) ?? null : null
+
+  useEffect(() => {
+    const canvas = stressCanvasRef.current
+    const surface = surfaceRef.current
+    if (!canvas || !surface) return
+
+    drawStressCanvas(canvas, surface, camera, stress, stressPeople, circlesById, stressSprites)
+  }, [camera, circlesById, stress, stressPeople, stressSprites])
+
+  useEffect(() => {
+    function handleResize() {
+      const canvas = stressCanvasRef.current
+      const surface = surfaceRef.current
+      if (!canvas || !surface) return
+      drawStressCanvas(canvas, surface, camera, stress, stressPeople, circlesById, stressSprites)
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [camera, circlesById, stress, stressPeople, stressSprites])
 
   function screenToWorld(point: { x: number; y: number }) {
     return {
@@ -649,6 +671,8 @@ function App() {
         onPointerCancel={handleSurfacePointerUp}
         onWheel={handleWheel}
       >
+        <canvas ref={stressCanvasRef} className="stress-canvas-layer" aria-hidden="true" />
+
         <svg className="edge-layer" aria-hidden="true">
           <g transform={`translate(${camera.x} ${camera.y}) scale(${camera.scale})`}>
             {graph.circles.map((circle) => {
@@ -661,13 +685,6 @@ function App() {
               if (!circle) return null
               return <path key={person.id} className="edge edge--person" d={makeCurve(circle, person)} />
             })}
-            {stress.showEdges
-              ? stressPeople.map((person) => {
-                  const circle = circlesById.get(person.circleId)
-                  if (!circle) return null
-                  return <path key={person.id} className="edge edge--stress" d={makeCurve(circle, person)} />
-                })
-              : null}
             {connector ? <path className="edge edge--draft" d={makeCurve({ x: connector.startX, y: connector.startY }, { x: connector.endX, y: connector.endY })} /> : null}
           </g>
         </svg>
@@ -706,8 +723,8 @@ function App() {
                     return getFlowerPath(R, R, baseR, petals, amp);
                   })()}
                   fill={MATERIAL_TONES[circle.tone].fill}
-                  stroke={MATERIAL_TONES[circle.tone].border}
-                  strokeWidth={selectedItem.type === 'circle' && selectedItem.id === circle.id ? 3.5 : 2}
+                  stroke={selectedItem.type === 'circle' && selectedItem.id === circle.id ? MATERIAL_TONES[circle.tone].border : 'none'}
+                  strokeWidth={selectedItem.type === 'circle' && selectedItem.id === circle.id ? 3.5 : 0}
                   filter="drop-shadow(0px 8px 16px rgba(0,0,0,0.06))"
                 />
               </svg>
@@ -794,52 +811,6 @@ function App() {
             </button>
           ))}
 
-          {stressPeople.map((person) => (
-            <button
-              key={person.id}
-              type="button"
-              className={`person person--stress ${stress.showLabels ? '' : 'person--icon-only'}`}
-              style={{ transform: `translate(${person.x}px, ${person.y}px)` }}
-              aria-label={person.name}
-              tabIndex={-1}
-            >
-              <span
-                style={{
-                  position: 'relative',
-                  width: 32,
-                  height: 32,
-                  background: 'transparent',
-                  display: 'grid',
-                  placeItems: 'center',
-                }}
-              >
-                <svg
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    width: '100%',
-                    height: '100%',
-                    pointerEvents: 'none',
-                    overflow: 'visible',
-                  }}
-                >
-                  <path d={getFlowerPath(16, 16, 12.5, 6, 2.5)} fill={person.role} stroke="#ffffff" strokeWidth={1.5} />
-                </svg>
-                <span
-                  style={{
-                    position: 'relative',
-                    zIndex: 1,
-                    color: '#ffffff',
-                    fontSize: 10,
-                    fontWeight: 900,
-                  }}
-                >
-                  {person.avatar}
-                </span>
-              </span>
-              {stress.showLabels ? <strong>{person.name}</strong> : null}
-            </button>
-          ))}
         </div>
       </div>
 
@@ -908,6 +879,151 @@ function App() {
       </aside>
     </main>
   )
+}
+
+function drawStressCanvas(
+  canvas: HTMLCanvasElement,
+  surface: HTMLElement,
+  camera: Camera,
+  stress: StressSettings,
+  people: PersonNode[],
+  circlesById: Map<string, CircleNode>,
+  sprites: HTMLCanvasElement[],
+) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 1.75)
+  const width = Math.max(1, surface.clientWidth)
+  const height = Math.max(1, surface.clientHeight)
+
+  if (canvas.width !== Math.round(width * dpr) || canvas.height !== Math.round(height * dpr)) {
+    canvas.width = Math.round(width * dpr)
+    canvas.height = Math.round(height * dpr)
+    canvas.style.width = `${width}px`
+    canvas.style.height = `${height}px`
+  }
+
+  const context = canvas.getContext('2d')
+  if (!context) return
+
+  context.setTransform(dpr, 0, 0, dpr, 0, 0)
+  context.clearRect(0, 0, width, height)
+  if (people.length === 0) return
+
+  const viewport = {
+    left: (0 - camera.x) / camera.scale,
+    right: (width - camera.x) / camera.scale,
+    top: (0 - camera.y) / camera.scale,
+    bottom: (height - camera.y) / camera.scale,
+  }
+  const padding = stress.showLabels ? 120 / camera.scale : 48 / camera.scale
+  const visiblePeople = people.filter(
+    (person) =>
+      person.x >= viewport.left - padding &&
+      person.x <= viewport.right + padding &&
+      person.y >= viewport.top - padding &&
+      person.y <= viewport.bottom + padding,
+  )
+
+  context.save()
+  context.translate(camera.x, camera.y)
+  context.scale(camera.scale, camera.scale)
+
+  if (stress.showEdges) {
+    context.beginPath()
+    context.strokeStyle = 'rgba(116, 126, 132, 0.12)'
+    context.lineWidth = Math.max(0.7 / camera.scale, 0.45)
+
+    for (const person of visiblePeople) {
+      const circle = circlesById.get(person.circleId)
+      if (!circle) continue
+      context.moveTo(circle.x, circle.y)
+      context.lineTo(person.x, person.y)
+    }
+
+    context.stroke()
+  }
+
+  const iconSize = stress.showLabels ? 30 : 28
+  const halfIcon = iconSize / 2
+  context.textAlign = 'center'
+  context.textBaseline = 'middle'
+
+  for (const person of visiblePeople) {
+    const sprite = sprites[getAvatarIndex(person.avatar) % sprites.length]
+    context.drawImage(sprite, person.x - halfIcon, person.y - halfIcon, iconSize, iconSize)
+  }
+
+  if (stress.showLabels) {
+    context.font = `${Math.max(10 / camera.scale, 8)}px Inter, system-ui, sans-serif`
+    context.textBaseline = 'top'
+
+    for (const person of visiblePeople) {
+      const labelWidth = context.measureText(person.name).width + 12 / camera.scale
+      const x = person.x - labelWidth / 2
+      const y = person.y + 19
+      context.fillStyle = 'rgba(255, 255, 255, 0.86)'
+      roundRect(context, x, y, labelWidth, 18 / camera.scale, 5 / camera.scale)
+      context.fill()
+      context.fillStyle = '#1c2528'
+      context.fillText(person.name, person.x, y + 4 / camera.scale)
+    }
+  }
+
+  context.restore()
+}
+
+function createStressSprites() {
+  const colors = ['#00629D', '#C00015', '#1E824A', '#D87A00', '#7F67BE', '#0F766E', '#4F46E5', '#BE185D', '#BE185D']
+  return colors.map((color, index) => {
+    const canvas = document.createElement('canvas')
+    const size = 64
+    const context = canvas.getContext('2d')
+    canvas.width = size
+    canvas.height = size
+    if (!context) return canvas
+
+    context.fillStyle = color
+    drawFlowerPath(context, size / 2, size / 2, 25, 6, 5)
+    context.fill()
+
+    context.strokeStyle = '#ffffff'
+    context.lineWidth = 4
+    context.stroke()
+
+    context.fillStyle = '#ffffff'
+    context.font = '900 18px Inter, system-ui, sans-serif'
+    context.textAlign = 'center'
+    context.textBaseline = 'middle'
+    context.fillText(makeAvatar(index), size / 2, size / 2 + 1)
+
+    return canvas
+  })
+}
+
+function drawFlowerPath(context: CanvasRenderingContext2D, cx: number, cy: number, r: number, petals: number, amplitude: number) {
+  const points = 72
+  context.beginPath()
+  for (let i = 0; i <= points; i += 1) {
+    const angle = (i * 2 * Math.PI) / points
+    const currentR = r + amplitude * Math.cos(petals * angle)
+    const x = cx + currentR * Math.cos(angle)
+    const y = cy + currentR * Math.sin(angle)
+    if (i === 0) {
+      context.moveTo(x, y)
+    } else {
+      context.lineTo(x, y)
+    }
+  }
+  context.closePath()
+}
+
+function roundRect(context: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
+  context.beginPath()
+  context.moveTo(x + radius, y)
+  context.arcTo(x + width, y, x + width, y + height, radius)
+  context.arcTo(x + width, y + height, x, y + height, radius)
+  context.arcTo(x, y + height, x, y, radius)
+  context.arcTo(x, y, x + width, y, radius)
+  context.closePath()
 }
 
 function useFrameRate() {
@@ -1083,6 +1199,11 @@ function menuPosition(menu: CreateMenu) {
 function makeAvatar(index: number) {
   const names = ['AL', 'BD', 'CE', 'DK', 'EV', 'FX', 'GN', 'HM', 'IR']
   return names[index % names.length]
+}
+
+function getAvatarIndex(avatar: string) {
+  const names = ['AL', 'BD', 'CE', 'DK', 'EV', 'FX', 'GN', 'HM', 'IR']
+  return Math.max(0, names.indexOf(avatar))
 }
 
 function seededRandom(seed: number) {
