@@ -11,7 +11,7 @@ Current visible prototype behavior:
 - includes seeded connected circles for EU friends, Pandora, and a market circle
 - includes a nested product-team subset inside Pandora
 - draws curved links from circle centers to circles and people
-- includes an icon stress-test panel with a 0-10,000 synthetic icon slider, optional synthetic edges, optional labels, and live FPS
+- includes a canvas-backed icon stress-test panel with a 0-10,000 synthetic icon slider, optional synthetic edges, optional labels, and live FPS
 - creates people, nested subset circles, or external connected circles from a circle context menu
 - supports Shift-drag from a circle center as a shortcut for creating from that center
 - keeps people as endpoints and circle centers as the only branch-creation sources
