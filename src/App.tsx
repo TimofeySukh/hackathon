@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react'
 
 type CircleTone = 'blue' | 'red' | 'green' | 'amber' | 'violet'
@@ -29,6 +29,12 @@ type PersonNode = {
 type GraphState = {
   circles: CircleNode[]
   people: PersonNode[]
+}
+
+type StressSettings = {
+  count: number
+  showLabels: boolean
+  showEdges: boolean
 }
 
 type Camera = {
@@ -101,6 +107,7 @@ const MIN_CIRCLE_RADIUS = 72
 const EDGE_RESIZE_HIT_SIZE = 18
 const PERSON_CONTAINMENT_RADIUS = 62
 const CIRCLE_CONTAINMENT_PADDING = 28
+const MAX_STRESS_ICONS = 10000
 const DEFAULT_STATE: GraphState = {
   circles: [
     {
@@ -192,6 +199,32 @@ const TONE_LABELS: Record<CircleTone, string> = {
   violet: 'Violet',
 }
 
+const MATERIAL_TONES: Record<CircleTone, { fill: string; border: string; text: string; centerBg: string }> = {
+  blue: { fill: '#D2E4FF', border: '#004A77', text: '#001D35', centerBg: '#00629D' },
+  red: { fill: '#FFDAD6', border: '#BA1A1A', text: '#410002', centerBg: '#C00015' },
+  green: { fill: '#D1E8D2', border: '#0F6D38', text: '#00210B', centerBg: '#1E824A' },
+  amber: { fill: '#FFE082', border: '#B06000', text: '#2A1400', centerBg: '#D87A00' },
+  violet: { fill: '#EADDFF', border: '#6750A4', text: '#21005D', centerBg: '#7F67BE' },
+}
+
+function getFlowerPath(cx: number, cy: number, r: number, petals: number, amplitude: number) {
+  let path = ''
+  const points = 120
+  for (let i = 0; i <= points; i++) {
+    const angle = (i * 2 * Math.PI) / points
+    const currentR = r + amplitude * Math.cos(petals * angle)
+    const x = cx + currentR * Math.cos(angle)
+    const y = cy + currentR * Math.sin(angle)
+    if (i === 0) {
+      path += `M ${x.toFixed(2)} ${y.toFixed(2)}`
+    } else {
+      path += ` L ${x.toFixed(2)} ${y.toFixed(2)}`
+    }
+  }
+  path += ' Z'
+  return path
+}
+
 function App() {
   const surfaceRef = useRef<HTMLDivElement | null>(null)
   const panRef = useRef<PanState | null>(null)
@@ -203,8 +236,26 @@ function App() {
   const [connector, setConnector] = useState<DragConnector | null>(null)
   const [createMenu, setCreateMenu] = useState<CreateMenu | null>(null)
   const [selectedItem, setSelectedItem] = useState<SelectedItem>({ type: 'circle', id: 'you' })
+  const [stress, setStress] = useState<StressSettings>({ count: 0, showLabels: false, showEdges: true })
+  const fps = useFrameRate()
 
   const circlesById = useMemo(() => new Map(graph.circles.map((circle) => [circle.id, circle])), [graph.circles])
+  const stressPeople = useMemo(() => generateStressPeople(stress.count), [stress.count])
+  const renderedPeopleCount = graph.people.length + stressPeople.length
+  const renderedEdgeCount =
+    graph.circles.filter((circle) => circle.connectedTo).length + graph.people.length + (stress.showEdges ? stressPeople.length : 0)
+  const sortedCircles = useMemo(() => {
+    function getDepth(circleId: string | null): number {
+      let depth = 0
+      let curr = circleId
+      while (curr) {
+        depth++
+        curr = circlesById.get(curr)?.parentId ?? null
+      }
+      return depth
+    }
+    return [...graph.circles].sort((a, b) => getDepth(a.parentId) - getDepth(b.parentId))
+  }, [graph.circles, circlesById])
   const selectedCircle = selectedItem.type === 'circle' ? circlesById.get(selectedItem.id) ?? null : null
   const selectedPerson = selectedItem.type === 'person' ? graph.people.find((person) => person.id === selectedItem.id) ?? null : null
 
@@ -534,6 +585,52 @@ function App() {
         </div>
       </div>
 
+      <section className="stress-panel" aria-label="Icon stress test controls">
+        <div className="stress-panel__header">
+          <strong>Icon stress</strong>
+          <span>{fps} FPS</span>
+        </div>
+        <label className="stress-slider">
+          <span>{stress.count.toLocaleString('en-US')} synthetic icons</span>
+          <input
+            type="range"
+            min="0"
+            max={MAX_STRESS_ICONS}
+            step="250"
+            value={stress.count}
+            onChange={(event) => setStress((current) => ({ ...current, count: Number(event.target.value) }))}
+          />
+        </label>
+        <div className="stress-toggles">
+          <label>
+            <input
+              type="checkbox"
+              checked={stress.showEdges}
+              onChange={(event) => setStress((current) => ({ ...current, showEdges: event.target.checked }))}
+            />
+            <span>Edges</span>
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={stress.showLabels}
+              onChange={(event) => setStress((current) => ({ ...current, showLabels: event.target.checked }))}
+            />
+            <span>Labels</span>
+          </label>
+        </div>
+        <dl>
+          <div>
+            <dt>Rendered icons</dt>
+            <dd>{renderedPeopleCount.toLocaleString('en-US')}</dd>
+          </div>
+          <div>
+            <dt>Rendered edges</dt>
+            <dd>{renderedEdgeCount.toLocaleString('en-US')}</dd>
+          </div>
+        </dl>
+      </section>
+
       <section className="help-panel" aria-label="How to use the prototype">
         <strong>How it works</strong>
         <span>Drag people or circles to move them.</span>
@@ -564,12 +661,19 @@ function App() {
               if (!circle) return null
               return <path key={person.id} className="edge edge--person" d={makeCurve(circle, person)} />
             })}
+            {stress.showEdges
+              ? stressPeople.map((person) => {
+                  const circle = circlesById.get(person.circleId)
+                  if (!circle) return null
+                  return <path key={person.id} className="edge edge--stress" d={makeCurve(circle, person)} />
+                })
+              : null}
             {connector ? <path className="edge edge--draft" d={makeCurve({ x: connector.startX, y: connector.startY }, { x: connector.endX, y: connector.endY })} /> : null}
           </g>
         </svg>
 
         <div className="world-layer" style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale})` }}>
-          {graph.circles.map((circle) => (
+          {sortedCircles.map((circle) => (
             <section
               key={circle.id}
               className={`circle circle--${circle.tone} ${selectedItem.type === 'circle' && selectedItem.id === circle.id ? 'is-selected' : ''}`}
@@ -577,15 +681,45 @@ function App() {
                 width: circle.radius * 2,
                 height: circle.radius * 2,
                 transform: `translate(${circle.x - circle.radius}px, ${circle.y - circle.radius}px)`,
+                background: 'transparent',
+                border: 'none',
               }}
               onContextMenu={(event) => openCircleCreateMenu(event, circle)}
               onPointerDown={(event) => startCircleSurfaceDrag(event, circle)}
             >
+              <svg
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  pointerEvents: 'none',
+                  overflow: 'visible',
+                }}
+              >
+                <path
+                  d={(() => {
+                    const R = circle.radius;
+                    const amp = Math.max(4, R * 0.08);
+                    const baseR = R - amp - 4;
+                    return getFlowerPath(R, R, baseR, 8, amp);
+                  })()}
+                  fill={MATERIAL_TONES[circle.tone].fill}
+                  stroke={MATERIAL_TONES[circle.tone].border}
+                  strokeWidth={selectedItem.type === 'circle' && selectedItem.id === circle.id ? 3.5 : 2}
+                  filter="drop-shadow(0px 8px 16px rgba(0,0,0,0.06))"
+                />
+              </svg>
               <span className="circle__label">{circle.name}</span>
               <button
                 type="button"
                 className="circle-center"
-                style={{ left: circle.radius, top: circle.radius }}
+                style={{
+                  left: circle.radius,
+                  top: circle.radius,
+                  background: MATERIAL_TONES[circle.tone].centerBg,
+                  borderColor: '#ffffff',
+                }}
                 onPointerDown={(event) => startCircleCenterDrag(event, circle)}
                 onClick={(event) => {
                   event.stopPropagation()
@@ -610,8 +744,99 @@ function App() {
               aria-label={`Select ${person.name}`}
               title="Drag to move this person"
             >
-              <span>{person.avatar}</span>
+              <span
+                style={{
+                  position: 'relative',
+                  width: 32,
+                  height: 32,
+                  background: 'transparent',
+                  display: 'grid',
+                  placeItems: 'center',
+                }}
+              >
+                <svg
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    pointerEvents: 'none',
+                    overflow: 'visible',
+                  }}
+                >
+                  <path
+                    d={getFlowerPath(16, 16, 12.5, 6, 2.5)}
+                    fill={(() => {
+                      const parentCircle = circlesById.get(person.circleId)
+                      return parentCircle ? MATERIAL_TONES[parentCircle.tone].centerBg : '#3F51B5'
+                    })()}
+                    stroke={(() => {
+                      const parentCircle = circlesById.get(person.circleId)
+                      return parentCircle ? MATERIAL_TONES[parentCircle.tone].border : '#ffffff'
+                    })()}
+                    strokeWidth={1.5}
+                  />
+                </svg>
+                <span
+                  style={{
+                    position: 'relative',
+                    zIndex: 1,
+                    color: '#ffffff',
+                    fontSize: 10,
+                    fontWeight: 900,
+                  }}
+                >
+                  {person.avatar}
+                </span>
+              </span>
               <strong>{person.name}</strong>
+            </button>
+          ))}
+
+          {stressPeople.map((person) => (
+            <button
+              key={person.id}
+              type="button"
+              className={`person person--stress ${stress.showLabels ? '' : 'person--icon-only'}`}
+              style={{ transform: `translate(${person.x}px, ${person.y}px)` }}
+              aria-label={person.name}
+              tabIndex={-1}
+            >
+              <span
+                style={{
+                  position: 'relative',
+                  width: 32,
+                  height: 32,
+                  background: 'transparent',
+                  display: 'grid',
+                  placeItems: 'center',
+                }}
+              >
+                <svg
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    pointerEvents: 'none',
+                    overflow: 'visible',
+                  }}
+                >
+                  <path d={getFlowerPath(16, 16, 12.5, 6, 2.5)} fill={person.role} stroke="#ffffff" strokeWidth={1.5} />
+                </svg>
+                <span
+                  style={{
+                    position: 'relative',
+                    zIndex: 1,
+                    color: '#ffffff',
+                    fontSize: 10,
+                    fontWeight: 900,
+                  }}
+                >
+                  {person.avatar}
+                </span>
+              </span>
+              {stress.showLabels ? <strong>{person.name}</strong> : null}
             </button>
           ))}
         </div>
@@ -682,6 +907,56 @@ function App() {
       </aside>
     </main>
   )
+}
+
+function useFrameRate() {
+  const [fps, setFps] = useState(0)
+
+  useEffect(() => {
+    let frameCount = 0
+    let lastMeasuredAt = performance.now()
+    let animationFrameId = 0
+
+    function tick(now: number) {
+      frameCount += 1
+      if (now - lastMeasuredAt >= 500) {
+        setFps(Math.round((frameCount * 1000) / (now - lastMeasuredAt)))
+        frameCount = 0
+        lastMeasuredAt = now
+      }
+
+      animationFrameId = window.requestAnimationFrame(tick)
+    }
+
+    animationFrameId = window.requestAnimationFrame(tick)
+    return () => window.cancelAnimationFrame(animationFrameId)
+  }, [])
+
+  return fps
+}
+
+function generateStressPeople(count: number): PersonNode[] {
+  const colors = ['#00629D', '#C00015', '#1E824A', '#D87A00', '#7F67BE', '#0F766E', '#4F46E5', '#BE185D']
+  const people: PersonNode[] = []
+
+  for (let index = 0; index < count; index += 1) {
+    const angle = index * 2.399963229728653
+    const ring = Math.floor(Math.sqrt(index))
+    const radius = 185 + ring * 15
+    const jitter = (seededRandom(index + 11) - 0.5) * 18
+
+    people.push({
+      id: `stress-${index}`,
+      name: `Stress ${index + 1}`,
+      role: colors[index % colors.length],
+      x: Math.cos(angle) * (radius + jitter),
+      y: Math.sin(angle) * (radius + jitter),
+      circleId: 'you',
+      avatar: makeAvatar(index),
+    })
+  }
+
+  return people
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -807,6 +1082,11 @@ function menuPosition(menu: CreateMenu) {
 function makeAvatar(index: number) {
   const names = ['AL', 'BD', 'CE', 'DK', 'EV', 'FX', 'GN', 'HM', 'IR']
   return names[index % names.length]
+}
+
+function seededRandom(seed: number) {
+  const value = Math.sin(seed * 12.9898) * 43758.5453
+  return value - Math.floor(value)
 }
 
 function nextTone(index: number): CircleTone {

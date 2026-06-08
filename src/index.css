@@ -84,11 +84,9 @@ svg {
 .help-panel,
 .inspector,
 .create-menu {
-  border: 1px solid var(--panel-border);
-  background: var(--panel-bg);
+  border: 1.5px solid #c4c7c8;
+  background: #ffffff;
   box-shadow: var(--panel-shadow);
-  -webkit-backdrop-filter: blur(16px);
-  backdrop-filter: blur(16px);
 }
 
 .brand {
@@ -323,16 +321,16 @@ svg {
   display: inline-grid;
   grid-template-columns: 32px auto;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   min-width: 92px;
   max-width: 142px;
   min-height: 38px;
   padding: 3px 9px 3px 3px;
-  border: 1px solid rgba(28, 37, 40, 0.13);
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.92);
+  border: 1.5px solid #c4c7c8;
+  border-radius: 12px;
+  background: #ffffff;
   color: #1c2528;
-  box-shadow: 0 9px 22px rgba(54, 61, 68, 0.12);
+  box-shadow: 0 4px 12px rgba(54, 61, 68, 0.07);
   cursor: grab;
   transform-origin: 0 0;
 }
@@ -343,10 +341,10 @@ svg {
 
 .person:hover,
 .person.is-selected {
-  border-color: rgba(37, 99, 235, 0.65);
+  border-color: #2563eb;
   box-shadow:
-    0 0 0 3px rgba(37, 99, 235, 0.15),
-    0 12px 25px rgba(54, 61, 68, 0.16);
+    0 0 0 3px rgba(37, 99, 235, 0.12),
+    0 8px 18px rgba(54, 61, 68, 0.12);
 }
 
 .person span {
@@ -354,13 +352,6 @@ svg {
   width: 32px;
   height: 32px;
   place-items: center;
-  border-radius: 6px;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.16), transparent),
-    #314252;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 850;
 }
 
 .person strong {
