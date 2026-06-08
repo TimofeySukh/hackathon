@@ -3,6 +3,8 @@ import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, 
 
 type CircleTone = 'blue' | 'red' | 'green' | 'amber' | 'violet'
 
+type ShapeType = 'circle' | 'wavy' | 'polygon'
+
 type CircleNode = {
   id: string
   name: string
@@ -14,6 +16,10 @@ type CircleNode = {
   parentId: string | null
   connectedTo: string | null
   tone: CircleTone
+  shapeType?: ShapeType
+  sides?: number
+  amplitude?: number
+  imageUrl?: string
 }
 
 type PersonNode = {
@@ -24,6 +30,10 @@ type PersonNode = {
   y: number
   circleId: string
   avatar: string
+  shapeType?: ShapeType
+  sides?: number
+  amplitude?: number
+  imageUrl?: string
 }
 
 type GraphState = {
@@ -108,6 +118,7 @@ const EDGE_RESIZE_HIT_SIZE = 18
 const PERSON_CONTAINMENT_RADIUS = 62
 const CIRCLE_CONTAINMENT_PADDING = 28
 const MAX_STRESS_ICONS = 10000
+
 const DEFAULT_STATE: GraphState = {
   circles: [
     {
@@ -121,6 +132,9 @@ const DEFAULT_STATE: GraphState = {
       parentId: null,
       connectedTo: null,
       tone: 'blue',
+      shapeType: 'wavy',
+      sides: 12,
+      amplitude: 7,
     },
     {
       id: 'eu-network',
@@ -133,6 +147,9 @@ const DEFAULT_STATE: GraphState = {
       parentId: null,
       connectedTo: 'you',
       tone: 'blue',
+      shapeType: 'wavy',
+      sides: 25,
+      amplitude: 15,
     },
     {
       id: 'pandora',
@@ -145,6 +162,9 @@ const DEFAULT_STATE: GraphState = {
       parentId: null,
       connectedTo: 'you',
       tone: 'red',
+      shapeType: 'wavy',
+      sides: 27,
+      amplitude: 16,
     },
     {
       id: 'product-team',
@@ -157,6 +177,9 @@ const DEFAULT_STATE: GraphState = {
       parentId: 'pandora',
       connectedTo: 'pandora',
       tone: 'blue',
+      shapeType: 'wavy',
+      sides: 8,
+      amplitude: 5,
     },
     {
       id: 'market',
@@ -169,25 +192,28 @@ const DEFAULT_STATE: GraphState = {
       parentId: null,
       connectedTo: 'you',
       tone: 'green',
+      shapeType: 'wavy',
+      sides: 23,
+      amplitude: 14,
     },
   ],
   people: [
-    { id: 'p1', name: 'Mia', role: 'Close friend', x: -62, y: -54, circleId: 'you', avatar: 'MI' },
-    { id: 'p2', name: 'Noah', role: 'Founder friend', x: 58, y: -6, circleId: 'you', avatar: 'NO' },
-    { id: 'p3', name: 'Ava', role: 'Design', x: 34, y: 67, circleId: 'you', avatar: 'AV' },
-    { id: 'p4', name: 'Sofia', role: 'Portugal', x: 168, y: -472, circleId: 'eu-network', avatar: 'SO' },
-    { id: 'p5', name: 'Lucas', role: 'Germany', x: 28, y: -610, circleId: 'eu-network', avatar: 'LU' },
-    { id: 'p6', name: 'Emma', role: 'Finland', x: -112, y: -416, circleId: 'eu-network', avatar: 'EM' },
-    { id: 'p7', name: 'Oscar', role: 'Denmark', x: 106, y: -302, circleId: 'eu-network', avatar: 'OC' },
-    { id: 'p8', name: 'Olivia', role: 'Brand', x: -166, y: 335, circleId: 'pandora', avatar: 'OL' },
-    { id: 'p9', name: 'Victor', role: 'Retail', x: 154, y: 360, circleId: 'pandora', avatar: 'VI' },
-    { id: 'p10', name: 'Freja', role: 'Operations', x: -190, y: 575, circleId: 'pandora', avatar: 'FR' },
-    { id: 'p11', name: 'Anton', role: 'PM', x: -92, y: 575, circleId: 'product-team', avatar: 'AN' },
-    { id: 'p12', name: 'Nora', role: 'UX', x: -20, y: 591, circleId: 'product-team', avatar: 'NR' },
-    { id: 'p13', name: 'Eli', role: 'Engineering', x: 50, y: 575, circleId: 'product-team', avatar: 'EL' },
-    { id: 'p14', name: 'Karim', role: 'Investor', x: 645, y: -15, circleId: 'market', avatar: 'KA' },
-    { id: 'p15', name: 'Lina', role: 'Media', x: 423, y: 4, circleId: 'market', avatar: 'LI' },
-    { id: 'p16', name: 'Yara', role: 'Analyst', x: 580, y: 198, circleId: 'market', avatar: 'YA' },
+    { id: 'p1', name: 'Mia', role: 'Close friend', x: -62, y: -54, circleId: 'you', avatar: 'MI', shapeType: 'polygon', sides: 8, amplitude: 2 },
+    { id: 'p2', name: 'Noah', role: 'Founder friend', x: 58, y: -6, circleId: 'you', avatar: 'NO', shapeType: 'polygon', sides: 10, amplitude: 2 },
+    { id: 'p3', name: 'Ava', role: 'Design', x: 34, y: 67, circleId: 'you', avatar: 'AV', shapeType: 'polygon', sides: 11, amplitude: 2 },
+    { id: 'p4', name: 'Sofia', role: 'Portugal', x: 168, y: -472, circleId: 'eu-network', avatar: 'SO', shapeType: 'polygon', sides: 9, amplitude: 2 },
+    { id: 'p5', name: 'Lucas', role: 'Germany', x: 28, y: -610, circleId: 'eu-network', avatar: 'LU', shapeType: 'polygon', sides: 12, amplitude: 2 },
+    { id: 'p6', name: 'Emma', role: 'Finland', x: -112, y: -416, circleId: 'eu-network', avatar: 'EM', shapeType: 'polygon', sides: 8, amplitude: 2 },
+    { id: 'p7', name: 'Oscar', role: 'Denmark', x: 106, y: -302, circleId: 'eu-network', avatar: 'OC', shapeType: 'polygon', sides: 10, amplitude: 2 },
+    { id: 'p8', name: 'Olivia', role: 'Brand', x: -166, y: 335, circleId: 'pandora', avatar: 'OL', shapeType: 'polygon', sides: 11, amplitude: 2 },
+    { id: 'p9', name: 'Victor', role: 'Retail', x: 154, y: 360, circleId: 'pandora', avatar: 'VI', shapeType: 'polygon', sides: 9, amplitude: 2 },
+    { id: 'p10', name: 'Freja', role: 'Operations', x: -190, y: 575, circleId: 'pandora', avatar: 'FR', shapeType: 'polygon', sides: 12, amplitude: 2 },
+    { id: 'p11', name: 'Anton', role: 'PM', x: -92, y: 575, circleId: 'product-team', avatar: 'AN', shapeType: 'polygon', sides: 8, amplitude: 2 },
+    { id: 'p12', name: 'Nora', role: 'UX', x: -20, y: 591, circleId: 'product-team', avatar: 'NR', shapeType: 'polygon', sides: 10, amplitude: 2 },
+    { id: 'p13', name: 'Eli', role: 'Engineering', x: 50, y: 575, circleId: 'product-team', avatar: 'EL', shapeType: 'polygon', sides: 11, amplitude: 2 },
+    { id: 'p14', name: 'Karim', role: 'Investor', x: 645, y: -15, circleId: 'market', avatar: 'KA', shapeType: 'polygon', sides: 9, amplitude: 2 },
+    { id: 'p15', name: 'Lina', role: 'Media', x: 423, y: 4, circleId: 'market', avatar: 'LI', shapeType: 'polygon', sides: 12, amplitude: 2 },
+    { id: 'p16', name: 'Yara', role: 'Analyst', x: 580, y: 198, circleId: 'market', avatar: 'YA', shapeType: 'polygon', sides: 8, amplitude: 2 },
   ],
 }
 
@@ -207,19 +233,90 @@ const MATERIAL_TONES: Record<CircleTone, { fill: string; border: string; text: s
   violet: { fill: '#EADDFF', border: '#6750A4', text: '#21005D', centerBg: '#7F67BE' },
 }
 
-function getFlowerPath(cx: number, cy: number, r: number, petals: number, amplitude: number) {
-  let path = ''
-  const points = 240
-  for (let i = 0; i <= points; i++) {
-    const angle = (i * 2 * Math.PI) / points
-    const currentR = r + amplitude * Math.cos(petals * angle)
-    const x = cx + currentR * Math.cos(angle)
-    const y = cy + currentR * Math.sin(angle)
-    if (i === 0) {
-      path += `M ${x.toFixed(2)} ${y.toFixed(2)}`
-    } else {
-      path += ` L ${x.toFixed(2)} ${y.toFixed(2)}`
+function getNodePath(
+  cx: number,
+  cy: number,
+  r: number,
+  shapeType: ShapeType,
+  sides: number,
+  amplitude: number
+) {
+  if (shapeType === 'circle' || amplitude === 0) {
+    let path = ''
+    const points = Math.max(120, Math.round(r * 2))
+    for (let i = 0; i <= points; i++) {
+      const angle = (i * 2 * Math.PI) / points
+      const x = cx + r * Math.cos(angle)
+      const y = cy + r * Math.sin(angle)
+      if (i === 0) {
+        path += `M ${x.toFixed(2)} ${y.toFixed(2)}`
+      } else {
+        path += ` L ${x.toFixed(2)} ${y.toFixed(2)}`
+      }
     }
+    path += ' Z'
+    return path
+  }
+
+  if (shapeType === 'wavy') {
+    let path = ''
+    const points = Math.max(240, Math.round(r * 2 * Math.PI))
+    const baseR = r - amplitude - 4
+    for (let i = 0; i <= points; i++) {
+      const angle = (i * 2 * Math.PI) / points
+      const currentR = baseR + amplitude * Math.cos(sides * angle)
+      const x = cx + currentR * Math.cos(angle)
+      const y = cy + currentR * Math.sin(angle)
+      if (i === 0) {
+        path += `M ${x.toFixed(2)} ${y.toFixed(2)}`
+      } else {
+        path += ` L ${x.toFixed(2)} ${y.toFixed(2)}`
+      }
+    }
+    path += ' Z'
+    return path
+  }
+
+  // shapeType === 'polygon'
+  const softness = Math.min(1.0, Math.max(0.0, amplitude / 20.0))
+  const vertices: { x: number; y: number }[] = []
+  const angleStep = (2 * Math.PI) / sides
+  for (let i = 0; i < sides; i++) {
+    const angle = i * angleStep - Math.PI / 2
+    vertices.push({
+      x: cx + r * Math.cos(angle),
+      y: cy + r * Math.sin(angle),
+    })
+  }
+
+  const midpoints: { x: number; y: number }[] = []
+  for (let i = 0; i < sides; i++) {
+    const next = (i + 1) % sides
+    midpoints.push({
+      x: (vertices[i].x + vertices[next].x) / 2,
+      y: (vertices[i].y + vertices[next].y) / 2,
+    })
+  }
+
+  let path = ''
+  for (let i = 0; i < sides; i++) {
+    const prevIdx = (i - 1 + sides) % sides
+    const p = vertices[i]
+    const mPrev = midpoints[prevIdx]
+    const mNext = midpoints[i]
+
+    const startX = p.x + (mPrev.x - p.x) * softness
+    const startY = p.y + (mPrev.y - p.y) * softness
+
+    const endX = p.x + (mNext.x - p.x) * softness
+    const endY = p.y + (mNext.y - p.y) * softness
+
+    if (i === 0) {
+      path += `M ${startX.toFixed(2)} ${startY.toFixed(2)}`
+    } else {
+      path += ` L ${startX.toFixed(2)} ${startY.toFixed(2)}`
+    }
+    path += ` Q ${p.x.toFixed(2)} ${p.y.toFixed(2)} ${endX.toFixed(2)} ${endY.toFixed(2)}`
   }
   path += ' Z'
   return path
@@ -494,6 +591,7 @@ function App() {
     if (!source) return
 
     const id = `person-${Date.now()}`
+    const sides = Math.floor(Math.random() * 5) + 8
     setGraph((current) =>
       ensureContainment({
         ...current,
@@ -507,6 +605,9 @@ function App() {
             y: createMenu.y,
             circleId: source.id,
             avatar: makeAvatar(current.people.length + 1),
+            shapeType: 'polygon',
+            sides,
+            amplitude: 2,
           },
         ],
       }),
@@ -539,6 +640,9 @@ function App() {
             parentId: isNested ? source.id : null,
             connectedTo: source.id,
             tone: isNested ? 'violet' : nextTone(current.circles.length),
+            shapeType: isNested ? 'polygon' : 'wavy',
+            sides: isNested ? 6 : 12,
+            amplitude: isNested ? 4 : 8,
           },
         ],
       }),
@@ -552,15 +656,21 @@ function App() {
     if (!source) return
 
     const nextIndex = graph.people.length + 1
-    const points = [-58, 0, 58].map((offset, index) => ({
-      id: `person-${Date.now()}-${index}`,
-      name: ['Alex', 'Daria', 'Sam'][index],
-      role: `Added to ${source.name}`,
-      x: source.x + offset,
-      y: source.y + source.radius * 0.42 + index * 18,
-      circleId: source.id,
-      avatar: makeAvatar(nextIndex + index),
-    }))
+    const points = [-58, 0, 58].map((offset, index) => {
+      const sides = Math.floor(Math.random() * 5) + 8
+      return {
+        id: `person-${Date.now()}-${index}`,
+        name: ['Alex', 'Daria', 'Sam'][index],
+        role: `Added to ${source.name}`,
+        x: source.x + offset,
+        y: source.y + source.radius * 0.42 + index * 18,
+        circleId: source.id,
+        avatar: makeAvatar(nextIndex + index),
+        shapeType: 'polygon' as ShapeType,
+        sides,
+        amplitude: 2,
+      }
+    })
     setGraph((current) => ensureContainment({ ...current, people: [...current.people, ...points] }))
   }
 
@@ -585,6 +695,36 @@ function App() {
       ...current,
       people: current.people.map((person) => (person.id === selectedItem.id ? { ...person, name: value } : person)),
     }))
+  }
+
+  function updateCircleStyle(id: string, updates: Partial<CircleNode>) {
+    setGraph((current) => ({
+      ...current,
+      circles: current.circles.map((circle) =>
+        circle.id === id ? { ...circle, ...updates } : circle
+      ),
+    }))
+  }
+
+  function updatePersonStyle(id: string, updates: Partial<PersonNode>) {
+    setGraph((current) => ({
+      ...current,
+      people: current.people.map((person) =>
+        person.id === id ? { ...person, ...updates } : person
+      ),
+    }))
+  }
+
+  function handleImageUpload(event: React.ChangeEvent<HTMLInputElement>, onComplete: (base64: string) => void) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      if (typeof reader.result === 'string') {
+        onComplete(reader.result)
+      }
+    }
+    reader.readAsDataURL(file)
   }
 
   return (
@@ -673,8 +813,43 @@ function App() {
       >
         <canvas ref={stressCanvasRef} className="stress-canvas-layer" aria-hidden="true" />
 
-        <svg className="edge-layer" aria-hidden="true">
-          <g transform={`translate(${camera.x} ${camera.y}) scale(${camera.scale})`}>
+        <div className="world-layer" style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale})` }}>
+          
+          {/* PASS 1: Circle Fills and Borders */}
+          {sortedCircles.map((circle) => (
+            <div
+              key={`body-${circle.id}`}
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                width: circle.radius * 2,
+                height: circle.radius * 2,
+                transform: `translate(${circle.x - circle.radius}px, ${circle.y - circle.radius}px)`,
+                pointerEvents: 'none',
+              }}
+            >
+              <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible' }}>
+                <path
+                  d={getNodePath(
+                    circle.radius,
+                    circle.radius,
+                    circle.radius,
+                    circle.shapeType ?? 'wavy',
+                    circle.sides ?? Math.max(8, Math.round(circle.radius / 10)),
+                    circle.amplitude ?? Math.max(4, circle.radius * 0.06)
+                  )}
+                  fill={MATERIAL_TONES[circle.tone].fill}
+                  stroke={selectedItem.type === 'circle' && selectedItem.id === circle.id ? MATERIAL_TONES[circle.tone].border : 'none'}
+                  strokeWidth={selectedItem.type === 'circle' && selectedItem.id === circle.id ? 3.5 : 0}
+                  filter="drop-shadow(0px 8px 16px rgba(0,0,0,0.06))"
+                />
+              </svg>
+            </div>
+          ))}
+
+          {/* PASS 2: Connection Edges */}
+          <svg className="edge-layer" aria-hidden="true" style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}>
             {graph.circles.map((circle) => {
               const source = circle.connectedTo ? circlesById.get(circle.connectedTo) : null
               if (!source) return null
@@ -686,10 +861,9 @@ function App() {
               return <path key={person.id} className="edge edge--person" d={makeCurve(circle, person)} />
             })}
             {connector ? <path className="edge edge--draft" d={makeCurve({ x: connector.startX, y: connector.startY }, { x: connector.endX, y: connector.endY })} /> : null}
-          </g>
-        </svg>
+          </svg>
 
-        <div className="world-layer" style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale})` }}>
+          {/* PASS 3: Circle Interactive Elements (Centers & Labels) */}
           {sortedCircles.map((circle) => (
             <section
               key={circle.id}
@@ -704,110 +878,151 @@ function App() {
               onContextMenu={(event) => openCircleCreateMenu(event, circle)}
               onPointerDown={(event) => startCircleSurfaceDrag(event, circle)}
             >
-              <svg
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  width: '100%',
-                  height: '100%',
-                  pointerEvents: 'none',
-                  overflow: 'visible',
-                }}
-              >
-                <path
-                  d={(() => {
-                    const R = circle.radius;
-                    const amp = Math.max(4, R * 0.06);
-                    const baseR = R - amp - 4;
-                    const petals = Math.max(8, Math.round(R / 10));
-                    return getFlowerPath(R, R, baseR, petals, amp);
-                  })()}
-                  fill={MATERIAL_TONES[circle.tone].fill}
-                  stroke={selectedItem.type === 'circle' && selectedItem.id === circle.id ? MATERIAL_TONES[circle.tone].border : 'none'}
-                  strokeWidth={selectedItem.type === 'circle' && selectedItem.id === circle.id ? 3.5 : 0}
-                  filter="drop-shadow(0px 8px 16px rgba(0,0,0,0.06))"
-                />
-              </svg>
               <span className="circle__label">{circle.name}</span>
               <button
                 type="button"
-                className="circle-center"
+                className={`circle-center ${selectedItem.type === 'circle' && selectedItem.id === circle.id ? 'is-selected' : ''}`}
                 style={{
+                  position: 'absolute',
                   left: circle.radius,
                   top: circle.radius,
-                  background: MATERIAL_TONES[circle.tone].centerBg,
-                  borderColor: '#ffffff',
+                  width: 40,
+                  height: 40,
+                  transform: 'translate(-50%, -50%)',
+                  background: circle.imageUrl ? 'transparent' : MATERIAL_TONES[circle.tone].centerBg,
+                  border: 'none',
+                  borderRadius: '50%',
+                  display: 'grid',
+                  placeItems: 'center',
+                  cursor: 'grab',
+                  padding: 0,
+                  outline: 'none',
                 }}
                 onPointerDown={(event) => startCircleCenterDrag(event, circle)}
                 onClick={(event) => {
                   event.stopPropagation()
                   setSelectedItem({ type: 'circle', id: circle.id })
                 }}
-                aria-label={`Select ${circle.name}`}
                 title="Drag to move. Shift-drag to create from this center."
               >
-                {circle.icon}
+                {circle.imageUrl ? (
+                  <svg viewBox="0 0 40 40" style={{ width: 40, height: 40, borderRadius: '50%' }}>
+                    <clipPath id={`clip-center-${circle.id}`}>
+                      <circle cx="20" cy="20" r="17" />
+                    </clipPath>
+                    <circle cx="20" cy="20" r="17" fill={MATERIAL_TONES[circle.tone].centerBg} />
+                    <image
+                      href={circle.imageUrl}
+                      x="3"
+                      y="3"
+                      width="34"
+                      height="34"
+                      preserveAspectRatio="xMidYMid slice"
+                      clipPath={`url(#clip-center-${circle.id})`}
+                    />
+                    <circle cx="20" cy="20" r="18.5" fill="none" stroke="#ffffff" strokeWidth="3" />
+                  </svg>
+                ) : (
+                  <span style={{ color: '#ffffff', fontSize: 10, fontWeight: 900 }}>{circle.icon}</span>
+                )}
               </button>
             </section>
           ))}
 
+          {/* PASS 4: People Icons and Labels */}
           {graph.people.map((person) => (
             <button
               key={person.id}
               type="button"
-              className={`person ${selectedItem.type === 'person' && selectedItem.id === person.id ? 'is-selected' : ''}`}
-              style={{ transform: `translate(${person.x}px, ${person.y}px)` }}
+              className={`person-icon-only ${selectedItem.type === 'person' && selectedItem.id === person.id ? 'is-selected' : ''}`}
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                width: 100,
+                height: 80,
+                transform: `translate(${person.x - 50}px, ${person.y - 20}px)`,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'grab',
+                outline: 'none',
+              }}
               onPointerDown={(event) => startPersonMove(event, person)}
               onClick={() => setSelectedItem({ type: 'person', id: person.id })}
               aria-label={`Select ${person.name}`}
               title="Drag to move this person"
             >
-              <span
+              <div
+                className={`person-avatar-shape ${selectedItem.type === 'person' && selectedItem.id === person.id ? 'is-selected' : ''}`}
                 style={{
                   position: 'relative',
-                  width: 32,
-                  height: 32,
-                  background: 'transparent',
+                  width: 40,
+                  height: 40,
                   display: 'grid',
                   placeItems: 'center',
                 }}
               >
-                <svg
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    width: '100%',
-                    height: '100%',
-                    pointerEvents: 'none',
-                    overflow: 'visible',
-                  }}
-                >
-                  <path
-                    d={getFlowerPath(16, 16, 12.5, 6, 2.5)}
-                    fill={(() => {
-                      const parentCircle = circlesById.get(person.circleId)
-                      return parentCircle ? MATERIAL_TONES[parentCircle.tone].centerBg : '#3F51B5'
-                    })()}
-                    stroke={(() => {
-                      const parentCircle = circlesById.get(person.circleId)
-                      return parentCircle ? MATERIAL_TONES[parentCircle.tone].border : '#ffffff'
-                    })()}
-                    strokeWidth={1.5}
-                  />
+                <svg viewBox="0 0 40 40" style={{ width: 40, height: 40, overflow: 'visible' }}>
+                  <defs>
+                    <clipPath id={`clip-${person.id}`}>
+                      <path d={getNodePath(20, 20, 18, person.shapeType ?? 'polygon', person.sides ?? 8, person.amplitude ?? 2)} />
+                    </clipPath>
+                  </defs>
+                  {person.imageUrl ? (
+                    <g>
+                      <path
+                        d={getNodePath(20, 20, 18, person.shapeType ?? 'polygon', person.sides ?? 8, person.amplitude ?? 2)}
+                        fill={(() => {
+                          const parentCircle = circlesById.get(person.circleId)
+                          return parentCircle ? MATERIAL_TONES[parentCircle.tone].centerBg : '#3F51B5'
+                        })()}
+                      />
+                      <image
+                        href={person.imageUrl}
+                        x="0"
+                        y="0"
+                        width="40"
+                        height="40"
+                        preserveAspectRatio="xMidYMid slice"
+                        clipPath={`url(#clip-${person.id})`}
+                      />
+                      <path
+                        d={getNodePath(20, 20, 18, person.shapeType ?? 'polygon', person.sides ?? 8, person.amplitude ?? 2)}
+                        fill="none"
+                        stroke={selectedItem.type === 'person' && selectedItem.id === person.id ? '#2563eb' : '#ffffff'}
+                        strokeWidth={selectedItem.type === 'person' && selectedItem.id === person.id ? 2.5 : 1.5}
+                      />
+                    </g>
+                  ) : (
+                    <g>
+                      <path
+                        d={getNodePath(20, 20, 18, person.shapeType ?? 'polygon', person.sides ?? 8, person.amplitude ?? 2)}
+                        fill={(() => {
+                          const parentCircle = circlesById.get(person.circleId)
+                          return parentCircle ? MATERIAL_TONES[parentCircle.tone].centerBg : '#3F51B5'
+                        })()}
+                        stroke={selectedItem.type === 'person' && selectedItem.id === person.id ? '#2563eb' : '#ffffff'}
+                        strokeWidth={selectedItem.type === 'person' && selectedItem.id === person.id ? 2.5 : 1.5}
+                      />
+                      <text
+                        x="20"
+                        y="21"
+                        fill="#ffffff"
+                        fontSize="11"
+                        fontWeight="900"
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                      >
+                        {person.avatar}
+                      </text>
+                    </g>
+                  )}
                 </svg>
-                <span
-                  style={{
-                    position: 'relative',
-                    zIndex: 1,
-                    color: '#ffffff',
-                    fontSize: 10,
-                    fontWeight: 900,
-                  }}
-                >
-                  {person.avatar}
-                </span>
-              </span>
-              <strong>{person.name}</strong>
+              </div>
+              <strong className="person-label">{person.name}</strong>
             </button>
           ))}
 
@@ -831,7 +1046,7 @@ function App() {
         </div>
       ) : null}
 
-      <aside className="inspector" aria-label="Selection details">
+      <aside className="inspector" aria-label="Selection details" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 120px)' }}>
         <span className="inspector__eyebrow">{selectedItem.type === 'circle' ? 'Circle center' : 'Person'}</span>
         <input
           value={selectedCircle?.name ?? selectedPerson?.name ?? ''}
@@ -858,24 +1073,137 @@ function App() {
                 <dd>{Math.round(selectedCircle.radius)} px</dd>
               </div>
             </dl>
-            <button type="button" className="primary-action" onClick={addDemoCluster}>
+
+            <div className="inspector-field">
+              <label>Shape Type</label>
+              <select
+                value={selectedCircle.shapeType ?? 'wavy'}
+                onChange={(e) => updateCircleStyle(selectedCircle.id, { shapeType: e.target.value as ShapeType })}
+              >
+                <option value="wavy">Wavy (Flower)</option>
+                <option value="polygon">Soft Polygon</option>
+                <option value="circle">Circle</option>
+              </select>
+            </div>
+            
+            {(selectedCircle.shapeType ?? 'wavy') !== 'circle' && (
+              <>
+                <div className="inspector-field">
+                  <label>Sides / Petals ({selectedCircle.sides ?? 8})</label>
+                  <input
+                    type="range"
+                    min="3"
+                    max="60"
+                    value={selectedCircle.sides ?? 8}
+                    onChange={(e) => updateCircleStyle(selectedCircle.id, { sides: parseInt(e.target.value) })}
+                  />
+                </div>
+                <div className="inspector-field">
+                  <label>Amplitude / Rounding ({selectedCircle.amplitude ?? 5})</label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="50"
+                    value={selectedCircle.amplitude ?? 5}
+                    onChange={(e) => updateCircleStyle(selectedCircle.id, { amplitude: parseFloat(e.target.value) })}
+                  />
+                </div>
+              </>
+            )}
+
+            <div className="inspector-field">
+              <label>Center Image URL</label>
+              <input
+                type="text"
+                placeholder="https://example.com/image.jpg"
+                value={selectedCircle.imageUrl ?? ''}
+                onChange={(e) => updateCircleStyle(selectedCircle.id, { imageUrl: e.target.value })}
+              />
+            </div>
+            <div className="inspector-field">
+              <label>Upload Photo</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleImageUpload(e, (base64) => updateCircleStyle(selectedCircle.id, { imageUrl: base64 }))}
+              />
+            </div>
+
+            <button type="button" className="primary-action" onClick={addDemoCluster} style={{ marginTop: '8px' }}>
               Add 3 demo people
             </button>
           </>
         ) : null}
         {selectedPerson ? (
-          <dl>
-            <div>
-              <dt>Role</dt>
-              <dd>{selectedPerson.role}</dd>
+          <>
+            <dl>
+              <div>
+                <dt>Role</dt>
+                <dd>{selectedPerson.role}</dd>
+              </div>
+              <div>
+                <dt>Circle</dt>
+                <dd>{circlesById.get(selectedPerson.circleId)?.name}</dd>
+              </div>
+            </dl>
+
+            <div className="inspector-field">
+              <label>Shape Type</label>
+              <select
+                value={selectedPerson.shapeType ?? 'polygon'}
+                onChange={(e) => updatePersonStyle(selectedPerson.id, { shapeType: e.target.value as ShapeType })}
+              >
+                <option value="polygon">Soft Polygon</option>
+                <option value="wavy">Wavy (Flower)</option>
+                <option value="circle">Circle</option>
+              </select>
             </div>
-            <div>
-              <dt>Circle</dt>
-              <dd>{circlesById.get(selectedPerson.circleId)?.name}</dd>
+            
+            {(selectedPerson.shapeType ?? 'polygon') !== 'circle' && (
+              <>
+                <div className="inspector-field">
+                  <label>Sides / Petals ({selectedPerson.sides ?? 8})</label>
+                  <input
+                    type="range"
+                    min="3"
+                    max="20"
+                    value={selectedPerson.sides ?? 8}
+                    onChange={(e) => updatePersonStyle(selectedPerson.id, { sides: parseInt(e.target.value) })}
+                  />
+                </div>
+                <div className="inspector-field">
+                  <label>Amplitude / Rounding ({selectedPerson.amplitude ?? 2})</label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="20"
+                    value={selectedPerson.amplitude ?? 2}
+                    onChange={(e) => updatePersonStyle(selectedPerson.id, { amplitude: parseFloat(e.target.value) })}
+                  />
+                </div>
+              </>
+            )}
+
+            <div className="inspector-field">
+              <label>Photo Image URL</label>
+              <input
+                type="text"
+                placeholder="https://example.com/image.jpg"
+                value={selectedPerson.imageUrl ?? ''}
+                onChange={(e) => updatePersonStyle(selectedPerson.id, { imageUrl: e.target.value })}
+              />
             </div>
-          </dl>
+            <div className="inspector-field">
+              <label>Upload Photo</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleImageUpload(e, (base64) => updatePersonStyle(selectedPerson.id, { imageUrl: base64 }))}
+              />
+            </div>
+          </>
         ) : null}
-        <p>Drag objects directly. Right-click a circle for creation actions. Parent circles auto-fit as contained objects move.</p>
+        <p style={{ marginTop: '14px' }}>Drag objects directly. Right-click a circle for creation actions. Parent circles auto-fit as contained objects move.</p>
       </aside>
     </main>
   )
@@ -1082,8 +1410,21 @@ function clamp(value: number, min: number, max: number) {
 
 function createInitialGraph() {
   return ensureContainment({
-    circles: DEFAULT_STATE.circles.map((circle) => ({ ...circle })),
-    people: DEFAULT_STATE.people.map((person) => ({ ...person })),
+    circles: DEFAULT_STATE.circles.map((circle) => ({
+      ...circle,
+      shapeType: circle.shapeType ?? 'wavy',
+      sides: circle.sides ?? Math.max(8, Math.round(circle.radius / 10)),
+      amplitude: circle.amplitude ?? Math.max(4, circle.radius * 0.06),
+    })),
+    people: DEFAULT_STATE.people.map((person) => {
+      const sides = Math.floor(Math.random() * 5) + 8
+      return {
+        ...person,
+        shapeType: person.shapeType ?? 'polygon',
+        sides: person.sides ?? sides,
+        amplitude: person.amplitude ?? 2,
+      }
+    }),
   })
 }
 
