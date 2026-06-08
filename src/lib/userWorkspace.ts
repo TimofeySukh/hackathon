@@ -39,7 +39,7 @@ export async function ensureUserWorkspace(user: User): Promise<UserWorkspace> {
 
   const boardInsertResult = await supabase.from('boards').insert({
     user_id: user.id,
-    title: 'Personal board',
+    title: 'SocialDataNode',
   })
 
   if (boardInsertResult.error && boardInsertResult.error.code !== '23505') {

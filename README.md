@@ -1,4 +1,4 @@
-# Hackathon Board
+# SocialDataNode
 
 A persisted social graph board built with React, Vite, and TypeScript.
 

@@ -446,7 +446,7 @@ const ANONYMOUS_ROOT: PersonNode = {
 const ANONYMOUS_BOARD = {
   id: 'anonymous-board',
   user_id: 'anonymous-user',
-  title: 'Local board',
+  title: 'SocialDataNode',
   created_at: new Date(0).toISOString(),
   updated_at: new Date(0).toISOString(),
 }
@@ -3229,6 +3229,11 @@ function App() {
           </div>
         </div>
 
+        <div className="top-bar__brand" aria-label="SocialDataNode">
+          <img className="top-bar__brand-mark" src="/favicon.svg" alt="" />
+          <span>SocialDataNode</span>
+        </div>
+
         <div className="top-bar__right">
           <div ref={searchPanelRef} className="search-panel">
             <div className="search-panel__bar">
@@ -3363,7 +3368,7 @@ function App() {
                     <div className="account-panel__text">
                       <span className="account-panel__label">{session.user.email}</span>
                       <span className="account-panel__meta">
-                        {graphStatus === 'loading' ? 'Loading your graph' : activeBoard?.title ?? 'Personal board'}
+                        {graphStatus === 'loading' ? 'Loading your graph' : activeBoard?.title ?? 'SocialDataNode'}
                       </span>
                     </div>
                     <button type="button" className="account-panel__button" onClick={signOut}>

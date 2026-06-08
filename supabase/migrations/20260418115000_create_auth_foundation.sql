@@ -10,7 +10,7 @@ create table if not exists public.profiles (
 create table if not exists public.boards (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
-  title text not null default 'Personal board',
+  title text not null default 'SocialDataNode',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint boards_one_per_user unique (user_id)
