@@ -55,7 +55,7 @@ When working on the project:
 
 - Status: Open
 - Reported behavior: the Flutter circle graph prototype dropped to around 40 FPS on a small test set, around 10 FPS near 500 points while moving, and around 2 FPS above 1,000 points.
-- Notes: `flutter_board/lib/main.dart` now paints real working people icons in one canvas layer with painter hit testing, paints dense stress icons in a screen-space `CustomPaint` overlay, culls stress icons through a spatial grid, stores stress coordinates in typed arrays, batches avatar rendering through a preprocessed sprite, renders real and synthetic stress edges as raw line segments, removes synthetic stress edges from the transformed world `EdgePainter`, and updates FPS through a `ValueNotifier` instead of rebuilding the board. Validate the result in release/profile mode on the target device or browser because debug Flutter FPS can be misleading.
+- Notes: `flutter_board/lib/main.dart` now paints real working people icons in a screen-space canvas layer with painter hit testing, paints dense stress icons in a screen-space `CustomPaint` overlay, culls dense layers to the viewport, stores stress coordinates in typed arrays, batches avatar rendering through a preprocessed sprite, renders real and synthetic stress edges as raw line segments with density-based level-of-detail sampling, removes person and synthetic stress edges from the transformed world `EdgePainter`, and updates FPS through a `ValueNotifier` instead of rebuilding the board. Validate the result in release/profile mode on the target device or browser because debug Flutter FPS can be misleading.
 
 ## Resolved Problems
 

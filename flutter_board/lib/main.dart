@@ -830,18 +830,22 @@ class _MyHomePageState extends State<MyHomePage>
     });
   }
 
-  PersonNode? _hitPersonAtWorldLayerPosition(Offset localPosition) {
-    final double worldX = localPosition.dx - halfWorldSize;
-    final double worldY = localPosition.dy - halfWorldSize;
-    final double scale = _transformationController.value.storage[0];
-    final double hitRadius = math.max(24.0, 30.0 / scale);
+  PersonNode? _hitPersonAtScreenPosition(Offset screenPosition) {
+    final matrix = _transformationController.value;
+    final double scale = matrix.storage[0];
+    final double tx = matrix.storage[12];
+    final double ty = matrix.storage[13];
+    final double iconSize = iconScreenSizeForScale(scale);
+    final double hitRadius = math.max(16.0, iconSize / 2 + 8.0);
 
     PersonNode? bestPerson;
     double bestDistanceSq = hitRadius * hitRadius;
 
     for (final person in people) {
-      final double dx = person.x - worldX;
-      final double dy = person.y - worldY;
+      final double sx = (person.x + halfWorldSize) * scale + tx;
+      final double sy = (person.y + halfWorldSize) * scale + ty;
+      final double dx = sx - screenPosition.dx;
+      final double dy = sy - screenPosition.dy;
       final double distanceSq = dx * dx + dy * dy;
       if (distanceSq <= bestDistanceSq) {
         bestDistanceSq = distanceSq;
@@ -853,7 +857,7 @@ class _MyHomePageState extends State<MyHomePage>
   }
 
   void _startPeopleLayerDrag(DragStartDetails details) {
-    final person = _hitPersonAtWorldLayerPosition(details.localPosition);
+    final person = _hitPersonAtScreenPosition(details.localPosition);
     if (person == null) return;
 
     setState(() {
@@ -886,7 +890,7 @@ class _MyHomePageState extends State<MyHomePage>
   }
 
   void _selectPeopleLayerPerson(TapUpDetails details) {
-    final person = _hitPersonAtWorldLayerPosition(details.localPosition);
+    final person = _hitPersonAtScreenPosition(details.localPosition);
     if (person == null) return;
 
     setState(() {
@@ -1129,7 +1133,6 @@ class _MyHomePageState extends State<MyHomePage>
                           painter: EdgePainter(
                             circles: circles,
                             circlesById: circlesById,
-                            people: people,
                             connectorStart: connectorStartPos,
                             connectorEnd: connectorEndPos,
                           ),
@@ -1201,28 +1204,30 @@ class _MyHomePageState extends State<MyHomePage>
                         ),
                       );
                     }),
-                    // Pass 4: Real people icons and hit testing
-                    Positioned.fill(
-                      child: RepaintBoundary(
-                        child: GestureDetector(
-                          onTapUp: _selectPeopleLayerPerson,
-                          onPanStart: _startPeopleLayerDrag,
-                          onPanUpdate: _updatePeopleLayerDrag,
-                          onPanEnd: (_) => _endPeopleLayerDrag(),
-                          onPanCancel: _endPeopleLayerDrag,
-                          child: CustomPaint(
-                            painter: RealPeoplePainter(
-                              people: people,
-                              circlesById: circlesById,
-                              selectedPersonId: selectedPersonId,
-                              avatarImage: _sharedPersonAvatar,
-                              labelCache: _realPersonLabelCache,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
                   ],
+                ),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: RepaintBoundary(
+              child: GestureDetector(
+                onTapUp: _selectPeopleLayerPerson,
+                onPanStart: _startPeopleLayerDrag,
+                onPanUpdate: _updatePeopleLayerDrag,
+                onPanEnd: (_) => _endPeopleLayerDrag(),
+                onPanCancel: _endPeopleLayerDrag,
+                child: CustomPaint(
+                  painter: RealPeoplePainter(
+                    people: people,
+                    circlesById: circlesById,
+                    selectedPersonId: selectedPersonId,
+                    avatarImage: _sharedPersonAvatar,
+                    labelCache: _realPersonLabelCache,
+                    showEdges: showEdges,
+                    isNavigating: _isNavigating,
+                    transformationController: _transformationController,
+                  ),
                 ),
               ),
             ),
@@ -1364,8 +1369,7 @@ class _MyHomePageState extends State<MyHomePage>
                 renderedIcons: people.length + _stressPeople.length,
                 renderedEdges:
                     circles.where((c) => c.connectedTo != null).length +
-                    people.length +
-                    (showEdges ? _stressPeople.length : 0),
+                    (showEdges ? people.length + _stressPeople.length : 0),
                 onCountChanged: _updateStressCount,
                 onShowEdgesChanged: (v) => setState(() => showEdges = v),
                 onShowLabelsChanged: (v) => setState(() => showLabels = v),
@@ -1520,14 +1524,12 @@ class CircleShapePainter extends CustomPainter {
 class EdgePainter extends CustomPainter {
   final List<CircleNode> circles;
   final Map<String, CircleNode> circlesById;
-  final List<PersonNode> people;
   final Offset? connectorStart;
   final Offset? connectorEnd;
 
   EdgePainter({
     required this.circles,
     required this.circlesById,
-    required this.people,
     this.connectorStart,
     this.connectorEnd,
   });
@@ -1540,12 +1542,6 @@ class EdgePainter extends CustomPainter {
       ..color = const Color(0xFFB5B8B9)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0
-      ..strokeCap = StrokeCap.round;
-
-    final personPaint = Paint()
-      ..color = const Color(0xFFD3D6D7)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5
       ..strokeCap = StrokeCap.round;
 
     final draftPaint = Paint()
@@ -1584,28 +1580,6 @@ class EdgePainter extends CustomPainter {
       );
     }
 
-    if (people.isNotEmpty) {
-      final edgePoints = Float32List(people.length * 4);
-      var cursor = 0;
-      for (final person in people) {
-        final circle = circlesById[person.circleId];
-        if (circle == null) continue;
-        edgePoints[cursor++] = circle.x + shift;
-        edgePoints[cursor++] = circle.y + shift;
-        edgePoints[cursor++] = person.x + shift;
-        edgePoints[cursor++] = person.y + shift;
-      }
-      if (cursor > 0) {
-        canvas.drawRawPoints(
-          ui.PointMode.lines,
-          cursor == edgePoints.length
-              ? edgePoints
-              : Float32List.sublistView(edgePoints, 0, cursor),
-          personPaint,
-        );
-      }
-    }
-
     if (connectorStart != null && connectorEnd != null) {
       drawCurve(connectorStart!, connectorEnd!, draftPaint);
     }
@@ -1621,6 +1595,11 @@ class RealPeoplePainter extends CustomPainter {
   final String? selectedPersonId;
   final ui.Image? avatarImage;
   final Map<String, TextPainter> labelCache;
+  final bool showEdges;
+  final bool isNavigating;
+  final TransformationController transformationController;
+  final List<int> _visibleIndexes = <int>[];
+  Float32List _edgePoints = Float32List(0);
 
   RealPeoplePainter({
     required this.people,
@@ -1628,18 +1607,28 @@ class RealPeoplePainter extends CustomPainter {
     required this.selectedPersonId,
     required this.avatarImage,
     required this.labelCache,
-  });
+    required this.showEdges,
+    required this.isNavigating,
+    required this.transformationController,
+  }) : super(repaint: transformationController);
 
   @override
   bool? hitTest(Offset position) {
-    const double hitRadius = 30.0;
-    final double worldX = position.dx - halfWorldSize;
-    final double worldY = position.dy - halfWorldSize;
+    final matrix = transformationController.value;
+    final double scale = matrix.storage[0];
+    final double tx = matrix.storage[12];
+    final double ty = matrix.storage[13];
+    final double hitRadius = math.max(
+      16.0,
+      iconScreenSizeForScale(scale) / 2 + 8.0,
+    );
 
     for (int i = people.length - 1; i >= 0; i--) {
       final person = people[i];
-      final double dx = person.x - worldX;
-      final double dy = person.y - worldY;
+      final double sx = (person.x + halfWorldSize) * scale + tx;
+      final double sy = (person.y + halfWorldSize) * scale + ty;
+      final double dx = sx - position.dx;
+      final double dy = sy - position.dy;
       if (dx * dx + dy * dy <= hitRadius * hitRadius) {
         return true;
       }
@@ -1650,19 +1639,91 @@ class RealPeoplePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    const double iconSize = 40.0;
-    const double iconRadius = iconSize / 2;
+    if (people.isEmpty) return;
+
+    final matrix = transformationController.value;
+    final double scale = matrix.storage[0];
+    final double tx = matrix.storage[12];
+    final double ty = matrix.storage[13];
+    final double iconSize = iconScreenSizeForScale(scale);
+    final double iconRadius = iconSize / 2;
+    final double padding = iconRadius + 48.0;
     final image = avatarImage;
 
-    for (final person in people) {
-      final double cx = person.x + halfWorldSize;
-      final double cy = person.y + halfWorldSize;
+    _visibleIndexes.clear();
+    for (int i = 0; i < people.length; i++) {
+      final person = people[i];
+      final double cx = (person.x + halfWorldSize) * scale + tx;
+      final double cy = (person.y + halfWorldSize) * scale + ty;
+      if (cx >= -padding &&
+          cx <= size.width + padding &&
+          cy >= -padding &&
+          cy <= size.height + padding) {
+        _visibleIndexes.add(i);
+      }
+    }
+    if (_visibleIndexes.isEmpty) return;
+
+    if (showEdges) {
+      final int edgeStride = edgeStrideForDensity(
+        visibleCount: _visibleIndexes.length,
+        scale: scale,
+        isNavigating: isNavigating,
+      );
+      final int edgeCount = (_visibleIndexes.length / edgeStride).ceil();
+      final requiredPointLength = edgeCount * 4;
+      if (_edgePoints.length != requiredPointLength) {
+        _edgePoints = Float32List(requiredPointLength);
+      }
+      var cursor = 0;
+
+      for (int i = 0; i < _visibleIndexes.length; i += edgeStride) {
+        final index = _visibleIndexes[i];
+        final person = people[index];
+        final circle = circlesById[person.circleId];
+        if (circle == null) continue;
+
+        _edgePoints[cursor++] = (circle.x + halfWorldSize) * scale + tx;
+        _edgePoints[cursor++] = (circle.y + halfWorldSize) * scale + ty;
+        _edgePoints[cursor++] = (person.x + halfWorldSize) * scale + tx;
+        _edgePoints[cursor++] = (person.y + halfWorldSize) * scale + ty;
+      }
+
+      if (cursor > 0) {
+        canvas.drawRawPoints(
+          ui.PointMode.lines,
+          cursor == _edgePoints.length
+              ? _edgePoints
+              : Float32List.sublistView(_edgePoints, 0, cursor),
+          Paint()
+            ..color = isNavigating
+                ? const Color(0x10A8ADAF)
+                : const Color(0x28A8ADAF)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.0
+            ..strokeCap = StrokeCap.round,
+        );
+      }
+    }
+
+    final bool drawLabels =
+        !isNavigating && scale >= 0.55 && _visibleIndexes.length <= 450;
+
+    for (final index in _visibleIndexes) {
+      final person = people[index];
+      final double cx = (person.x + halfWorldSize) * scale + tx;
+      final double cy = (person.y + halfWorldSize) * scale + ty;
       final bool selected = selectedPersonId == person.id;
 
       if (image != null) {
-        canvas.drawImage(
+        canvas.drawImageRect(
           image,
-          Offset(cx - iconRadius, cy - iconRadius),
+          const Rect.fromLTWH(0, 0, 40, 40),
+          Rect.fromCenter(
+            center: Offset(cx, cy),
+            width: iconSize,
+            height: iconSize,
+          ),
           Paint()
             ..isAntiAlias = true
             ..filterQuality = FilterQuality.medium,
@@ -1716,30 +1777,32 @@ class RealPeoplePainter extends CustomPainter {
           ..strokeWidth = selected ? 2.5 : 1.5,
       );
 
-      final label = _labelPainter(
-        'label:${person.name}:$selected',
-        person.name,
-        TextStyle(
-          color: selected ? const Color(0xFF2563EB) : const Color(0xFF1C2528),
-          fontSize: 10,
-          fontWeight: FontWeight.w800,
-        ),
-      );
-      final double labelWidth = label.width + 10.0;
-      final double labelHeight = label.height + 4.0;
-      final double labelX = cx - labelWidth / 2;
-      final double labelY = cy + 22.0;
+      if (drawLabels || selected) {
+        final label = _labelPainter(
+          'label:${person.name}:$selected',
+          person.name,
+          TextStyle(
+            color: selected ? const Color(0xFF2563EB) : const Color(0xFF1C2528),
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+          ),
+        );
+        final double labelWidth = label.width + 10.0;
+        final double labelHeight = label.height + 4.0;
+        final double labelX = cx - labelWidth / 2;
+        final double labelY = cy + iconRadius + 2.0;
 
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(labelX, labelY, labelWidth, labelHeight),
-          const Radius.circular(4.0),
-        ),
-        Paint()
-          ..color = Colors.white.withValues(alpha: 0.88)
-          ..style = PaintingStyle.fill,
-      );
-      label.paint(canvas, Offset(cx - label.width / 2, labelY + 2.0));
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromLTWH(labelX, labelY, labelWidth, labelHeight),
+            const Radius.circular(4.0),
+          ),
+          Paint()
+            ..color = Colors.white.withValues(alpha: 0.88)
+            ..style = PaintingStyle.fill,
+        );
+        label.paint(canvas, Offset(cx - label.width / 2, labelY + 2.0));
+      }
     }
   }
 
@@ -1756,12 +1819,7 @@ class RealPeoplePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant RealPeoplePainter oldDelegate) {
-    return oldDelegate.people != people ||
-        oldDelegate.circlesById != circlesById ||
-        oldDelegate.selectedPersonId != selectedPersonId ||
-        oldDelegate.avatarImage != avatarImage;
-  }
+  bool shouldRepaint(covariant RealPeoplePainter oldDelegate) => true;
 }
 
 class StressRenderData {
@@ -1769,7 +1827,6 @@ class StressRenderData {
   final Float32List xs;
   final Float32List ys;
   final Uint8List avatarIndexes;
-  final Float32List edgeWorldPoints;
   final Map<int, List<int>> buckets;
   final double cellSize;
 
@@ -1778,7 +1835,6 @@ class StressRenderData {
     required this.xs,
     required this.ys,
     required this.avatarIndexes,
-    required this.edgeWorldPoints,
     required this.buckets,
     required this.cellSize,
   });
@@ -1789,7 +1845,6 @@ class StressRenderData {
       xs: Float32List(0),
       ys: Float32List(0),
       avatarIndexes: Uint8List(0),
-      edgeWorldPoints: Float32List(0),
       buckets: const {},
       cellSize: 320.0,
     );
@@ -1800,7 +1855,6 @@ class StressRenderData {
     final xs = Float32List(people.length);
     final ys = Float32List(people.length);
     final avatarIndexes = Uint8List(people.length);
-    final edgeWorldPoints = Float32List(people.length * 4);
     final buckets = <int, List<int>>{};
 
     for (int i = 0; i < people.length; i++) {
@@ -1808,11 +1862,6 @@ class StressRenderData {
       xs[i] = person.x;
       ys[i] = person.y;
       avatarIndexes[i] = i % 9;
-      final int edgeCursor = i * 4;
-      edgeWorldPoints[edgeCursor] = halfWorldSize;
-      edgeWorldPoints[edgeCursor + 1] = halfWorldSize;
-      edgeWorldPoints[edgeCursor + 2] = person.x + halfWorldSize;
-      edgeWorldPoints[edgeCursor + 3] = person.y + halfWorldSize;
 
       final int gx = (person.x / cellSize).floor();
       final int gy = (person.y / cellSize).floor();
@@ -1824,7 +1873,6 @@ class StressRenderData {
       xs: xs,
       ys: ys,
       avatarIndexes: avatarIndexes,
-      edgeWorldPoints: edgeWorldPoints,
       buckets: buckets,
       cellSize: cellSize,
     );
@@ -1904,6 +1952,8 @@ class StressIconsPainter extends CustomPainter {
     final double scale = matrix.storage[0];
     final double tx = matrix.storage[12];
     final double ty = matrix.storage[13];
+    final double iconSize = iconScreenSizeForScale(scale);
+    final double iconRadius = iconSize / 2;
 
     final double left = -tx / scale - halfWorldSize;
     final double top = -ty / scale - halfWorldSize;
@@ -1911,29 +1961,39 @@ class StressIconsPainter extends CustomPainter {
     final double bottom = (size.height - ty) / scale - halfWorldSize;
 
     final visibleWorldRect = Rect.fromLTRB(left, top, right, bottom);
-    final double padding = showLabels && !isNavigating
-        ? (120.0 / scale)
-        : (48.0 / scale);
+    final double padding = (showLabels && !isNavigating ? 120.0 : 48.0) / scale;
     _visibleIndexes.clear();
     data.collectVisible(visibleWorldRect, padding, _visibleIndexes);
     if (_visibleIndexes.isEmpty) return;
 
     if (showEdges) {
-      canvas.save();
-      canvas.translate(tx, ty);
-      canvas.scale(scale);
+      final int edgeStride = edgeStrideForDensity(
+        visibleCount: _visibleIndexes.length,
+        scale: scale,
+        isNavigating: isNavigating,
+      );
+      final int edgeCount = (_visibleIndexes.length / edgeStride).ceil();
+      final requiredPointLength = edgeCount * 4;
+      final edgePoints = Float32List(requiredPointLength);
+      var cursor = 0;
+      for (int i = 0; i < _visibleIndexes.length; i += edgeStride) {
+        final index = _visibleIndexes[i];
+        edgePoints[cursor++] = halfWorldSize * scale + tx;
+        edgePoints[cursor++] = halfWorldSize * scale + ty;
+        edgePoints[cursor++] = (data.xs[index] + halfWorldSize) * scale + tx;
+        edgePoints[cursor++] = (data.ys[index] + halfWorldSize) * scale + ty;
+      }
       canvas.drawRawPoints(
         ui.PointMode.lines,
-        data.edgeWorldPoints,
+        edgePoints,
         Paint()
           ..color = isNavigating
-              ? const Color(0x14747E84)
-              : const Color(0x24747E84)
+              ? const Color(0x10747E84)
+              : const Color(0x20747E84)
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.0 / scale
+          ..strokeWidth = 1.0
           ..strokeCap = StrokeCap.round,
       );
-      canvas.restore();
     }
 
     final atlas = sharedAvatarImage ?? avatarAtlas;
@@ -1946,7 +2006,7 @@ class StressIconsPainter extends CustomPainter {
         _atlasTransforms.add(
           ui.RSTransform.fromComponents(
             rotation: 0.0,
-            scale: 1.0,
+            scale: iconSize / 40.0,
             anchorX: 20.0,
             anchorY: 20.0,
             translateX: cx,
@@ -1984,12 +2044,13 @@ class StressIconsPainter extends CustomPainter {
         if (avatarImages.isNotEmpty) {
           canvas.drawImage(
             avatarImages[avatarIndex % avatarImages.length],
-            Offset(cx - 20.0, cy - 20.0),
+            Offset(cx - iconRadius, cy - iconRadius),
             Paint()..filterQuality = FilterQuality.medium,
           );
         } else if (avatarPictures.isNotEmpty) {
           canvas.save();
-          canvas.translate(cx - 20.0, cy - 20.0);
+          canvas.translate(cx - iconRadius, cy - iconRadius);
+          canvas.scale(iconSize / 40.0);
           canvas.drawPicture(
             avatarPictures[avatarIndex % avatarPictures.length],
           );
@@ -1998,7 +2059,10 @@ class StressIconsPainter extends CustomPainter {
       }
     }
 
-    if (showLabels && !isNavigating) {
+    if (showLabels &&
+        !isNavigating &&
+        scale >= 0.55 &&
+        _visibleIndexes.length <= 450) {
       for (final index in _visibleIndexes) {
         final double cx = (data.xs[index] + halfWorldSize) * scale + tx;
         final double cy = (data.ys[index] + halfWorldSize) * scale + ty;
@@ -2008,7 +2072,7 @@ class StressIconsPainter extends CustomPainter {
         final double labelWidth = labelPainter.width + 10.0;
         final double labelHeight = labelPainter.height + 4.0;
         final double x = cx - labelWidth / 2;
-        final double y = cy + 18.0;
+        final double y = cy + iconRadius + 2.0;
 
         final bgPaint = Paint()
           ..color = Colors.white.withValues(alpha: 0.86)
@@ -3157,6 +3221,20 @@ double normalizedFlowerAmplitude(double radius, double amplitude) {
   final double floor = math.min(radius * 0.07, requested);
   final double ceiling = radius * 0.24;
   return math.max(floor, math.max(relative, scaled)).clamp(0.4, ceiling);
+}
+
+double iconScreenSizeForScale(double scale) {
+  return (40.0 * scale).clamp(14.0, 40.0);
+}
+
+int edgeStrideForDensity({
+  required int visibleCount,
+  required double scale,
+  required bool isNavigating,
+}) {
+  final int target = isNavigating ? 900 : (scale < 0.55 ? 1600 : 3200);
+  if (visibleCount <= target) return 1;
+  return (visibleCount / target).ceil();
 }
 
 class ShapeClipper extends CustomClipper<Path> {
