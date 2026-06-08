@@ -3229,11 +3229,6 @@ function App() {
           </div>
         </div>
 
-        <div className="top-bar__brand" aria-label="SocialDataNode">
-          <img className="top-bar__brand-mark" src="/favicon.svg" alt="" />
-          <span>SocialDataNode</span>
-        </div>
-
         <div className="top-bar__right">
           <div ref={searchPanelRef} className="search-panel">
             <div className="search-panel__bar">
