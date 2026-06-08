@@ -15,7 +15,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Circle graph board'), findsOneWidget);
-    expect(find.text('Icon stress'), findsOneWidget);
+    expect(find.text('People load'), findsOneWidget);
     expect(find.text('You'), findsWidgets);
   });
 }

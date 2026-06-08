@@ -21,7 +21,7 @@ The current visible prototype is intentionally narrow:
 - selection and renaming through a right-side inspector
 - local pan and zoom
 - browser-session-only state
-- a Flutter implementation in `flutter_board/` with a screen-space `CustomPaint` stress layer for thousands of synthetic icons
+- a Flutter implementation in `flutter_board/` with screen-space canvas rendering for dense real people icons and people edges
 - no visible Supabase, auth, LinkedIn import, persistence, notes, AI search, or collaboration in this prototype screen
 
 ## Active Work
@@ -65,7 +65,7 @@ Completed tasks can remain listed here when they explain repository history. Liv
 - `scripts/seed-demo-user.mjs`: idempotent demo-data seed for one user's board with reusable people, notes, AI summaries, and connections.
 - `src/main.tsx`: React entry point.
 - `src/App.tsx`: current local circle graph prototype behavior.
-- `flutter_board/lib/main.dart`: Flutter circle graph prototype, including widget-based circles/real people and the optimized screen-space stress icon painter.
+- `flutter_board/lib/main.dart`: Flutter circle graph prototype, including widget-based circles plus optimized screen-space rendering, hit testing, dragging, and edge drawing for real people.
 - `flutter_board/test/widget_test.dart`: Flutter smoke test for the circle graph board.
 - `src/lib/supabase.ts`: browser Supabase client configuration.
 - `src/lib/useAuth.ts`: session and Google sign-in state.

@@ -11,7 +11,7 @@ Current visible prototype behavior:
 - includes seeded connected circles for EU friends, Pandora, and a market circle
 - includes a nested product-team subset inside Pandora
 - draws curved links from circle centers to circles and people
-- includes a canvas-backed icon stress-test panel with a 0-10,000 synthetic icon slider, optional synthetic edges, optional labels, and live FPS
+- includes a people load panel with a 0-10,000 generated-person slider, optional people edges, and live FPS
 - creates people, nested subset circles, or external connected circles from a circle context menu
 - supports Shift-drag from a circle center as a shortcut for creating from that center
 - keeps people as endpoints and circle centers as the only branch-creation sources
@@ -35,13 +35,12 @@ Current Flutter prototype behavior in `flutter_board/`:
 - ports the circle graph board visual model to Flutter
 - keeps normal circles, inspector UI, and controls as Flutter widgets
 - renders real working people icons in a screen-space canvas layer with painter hit testing and drag support, instead of creating one Flutter widget per person or painting them inside the transformed world canvas
-- renders dense synthetic stress icons and their optional edges in a screen-space `CustomPaint` overlay instead of inside the transformed world stack
-- culls stress icons through a spatial grid and renders visible avatars from a single sprite atlas
-- renders real people edges and optional synthetic stress edges as batched raw line segments
+- uses the load panel to add generated people to a normal circle as real graph data, not through a separate synthetic icon renderer
+- renders real people edges as batched raw line segments
 - applies viewport culling, zoom-aware icon sizes, label suppression at low zoom, and edge level-of-detail sampling for dense views
-- preprocesses `flutter_board/assets/shared_person_avatar.png` into a small flower-clipped avatar sprite before rendering people and stress icons
+- preprocesses `flutter_board/assets/shared_person_avatar.png` into a small flower-clipped avatar sprite before rendering people
 - keeps people icons on flower shapes by default, with normalized flower amplitude across small and large nodes
-- updates the stress FPS label through a `ValueNotifier` so the whole board does not rebuild every half second
+- updates the load-panel FPS label through a `ValueNotifier` so the whole board does not rebuild every half second
 
 There is no multiplayer or drawing toolset yet.
 
