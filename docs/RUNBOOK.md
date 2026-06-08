@@ -19,6 +19,7 @@ Current app behavior:
 - open a LinkedIn menu with visual instructions for requesting a LinkedIn data archive
 - sync LinkedIn connections by dragging or selecting a LinkedIn export zip and importing only `Connections.csv`
 - import LinkedIn email addresses and profile URLs only when those opt-in fields are selected in the import dialog
+- import LinkedIn people, source notes, and root connections through batched Supabase inserts
 - create one personal board record for each signed-in user
 - create one immutable root person at `0,0` for each signed-in user
 - persist people, colored tags, notes, and undirected connections in Supabase
@@ -33,6 +34,7 @@ Current app behavior:
 - open a people search layer, match locally while typing, and run natural-language AI search on Enter when signed in
 - limit AI search to up to 40 browser-selected candidate people and sanitize email addresses and URLs before provider calls
 - export graph data, delete graph data, or delete account data from the account menu
+- keep large graphs responsive with a canvas overview layer, viewport-capped DOM nodes, capped SVG connections, and label level-of-detail
 - drag a right-click selection box to select multiple people, then drag one of them to move the group
 - use a mobile layout with the search field and account/theme controls at the top and the Tags control docked near the bottom-left safe area
 - avoid selecting connection lines on coarse touch pointers so mobile board panning does not accidentally open the delete-connection menu
@@ -409,7 +411,9 @@ Manual verification:
 30. Open the LinkedIn import dialog and confirm email addresses and profile URLs are opt-in fields that default off.
 31. Export graph data from the account menu and confirm a JSON file downloads.
 32. Delete graph data from the account menu and confirm people, notes, tags, connections, and AI summaries are cleared while the root person remains.
-33. Sign out and confirm the anonymous board state returns.
+33. Import `fixtures/linkedin/linkedin-connections-10000.zip` on a signed-in test account and confirm the import status advances as a batch import rather than one row at a time.
+34. Pan and zoom the 10000-contact board and confirm the canvas overview remains visible while labels and interactive nodes are capped around the viewport.
+35. Sign out and confirm the anonymous board state returns.
 
 Supabase verification:
 

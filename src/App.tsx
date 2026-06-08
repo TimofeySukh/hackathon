@@ -104,6 +104,16 @@ type BoardStyle = CSSProperties & {
   '--major-dot-size': string
 }
 
+type WorldBounds = {
+  left: number
+  right: number
+  top: number
+  bottom: number
+  centerX: number
+  centerY: number
+  scale: number
+}
+
 type TagColorStyle = CSSProperties & {
   '--tag-color': string
   '--tag-color-rgb'?: string
@@ -193,6 +203,14 @@ const LINKEDIN_RING_CAPACITIES = [10, 40]
 const LINKEDIN_RING_RADIUS = 260
 const LINKEDIN_RING_STEP = 190
 const LINKEDIN_GRID_SPACING = 170
+const RENDER_MARGIN_SCREEN_PX = 700
+const RENDER_BOUNDS_PAN_THRESHOLD = 320
+const MAX_RENDERED_NODES = 1600
+const MAX_RENDERED_CONNECTIONS = 1400
+const LABEL_NODE_LIMIT = 450
+const LABEL_MIN_SCALE = 0.58
+const CONNECTION_NODE_LIMIT = 1200
+const LARGE_GRAPH_SVG_SIZE = 200000
 
 function getLinkedInRingCapacity(ringIndex: number) {
   if (ringIndex < LINKEDIN_RING_CAPACITIES.length) {
@@ -459,6 +477,54 @@ function createLocalId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
+function createUuid() {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID()
+  }
+
+  return '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, (character) =>
+    (Number(character) ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> Number(character) / 4).toString(16),
+  )
+}
+
+function getViewportRenderBounds(boardElement: HTMLElement, offset: Offset, scale: number): WorldBounds {
+  const viewportWidth = boardElement.clientWidth
+  const viewportHeight = boardElement.clientHeight
+  const marginWorld = RENDER_MARGIN_SCREEN_PX / scale
+  const left = (-viewportWidth / 2 - offset.x) / scale - marginWorld
+  const right = (viewportWidth / 2 - offset.x) / scale + marginWorld
+  const top = (-viewportHeight / 2 - offset.y) / scale - marginWorld
+  const bottom = (viewportHeight / 2 - offset.y) / scale + marginWorld
+
+  return {
+    left,
+    right,
+    top,
+    bottom,
+    centerX: (left + right) / 2,
+    centerY: (top + bottom) / 2,
+    scale,
+  }
+}
+
+function shouldUpdateRenderBounds(currentBounds: WorldBounds | null, nextBounds: WorldBounds) {
+  if (!currentBounds) return true
+
+  const thresholdWorld = RENDER_BOUNDS_PAN_THRESHOLD / nextBounds.scale
+
+  return (
+    Math.abs(currentBounds.centerX - nextBounds.centerX) > thresholdWorld ||
+    Math.abs(currentBounds.centerY - nextBounds.centerY) > thresholdWorld ||
+    Math.abs(currentBounds.scale - nextBounds.scale) > 0.08
+  )
+}
+
+function isNodeInsideBounds(node: PersonNode, bounds: WorldBounds | null) {
+  if (!bounds) return true
+
+  return node.x >= bounds.left && node.x <= bounds.right && node.y >= bounds.top && node.y <= bounds.bottom
+}
+
 function createDefaultLocalTags(): Tag[] {
   const timestamp = new Date(0).toISOString()
 
@@ -587,6 +653,7 @@ function App() {
     deleteNote: deleteRemoteNote,
     refreshPersonAiNote,
     deleteCurrentGraphData,
+    bulkCreatePeople: bulkCreateRemotePeople,
   } = useBoardGraph(session?.user ?? null)
 
   const [theme, setTheme] = useState<Theme>(() => {
@@ -594,6 +661,7 @@ function App() {
     return savedTheme === 'light' ? 'light' : 'dark'
   })
   const [zoomPercentage, setZoomPercentage] = useState(100)
+  const [renderBounds, setRenderBounds] = useState<WorldBounds | null>(null)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [inspectorNodeId, setInspectorNodeId] = useState<string | null>(null)
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null)
@@ -645,6 +713,7 @@ function App() {
 
   const boardRef = useRef<HTMLElement | null>(null)
   const boardSurfaceRef = useRef<HTMLDivElement | null>(null)
+  const graphCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const graphLayerRef = useRef<HTMLDivElement | null>(null)
   const tagsMenuRef = useRef<HTMLDivElement | null>(null)
   const linkedInMenuRef = useRef<HTMLDivElement | null>(null)
@@ -665,6 +734,21 @@ function App() {
   const inspectorOpenScaleRef = useRef(1)
   const suppressNodeClickRef = useRef(false)
   const viewportRef = useRef({ offset: { x: 0, y: 0 }, scale: 1 })
+  const renderBoundsRef = useRef<WorldBounds | null>(null)
+  const graphCanvasFrameRef = useRef<number | null>(null)
+  const graphCanvasDataRef = useRef<{
+    nodes: PersonNode[]
+    connections: Connection[]
+    nodesById: Record<string, PersonNode>
+    tagColorById: Record<string, string>
+    theme: Theme
+  }>({
+    nodes: [],
+    connections: [],
+    nodesById: {},
+    tagColorById: {},
+    theme: 'dark',
+  })
   const pendingViewportRef = useRef<{ offset: Offset; scale: number } | null>(null)
   const viewportFrameRef = useRef<number | null>(null)
   const connectionDragStateRef = useRef<ConnectionDrag | null>(null)
@@ -764,6 +848,162 @@ function App() {
       ),
     [boardConnections, visibleNodesById],
   )
+  const pinnedRenderNodeIds = useMemo(() => {
+    const nodeIds = new Set<string>()
+
+    if (selectedNodeId) nodeIds.add(selectedNodeId)
+    if (inspectorNodeId) nodeIds.add(inspectorNodeId)
+    if (connectionDrag?.fromId) nodeIds.add(connectionDrag.fromId)
+    for (const nodeId of multiSelectedNodeIds) {
+      nodeIds.add(nodeId)
+    }
+
+    return nodeIds
+  }, [connectionDrag, inspectorNodeId, multiSelectedNodeIds, selectedNodeId])
+  const renderedBoardNodes = useMemo(() => {
+    const candidates = visibleBoardNodes.filter(
+      (node) => node.is_root || pinnedRenderNodeIds.has(node.id) || isNodeInsideBounds(node, renderBounds),
+    )
+
+    if (candidates.length <= MAX_RENDERED_NODES) return candidates
+
+    const pinnedNodes = candidates.filter((node) => node.is_root || pinnedRenderNodeIds.has(node.id))
+    const pinnedIds = new Set(pinnedNodes.map((node) => node.id))
+    const centerX = renderBounds?.centerX ?? 0
+    const centerY = renderBounds?.centerY ?? 0
+    const remainingSlots = Math.max(0, MAX_RENDERED_NODES - pinnedNodes.length)
+    const nearestNodes = candidates
+      .filter((node) => !pinnedIds.has(node.id))
+      .sort((left, right) => {
+        const leftDistance = Math.hypot(left.x - centerX, left.y - centerY)
+        const rightDistance = Math.hypot(right.x - centerX, right.y - centerY)
+        return leftDistance - rightDistance
+      })
+      .slice(0, remainingSlots)
+
+    return [...pinnedNodes, ...nearestNodes]
+  }, [pinnedRenderNodeIds, renderBounds, visibleBoardNodes])
+  const renderedNodesById = useMemo(
+    () => Object.fromEntries(renderedBoardNodes.map((node) => [node.id, node])) as Record<string, PersonNode>,
+    [renderedBoardNodes],
+  )
+  const renderedBoardConnections = useMemo(() => {
+    if (renderedBoardNodes.length > CONNECTION_NODE_LIMIT && !selectedConnectionId) return []
+
+    const renderedConnections = visibleBoardConnections.filter(
+      (edge) => renderedNodesById[edge.person_a_id] && renderedNodesById[edge.person_b_id],
+    )
+
+    if (renderedConnections.length <= MAX_RENDERED_CONNECTIONS) return renderedConnections
+
+    const selectedConnection = selectedConnectionId
+      ? renderedConnections.find((connection) => connection.id === selectedConnectionId) ?? null
+      : null
+    const cappedConnections = renderedConnections
+      .filter((connection) => connection.id !== selectedConnectionId)
+      .slice(0, selectedConnection ? MAX_RENDERED_CONNECTIONS - 1 : MAX_RENDERED_CONNECTIONS)
+
+    return selectedConnection ? [selectedConnection, ...cappedConnections] : cappedConnections
+  }, [renderedBoardNodes.length, renderedNodesById, selectedConnectionId, visibleBoardConnections])
+  const shouldShowGraphLabels =
+    (renderBounds?.scale ?? 1) >= LABEL_MIN_SCALE &&
+    renderedBoardNodes.length <= LABEL_NODE_LIMIT
+  const drawGraphCanvas = useCallback(() => {
+    const canvas = graphCanvasRef.current
+    const boardElement = boardRef.current
+    if (!canvas || !boardElement) return
+
+    const context = canvas.getContext('2d')
+    if (!context) return
+
+    const { nodes, connections, nodesById: canvasNodesById, tagColorById: canvasTagColorById, theme: canvasTheme } =
+      graphCanvasDataRef.current
+    const view = viewportRef.current
+    const width = boardElement.clientWidth
+    const height = boardElement.clientHeight
+    const pixelRatio = Math.min(window.devicePixelRatio || 1, 2)
+    const canvasWidth = Math.max(1, Math.floor(width * pixelRatio))
+    const canvasHeight = Math.max(1, Math.floor(height * pixelRatio))
+
+    if (canvas.width !== canvasWidth || canvas.height !== canvasHeight) {
+      canvas.width = canvasWidth
+      canvas.height = canvasHeight
+    }
+
+    canvas.style.width = `${width}px`
+    canvas.style.height = `${height}px`
+    context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
+    context.clearRect(0, 0, width, height)
+
+    if (nodes.length === 0) return
+
+    const margin = 80
+    const toScreen = (node: Pick<PersonNode, 'x' | 'y'>) => ({
+      x: width / 2 + view.offset.x + node.x * view.scale,
+      y: height / 2 + view.offset.y + node.y * view.scale,
+    })
+    const isOnScreen = (point: Offset) =>
+      point.x >= -margin && point.x <= width + margin && point.y >= -margin && point.y <= height + margin
+    const visibleNodeIds = new Set<string>()
+    const visibleNodes: Array<{ node: PersonNode; screen: Offset }> = []
+
+    for (const node of nodes) {
+      const screen = toScreen(node)
+      if (!isOnScreen(screen)) continue
+
+      visibleNodeIds.add(node.id)
+      visibleNodes.push({ node, screen })
+    }
+
+    if (visibleNodes.length === 0) return
+
+    if (connections.length <= 20000 && view.scale >= 0.16) {
+      context.beginPath()
+      context.strokeStyle = canvasTheme === 'light' ? 'rgba(33, 98, 73, 0.16)' : 'rgba(138, 255, 214, 0.12)'
+      context.lineWidth = Math.max(0.6, Math.min(1.2, view.scale))
+
+      let drawnConnections = 0
+      for (const connection of connections) {
+        if (!visibleNodeIds.has(connection.person_a_id) && !visibleNodeIds.has(connection.person_b_id)) continue
+
+        const fromNode = canvasNodesById[connection.person_a_id]
+        const toNode = canvasNodesById[connection.person_b_id]
+        if (!fromNode || !toNode) continue
+
+        const from = toScreen(fromNode)
+        const to = toScreen(toNode)
+        if (!isOnScreen(from) && !isOnScreen(to)) continue
+
+        context.moveTo(from.x, from.y)
+        context.lineTo(to.x, to.y)
+        drawnConnections += 1
+        if (drawnConnections >= 12000) break
+      }
+      context.stroke()
+    }
+
+    const defaultFill = canvasTheme === 'light' ? 'rgba(62, 158, 118, 0.72)' : 'rgba(138, 255, 214, 0.72)'
+    const radius = Math.max(1.2, Math.min(3.2, 2.4 * view.scale))
+
+    for (const { node, screen } of visibleNodes) {
+      context.beginPath()
+      context.fillStyle = node.tag_id ? canvasTagColorById[node.tag_id] ?? defaultFill : defaultFill
+      context.globalAlpha = node.is_root ? 0.95 : 0.76
+      context.arc(screen.x, screen.y, node.is_root ? radius * 1.8 : radius, 0, Math.PI * 2)
+      context.fill()
+    }
+
+    context.globalAlpha = 1
+  }, [])
+
+  const scheduleGraphCanvasDraw = useCallback(() => {
+    if (graphCanvasFrameRef.current !== null) return
+
+    graphCanvasFrameRef.current = window.requestAnimationFrame(() => {
+      graphCanvasFrameRef.current = null
+      drawGraphCanvas()
+    })
+  }, [drawGraphCanvas])
   const multiSelectedNodeIdSet = useMemo(() => new Set(multiSelectedNodeIds), [multiSelectedNodeIds])
   const isVeryDenseGraph = visibleBoardNodes.length >= 60
   const defaultSelectedNodeId =
@@ -1216,8 +1456,19 @@ function App() {
   }, [areaSelection])
 
   useEffect(() => {
-    visibleBoardNodesRef.current = visibleBoardNodes
-  }, [visibleBoardNodes])
+    visibleBoardNodesRef.current = renderedBoardNodes
+  }, [renderedBoardNodes])
+
+  useEffect(() => {
+    graphCanvasDataRef.current = {
+      nodes: visibleBoardNodes,
+      connections: visibleBoardConnections,
+      nodesById,
+      tagColorById,
+      theme,
+    }
+    scheduleGraphCanvasDraw()
+  }, [nodesById, scheduleGraphCanvasDraw, tagColorById, theme, visibleBoardConnections, visibleBoardNodes])
 
   const closeInspectorUi = useCallback(() => {
     setInspectorNodeId(null)
@@ -1284,10 +1535,11 @@ function App() {
   }, [activeTagOptionIndex, isTagPickerOpen, tagPickerOptions.length])
   const applyViewport = useCallback((nextOffset: Offset, nextScale: number) => {
     viewportRef.current = { offset: nextOffset, scale: nextScale }
+    const boardElement = boardRef.current
 
     if (boardSurfaceRef.current) {
-      const viewportWidth = boardRef.current?.clientWidth ?? 0
-      const viewportHeight = boardRef.current?.clientHeight ?? 0
+      const viewportWidth = boardElement?.clientWidth ?? 0
+      const viewportHeight = boardElement?.clientHeight ?? 0
       const gridOriginX = viewportWidth / 2 + nextOffset.x
       const gridOriginY = viewportHeight / 2 + nextOffset.y
 
@@ -1327,7 +1579,18 @@ function App() {
     setZoomPercentage((currentZoomPercentage) =>
       currentZoomPercentage === nextZoomPercentage ? currentZoomPercentage : nextZoomPercentage,
     )
-  }, [])
+
+    if (boardElement) {
+      const nextRenderBounds = getViewportRenderBounds(boardElement, nextOffset, nextScale)
+
+      if (shouldUpdateRenderBounds(renderBoundsRef.current, nextRenderBounds)) {
+        renderBoundsRef.current = nextRenderBounds
+        setRenderBounds(nextRenderBounds)
+      }
+    }
+
+    scheduleGraphCanvasDraw()
+  }, [scheduleGraphCanvasDraw])
 
   const queueViewportUpdate = useCallback(
     (nextOffset: Offset, nextScale: number) => {
@@ -1394,10 +1657,22 @@ function App() {
       if (viewportFrameRef.current !== null) {
         window.cancelAnimationFrame(viewportFrameRef.current)
       }
+      if (graphCanvasFrameRef.current !== null) {
+        window.cancelAnimationFrame(graphCanvasFrameRef.current)
+      }
       if (trackpadPan.timeoutId !== null) {
         window.clearTimeout(trackpadPan.timeoutId)
       }
     }
+  }, [applyViewport])
+
+  useEffect(() => {
+    const handleResize = () => {
+      applyViewport(viewportRef.current.offset, viewportRef.current.scale)
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
   }, [applyViewport])
 
   useEffect(() => {
@@ -2545,26 +2820,24 @@ function App() {
         tags.find((tag) => normalizeTagName(tag.name).toLowerCase() === LINKEDIN_TAG_NAME.toLowerCase()) ??
         await createTag(LINKEDIN_TAG_NAME)
       const positions = getLinkedInImportPositions(connectionsToCreate.length, people)
-      let importedCount = 0
+      const peopleToCreate = connectionsToCreate.map((connection, index) => ({
+        id: createUuid(),
+        name: getLinkedInConnectionName(connection),
+        tagId: linkedInTag.id,
+        x: positions[index].x,
+        y: positions[index].y,
+        noteTitle: 'LinkedIn connection',
+        noteBody: getLinkedInNoteBody(connection, linkedInImportOptions),
+        connectToPersonId: rootPerson.id,
+      }))
 
-      for (const [index, connection] of connectionsToCreate.entries()) {
-        const person = await createPerson({
-          name: getLinkedInConnectionName(connection),
-          tagId: linkedInTag.id,
-          x: positions[index].x,
-          y: positions[index].y,
-        })
+      setLinkedInImportStatus({
+        state: 'loading',
+        message: `Importing ${peopleToCreate.length} LinkedIn connections in batches...`,
+      })
 
-        await createNote('LinkedIn connection', getLinkedInNoteBody(connection, linkedInImportOptions), person.id, {
-          syncAi: false,
-        })
-        await createConnection(rootPerson.id, person.id)
-        importedCount += 1
-        setLinkedInImportStatus({
-          state: 'loading',
-          message: `Imported ${importedCount} of ${connectionsToCreate.length} LinkedIn connections...`,
-        })
-      }
+      const importedGraph = await bulkCreateRemotePeople(peopleToCreate)
+      const importedCount = importedGraph.people.length
 
       setLinkedInImportStatus({
         state: 'success',
@@ -3817,13 +4090,14 @@ function App() {
             } as BoardStyle
           }
         />
+        <canvas ref={graphCanvasRef} className="graph-canvas" aria-hidden="true" />
         <div ref={graphLayerRef} className="graph-layer">
           <svg
             className="graph-connections"
-            viewBox="-2200 -2200 4400 4400"
+            viewBox={`${-LARGE_GRAPH_SVG_SIZE / 2} ${-LARGE_GRAPH_SVG_SIZE / 2} ${LARGE_GRAPH_SVG_SIZE} ${LARGE_GRAPH_SVG_SIZE}`}
             aria-hidden="true"
           >
-            {visibleBoardConnections.map((edge) => {
+            {renderedBoardConnections.map((edge) => {
               const fromNode = nodesById[edge.person_a_id]
               const toNode = nodesById[edge.person_b_id]
               if (!fromNode || !toNode) return null
@@ -3847,13 +4121,13 @@ function App() {
               />
             ) : null}
           </svg>
-          {visibleBoardNodes.map((node) => (
+          {renderedBoardNodes.map((node) => (
             <GraphNodeCard
               key={node.id}
               node={node}
               isSelected={node.id === selectedNode?.id || multiSelectedNodeIdSet.has(node.id)}
               tagColor={node.tag_id ? tagColorById[node.tag_id] : null}
-              showLabel
+              showLabel={shouldShowGraphLabels || node.is_root || node.id === selectedNode?.id}
               connectionModifierLabel={connectionModifierLabel}
               onPointerDown={startNodeInteraction}
               onClick={handleNodeClick}

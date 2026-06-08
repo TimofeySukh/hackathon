@@ -6,7 +6,8 @@ The repository currently has a single-screen frontend architecture.
 
 Runtime boundaries:
 
-- React owns UI state and rendering.
+- React owns UI state and the interactive DOM overlay.
+- A canvas layer owns passive large-graph node and connection drawing.
 - Vite owns local development and production bundling.
 - CSS owns the visual board surface, theme tokens, and responsive layout.
 - The browser owns theme persistence through `localStorage`.
@@ -25,12 +26,12 @@ The backend boundary remains intentionally narrow: Supabase Auth provides identi
 ## Current Frontend Shape
 
 - `src/main.tsx` mounts the React app.
-- `src/App.tsx` contains the board interaction model, unsigned local graph state, and selected-person inspector.
+- `src/App.tsx` contains the board interaction model, unsigned local graph state, selected-person inspector, canvas overview renderer, and viewport-capped interactive graph overlay.
 - `src/App.tsx` also contains the people search overlay with local matching while typing and signed-in AI search on Enter.
 - `src/lib/supabase.ts` creates the browser Supabase client from Vite environment variables.
 - `src/lib/useAuth.ts` owns session loading, Google sign-in, and sign-out.
-- `src/lib/useBoardGraph.ts` owns board graph loading, frontend mutation state, and manual AI note refresh.
-- `src/lib/graphStorage.ts` owns Supabase CRUD for graph data, `person_ai_notes`, and Edge Function invocation.
+- `src/lib/useBoardGraph.ts` owns board graph loading, frontend mutation state, bulk graph creation, graph-data deletion, and manual AI note refresh.
+- `src/lib/graphStorage.ts` owns Supabase CRUD and bulk insert calls for graph data, `person_ai_notes`, and Edge Function invocation.
 - `src/lib/userWorkspace.ts` upserts the user profile and ensures a single personal board plus root node.
 - `mcp/server.mjs` exposes repo docs as MCP resources and the persisted graph model as MCP tools and dynamic resources.
 - `supabase/functions/_shared/ai.ts` calls Gemini first and falls back to OpenRouter for structured AI responses.
@@ -40,7 +41,7 @@ The backend boundary remains intentionally narrow: Supabase Auth provides identi
 - `supabase/functions/delete-account-data/index.ts` clears the signed-in user's graph rows, AI summaries, profile fields, and root-person identity fields without deleting the Auth user.
 - `src/index.css` contains the full visual system.
 
-The board is simulated by shifting layered CSS backgrounds according to a camera offset. The app does not store board objects or draw on a canvas element.
+The board grid is simulated by shifting layered CSS backgrounds according to a camera offset. Large graph previews are drawn on a viewport-sized canvas. React renders only a capped interactive subset of nodes and connections around the viewport, plus selected or pinned nodes.
 
 ## Current Product Boundaries
 
@@ -64,6 +65,8 @@ Current scope:
 - at most one manually refreshed AI summary record per person with a top-level text summary plus structured JSON fields
 - undirected person-to-person connections
 - a people search overlay over names, tags, notes, and AI-generated search explanations
+- batch LinkedIn import that inserts people, notes, and root connections in chunks instead of one request per row
+- dense graph rendering with canvas overview drawing, viewport culling, label LOD, and capped SVG/DOM overlays
 
 Out of scope for the current version:
 

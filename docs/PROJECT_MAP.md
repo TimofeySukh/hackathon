@@ -16,6 +16,8 @@ The current product is intentionally narrow:
 - editable unsigned local board state when the user is not signed in
 - one personal board record per signed-in user
 - persistent people nodes, reusable colored tags, notes, and undirected connections per signed-in user
+- batched LinkedIn import for people, source notes, and root connections
+- canvas overview rendering for large graphs with a capped interactive DOM/SVG overlay
 - a top-left Tags menu for creating tags, renaming them, changing tag colors, and toggling tag visibility on the board
 - a node-anchored inspector for editing the selected person that opens on single click
 - a people search layer that matches locally while typing and can run candidate-limited AI search on Enter when signed in

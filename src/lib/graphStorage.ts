@@ -18,6 +18,7 @@ import { ensureUserWorkspace } from './userWorkspace'
 type CreatePersonInput = {
   boardId: string
   ownerUserId: string
+  id?: string
   name: string
   tagId?: string | null
   x: number
@@ -42,6 +43,23 @@ type CreateNoteInput = {
   ownerUserId: string
   title: string
   body: string
+}
+
+export type BulkGraphPersonInput = {
+  id: string
+  name: string
+  tagId?: string | null
+  x: number
+  y: number
+  noteTitle?: string
+  noteBody?: string
+  connectToPersonId?: string
+}
+
+type BulkCreateGraphInput = {
+  boardId: string
+  ownerUserId: string
+  people: BulkGraphPersonInput[]
 }
 
 type UpdateNoteInput = {
@@ -77,6 +95,8 @@ const EMPTY_PERSON_AI_STRUCTURED_SUMMARY: PersonAiStructuredSummary = {
   relationship_context: [],
   open_questions: [],
 }
+
+const BULK_INSERT_CHUNK_SIZE = 500
 
 function requireSupabase() {
   if (!supabase) {
@@ -121,6 +141,16 @@ function canonicalizeConnection(firstPersonId: string, secondPersonId: string) {
   return firstPersonId < secondPersonId
     ? { personAId: firstPersonId, personBId: secondPersonId }
     : { personAId: secondPersonId, personBId: firstPersonId }
+}
+
+function chunkArray<T>(items: T[], chunkSize: number) {
+  const chunks: T[][] = []
+
+  for (let index = 0; index < items.length; index += chunkSize) {
+    chunks.push(items.slice(index, index + chunkSize))
+  }
+
+  return chunks
 }
 
 export function normalizeTagName(name: string) {
@@ -324,6 +354,7 @@ export async function createPerson(input: CreatePersonInput): Promise<PersonNode
   const { data, error } = await client
     .from('people')
     .insert({
+      ...(input.id ? { id: input.id } : {}),
       board_id: input.boardId,
       owner_user_id: input.ownerUserId,
       name: input.name,
@@ -337,6 +368,71 @@ export async function createPerson(input: CreatePersonInput): Promise<PersonNode
   if (error) throw error
 
   return data as PersonNode
+}
+
+export async function bulkCreateGraph(input: BulkCreateGraphInput): Promise<{
+  people: PersonNode[]
+  notes: PersonNote[]
+  connections: Connection[]
+}> {
+  const client = requireSupabase()
+  const people: PersonNode[] = []
+  const notes: PersonNote[] = []
+  const connections: Connection[] = []
+  const personRows = input.people.map((person) => ({
+    id: person.id,
+    board_id: input.boardId,
+    owner_user_id: input.ownerUserId,
+    name: person.name,
+    tag_id: person.tagId ?? null,
+    x: person.x,
+    y: person.y,
+  }))
+
+  for (const chunk of chunkArray(personRows, BULK_INSERT_CHUNK_SIZE)) {
+    const { data, error } = await client.from('people').insert(chunk).select('*')
+
+    if (error) throw error
+    people.push(...((data ?? []) as PersonNode[]))
+  }
+
+  const noteRows = input.people
+    .filter((person) => person.noteTitle !== undefined || person.noteBody !== undefined)
+    .map((person) => ({
+      person_id: person.id,
+      owner_user_id: input.ownerUserId,
+      title: person.noteTitle ?? '',
+      body: person.noteBody ?? '',
+    }))
+
+  for (const chunk of chunkArray(noteRows, BULK_INSERT_CHUNK_SIZE)) {
+    const { data, error } = await client.from('notes').insert(chunk).select('*')
+
+    if (error) throw error
+    notes.push(...((data ?? []) as PersonNote[]))
+  }
+
+  const connectionRows = input.people
+    .filter((person) => person.connectToPersonId && person.connectToPersonId !== person.id)
+    .map((person) => {
+      const { personAId, personBId } = canonicalizeConnection(person.connectToPersonId ?? '', person.id)
+
+      return {
+        board_id: input.boardId,
+        owner_user_id: input.ownerUserId,
+        person_a_id: personAId,
+        person_b_id: personBId,
+      }
+    })
+
+  for (const chunk of chunkArray(connectionRows, BULK_INSERT_CHUNK_SIZE)) {
+    const { data, error } = await client.from('connections').insert(chunk).select('*')
+
+    if (error) throw error
+    connections.push(...((data ?? []) as Connection[]))
+  }
+
+  return { people, notes, connections }
 }
 
 export async function updatePerson(input: UpdatePersonInput): Promise<PersonNode> {

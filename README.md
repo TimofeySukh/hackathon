@@ -31,6 +31,8 @@ A persisted social graph board built with React, Vite, and TypeScript.
 - AI summaries refresh manually from the selected-person inspector instead of after every note edit
 - AI search sends only up to 40 browser-selected candidates and strips email addresses and URLs before provider calls
 - LinkedIn import defaults to name, company, position, and connected date; email addresses and profile URLs are opt-in
+- LinkedIn import creates people, source notes, and root connections in Supabase batches
+- Large graphs use a canvas overview layer plus a capped interactive DOM/SVG overlay near the viewport
 - Newly created people open their inspector automatically
 - Single-click a person to open that inspector directly on the board
 - Opening the inspector pans the board enough to keep it visible and opens it at a consistent size before later zoom changes affect it

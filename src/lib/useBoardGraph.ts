@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js'
 
 import type { BoardGraphPayload, Connection, PersonAiNote, PersonNode, PersonNote, Tag } from './graphTypes'
 import {
+  bulkCreateGraph,
   createConnection,
   createNote,
   createPerson,
@@ -21,6 +22,7 @@ import {
   updatePerson,
   updateTag,
 } from './graphStorage'
+import type { BulkGraphPersonInput } from './graphStorage'
 
 type GraphStatus = 'idle' | 'loading' | 'ready'
 
@@ -293,6 +295,29 @@ export function useBoardGraph(user: User | null) {
         })
         applyPerson(person)
         return person
+      } catch (error) {
+        setError(error)
+        throw error
+      }
+    },
+    async bulkCreatePeople(people: BulkGraphPersonInput[]) {
+      try {
+        const { boardId, userId } = ensureUserAndBoard()
+        const payload = await bulkCreateGraph({
+          boardId,
+          ownerUserId: userId,
+          people,
+        })
+
+        setGraphState((currentState) => ({
+          ...currentState,
+          people: [...currentState.people, ...payload.people],
+          notes: [...currentState.notes, ...payload.notes],
+          connections: [...currentState.connections, ...payload.connections],
+          error: null,
+        }))
+
+        return payload
       } catch (error) {
         setError(error)
         throw error

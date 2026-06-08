@@ -88,7 +88,8 @@ Contains the board experience:
 - board viewport and camera state
 - selected-person inspector state
 - people search overlay state
-- persisted social graph node and connection rendering
+- persisted social graph canvas overview rendering
+- viewport-capped interactive social graph node and connection rendering
 - drag node repositioning
 - platform-native modifier drag for node connection creation: `Command` on macOS, `Control` elsewhere
 - theme toggle
@@ -100,8 +101,8 @@ Shared low-level helpers.
 
 - `supabase.ts` creates the browser Supabase client from Vite environment variables.
 - `useAuth.ts` owns session loading, Google OAuth sign-in, and sign-out.
-- `useBoardGraph.ts` owns board graph loading, mutation state, graph-data deletion, and manual AI note refresh per person.
-- `graphStorage.ts` owns Supabase CRUD calls for persisted graph data, `person_ai_notes`, and AI Edge Function invocation.
+- `useBoardGraph.ts` owns board graph loading, mutation state, bulk graph creation, graph-data deletion, and manual AI note refresh per person.
+- `graphStorage.ts` owns Supabase CRUD and bulk insert calls for persisted graph data, `person_ai_notes`, and AI Edge Function invocation.
 - `graphTypes.ts` defines shared profile, board, person, note, AI note, tag, and connection interfaces, including the structured AI summary shape.
 - `userWorkspace.ts` upserts profile data and ensures one personal board plus root person for the signed-in user.
 
@@ -165,6 +166,7 @@ It currently supports:
 - cursor-centered zoom with the mouse wheel
 - visual theme switching
 - persistent social graph nodes connected by lines
+- dense graph canvas overview drawing with capped interactive DOM/SVG rendering near the viewport
 - one manually refreshed AI summary record per person in the database with `status`, plain-text `summary`, structured JSON data, and sync error state
 - modifier-drag to connect two existing nodes by releasing on another node hit area: `Command` on macOS, `Control` elsewhere
 - modifier-drag to create node growth from any existing node with an immediate connecting line: `Command` on macOS, `Control` elsewhere
@@ -180,12 +182,13 @@ It currently supports:
 - a keyboard-first inspector that treats `#tag` in the name field as a tag command and uses one capture textarea for new notes
 - local people search while typing plus candidate-limited natural-language AI search on Enter when signed in
 - graph export, graph deletion, and account-data deletion controls in the account menu
+- batched LinkedIn import that creates people, notes, and root connections in chunks
 - drag repositioning for non-root nodes
 - persisted node renaming
 - grid movement through background offset changes
 - mobile-safe control placement with the primary search/account/theme row at the top and the Tags menu docked near the bottom-left edge
 
-The visual board is simulated by shifting layered CSS backgrounds based on the current camera offset.
+The visual board grid is simulated by shifting layered CSS backgrounds based on the current camera offset. Dense graph previews are drawn on a canvas layer, with React rendering a capped interactive DOM/SVG overlay around the viewport.
 
 ## Extension Strategy
 
