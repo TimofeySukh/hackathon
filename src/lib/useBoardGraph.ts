@@ -127,7 +127,10 @@ const EMPTY_GRAPH_STATE: GraphState = {
 const PERSON_AI_SYNC_DEBOUNCE_MS = 3000
 
 export function useBoardGraph(user: User | null) {
-  const [graphState, setGraphState] = useState<GraphState>(EMPTY_GRAPH_STATE)
+  const [graphState, setGraphState] = useState<GraphState>(() => ({
+    ...EMPTY_GRAPH_STATE,
+    status: user ? 'loading' : 'idle',
+  }))
   const personAiSyncTimersRef = useRef(new Map<string, number>())
   const personAiSyncInFlightRef = useRef(new Set<string>())
   const personAiSyncQueuedRef = useRef(new Set<string>())
@@ -189,10 +192,17 @@ export function useBoardGraph(user: User | null) {
       .catch((error: unknown) => {
         if (!isMounted) return
 
+        let errMsg = 'Unable to load board data.'
+        if (error instanceof Error) {
+          errMsg = error.message
+        } else if (error && typeof error === 'object' && 'message' in error && typeof (error as any).message === 'string') {
+          errMsg = (error as any).message
+        }
+
         setGraphState({
           ...EMPTY_GRAPH_STATE,
           status: 'idle',
-          error: error instanceof Error ? error.message : 'Unable to load board data.',
+          error: errMsg,
         })
       })
 
@@ -456,7 +466,8 @@ export function useBoardGraph(user: User | null) {
         people: currentState.people.map((p) => (p.id === id ? { ...p, x, y } : p)),
       }))
 
-      if (user) {
+      const isLoadTest = id.startsWith('load-test-person-') || id.startsWith('stress-')
+      if (user && !isLoadTest) {
         const existingTimer = movePersonTimersRef.current.get(id)
         if (existingTimer !== undefined) {
           window.clearTimeout(existingTimer)
@@ -593,7 +604,8 @@ export function useBoardGraph(user: User | null) {
         }
       })
 
-      if (user) {
+      const isLoadTest = id === 'load-test-circle'
+      if (user && !isLoadTest) {
         const existingTimer = moveCircleTimersRef.current.get(id)
         if (existingTimer !== undefined) {
           window.clearTimeout(existingTimer)

@@ -357,16 +357,23 @@ function App() {
   useEffect(() => {
     if (isRemote && boardGraph.status === 'ready') {
       Promise.resolve().then(() => {
-        setGraph({
-          circles: boardGraph.circles,
-          people: boardGraph.people,
-          notes: boardGraph.notes,
+        setGraph((current) => {
+          const currentLoadCircle = current.circles.find(isLoadTestCircle)
+          const currentLoadPeople = current.people.filter(isLoadTestPerson)
+          
+          return {
+            circles: currentLoadCircle ? [...boardGraph.circles, currentLoadCircle] : boardGraph.circles,
+            people: currentLoadPeople.length > 0 ? [...boardGraph.people, ...currentLoadPeople] : boardGraph.people,
+            notes: boardGraph.notes,
+          }
         })
         setSelectedItem((current) => {
           if (current.type === 'circle') {
+            if (isLoadTestCircle({ id: current.id })) return current
             const exists = boardGraph.circles.some((c) => c.id === current.id)
             return exists ? current : { type: 'circle', id: 'you' }
           } else {
+            if (isLoadTestPerson({ id: current.id })) return current
             const exists = boardGraph.people.some((p) => p.id === current.id)
             return exists ? current : { type: 'circle', id: 'you' }
           }
@@ -389,12 +396,49 @@ function App() {
     }
   }, [])
 
+  function updateLoadPeopleCount(count: number) {
+    const nextCount = Math.max(0, Math.min(count, MAX_STRESS_ICONS))
+    setStress(current => ({ ...current, count: nextCount }))
+    
+    setGraph(current => {
+      const cleanCircles = current.circles.filter(c => !isLoadTestCircle(c))
+      const cleanPeople = current.people.filter(p => !isLoadTestPerson(p))
+      
+      if (nextCount === 0) {
+        return {
+          ...current,
+          circles: cleanCircles,
+          people: cleanPeople,
+        }
+      } else {
+        return {
+          ...current,
+          circles: [...cleanCircles, createLoadTestCircle(nextCount)],
+          people: [...cleanPeople, ...generateLoadPeople(nextCount)],
+        }
+      }
+    })
+    
+    setSelectedItem(current => {
+      if (current.type === 'circle' && current.id === LOAD_TEST_CIRCLE_ID && nextCount === 0) {
+        return { type: 'circle', id: 'you' }
+      }
+      if (current.type === 'person' && isLoadTestPerson({ id: current.id }) && nextCount === 0) {
+        return { type: 'circle', id: 'you' }
+      }
+      return current
+    })
+  }
+
   const circlesById = useMemo(() => new Map(graph.circles.map((circle) => [circle.id, circle])), [graph.circles])
-  const stressPeople = useMemo(() => generateStressPeople(stress.count), [stress.count])
+  const loadPeople = useMemo(() => graph.people.filter(isLoadTestPerson), [graph.people])
   const stressSprites = useMemo(() => createStressSprites(), [])
-  const renderedPeopleCount = graph.people.length + stressPeople.length
+  const renderedPeopleCount = graph.people.length
   const renderedEdgeCount =
-    graph.circles.filter((circle) => circle.connectedTo).length + graph.people.length + (stress.showEdges ? stressPeople.length : 0)
+    graph.circles.filter((circle) => circle.connectedTo).length +
+    graph.people.filter(p => !isLoadTestPerson(p)).length +
+    (stress.showEdges ? loadPeople.length : 0)
+
   const sortedCircles = useMemo(() => {
     function getDepth(circleId: string | null): number {
       let depth = 0
@@ -415,20 +459,20 @@ function App() {
     const surface = surfaceRef.current
     if (!canvas || !surface) return
 
-    drawStressCanvas(canvas, surface, camera, stress, stressPeople, circlesById, stressSprites)
-  }, [camera, circlesById, stress, stressPeople, stressSprites])
+    drawStressCanvas(canvas, surface, camera, stress, loadPeople, circlesById, stressSprites)
+  }, [camera, circlesById, stress, loadPeople, stressSprites])
 
   useEffect(() => {
     function handleResize() {
       const canvas = stressCanvasRef.current
       const surface = surfaceRef.current
       if (!canvas || !surface) return
-      drawStressCanvas(canvas, surface, camera, stress, stressPeople, circlesById, stressSprites)
+      drawStressCanvas(canvas, surface, camera, stress, loadPeople, circlesById, stressSprites)
     }
 
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
-  }, [camera, circlesById, stress, stressPeople, stressSprites])
+  }, [camera, circlesById, stress, loadPeople, stressSprites])
 
   function screenToWorld(point: { x: number; y: number }) {
     return {
@@ -616,6 +660,7 @@ function App() {
   }
 
   function openCircleCreateMenu(event: ReactMouseEvent<HTMLElement>, circle: CircleNode) {
+    if (isLoadTestCircle(circle)) return
     event.preventDefault()
     event.stopPropagation()
     const world = screenToWorld({ x: event.clientX, y: event.clientY })
@@ -816,6 +861,8 @@ function App() {
   }
 
   function renameSelected(value: string) {
+    if (selectedItem.type === 'circle' && selectedItem.id === LOAD_TEST_CIRCLE_ID) return
+    if (selectedItem.type === 'person' && isLoadTestPerson({ id: selectedItem.id })) return
     if (selectedItem.type === 'circle') {
       setGraph((current) => ({
         ...current,
@@ -849,6 +896,7 @@ function App() {
   }
 
   function updateCircleStyle(id: string, updates: Partial<CircleNode>) {
+    if (id === LOAD_TEST_CIRCLE_ID) return
     setGraph((current) => ({
       ...current,
       circles: current.circles.map((circle) =>
@@ -865,6 +913,7 @@ function App() {
   }
 
   function updatePersonStyle(id: string, updates: Partial<PersonNode>) {
+    if (isLoadTestPerson({ id })) return
     setGraph((current) => ({
       ...current,
       people: current.people.map((person) =>
@@ -893,8 +942,8 @@ function App() {
   }
 
   function handleDeleteCircle(id: string) {
-    if (id === 'you') {
-      alert('Root circle cannot be deleted.')
+    if (id === 'you' || id === LOAD_TEST_CIRCLE_ID) {
+      alert('Root or load test circles cannot be deleted.')
       return
     }
     if (confirm('Are you sure you want to delete this circle? This will delete all its nested sub-circles.')) {
@@ -919,6 +968,10 @@ function App() {
 
   function handleDeletePerson(id: string) {
     const person = graph.people.find(p => p.id === id)
+    if (isLoadTestPerson({ id })) {
+      alert('Load test people cannot be deleted individually.')
+      return
+    }
     // In remote mode or local mode, prevent deleting the root person (which is Mia in legacy default, or is_root flag)
     if (person?.isRoot || person?.id === 'p1' || person?.name === 'Mia' && person?.circleId === 'you') {
       alert('Root person cannot be deleted.')
@@ -990,6 +1043,26 @@ function App() {
         }))
       }
     }
+  }
+
+  if (isRemote && boardGraph.error) {
+    return (
+      <div className="auth-gate-container">
+        <div className="auth-card" style={{ maxWidth: '480px' }}>
+          <div className="auth-logo">DN</div>
+          <h1>Database Connection Error</h1>
+          <p className="auth-error" style={{ color: '#ef4444', backgroundColor: '#fef2f2', padding: '12px', borderRadius: '6px', fontSize: '13px', margin: '16px 0', border: '1px solid #fee2e2', textAlign: 'left', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
+            {boardGraph.error}
+          </p>
+          <p style={{ fontSize: '14px', color: '#4b5563', marginBottom: '20px' }}>
+            Please ensure that all database migrations have been successfully run in your Supabase SQL Editor.
+          </p>
+          <button type="button" onClick={() => window.location.reload()} className="google-signin-btn" style={{ justifyContent: 'center', width: '100%' }}>
+            Retry Connection
+          </button>
+        </div>
+      </div>
+    )
   }
 
   if (authStatus === 'loading' || (isRemote && boardGraph.status === 'loading')) {
@@ -1094,20 +1167,20 @@ function App() {
       </div>
 
       {isDev && (
-        <section className="stress-panel" aria-label="Icon stress test controls">
+        <section className="stress-panel" aria-label="People load controls">
           <div className="stress-panel__header">
-            <strong>Icon stress</strong>
+            <strong>People load</strong>
             <span>{fps} FPS</span>
           </div>
           <label className="stress-slider">
-            <span>{stress.count.toLocaleString('en-US')} synthetic icons</span>
+            <span>{stress.count.toLocaleString('en-US')} generated people</span>
             <input
               type="range"
               min="0"
               max={MAX_STRESS_ICONS}
               step="250"
               value={stress.count}
-              onChange={(event) => setStress((current) => ({ ...current, count: Number(event.target.value) }))}
+              onChange={(event) => updateLoadPeopleCount(Number(event.target.value))}
             />
           </label>
           <div className="stress-toggles">
@@ -1205,7 +1278,7 @@ function App() {
               if (!source) return null
               return <path key={circle.id} className="edge edge--circle" d={makeCurve(source, circle)} />
             })}
-            {graph.people.map((person) => {
+            {graph.people.filter(p => !isLoadTestPerson(p)).map((person) => {
               const circle = circlesById.get(person.circleId)
               if (!circle) return null
               return <path key={person.id} className="edge edge--person" d={makeCurve(circle, person)} />
@@ -1280,7 +1353,7 @@ function App() {
           ))}
 
           {/* PASS 4: People Icons and Labels */}
-          {graph.people.map((person) => (
+          {graph.people.filter(p => !isLoadTestPerson(p)).map((person) => (
             <button
               key={person.id}
               type="button"
@@ -1891,27 +1964,63 @@ function useFrameRate() {
   return fps
 }
 
-function generateStressPeople(count: number): PersonNode[] {
-  const colors = ['#00629D', '#C00015', '#1E824A', '#D87A00', '#7F67BE', '#0F766E', '#4F46E5', '#BE185D']
-  const people: PersonNode[] = []
+const LOAD_TEST_CIRCLE_ID = 'load-test-circle'
 
-  for (let index = 0; index < count; index += 1) {
-    const angle = index * 2.399963229728653
-    const ring = Math.floor(Math.sqrt(index))
-    const radius = 185 + ring * 15
-    const jitter = (seededRandom(index + 11) - 0.5) * 18
+function isLoadTestCircle(circle: { id: string }): boolean {
+  return circle.id === LOAD_TEST_CIRCLE_ID
+}
+
+function isLoadTestPerson(person: { id: string }): boolean {
+  return person.id.startsWith('load-test-person-') || person.id.startsWith('stress-')
+}
+
+function loadPeopleRadius(count: number): number {
+  if (count <= 0) return 0
+  return 58 + Math.sqrt(count) * 13
+}
+
+function createLoadTestCircle(count: number): CircleNode {
+  const radius = Math.max(220, loadPeopleRadius(count) + 96)
+  return {
+    id: LOAD_TEST_CIRCLE_ID,
+    name: 'Load test',
+    icon: 'LT',
+    x: 980,
+    y: -160,
+    radius,
+    minRadius: radius,
+    parentId: null,
+    connectedTo: 'you',
+    tone: 'violet',
+    shapeType: 'wavy',
+    sides: 18,
+    amplitude: 10,
+  }
+}
+
+function generateLoadPeople(count: number): PersonNode[] {
+  const people: PersonNode[] = []
+  const centerX = 980
+  const centerY = -160
+
+  for (let i = 0; i < count; i++) {
+    const angle = i * 2.399963229728653
+    const radius = 52 + Math.sqrt(i) * 13
+    const jitter = (seededRandom(i + 11) - 0.5) * 10
 
     people.push({
-      id: `stress-${index}`,
-      name: `Stress ${index + 1}`,
-      role: colors[index % colors.length],
-      x: Math.cos(angle) * (radius + jitter),
-      y: Math.sin(angle) * (radius + jitter),
-      circleId: 'you',
-      avatar: makeAvatar(index),
+      id: `load-test-person-${i}`,
+      name: `Load ${i + 1}`,
+      role: 'Generated load person',
+      x: centerX + Math.cos(angle) * (radius + jitter),
+      y: centerY + Math.sin(angle) * (radius + jitter),
+      circleId: LOAD_TEST_CIRCLE_ID,
+      avatar: makeAvatar(i),
+      shapeType: 'wavy',
+      sides: 8,
+      amplitude: 1,
     })
   }
-
   return people
 }
 
