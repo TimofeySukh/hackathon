@@ -59,9 +59,9 @@ When working on the project:
 
 ### Flutter app freezes during zoom-out and window resize
 
-- Status: Open
+- Status: Resolved
 - Reported behavior: The Flutter application freezes/hangs completely when zooming out and when resizing the window.
-- Notes: Detailed synchronous event logging is being implemented to diagnose the execution trace right before the freeze, monitoring layout passes, painters (RealPeoplePainter, GridPainter, CircleShapePainter, EdgePainter), and gestures.
+- Notes: Replaced the built-in `InteractiveViewer` (configured with `constrained: false` and a large `boundaryMargin`) with a custom pan/zoom container combining a `GestureDetector`, `Listener` (for scroll wheel), and `Transform`. This aligns with the React version's transform layout model, supports infinite panning, and eliminates the layout/physics loop freezes.
 
 ## Resolved Problems
 
