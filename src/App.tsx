@@ -10,7 +10,7 @@ import type {
 import { useAuth } from './lib/useAuth'
 import { deleteAccountData, normalizeTagName, searchPeopleWithAi } from './lib/graphStorage'
 import type { Connection, PersonAiNote, PersonNode, PersonNote, Tag } from './lib/graphTypes'
-import { STARTER_SAMPLE_CONTACTS, STARTER_SAMPLE_TAGS, buildStarterSamplePeople } from './lib/starterSample'
+import { STARTER_SAMPLE_CONTACTS, buildStarterSamplePeople } from './lib/starterSample'
 import { DEFAULT_TAG_COLOR, DEFAULT_TAGS, hexToRgb, normalizeTagColor } from './lib/tagPalette'
 import { useBoardGraph } from './lib/useBoardGraph'
 
@@ -153,44 +153,10 @@ type TagPickerOption =
       label: string
     }
 
-type OnboardingTarget =
-  | 'account'
-  | 'sample-node'
-  | 'inspector'
-  | 'root-node'
-  | 'tag-picker'
-  | 'note-composer'
-  | 'linkedin'
-  | 'none'
-
-type OnboardingStep = {
-  id:
-    | 'signin'
-    | 'sample'
-    | 'sample-details'
-    | 'create-contact'
-    | 'create-tag'
-    | 'add-note'
-    | 'linkedin'
-    | 'done'
-  title: string
-  body: string
-  target: OnboardingTarget
-}
-
-type OnboardingOverlayRect = {
-  x: number
-  y: number
-  width: number
-  height: number
-  viewportWidth: number
-  viewportHeight: number
-}
-
 const THEME_STORAGE_KEY = 'hackathon-theme'
 const TAG_COLOR_STORAGE_KEY = 'hackathon-tag-colors'
-const ONBOARDING_DISMISSED_STORAGE_KEY = 'hackathon-guided-onboarding-dismissed-v2'
-const STARTER_SAMPLE_SEEDED_STORAGE_KEY = 'hackathon-starter-sample-seeded-v2'
+const ONBOARDING_DISMISSED_STORAGE_KEY = 'hackathon-onboarding-dismissed'
+const STARTER_SAMPLE_SEEDED_STORAGE_KEY = 'hackathon-starter-sample-seeded'
 const LINKEDIN_TAG_NAME = 'LinkedIn'
 const DEFAULT_LINKEDIN_IMPORT_OPTIONS: LinkedInImportOptions = {
   includeEmail: false,
@@ -248,57 +214,6 @@ const LABEL_NODE_LIMIT = 450
 const LABEL_MIN_SCALE = 0.58
 const CONNECTION_NODE_LIMIT = 1200
 const LARGE_GRAPH_SVG_SIZE = 200000
-const ONBOARDING_SPOTLIGHT_PADDING = 12
-const ONBOARDING_STEPS: OnboardingStep[] = [
-  {
-    id: 'signin',
-    title: 'Save your graph first',
-    body: 'Sign in with Google so your people, notes, and tags stay saved. AI search also needs an account because it searches your saved graph.',
-    target: 'account',
-  },
-  {
-    id: 'sample',
-    title: 'Start with a small sample',
-    body: 'New accounts get a starter graph. It shows how contacts, tags, and notes fit together before you import a real archive.',
-    target: 'sample-node',
-  },
-  {
-    id: 'sample-details',
-    title: 'Click people to open context',
-    body: 'A person opens a side panel with their tag and notes. This is the basic unit AI search will use later.',
-    target: 'inspector',
-  },
-  {
-    id: 'create-contact',
-    title: 'Create a contact',
-    body: 'You can build the graph manually too. This step creates one contact and connects it to your root node.',
-    target: 'root-node',
-  },
-  {
-    id: 'create-tag',
-    title: 'Add a tag',
-    body: 'Tags keep people scannable. We will create a Follow up tag and attach it to the new contact.',
-    target: 'tag-picker',
-  },
-  {
-    id: 'add-note',
-    title: 'Save a note',
-    body: 'Notes are the memory layer. They explain why this person matters and make search more useful.',
-    target: 'note-composer',
-  },
-  {
-    id: 'linkedin',
-    title: 'Open the LinkedIn import guide',
-    body: 'Use the guide when you are ready to import your real LinkedIn archive. The import keeps only the default fields unless you choose more.',
-    target: 'linkedin',
-  },
-  {
-    id: 'done',
-    title: 'Onboarding complete',
-    body: 'You have seen sign-in, sample contacts, person details, tags, notes, and the LinkedIn import guide.',
-    target: 'none',
-  },
-]
 
 function getLinkedInRingCapacity(ringIndex: number) {
   if (ringIndex < LINKEDIN_RING_CAPACITIES.length) {
@@ -796,9 +711,6 @@ function App() {
   const [isOnboardingDismissed, setIsOnboardingDismissed] = useState(() =>
     window.localStorage.getItem(ONBOARDING_DISMISSED_STORAGE_KEY) === 'true',
   )
-  const [onboardingStepIndex, setOnboardingStepIndex] = useState(0)
-  const [onboardingOverlayRect, setOnboardingOverlayRect] = useState<OnboardingOverlayRect | null>(null)
-  const [onboardingCreatedPersonId, setOnboardingCreatedPersonId] = useState<string | null>(null)
   const [localPeople, setLocalPeople] = useState<PersonNode[]>([ANONYMOUS_ROOT])
   const [localTags, setLocalTags] = useState<Tag[]>(() => createDefaultLocalTags())
   const [localNotes, setLocalNotes] = useState<PersonNote[]>([])
@@ -883,8 +795,7 @@ function App() {
   const shouldShowOnboarding =
     isGraphReady &&
     !isOnboardingDismissed &&
-    nonRootPeopleCount <= STARTER_SAMPLE_CONTACTS.length + 1
-  const onboardingStep = ONBOARDING_STEPS[Math.min(onboardingStepIndex, ONBOARDING_STEPS.length - 1)]
+    nonRootPeopleCount <= STARTER_SAMPLE_CONTACTS.length
   const boardNodes = useMemo(
     () =>
       activePeople.map((node) => {
@@ -1420,7 +1331,7 @@ function App() {
     setLocalConnections((currentConnections) => currentConnections.filter((connection) => connection.id !== id))
   }, [deleteRemoteConnection, isRemoteGraphReady])
 
-  const createTag = useCallback(async (name: string) => {
+  async function createTag(name: string) {
     if (isRemoteGraphReady) {
       return createRemoteTag(name)
     }
@@ -1443,7 +1354,7 @@ function App() {
     }
     setLocalTags((currentTags) => [...currentTags, tag])
     return tag
-  }, [createRemoteTag, isRemoteGraphReady, localTags])
+  }
 
   useEffect(() => {
     const userId = session?.user?.id
@@ -1460,25 +1371,13 @@ function App() {
     starterSampleInFlightRef.current = userId
 
     const seedStarterSample = async () => {
-      const tagIdsByName: Record<string, string> = {}
-
-      for (const sampleTag of STARTER_SAMPLE_TAGS) {
-        const existingTag = tags.find(
-          (tag) => normalizeTagName(tag.name).toLowerCase() === sampleTag.name.toLowerCase(),
-        )
-        const tag = existingTag ?? await createRemoteTag(sampleTag.name)
-        const normalizedColor = normalizeTagColor(sampleTag.color)
-
-        if (normalizeTagColor(tag.color ?? DEFAULT_TAG_COLOR) !== normalizedColor) {
-          await updateRemoteTag({ id: tag.id, color: normalizedColor })
-        }
-
-        tagIdsByName[sampleTag.name] = tag.id
-      }
+      const linkedInTag =
+        tags.find((tag) => normalizeTagName(tag.name).toLowerCase() === LINKEDIN_TAG_NAME.toLowerCase()) ??
+        await createRemoteTag(LINKEDIN_TAG_NAME)
 
       await bulkCreateRemotePeople(buildStarterSamplePeople({
         rootPersonId: rootPerson.id,
-        tagIdsByName,
+        tagId: linkedInTag.id,
         createId: createUuid,
       }))
       window.localStorage.setItem(storageKey, 'true')
@@ -1502,7 +1401,6 @@ function App() {
     people,
     session?.user?.id,
     tags,
-    updateRemoteTag,
   ])
 
   async function updateTag(input: { id: string; name?: string; color?: string }) {
@@ -1543,12 +1441,12 @@ function App() {
     )
   }
 
-  const createNote = useCallback(async (
+  async function createNote(
     title: string,
     body: string,
     personId: string,
     options?: { syncAi?: boolean },
-  ) => {
+  ) {
     if (isRemoteGraphReady) {
       return createRemoteNote(title, body, personId, options)
     }
@@ -1565,7 +1463,7 @@ function App() {
     }
     setLocalNotes((currentNotes) => [...currentNotes, note])
     return note
-  }, [createRemoteNote, isRemoteGraphReady])
+  }
 
   async function updateNote(input: { id: string; title?: string; body?: string }) {
     if (isRemoteGraphReady) {
@@ -2018,6 +1916,21 @@ function App() {
     setNewNoteText('')
     closeTransientUi()
   }, [closeTransientUi])
+
+  const handleCreateOnboardingPerson = useCallback(async () => {
+    const rootPerson = activePeople.find((person) => person.is_root)
+    if (!rootPerson || !isGraphReady) return
+
+    dismissOnboarding()
+    const createdPerson = await createPerson({
+      name: '',
+      tagId: null,
+      x: rootPerson.x + 280,
+      y: rootPerson.y,
+    })
+    await createConnection(rootPerson.id, createdPerson.id)
+    openInspectorForNode(createdPerson)
+  }, [activePeople, createConnection, createPerson, dismissOnboarding, isGraphReady, openInspectorForNode])
 
   const finishConnectionDrag = useCallback(
     async (clientX: number, clientY: number) => {
@@ -3254,7 +3167,7 @@ function App() {
     await refreshPersonAiNote(inspectorNode.id)
   }
 
-  const focusNode = useCallback((node: PersonNode) => {
+  function focusNode(node: PersonNode) {
     const nextScale = viewportRef.current.scale
     queueViewportUpdate(
       {
@@ -3264,262 +3177,7 @@ function App() {
       nextScale,
     )
     openInspectorForNode(node)
-  }, [openInspectorForNode, queueViewportUpdate])
-
-  const getFirstSamplePerson = useCallback(() => (
-    activePeople.find((person) => !person.is_root) ?? null
-  ), [activePeople])
-
-  const getOnboardingTargetElement = useCallback((target: OnboardingTarget) => {
-    if (target === 'account') return document.querySelector<HTMLElement>('.account-panel__trigger')
-    if (target === 'sample-node') return document.querySelector<HTMLElement>('.graph-node:not(.graph-node--root)')
-    if (target === 'inspector') return inspectorPanelRef.current
-    if (target === 'root-node') return document.querySelector<HTMLElement>('.graph-node--root')
-    if (target === 'tag-picker') return tagTriggerRef.current
-    if (target === 'note-composer') return newNoteTextareaRef.current
-    if (target === 'linkedin') return document.querySelector<HTMLElement>('.linkedin-menu__toggle')
-    return null
-  }, [])
-
-  const updateOnboardingSpotlight = useCallback(() => {
-    if (!shouldShowOnboarding || onboardingStep.target === 'none') {
-      setOnboardingOverlayRect(null)
-      return
-    }
-
-    const targetElement = getOnboardingTargetElement(onboardingStep.target)
-
-    if (!targetElement) {
-      setOnboardingOverlayRect(null)
-      return
-    }
-
-    const rect = targetElement.getBoundingClientRect()
-    const x = Math.max(0, rect.left - ONBOARDING_SPOTLIGHT_PADDING)
-    const y = Math.max(0, rect.top - ONBOARDING_SPOTLIGHT_PADDING)
-    const right = Math.min(window.innerWidth, rect.right + ONBOARDING_SPOTLIGHT_PADDING)
-    const bottom = Math.min(window.innerHeight, rect.bottom + ONBOARDING_SPOTLIGHT_PADDING)
-
-    setOnboardingOverlayRect({
-      x,
-      y,
-      width: Math.max(0, right - x),
-      height: Math.max(0, bottom - y),
-      viewportWidth: window.innerWidth,
-      viewportHeight: window.innerHeight,
-    })
-  }, [getOnboardingTargetElement, onboardingStep.target, shouldShowOnboarding])
-
-  useEffect(() => {
-    if (!shouldShowOnboarding) return
-
-    const frameId = window.requestAnimationFrame(updateOnboardingSpotlight)
-    window.addEventListener('resize', updateOnboardingSpotlight)
-    window.addEventListener('scroll', updateOnboardingSpotlight, true)
-
-    return () => {
-      window.cancelAnimationFrame(frameId)
-      window.removeEventListener('resize', updateOnboardingSpotlight)
-      window.removeEventListener('scroll', updateOnboardingSpotlight, true)
-    }
-  }, [
-    activePeople.length,
-    inspectorNodeId,
-    isAccountMenuOpen,
-    isLinkedInGuideOpen,
-    isLinkedInMenuOpen,
-    isTagPickerOpen,
-    onboardingStepIndex,
-    shouldShowOnboarding,
-    updateOnboardingSpotlight,
-    zoomPercentage,
-  ])
-
-  useEffect(() => {
-    if (!shouldShowOnboarding) return
-
-    const frameId = window.requestAnimationFrame(() => {
-      if (onboardingStep.id === 'sample-details') {
-        const samplePerson = getFirstSamplePerson()
-        if (samplePerson && inspectorNodeId !== samplePerson.id) {
-          focusNode(samplePerson)
-        }
-      }
-
-      if ((onboardingStep.id === 'create-tag' || onboardingStep.id === 'add-note') && onboardingCreatedPersonId) {
-        const tourPerson = activePeople.find((person) => person.id === onboardingCreatedPersonId)
-        if (tourPerson && inspectorNodeId !== tourPerson.id) {
-          focusNode(tourPerson)
-        }
-      }
-    })
-
-    return () => window.cancelAnimationFrame(frameId)
-  }, [
-    activePeople,
-    focusNode,
-    getFirstSamplePerson,
-    inspectorNodeId,
-    onboardingCreatedPersonId,
-    onboardingStep.id,
-    shouldShowOnboarding,
-  ])
-
-  const goToNextOnboardingStep = useCallback(() => {
-    setOnboardingStepIndex((currentIndex) => Math.min(currentIndex + 1, ONBOARDING_STEPS.length - 1))
-  }, [])
-
-  const goToPreviousOnboardingStep = useCallback(() => {
-    setOnboardingStepIndex((currentIndex) => Math.max(currentIndex - 1, 0))
-  }, [])
-
-  const createOnboardingContact = useCallback(async () => {
-    const rootPerson = activePeople.find((person) => person.is_root)
-    if (!rootPerson || !isGraphReady) return null
-
-    const existingTourPerson = onboardingCreatedPersonId
-      ? activePeople.find((person) => person.id === onboardingCreatedPersonId) ?? null
-      : null
-
-    if (existingTourPerson) {
-      focusNode(existingTourPerson)
-      return existingTourPerson
-    }
-
-    const createdPerson = await createPerson({
-      name: 'New onboarding contact',
-      tagId: null,
-      x: rootPerson.x + 300,
-      y: rootPerson.y + 80,
-    })
-    await createConnection(rootPerson.id, createdPerson.id)
-    setOnboardingCreatedPersonId(createdPerson.id)
-    focusNode(createdPerson)
-    return createdPerson
-  }, [
-    activePeople,
-    createConnection,
-    createPerson,
-    focusNode,
-    isGraphReady,
-    onboardingCreatedPersonId,
-  ])
-
-  const getOnboardingEditablePerson = useCallback(async () => {
-    if (onboardingCreatedPersonId) {
-      const tourPerson = activePeople.find((person) => person.id === onboardingCreatedPersonId)
-      if (tourPerson) {
-        focusNode(tourPerson)
-        return tourPerson
-      }
-    }
-
-    return createOnboardingContact()
-  }, [activePeople, createOnboardingContact, focusNode, onboardingCreatedPersonId])
-
-  const getOnboardingPrimaryLabel = useCallback(() => {
-    if (onboardingStep.id === 'signin') {
-      if (isAuthenticated) return 'Continue'
-      if (status === 'unconfigured') return 'Continue without sign-in'
-      return 'Sign in with Google'
-    }
-    if (onboardingStep.id === 'sample') return 'Open a sample person'
-    if (onboardingStep.id === 'sample-details') return 'Continue'
-    if (onboardingStep.id === 'create-contact') return 'Create contact'
-    if (onboardingStep.id === 'create-tag') return 'Create and add tag'
-    if (onboardingStep.id === 'add-note') return 'Add saved note'
-    if (onboardingStep.id === 'linkedin') return 'Open guide'
-    return 'Finish'
-  }, [isAuthenticated, onboardingStep.id, status])
-
-  const handleOnboardingPrimaryAction = useCallback(async () => {
-    if (onboardingStep.id === 'signin') {
-      if (!isAuthenticated && status !== 'unconfigured') {
-        await signInWithGoogle()
-        return
-      }
-
-      goToNextOnboardingStep()
-      return
-    }
-
-    if (onboardingStep.id === 'sample') {
-      const samplePerson = getFirstSamplePerson()
-      if (samplePerson) {
-        focusNode(samplePerson)
-      }
-      goToNextOnboardingStep()
-      return
-    }
-
-    if (onboardingStep.id === 'sample-details') {
-      goToNextOnboardingStep()
-      return
-    }
-
-    if (onboardingStep.id === 'create-contact') {
-      await createOnboardingContact()
-      goToNextOnboardingStep()
-      return
-    }
-
-    if (onboardingStep.id === 'create-tag') {
-      const editablePerson = await getOnboardingEditablePerson()
-      if (!editablePerson) return
-
-      const existingTag = activeTags.find(
-        (tag) => normalizeTagName(tag.name).toLowerCase() === 'follow up',
-      )
-      const tag = existingTag ?? await createTag('Follow up')
-      const updatedPerson = await updatePerson({ id: editablePerson.id, tag_id: tag.id })
-
-      openInspectorForNode(updatedPerson)
-      goToNextOnboardingStep()
-      return
-    }
-
-    if (onboardingStep.id === 'add-note') {
-      const editablePerson = await getOnboardingEditablePerson()
-      if (!editablePerson) return
-
-      await createNote(
-        'Follow up',
-        'Ask about product analytics and warm intros next week.',
-        editablePerson.id,
-        { syncAi: false },
-      )
-      setNewNoteText('')
-      openInspectorForNode(editablePerson)
-      goToNextOnboardingStep()
-      return
-    }
-
-    if (onboardingStep.id === 'linkedin') {
-      setIsLinkedInMenuOpen(true)
-      setIsLinkedInGuideOpen(true)
-      setIsLinkedInUploadOpen(false)
-      goToNextOnboardingStep()
-      return
-    }
-
-    dismissOnboarding()
-  }, [
-    activeTags,
-    createNote,
-    createOnboardingContact,
-    dismissOnboarding,
-    getFirstSamplePerson,
-    getOnboardingEditablePerson,
-    goToNextOnboardingStep,
-    isAuthenticated,
-    onboardingStep.id,
-    openInspectorForNode,
-    signInWithGoogle,
-    status,
-    updatePerson,
-    createTag,
-    focusNode,
-  ])
+  }
 
   const selectConnection = useCallback((connectionId: string, event: ReactPointerEvent<SVGPathElement>) => {
     if (!isGraphReady) return
@@ -3566,17 +3224,6 @@ function App() {
   const selectedTagColor = selectedInspectorTag
     ? tagColorById[selectedInspectorTag.id] ?? normalizeTagColor(selectedInspectorTag.color ?? DEFAULT_TAG_COLOR)
     : null
-  const onboardingPrimaryLabel = getOnboardingPrimaryLabel()
-  const isOnboardingPrimaryDisabled =
-    onboardingStep.id === 'signin' && !isAuthenticated && status === 'loading'
-  const onboardingStepCount = ONBOARDING_STEPS.length
-  const onboardingProgressPercent = `${Math.round(((onboardingStepIndex + 1) / onboardingStepCount) * 100)}%`
-  const onboardingFullBlockerStyle: CSSProperties = {
-    left: 0,
-    top: 0,
-    width: '100vw',
-    height: '100vh',
-  }
 
   return (
     <main className={`app-shell theme-${theme}`}>
@@ -4137,106 +3784,76 @@ function App() {
       </div>
 
       {shouldShowOnboarding ? (
-        <div className="onboarding-tour" aria-live="polite">
-          {onboardingOverlayRect ? (
-            <>
-              <div
-                className="onboarding-tour__blocker"
-                style={{
-                  left: 0,
-                  top: 0,
-                  width: '100vw',
-                  height: onboardingOverlayRect.y,
-                }}
+        <section className="onboarding-panel" aria-label="Getting started">
+          <div className="onboarding-panel__copy">
+            <span className="onboarding-panel__eyebrow">SocialDataNode</span>
+            <h1 className="onboarding-panel__title">Map the people around your work.</h1>
+            <p className="onboarding-panel__body">
+              Start with one person, add context as notes, then search your network when you need the right intro.
+            </p>
+          </div>
+
+          <div className="onboarding-panel__orbit" aria-hidden="true">
+            {STARTER_SAMPLE_CONTACTS.slice(0, 8).map((contact, index) => (
+              <span
+                key={`${contact.firstName}-${contact.lastName}`}
+                className="onboarding-panel__orbit-dot"
+                style={{ '--orbit-index': index } as CSSProperties}
               />
-              <div
-                className="onboarding-tour__blocker"
-                style={{
-                  left: 0,
-                  top: onboardingOverlayRect.y,
-                  width: onboardingOverlayRect.x,
-                  height: onboardingOverlayRect.height,
+            ))}
+            <span className="onboarding-panel__orbit-root" />
+          </div>
+
+          <div className="onboarding-panel__actions">
+            <button
+              type="button"
+              className="onboarding-panel__button onboarding-panel__button--primary"
+              onClick={() => {
+                void handleCreateOnboardingPerson()
+              }}
+            >
+              Add first person
+            </button>
+            <button
+              type="button"
+              className="onboarding-panel__button"
+              onClick={() => {
+                dismissOnboarding()
+                openLinkedInUpload()
+              }}
+            >
+              Import LinkedIn
+            </button>
+            {!isAuthenticated ? (
+              <button
+                type="button"
+                className="onboarding-panel__button"
+                onClick={() => {
+                  dismissOnboarding()
+                  void signInWithGoogle()
                 }}
-              />
-              <div
-                className="onboarding-tour__blocker"
-                style={{
-                  left: onboardingOverlayRect.x + onboardingOverlayRect.width,
-                  top: onboardingOverlayRect.y,
-                  width: Math.max(0, onboardingOverlayRect.viewportWidth - onboardingOverlayRect.x - onboardingOverlayRect.width),
-                  height: onboardingOverlayRect.height,
-                }}
-              />
-              <div
-                className="onboarding-tour__blocker"
-                style={{
-                  left: 0,
-                  top: onboardingOverlayRect.y + onboardingOverlayRect.height,
-                  width: '100vw',
-                  height: Math.max(0, onboardingOverlayRect.viewportHeight - onboardingOverlayRect.y - onboardingOverlayRect.height),
-                }}
-              />
-              <div
-                className="onboarding-tour__spotlight"
-                style={{
-                  left: onboardingOverlayRect.x,
-                  top: onboardingOverlayRect.y,
-                  width: onboardingOverlayRect.width,
-                  height: onboardingOverlayRect.height,
-                }}
-              />
-            </>
-          ) : (
-            <div className="onboarding-tour__blocker" style={onboardingFullBlockerStyle} />
-          )}
+                disabled={status === 'loading' || status === 'unconfigured'}
+              >
+                Sign in to save
+              </button>
+            ) : null}
+          </div>
+
+          <div className="onboarding-panel__steps" aria-label="Starter workflow">
+            <span>Create a person</span>
+            <span>Add notes</span>
+            <span>Search later</span>
+          </div>
 
           <button
             type="button"
-            className="onboarding-tour__skip"
+            className="onboarding-panel__dismiss"
             onClick={dismissOnboarding}
-            aria-label="Skip onboarding"
+            aria-label="Dismiss onboarding"
           >
-            <span aria-hidden="true">x</span>
-            Skip onboarding
+            x
           </button>
-
-          <section
-            className="onboarding-tour__panel"
-            aria-label="Product onboarding"
-            aria-describedby="onboarding-tour-body"
-          >
-            <div className="onboarding-tour__progress" aria-hidden="true">
-              <span style={{ width: onboardingProgressPercent }} />
-            </div>
-            <div className="onboarding-tour__meta">
-              Step {onboardingStepIndex + 1} of {onboardingStepCount}
-            </div>
-            <h1 className="onboarding-tour__title">{onboardingStep.title}</h1>
-            <p id="onboarding-tour-body" className="onboarding-tour__body">
-              {onboardingStep.body}
-            </p>
-            <div className="onboarding-tour__actions">
-              <button
-                type="button"
-                className="onboarding-tour__button"
-                onClick={goToPreviousOnboardingStep}
-                disabled={onboardingStepIndex === 0}
-              >
-                Back
-              </button>
-              <button
-                type="button"
-                className="onboarding-tour__button onboarding-tour__button--primary"
-                onClick={() => {
-                  void handleOnboardingPrimaryAction()
-                }}
-                disabled={isOnboardingPrimaryDisabled}
-              >
-                {onboardingPrimaryLabel}
-              </button>
-            </div>
-          </section>
-        </div>
+        </section>
       ) : null}
 
       {inspectorNode ? (
