@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 
-import type { BoardGraphPayload, Connection, PersonAiNote, PersonNode, PersonNote, Tag } from './graphTypes'
+import type { BoardGraphPayload, Circle, Connection, PersonAiNote, PersonNode, PersonNote, Tag } from './graphTypes'
 import {
   createConnection,
   createNote,
@@ -19,12 +19,90 @@ import {
   updateNote,
   updatePerson,
   updateTag,
+  createCircle,
+  updateCircle,
+  moveCircle,
+  deleteCircle,
 } from './graphStorage'
+
+export type CircleTone = 'blue' | 'red' | 'green' | 'amber' | 'violet'
+export type ShapeType = 'circle' | 'wavy' | 'polygon'
+
+export type CircleNodeUi = {
+  id: string
+  name: string
+  icon: string
+  x: number
+  y: number
+  radius: number
+  minRadius: number
+  parentId: string | null
+  connectedTo: string | null
+  tone: CircleTone
+  shapeType: ShapeType
+  sides: number
+  amplitude: number
+  imageUrl?: string
+  isRoot?: boolean
+}
+
+export type PersonNodeUi = {
+  id: string
+  name: string
+  role: string
+  x: number
+  y: number
+  circleId: string
+  avatar: string
+  shapeType?: ShapeType
+  sides?: number
+  amplitude?: number
+  imageUrl?: string
+  isRoot?: boolean
+}
+
+export function mapDbCircleToUi(circle: Circle): CircleNodeUi {
+  return {
+    id: circle.id,
+    name: circle.name,
+    icon: circle.icon,
+    x: circle.x,
+    y: circle.y,
+    radius: circle.radius,
+    minRadius: circle.min_radius,
+    parentId: circle.parent_id,
+    connectedTo: circle.connected_to,
+    tone: circle.tone as CircleTone,
+    shapeType: circle.shape_type as ShapeType,
+    sides: circle.sides,
+    amplitude: circle.amplitude,
+    imageUrl: circle.image_url ?? undefined,
+    isRoot: circle.is_root,
+  }
+}
+
+export function mapDbPersonToUi(person: PersonNode): PersonNodeUi {
+  return {
+    id: person.id,
+    name: person.name,
+    role: person.role,
+    x: person.x,
+    y: person.y,
+    circleId: person.circle_id ?? '',
+    avatar: person.avatar,
+    shapeType: (person.shape_type as ShapeType) ?? undefined,
+    sides: person.sides ?? undefined,
+    amplitude: person.amplitude ?? undefined,
+    imageUrl: person.image_url ?? undefined,
+    isRoot: person.is_root,
+  }
+}
 
 type GraphStatus = 'idle' | 'loading' | 'ready'
 
 type GraphState = {
   board: BoardGraphPayload['board'] | null
+  circles: Circle[]
   people: PersonNode[]
   tags: Tag[]
   notes: PersonNote[]
@@ -36,6 +114,7 @@ type GraphState = {
 
 const EMPTY_GRAPH_STATE: GraphState = {
   board: null,
+  circles: [],
   people: [],
   tags: [],
   notes: [],
@@ -97,6 +176,7 @@ export function useBoardGraph(user: User | null) {
 
         setGraphState({
           board: payload.board,
+          circles: payload.circles,
           people: payload.people,
           tags: payload.tags,
           notes: payload.notes,
@@ -125,6 +205,26 @@ export function useBoardGraph(user: User | null) {
   }, [clearScheduledPersonAiSync, user])
 
   const visibleState = user ? graphState : EMPTY_GRAPH_STATE
+  const graphStateRef = useRef(graphState)
+  useEffect(() => {
+    graphStateRef.current = graphState
+  }, [graphState])
+
+  const movePersonTimersRef = useRef(new Map<string, number>())
+  const moveCircleTimersRef = useRef(new Map<string, number>())
+
+  useEffect(() => {
+    const movePersonTimers = movePersonTimersRef.current
+    const moveCircleTimers = moveCircleTimersRef.current
+    return () => {
+      for (const timerId of movePersonTimers.values()) {
+        window.clearTimeout(timerId)
+      }
+      for (const timerId of moveCircleTimers.values()) {
+        window.clearTimeout(timerId)
+      }
+    }
+  }, [])
 
   const ensureUserAndBoard = () => {
     if (!user || !graphState.board) {
@@ -247,7 +347,16 @@ export function useBoardGraph(user: User | null) {
   }
 
   return {
-    ...visibleState,
+    board: visibleState.board,
+    status: visibleState.status,
+    error: visibleState.error,
+    tags: visibleState.tags,
+    notes: visibleState.notes,
+    personAiNotes: visibleState.personAiNotes,
+    connections: visibleState.connections,
+    circles: visibleState.circles.map(mapDbCircleToUi),
+    people: visibleState.people.map(mapDbPersonToUi),
+
     async createTag(name: string) {
       try {
         const { userId } = ensureUserAndBoard()
@@ -293,7 +402,18 @@ export function useBoardGraph(user: User | null) {
         throw error
       }
     },
-    async createPerson(input: Omit<Parameters<typeof createPerson>[0], 'boardId' | 'ownerUserId'>) {
+    async createPerson(input: {
+      name: string
+      x: number
+      y: number
+      circleId: string | null
+      role: string
+      avatar: string
+      shapeType: string
+      sides: number
+      amplitude: number
+      imageUrl?: string | null
+    }) {
       try {
         const { boardId, userId } = ensureUserAndBoard()
         const person = await createPerson({
@@ -302,30 +422,56 @@ export function useBoardGraph(user: User | null) {
           ...input,
         })
         applyPerson(person)
-        return person
+        return mapDbPersonToUi(person)
       } catch (error) {
         setError(error)
         throw error
       }
     },
-    async updatePerson(input: Parameters<typeof updatePerson>[0]) {
+    async updatePerson(input: {
+      id: string
+      name?: string
+      tag_id?: string | null
+      circle_id?: string | null
+      role?: string
+      avatar?: string
+      shape_type?: string
+      sides?: number
+      amplitude?: number
+      image_url?: string | null
+    }) {
       try {
         const person = await updatePerson(input)
         applyPerson(person)
-        return person
+        return mapDbPersonToUi(person)
       } catch (error) {
         setError(error)
         throw error
       }
     },
     async movePerson(id: string, x: number, y: number) {
-      try {
-        const person = await movePerson(id, x, y)
-        applyPerson(person)
-        return person
-      } catch (error) {
-        setError(error)
-        throw error
+      // Optimistically update local state immediately
+      setGraphState((currentState) => ({
+        ...currentState,
+        people: currentState.people.map((p) => (p.id === id ? { ...p, x, y } : p)),
+      }))
+
+      if (user) {
+        const existingTimer = movePersonTimersRef.current.get(id)
+        if (existingTimer !== undefined) {
+          window.clearTimeout(existingTimer)
+        }
+
+        const timerId = window.setTimeout(async () => {
+          movePersonTimersRef.current.delete(id)
+          try {
+            await movePerson(id, x, y)
+          } catch (error) {
+            setError(error)
+          }
+        }, 500)
+
+        movePersonTimersRef.current.set(id, timerId)
       }
     },
     async deletePerson(id: string) {
@@ -344,6 +490,181 @@ export function useBoardGraph(user: User | null) {
           ),
           error: null,
         }))
+      } catch (error) {
+        setError(error)
+        throw error
+      }
+    },
+    async createCircle(input: {
+      name: string
+      icon: string
+      x: number
+      y: number
+      radius: number
+      minRadius: number
+      parentId: string | null
+      connectedTo: string | null
+      tone: string
+      shapeType: string
+      sides: number
+      amplitude: number
+      imageUrl?: string | null
+    }) {
+      try {
+        const { boardId, userId } = ensureUserAndBoard()
+        const circle = await createCircle({
+          boardId,
+          ownerUserId: userId,
+          ...input,
+        })
+        setGraphState((currentState) => ({
+          ...currentState,
+          circles: [...currentState.circles, circle],
+          error: null,
+        }))
+        return mapDbCircleToUi(circle)
+      } catch (error) {
+        setError(error)
+        throw error
+      }
+    },
+    async updateCircle(id: string, updates: Partial<CircleNodeUi>) {
+      try {
+        const dbUpdates: Record<string, unknown> = {}
+        if (updates.name !== undefined) dbUpdates.name = updates.name
+        if (updates.icon !== undefined) dbUpdates.icon = updates.icon
+        if (updates.x !== undefined) dbUpdates.x = updates.x
+        if (updates.y !== undefined) dbUpdates.y = updates.y
+        if (updates.radius !== undefined) dbUpdates.radius = updates.radius
+        if (updates.minRadius !== undefined) dbUpdates.min_radius = updates.minRadius
+        if (updates.parentId !== undefined) dbUpdates.parent_id = updates.parentId
+        if (updates.connectedTo !== undefined) dbUpdates.connected_to = updates.connectedTo
+        if (updates.tone !== undefined) dbUpdates.tone = updates.tone
+        if (updates.shapeType !== undefined) dbUpdates.shape_type = updates.shapeType
+        if (updates.sides !== undefined) dbUpdates.sides = updates.sides
+        if (updates.amplitude !== undefined) dbUpdates.amplitude = updates.amplitude
+        if (updates.imageUrl !== undefined) dbUpdates.image_url = updates.imageUrl
+
+        const circle = await updateCircle({ id, ...dbUpdates })
+        setGraphState((currentState) => ({
+          ...currentState,
+          circles: currentState.circles.map((c) => (c.id === id ? circle : c)),
+          error: null,
+        }))
+        return mapDbCircleToUi(circle)
+      } catch (error) {
+        setError(error)
+        throw error
+      }
+    },
+    async moveCircle(id: string, x: number, y: number) {
+      // Optimistically move subtree immediately
+      setGraphState((currentState) => {
+        const circle = currentState.circles.find((c) => c.id === id)
+        if (!circle) return currentState
+
+        const deltaX = x - circle.x
+        const deltaY = y - circle.y
+
+        const descendants = new Set<string>()
+        const pending = [id]
+        while (pending.length > 0) {
+          const pId = pending.pop()!
+          for (const c of currentState.circles) {
+            if (c.parent_id === pId && !descendants.has(c.id)) {
+              descendants.add(c.id)
+              pending.push(c.id)
+            }
+          }
+        }
+        descendants.add(id)
+
+        const nextCircles = currentState.circles.map((c) =>
+          descendants.has(c.id) ? { ...c, x: c.x + deltaX, y: c.y + deltaY } : c,
+        )
+        const nextPeople = currentState.people.map((p) =>
+          p.circle_id && descendants.has(p.circle_id) ? { ...p, x: p.x + deltaX, y: p.y + deltaY } : p,
+        )
+
+        return {
+          ...currentState,
+          circles: nextCircles,
+          people: nextPeople,
+        }
+      })
+
+      if (user) {
+        const existingTimer = moveCircleTimersRef.current.get(id)
+        if (existingTimer !== undefined) {
+          window.clearTimeout(existingTimer)
+        }
+
+        const timerId = window.setTimeout(async () => {
+          moveCircleTimersRef.current.delete(id)
+          try {
+            const currentState = graphStateRef.current
+            const descendants = new Set<string>()
+            const pending = [id]
+            while (pending.length > 0) {
+              const pId = pending.pop()!
+              for (const c of currentState.circles) {
+                if (c.parent_id === pId && !descendants.has(c.id)) {
+                  descendants.add(c.id)
+                  pending.push(c.id)
+                }
+              }
+            }
+            descendants.add(id)
+
+            const promises: Promise<unknown>[] = []
+            for (const c of currentState.circles) {
+              if (descendants.has(c.id)) {
+                promises.push(moveCircle(c.id, c.x, c.y))
+              }
+            }
+            for (const p of currentState.people) {
+              if (p.circle_id && descendants.has(p.circle_id)) {
+                promises.push(movePerson(p.id, p.x, p.y))
+              }
+            }
+            await Promise.all(promises)
+          } catch (error) {
+            setError(error)
+          }
+        }, 500)
+
+        moveCircleTimersRef.current.set(id, timerId)
+      }
+    },
+    async deleteCircle(id: string) {
+      try {
+        await deleteCircle(id)
+        setGraphState((currentState) => {
+          const descendants = new Set<string>()
+          const pending = [id]
+          while (pending.length > 0) {
+            const pId = pending.pop()!
+            for (const c of currentState.circles) {
+              if (c.parent_id === pId && !descendants.has(c.id)) {
+                descendants.add(c.id)
+                pending.push(c.id)
+              }
+            }
+          }
+          descendants.add(id)
+
+          const rootCircle = currentState.circles.find((c) => c.is_root)
+          const rootCircleId = rootCircle ? rootCircle.id : ''
+
+          return {
+            ...currentState,
+            circles: currentState.circles.filter((c) => !descendants.has(c.id)),
+            people: currentState.people.map((p) =>
+              p.circle_id && descendants.has(p.circle_id) ? { ...p, circle_id: rootCircleId } : p,
+            ),
+            error: null,
+          }
+        })
       } catch (error) {
         setError(error)
         throw error
@@ -421,5 +742,6 @@ export function useBoardGraph(user: User | null) {
         throw error
       }
     },
+    syncPersonAiNote,
   }
 }

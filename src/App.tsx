@@ -1,44 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react'
+import { useAuth } from './lib/useAuth'
+import { useBoardGraph } from './lib/useBoardGraph'
+import type { CircleNodeUi as CircleNode, PersonNodeUi as PersonNode, CircleTone, ShapeType } from './lib/useBoardGraph'
+import { searchPeopleWithAi } from './lib/graphStorage'
+import type { AiPeopleSearchResult } from './lib/graphStorage'
 
-type CircleTone = 'blue' | 'red' | 'green' | 'amber' | 'violet'
-
-type ShapeType = 'circle' | 'wavy' | 'polygon'
-
-type CircleNode = {
-  id: string
-  name: string
-  icon: string
-  x: number
-  y: number
-  radius: number
-  minRadius: number
-  parentId: string | null
-  connectedTo: string | null
-  tone: CircleTone
-  shapeType?: ShapeType
-  sides?: number
-  amplitude?: number
-  imageUrl?: string
-}
-
-type PersonNode = {
-  id: string
-  name: string
-  role: string
-  x: number
-  y: number
-  circleId: string
-  avatar: string
-  shapeType?: ShapeType
-  sides?: number
-  amplitude?: number
-  imageUrl?: string
-}
+import type { PersonNote } from './lib/graphTypes'
 
 type GraphState = {
   circles: CircleNode[]
   people: PersonNode[]
+  notes: PersonNote[]
 }
 
 type StressSettings = {
@@ -215,6 +188,7 @@ const DEFAULT_STATE: GraphState = {
     { id: 'p15', name: 'Lina', role: 'Media', x: 423, y: 4, circleId: 'market', avatar: 'LI', shapeType: 'polygon', sides: 12, amplitude: 2 },
     { id: 'p16', name: 'Yara', role: 'Analyst', x: 580, y: 198, circleId: 'market', avatar: 'YA', shapeType: 'polygon', sides: 8, amplitude: 2 },
   ],
+  notes: [],
 }
 
 const TONE_LABELS: Record<CircleTone, string> = {
@@ -329,13 +303,91 @@ function App() {
   const moveCircleRef = useRef<MoveCircleState | null>(null)
   const movePersonRef = useRef<MovePersonState | null>(null)
   const resizeCircleRef = useRef<ResizeCircleState | null>(null)
+  const { session, status: authStatus, signInWithGoogle, signOut, error: authError } = useAuth()
+  const boardGraph = useBoardGraph(session?.user ?? null)
+  const isRemote = authStatus === 'authenticated'
+  const isDev = import.meta.env.DEV || new URLSearchParams(window.location.search).get('dev') === 'true'
+
+  function handleSearchChange(query: string) {
+    setSearchQuery(query)
+    if (!query.trim()) {
+      setSearchResults([])
+      return
+    }
+
+    if (searchTimerRef.current !== null) {
+      window.clearTimeout(searchTimerRef.current)
+    }
+
+    searchTimerRef.current = window.setTimeout(async () => {
+      try {
+        const results = await searchPeopleWithAi(query)
+        setSearchResults(results)
+      } catch (err) {
+        console.error('AI search failed:', err)
+      }
+    }, 400)
+  }
+
+  function handleSelectSearchResult(person: PersonNode) {
+    setSelectedItem({ type: 'person', id: person.id })
+    setCamera({
+      x: window.innerWidth / 2 - person.x * camera.scale,
+      y: window.innerHeight / 2 - person.y * camera.scale,
+      scale: camera.scale,
+    })
+    setSearchQuery('')
+    setSearchResults([])
+  }
+
   const [graph, setGraph] = useState(createInitialGraph)
   const [camera, setCamera] = useState<Camera>({ x: window.innerWidth / 2, y: window.innerHeight / 2, scale: 0.82 })
   const [connector, setConnector] = useState<DragConnector | null>(null)
   const [createMenu, setCreateMenu] = useState<CreateMenu | null>(null)
   const [selectedItem, setSelectedItem] = useState<SelectedItem>({ type: 'circle', id: 'you' })
   const [stress, setStress] = useState<StressSettings>({ count: 0, showLabels: false, showEdges: true })
+  const [showShapeMenu, setShowShapeMenu] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<AiPeopleSearchResult[]>([])
+  const searchTimerRef = useRef<number | null>(null)
+  const renameTimersRef = useRef<Record<string, number>>({})
   const fps = useFrameRate()
+
+  // Sync state from Supabase once ready
+  useEffect(() => {
+    if (isRemote && boardGraph.status === 'ready') {
+      Promise.resolve().then(() => {
+        setGraph({
+          circles: boardGraph.circles,
+          people: boardGraph.people,
+          notes: boardGraph.notes,
+        })
+        setSelectedItem((current) => {
+          if (current.type === 'circle') {
+            const exists = boardGraph.circles.some((c) => c.id === current.id)
+            return exists ? current : { type: 'circle', id: 'you' }
+          } else {
+            const exists = boardGraph.people.some((p) => p.id === current.id)
+            return exists ? current : { type: 'circle', id: 'you' }
+          }
+        })
+      })
+    }
+  }, [isRemote, boardGraph.status, boardGraph.circles, boardGraph.people, boardGraph.notes])
+
+  // Cleanup rename/debounce timers on unmount
+  useEffect(() => {
+    const renameTimers = renameTimersRef.current
+    const searchTimer = searchTimerRef
+    return () => {
+      for (const timerId of Object.values(renameTimers)) {
+        window.clearTimeout(timerId)
+      }
+      if (searchTimer.current !== null) {
+        window.clearTimeout(searchTimer.current)
+      }
+    }
+  }, [])
 
   const circlesById = useMemo(() => new Map(graph.circles.map((circle) => [circle.id, circle])), [graph.circles])
   const stressPeople = useMemo(() => generateStressPeople(stress.count), [stress.count])
@@ -447,15 +499,36 @@ function App() {
     }
 
     if (moveCircleRef.current?.pointerId === event.pointerId) {
+      const circleId = moveCircleRef.current.circleId
       moveCircleRef.current = null
+      if (isRemote) {
+        const target = graph.circles.find((c) => c.id === circleId)
+        if (target) {
+          boardGraph.moveCircle(circleId, target.x, target.y)
+        }
+      }
     }
 
     if (movePersonRef.current?.pointerId === event.pointerId) {
+      const personId = movePersonRef.current.personId
       movePersonRef.current = null
+      if (isRemote) {
+        const target = graph.people.find((p) => p.id === personId)
+        if (target) {
+          boardGraph.movePerson(personId, target.x, target.y)
+        }
+      }
     }
 
     if (resizeCircleRef.current?.pointerId === event.pointerId) {
+      const circleId = resizeCircleRef.current.circleId
       resizeCircleRef.current = null
+      if (isRemote) {
+        const target = graph.circles.find((c) => c.id === circleId)
+        if (target) {
+          boardGraph.updateCircle(circleId, { radius: target.radius, minRadius: target.minRadius })
+        }
+      }
     }
 
     if (!connector) return
@@ -591,28 +664,42 @@ function App() {
     if (!source) return
 
     const id = `person-${Date.now()}`
-    const sides = Math.floor(Math.random() * 5) + 8
-    setGraph((current) =>
-      ensureContainment({
-        ...current,
-        people: [
-          ...current.people,
-          {
-            id,
-            name: `New person ${current.people.length + 1}`,
-            role: `Inside ${source.name}`,
-            x: createMenu.x,
-            y: createMenu.y,
-            circleId: source.id,
-            avatar: makeAvatar(current.people.length + 1),
-            shapeType: 'polygon',
-            sides,
-            amplitude: 2,
-          },
-        ],
-      }),
-    )
-    setSelectedItem({ type: 'person', id })
+    const sides = 8
+    const newPersonInput = {
+      name: `New person ${graph.people.length + 1}`,
+      role: `Inside ${source.name}`,
+      x: createMenu.x,
+      y: createMenu.y,
+      circleId: source.id,
+      avatar: makeAvatar(graph.people.length + 1),
+      shapeType: 'wavy' as ShapeType,
+      sides,
+      amplitude: 1,
+      imageUrl: null as string | null,
+    }
+
+    if (isRemote) {
+      boardGraph.createPerson(newPersonInput).then((created) => {
+        setGraph((current) =>
+          ensureContainment({
+            ...current,
+            people: [...current.people, created],
+          }),
+        )
+        setSelectedItem({ type: 'person', id: created.id })
+      })
+    } else {
+      setGraph((current) =>
+        ensureContainment({
+          ...current,
+          people: [
+            ...current.people,
+            { id, ...newPersonInput, imageUrl: undefined },
+          ],
+        }),
+      )
+      setSelectedItem({ type: 'person', id })
+    }
     setCreateMenu(null)
   }
 
@@ -624,30 +711,44 @@ function App() {
 
     const id = `circle-${Date.now()}`
     const isNested = mode === 'nested'
-    setGraph((current) =>
-      ensureContainment({
-        ...current,
-        circles: [
-          ...current.circles,
-          {
-            id,
-            name: isNested ? `${source.name} subset` : 'New circle',
-            icon: isNested ? 'SUB' : 'C',
-            x: createMenu.x,
-            y: createMenu.y,
-            radius: isNested ? 82 : 190,
-            minRadius: isNested ? 82 : 190,
-            parentId: isNested ? source.id : null,
-            connectedTo: source.id,
-            tone: isNested ? 'violet' : nextTone(current.circles.length),
-            shapeType: isNested ? 'polygon' : 'wavy',
-            sides: isNested ? 6 : 12,
-            amplitude: isNested ? 4 : 8,
-          },
-        ],
-      }),
-    )
-    setSelectedItem({ type: 'circle', id })
+    const newCircleInput = {
+      name: isNested ? `${source.name} subset` : 'New circle',
+      icon: isNested ? 'SUB' : 'C',
+      x: createMenu.x,
+      y: createMenu.y,
+      radius: isNested ? 82 : 190,
+      minRadius: isNested ? 82 : 190,
+      parentId: isNested ? source.id : null,
+      connectedTo: source.id,
+      tone: isNested ? 'violet' : nextTone(graph.circles.length),
+      shapeType: isNested ? ('polygon' as ShapeType) : ('wavy' as ShapeType),
+      sides: isNested ? 6 : 12,
+      amplitude: isNested ? 4 : 8,
+      imageUrl: null as string | null,
+    }
+
+    if (isRemote) {
+      boardGraph.createCircle(newCircleInput).then((created) => {
+        setGraph((current) =>
+          ensureContainment({
+            ...current,
+            circles: [...current.circles, created],
+          }),
+        )
+        setSelectedItem({ type: 'circle', id: created.id })
+      })
+    } else {
+      setGraph((current) =>
+        ensureContainment({
+          ...current,
+          circles: [
+            ...current.circles,
+            { id, ...newCircleInput, imageUrl: undefined },
+          ],
+        }),
+      )
+      setSelectedItem({ type: 'circle', id })
+    }
     setCreateMenu(null)
   }
 
@@ -657,7 +758,6 @@ function App() {
 
     const nextIndex = graph.people.length + 1
     const points = [-58, 0, 58].map((offset, index) => {
-      const sides = Math.floor(Math.random() * 5) + 8
       return {
         id: `person-${Date.now()}-${index}`,
         name: ['Alex', 'Daria', 'Sam'][index],
@@ -666,12 +766,45 @@ function App() {
         y: source.y + source.radius * 0.42 + index * 18,
         circleId: source.id,
         avatar: makeAvatar(nextIndex + index),
-        shapeType: 'polygon' as ShapeType,
-        sides,
-        amplitude: 2,
+        shapeType: 'wavy' as ShapeType,
+        sides: 6,
+        amplitude: 5,
+        imageUrl: undefined as string | undefined,
       }
     })
-    setGraph((current) => ensureContainment({ ...current, people: [...current.people, ...points] }))
+
+    if (isRemote) {
+      Promise.all(
+        points.map((p) =>
+          boardGraph.createPerson({
+            name: p.name,
+            x: p.x,
+            y: p.y,
+            circleId: p.circleId,
+            role: p.role,
+            avatar: p.avatar,
+            shapeType: p.shapeType,
+            sides: p.sides,
+            amplitude: p.amplitude,
+            imageUrl: p.imageUrl ?? null,
+          }),
+        ),
+      ).then((createdPeople) => {
+        setGraph((current) =>
+          ensureContainment({
+            ...current,
+            people: [...current.people, ...createdPeople],
+          }),
+        )
+      })
+    } else {
+      setGraph((current) =>
+        ensureContainment({
+          ...current,
+          people: [...current.people, ...points],
+        }),
+      )
+    }
   }
 
   function resetDemo() {
@@ -686,33 +819,65 @@ function App() {
     if (selectedItem.type === 'circle') {
       setGraph((current) => ({
         ...current,
-        circles: current.circles.map((circle) => (circle.id === selectedItem.id ? { ...circle, name: value } : circle)),
+        circles: current.circles.map((circle) =>
+          circle.id === selectedItem.id ? { ...circle, name: value } : circle,
+        ),
       }))
+      if (isRemote) {
+        const id = selectedItem.id
+        window.clearTimeout(renameTimersRef.current[id])
+        renameTimersRef.current[id] = window.setTimeout(() => {
+          boardGraph.updateCircle(id, { name: value })
+        }, 500)
+      }
       return
     }
 
     setGraph((current) => ({
       ...current,
-      people: current.people.map((person) => (person.id === selectedItem.id ? { ...person, name: value } : person)),
+      people: current.people.map((person) =>
+        person.id === selectedItem.id ? { ...person, name: value } : person,
+      ),
     }))
+    if (isRemote) {
+      const id = selectedItem.id
+      window.clearTimeout(renameTimersRef.current[id])
+      renameTimersRef.current[id] = window.setTimeout(() => {
+        boardGraph.updatePerson({ id, name: value })
+      }, 500)
+    }
   }
 
   function updateCircleStyle(id: string, updates: Partial<CircleNode>) {
     setGraph((current) => ({
       ...current,
       circles: current.circles.map((circle) =>
-        circle.id === id ? { ...circle, ...updates } : circle
+        circle.id === id ? { ...circle, ...updates } : circle,
       ),
     }))
+    if (isRemote) {
+      const timerKey = `circle-style-${id}`
+      window.clearTimeout(renameTimersRef.current[timerKey])
+      renameTimersRef.current[timerKey] = window.setTimeout(() => {
+        boardGraph.updateCircle(id, updates)
+      }, 400)
+    }
   }
 
   function updatePersonStyle(id: string, updates: Partial<PersonNode>) {
     setGraph((current) => ({
       ...current,
       people: current.people.map((person) =>
-        person.id === id ? { ...person, ...updates } : person
+        person.id === id ? { ...person, ...updates } : person,
       ),
     }))
+    if (isRemote) {
+      const timerKey = `person-style-${id}`
+      window.clearTimeout(renameTimersRef.current[timerKey])
+      renameTimersRef.current[timerKey] = window.setTimeout(() => {
+        boardGraph.updatePerson({ id, ...updates })
+      }, 400)
+    }
   }
 
   function handleImageUpload(event: React.ChangeEvent<HTMLInputElement>, onComplete: (base64: string) => void) {
@@ -727,13 +892,183 @@ function App() {
     reader.readAsDataURL(file)
   }
 
+  function handleDeleteCircle(id: string) {
+    if (id === 'you') {
+      alert('Root circle cannot be deleted.')
+      return
+    }
+    if (confirm('Are you sure you want to delete this circle? This will delete all its nested sub-circles.')) {
+      if (isRemote) {
+        boardGraph.deleteCircle(id).then(() => {
+          setSelectedItem({ type: 'circle', id: 'you' })
+        })
+      } else {
+        setGraph((current) => {
+          const descendants = getDescendantCircleIds(current.circles, id)
+          descendants.add(id)
+          return {
+            ...current,
+            circles: current.circles.filter((c) => !descendants.has(c.id)),
+            people: current.people.map((p) => descendants.has(p.circleId) ? { ...p, circleId: 'you' } : p),
+          }
+        })
+        setSelectedItem({ type: 'circle', id: 'you' })
+      }
+    }
+  }
+
+  function handleDeletePerson(id: string) {
+    const person = graph.people.find(p => p.id === id)
+    // In remote mode or local mode, prevent deleting the root person (which is Mia in legacy default, or is_root flag)
+    if (person?.isRoot || person?.id === 'p1' || person?.name === 'Mia' && person?.circleId === 'you') {
+      alert('Root person cannot be deleted.')
+      return
+    }
+
+    if (confirm('Are you sure you want to delete this person?')) {
+      if (isRemote) {
+        boardGraph.deletePerson(id).then(() => {
+          setSelectedItem({ type: 'circle', id: 'you' })
+        })
+      } else {
+        setGraph((current) => ({
+          ...current,
+          people: current.people.filter((p) => p.id !== id),
+          notes: (current.notes ?? []).filter((n) => n.person_id !== id)
+        }))
+        setSelectedItem({ type: 'circle', id: 'you' })
+      }
+    }
+  }
+
+  function handleCreateNote() {
+    if (!selectedPerson) return
+    const noteId = `note-${Date.now()}`
+    if (isRemote) {
+      boardGraph.createNote('New Note', '', selectedPerson.id)
+    } else {
+      setGraph((current) => ({
+        ...current,
+        notes: [
+          ...(current.notes ?? []),
+          {
+            id: noteId,
+            person_id: selectedPerson.id,
+            owner_user_id: 'local',
+            title: 'New Note',
+            body: '',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+        ]
+      }))
+    }
+  }
+
+  function handleUpdateNote(id: string, updates: Partial<{ title: string; body: string }>) {
+    setGraph((current) => ({
+      ...current,
+      notes: (current.notes ?? []).map((n) => n.id === id ? { ...n, ...updates } : n)
+    }))
+    if (isRemote) {
+      const timerKey = `note-${id}`
+      window.clearTimeout(renameTimersRef.current[timerKey])
+      renameTimersRef.current[timerKey] = window.setTimeout(() => {
+        boardGraph.updateNote({ id, ...updates })
+      }, 500)
+    }
+  }
+
+  function handleDeleteNote(id: string) {
+    if (confirm('Are you sure you want to delete this note?')) {
+      if (isRemote) {
+        boardGraph.deleteNote(id)
+      } else {
+        setGraph((current) => ({
+          ...current,
+          notes: (current.notes ?? []).filter((n) => n.id !== id)
+        }))
+      }
+    }
+  }
+
+  if (authStatus === 'loading' || (isRemote && boardGraph.status === 'loading')) {
+    return (
+      <div className="auth-gate-container">
+        <div className="spinner"></div>
+      </div>
+    )
+  }
+
+  if (authStatus === 'anonymous') {
+    return (
+      <div className="auth-gate-container">
+        <div className="auth-card">
+          <div className="auth-logo">DN</div>
+          <h1>Circle Graph</h1>
+          <p>Organize your contacts and relationships visually with AI-powered notes.</p>
+          <button type="button" onClick={signInWithGoogle} className="google-signin-btn">
+            <svg viewBox="0 0 24 24" width="20" height="20">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+            </svg>
+            <span>Sign in with Google</span>
+          </button>
+          {authError && <div className="auth-error">{authError}</div>}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <main className="app-shell">
       <div className="toolbar" aria-label="Graph controls">
         <div className="brand">
           <span className="brand__mark">DN</span>
-          <span>Circle graph prototype</span>
+          <span>Circle graph</span>
         </div>
+
+        {isRemote && (
+          <div className="ai-search-container" style={{ pointerEvents: 'auto' }}>
+            <div className="ai-search-input-wrapper">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                placeholder="Search graph with AI..."
+                className="ai-search-input"
+              />
+              {searchQuery && (
+                <button type="button" onClick={() => handleSearchChange('')} className="search-clear-btn">&times;</button>
+              )}
+            </div>
+            {searchResults.length > 0 && (
+              <div className="ai-search-results">
+                {searchResults.map((result) => {
+                  const person = graph.people.find(p => p.id === result.person_id)
+                  if (!person) return null
+                  return (
+                    <button
+                      key={result.person_id}
+                      type="button"
+                      onClick={() => handleSelectSearchResult(person)}
+                      className="search-result-item"
+                    >
+                      <div className="search-result-item__main">
+                        <strong>{person.name}</strong>
+                        <span className="search-result-score">Match: {Math.round(result.score * 100)}%</span>
+                      </div>
+                      <p className="search-result-reason">{result.reason}</p>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="toolbar__group">
           <button type="button" onClick={() => setCamera((current) => ({ ...current, scale: clamp(current.scale * 1.14, MIN_SCALE, MAX_SCALE) }))} aria-label="Zoom in">
             <ZoomInIcon />
@@ -741,66 +1076,81 @@ function App() {
           <button type="button" onClick={() => setCamera((current) => ({ ...current, scale: clamp(current.scale / 1.14, MIN_SCALE, MAX_SCALE) }))} aria-label="Zoom out">
             <ZoomOutIcon />
           </button>
-          <button type="button" onClick={resetDemo} aria-label="Reset demo">
-            <ResetIcon />
-          </button>
+          {isDev && (
+            <button type="button" onClick={resetDemo} aria-label="Reset demo">
+              <ResetIcon />
+            </button>
+          )}
         </div>
+
+        {isRemote && (
+          <div className="user-menu" style={{ pointerEvents: 'auto' }}>
+            <span className="user-email">{session?.user?.email}</span>
+            <button type="button" onClick={signOut} className="signout-btn">
+              Sign out
+            </button>
+          </div>
+        )}
       </div>
 
-      <section className="stress-panel" aria-label="Icon stress test controls">
-        <div className="stress-panel__header">
-          <strong>Icon stress</strong>
-          <span>{fps} FPS</span>
-        </div>
-        <label className="stress-slider">
-          <span>{stress.count.toLocaleString('en-US')} synthetic icons</span>
-          <input
-            type="range"
-            min="0"
-            max={MAX_STRESS_ICONS}
-            step="250"
-            value={stress.count}
-            onChange={(event) => setStress((current) => ({ ...current, count: Number(event.target.value) }))}
-          />
-        </label>
-        <div className="stress-toggles">
-          <label>
-            <input
-              type="checkbox"
-              checked={stress.showEdges}
-              onChange={(event) => setStress((current) => ({ ...current, showEdges: event.target.checked }))}
-            />
-            <span>Edges</span>
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={stress.showLabels}
-              onChange={(event) => setStress((current) => ({ ...current, showLabels: event.target.checked }))}
-            />
-            <span>Labels</span>
-          </label>
-        </div>
-        <dl>
-          <div>
-            <dt>Rendered icons</dt>
-            <dd>{renderedPeopleCount.toLocaleString('en-US')}</dd>
+      {isDev && (
+        <section className="stress-panel" aria-label="Icon stress test controls">
+          <div className="stress-panel__header">
+            <strong>Icon stress</strong>
+            <span>{fps} FPS</span>
           </div>
-          <div>
-            <dt>Rendered edges</dt>
-            <dd>{renderedEdgeCount.toLocaleString('en-US')}</dd>
+          <label className="stress-slider">
+            <span>{stress.count.toLocaleString('en-US')} synthetic icons</span>
+            <input
+              type="range"
+              min="0"
+              max={MAX_STRESS_ICONS}
+              step="250"
+              value={stress.count}
+              onChange={(event) => setStress((current) => ({ ...current, count: Number(event.target.value) }))}
+            />
+          </label>
+          <div className="stress-toggles">
+            <label>
+              <input
+                type="checkbox"
+                checked={stress.showEdges}
+                onChange={(event) => setStress((current) => ({ ...current, showEdges: event.target.checked }))}
+              />
+              <span>Edges</span>
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={stress.showLabels}
+                onChange={(event) => setStress((current) => ({ ...current, showLabels: event.target.checked }))}
+              />
+              <span>Labels</span>
+            </label>
           </div>
-        </dl>
-      </section>
+          <dl>
+            <div>
+              <dt>Rendered icons</dt>
+              <dd>{renderedPeopleCount.toLocaleString('en-US')}</dd>
+            </div>
+            <div>
+              <dt>Rendered edges</dt>
+              <dd>{renderedEdgeCount.toLocaleString('en-US')}</dd>
+            </div>
+          </dl>
+        </section>
+      )}
 
-      <section className="help-panel" aria-label="How to use the prototype">
-        <strong>How it works</strong>
-        <span>Drag people or circles to move them.</span>
-        <span>Grab a circle edge to resize it.</span>
-        <span>Right-click a circle to add a person, subset, or connected circle.</span>
-        <span>Shift-drag from a circle center to create from the center.</span>
-        <span>Parent circles auto-fit their contents.</span>
-      </section>
+      {isDev && (
+        <section className="help-panel" aria-label="How to use the prototype">
+          <strong>How it works</strong>
+          <span>Drag people or circles to move them.</span>
+          <span>Grab a circle edge to resize it.</span>
+          <span>Right-click a circle to add a person, subset, or connected circle.</span>
+          <span>Shift-drag from a circle center to create from the center.</span>
+          <span>Parent circles auto-fit their contents.</span>
+        </section>
+      )}
 
       <div
         ref={surfaceRef}
@@ -1047,7 +1397,7 @@ function App() {
       ) : null}
 
       <aside className="inspector" aria-label="Selection details" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 120px)' }}>
-        <span className="inspector__eyebrow">{selectedItem.type === 'circle' ? 'Circle center' : 'Person'}</span>
+        <span className="inspector__eyebrow">{selectedItem.type === 'circle' ? 'Circle' : 'Person'}</span>
         <input
           value={selectedCircle?.name ?? selectedPerson?.name ?? ''}
           onChange={(event) => renameSelected(event.target.value)}
@@ -1074,137 +1424,298 @@ function App() {
               </div>
             </dl>
 
-            <div className="inspector-field">
-              <label>Shape Type</label>
-              <select
-                value={selectedCircle.shapeType ?? 'wavy'}
-                onChange={(e) => updateCircleStyle(selectedCircle.id, { shapeType: e.target.value as ShapeType })}
-              >
-                <option value="wavy">Wavy (Flower)</option>
-                <option value="polygon">Soft Polygon</option>
-                <option value="circle">Circle</option>
-              </select>
-            </div>
-            
-            {(selectedCircle.shapeType ?? 'wavy') !== 'circle' && (
-              <>
-                <div className="inspector-field">
-                  <label>Sides / Petals ({selectedCircle.sides ?? 8})</label>
-                  <input
-                    type="range"
-                    min="3"
-                    max="60"
-                    value={selectedCircle.sides ?? 8}
-                    onChange={(e) => updateCircleStyle(selectedCircle.id, { sides: parseInt(e.target.value) })}
-                  />
-                </div>
-                <div className="inspector-field">
-                  <label>Amplitude / Rounding ({selectedCircle.amplitude ?? 5})</label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="50"
-                    value={selectedCircle.amplitude ?? 5}
-                    onChange={(e) => updateCircleStyle(selectedCircle.id, { amplitude: parseFloat(e.target.value) })}
-                  />
-                </div>
-              </>
+            <button
+              type="button"
+              className="secondary-action"
+              onClick={() => setShowShapeMenu(!showShapeMenu)}
+              style={{ marginTop: '8px', width: '100%', padding: '10px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+            >
+              Customize Shape & Photo...
+            </button>
+
+            {isDev && (
+              <button type="button" className="primary-action" onClick={addDemoCluster} style={{ marginTop: '8px', width: '100%' }}>
+                Add 3 demo people
+              </button>
             )}
 
-            <div className="inspector-field">
-              <label>Center Image URL</label>
-              <input
-                type="text"
-                placeholder="https://example.com/image.jpg"
-                value={selectedCircle.imageUrl ?? ''}
-                onChange={(e) => updateCircleStyle(selectedCircle.id, { imageUrl: e.target.value })}
-              />
-            </div>
-            <div className="inspector-field">
-              <label>Upload Photo</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => handleImageUpload(e, (base64) => updateCircleStyle(selectedCircle.id, { imageUrl: base64 }))}
-              />
-            </div>
-
-            <button type="button" className="primary-action" onClick={addDemoCluster} style={{ marginTop: '8px' }}>
-              Add 3 demo people
-            </button>
+            {selectedCircle.id !== 'you' && !selectedCircle.isRoot && (
+              <button
+                type="button"
+                className="danger-action"
+                onClick={() => handleDeleteCircle(selectedCircle.id)}
+                style={{ marginTop: '8px', width: '100%', padding: '10px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                Delete Circle
+              </button>
+            )}
           </>
         ) : null}
+
         {selectedPerson ? (
           <>
-            <dl>
+            <dl style={{ marginBottom: '14px' }}>
               <div>
                 <dt>Role</dt>
-                <dd>{selectedPerson.role}</dd>
+                <dd>{selectedPerson.role || 'No role specified'}</dd>
               </div>
               <div>
                 <dt>Circle</dt>
-                <dd>{circlesById.get(selectedPerson.circleId)?.name}</dd>
+                <dd>{circlesById.get(selectedPerson.circleId)?.name || 'None'}</dd>
               </div>
             </dl>
 
-            <div className="inspector-field">
-              <label>Shape Type</label>
-              <select
-                value={selectedPerson.shapeType ?? 'polygon'}
-                onChange={(e) => updatePersonStyle(selectedPerson.id, { shapeType: e.target.value as ShapeType })}
-              >
-                <option value="polygon">Soft Polygon</option>
-                <option value="wavy">Wavy (Flower)</option>
-                <option value="circle">Circle</option>
-              </select>
+            <div className="inspector-field" style={{ marginTop: '0px', marginBottom: '14px' }}>
+              <label>Role</label>
+              <input
+                type="text"
+                value={selectedPerson.role}
+                onChange={(e) => updatePersonStyle(selectedPerson.id, { role: e.target.value })}
+                placeholder="Enter role (e.g. Designer, Partner)..."
+                style={{ fontSize: '14px', padding: '6px 8px', borderBottom: '1px solid rgba(28, 37, 40, 0.12)' }}
+              />
             </div>
-            
-            {(selectedPerson.shapeType ?? 'polygon') !== 'circle' && (
+
+            <button
+              type="button"
+              className="secondary-action"
+              onClick={() => setShowShapeMenu(!showShapeMenu)}
+              style={{ marginBottom: '14px', width: '100%', padding: '10px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+            >
+              Customize Shape & Photo...
+            </button>
+
+            <div className="notes-section">
+              <h4>Relationship Notes</h4>
+              <div className="notes-list">
+                {(() => {
+                  const personNotes = (graph.notes ?? []).filter((note) => note.person_id === selectedPerson.id)
+                  if (personNotes.length === 0) {
+                    return <p className="no-notes-msg">No notes captured yet.</p>
+                  }
+                  return personNotes.map((note) => (
+                    <div key={note.id} className="note-card">
+                      <div className="note-card-header">
+                        <input
+                          type="text"
+                          value={note.title}
+                          onChange={(e) => handleUpdateNote(note.id, { title: e.target.value })}
+                          placeholder="Note title..."
+                          className="note-title-input"
+                        />
+                        <button type="button" onClick={() => handleDeleteNote(note.id)} className="delete-note-btn" title="Delete note">
+                          &times;
+                        </button>
+                      </div>
+                      <textarea
+                        value={note.body}
+                        onChange={(e) => handleUpdateNote(note.id, { body: e.target.value })}
+                        placeholder="Start typing relationship details..."
+                        className="note-body-textarea"
+                      />
+                    </div>
+                  ))
+                })()}
+              </div>
+              <button type="button" onClick={handleCreateNote} className="primary-action add-note-btn" style={{ width: '100%', marginTop: '8px' }}>
+                + Add Note
+              </button>
+            </div>
+
+            {isRemote && (
+              <div className="ai-insights-container" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(28, 37, 40, 0.08)' }}>
+                <h4 style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '0 0 10px 0', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#7c3aed' }}>
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: '#7c3aed' }}>
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                  </svg>
+                  AI Relationship Insights
+                </h4>
+                {(() => {
+                  const aiNote = boardGraph.personAiNotes.find((n) => n.person_id === selectedPerson.id)
+                  if (!aiNote) {
+                    return (
+                      <div className="ai-insights-empty" style={{ fontSize: '12px', color: 'rgba(28, 37, 40, 0.6)' }}>
+                        Write some notes to trigger automatic AI summaries.
+                      </div>
+                    )
+                  }
+                  if (aiNote.status === 'pending') {
+                    return <div className="ai-insights-loading" style={{ fontSize: '12px', color: '#7c3aed', fontStyle: 'italic' }}>AI is summarizing relationship context...</div>
+                  }
+                  if (aiNote.status === 'error') {
+                    return (
+                      <div className="ai-insights-error" style={{ fontSize: '12px', color: '#dc2626', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <span>Failed to generate summary.</span>
+                        <button type="button" onClick={() => boardGraph.syncPersonAiNote(selectedPerson.id)} className="secondary-action" style={{ padding: '4px 8px', fontSize: '11px', alignSelf: 'flex-start' }}>Retry</button>
+                      </div>
+                    )
+                  }
+                  return (
+                    <div className="ai-insights-content" style={{ display: 'grid', gap: '10px' }}>
+                      <p className="ai-summary-text" style={{ margin: 0, fontSize: '12px', lineHeight: '1.45', color: '#1c2528', background: 'rgba(124, 58, 237, 0.05)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(124, 58, 237, 0.12)' }}>{aiNote.summary}</p>
+                      {aiNote.structured_summary.traits.length > 0 && (
+                        <div className="ai-traits-section">
+                          <strong style={{ fontSize: '11px', color: 'rgba(28, 37, 40, 0.6)' }}>Traits:</strong>
+                          <div className="ai-tags-list" style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
+                            {aiNote.structured_summary.traits.map(t => <span key={t} className="ai-tag" style={{ fontSize: '10px', background: '#eaddff', color: '#21005d', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>{t}</span>)}
+                          </div>
+                        </div>
+                      )}
+                      {aiNote.structured_summary.interests.length > 0 && (
+                        <div className="ai-traits-section">
+                          <strong style={{ fontSize: '11px', color: 'rgba(28, 37, 40, 0.6)' }}>Interests:</strong>
+                          <div className="ai-tags-list" style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
+                            {aiNote.structured_summary.interests.map(t => <span key={t} className="ai-tag" style={{ fontSize: '10px', background: '#d1e8d2', color: '#00210b', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>{t}</span>)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
+              </div>
+            )}
+
+            {selectedPerson.id !== 'p1' && !selectedPerson.isRoot && (
+              <button
+                type="button"
+                className="danger-action"
+                onClick={() => handleDeletePerson(selectedPerson.id)}
+                style={{ marginTop: '16px', width: '100%', padding: '10px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                Delete Person
+              </button>
+            )}
+          </>
+        ) : null}
+        <p style={{ marginTop: '14px', fontSize: '11px', opacity: 0.6 }}>Drag objects directly. Right-click a circle for creation actions. Parent circles auto-fit as contained objects move.</p>
+      </aside>
+
+      {showShapeMenu && (selectedCircle || selectedPerson) && (
+        <div className="shape-popover-panel">
+          <div className="shape-popover-header">
+            <h3>Customize Shape & Photo</h3>
+            <button type="button" onClick={() => setShowShapeMenu(false)} className="close-popover-btn">&times;</button>
+          </div>
+          <div className="shape-popover-content">
+            {selectedCircle && (
               <>
                 <div className="inspector-field">
-                  <label>Sides / Petals ({selectedPerson.sides ?? 8})</label>
+                  <label>Shape Type</label>
+                  <select
+                    value={selectedCircle.shapeType ?? 'wavy'}
+                    onChange={(e) => updateCircleStyle(selectedCircle.id, { shapeType: e.target.value as ShapeType })}
+                  >
+                    <option value="wavy">Wavy (Flower)</option>
+                    <option value="polygon">Soft Polygon</option>
+                    <option value="circle">Circle</option>
+                  </select>
+                </div>
+                
+                {(selectedCircle.shapeType ?? 'wavy') !== 'circle' && (
+                  <>
+                    <div className="inspector-field">
+                      <label>Sides / Petals ({selectedCircle.sides ?? 8})</label>
+                      <input
+                        type="range"
+                        min="3"
+                        max="60"
+                        value={selectedCircle.sides ?? 8}
+                        onChange={(e) => updateCircleStyle(selectedCircle.id, { sides: parseInt(e.target.value) })}
+                      />
+                    </div>
+                    <div className="inspector-field">
+                      <label>Amplitude / Rounding ({selectedCircle.amplitude ?? 5})</label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="50"
+                        value={selectedCircle.amplitude ?? 5}
+                        onChange={(e) => updateCircleStyle(selectedCircle.id, { amplitude: parseFloat(e.target.value) })}
+                      />
+                    </div>
+                  </>
+                )}
+
+                <div className="inspector-field">
+                  <label>Center Image URL</label>
                   <input
-                    type="range"
-                    min="3"
-                    max="20"
-                    value={selectedPerson.sides ?? 8}
-                    onChange={(e) => updatePersonStyle(selectedPerson.id, { sides: parseInt(e.target.value) })}
+                    type="text"
+                    placeholder="https://example.com/image.jpg"
+                    value={selectedCircle.imageUrl ?? ''}
+                    onChange={(e) => updateCircleStyle(selectedCircle.id, { imageUrl: e.target.value })}
                   />
                 </div>
                 <div className="inspector-field">
-                  <label>Amplitude / Rounding ({selectedPerson.amplitude ?? 2})</label>
+                  <label>Upload Photo</label>
                   <input
-                    type="range"
-                    min="0"
-                    max="20"
-                    value={selectedPerson.amplitude ?? 2}
-                    onChange={(e) => updatePersonStyle(selectedPerson.id, { amplitude: parseFloat(e.target.value) })}
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleImageUpload(e, (base64) => updateCircleStyle(selectedCircle.id, { imageUrl: base64 }))}
                   />
                 </div>
               </>
             )}
+            {selectedPerson && (
+              <>
+                <div className="inspector-field">
+                  <label>Shape Type</label>
+                  <select
+                    value={selectedPerson.shapeType ?? 'polygon'}
+                    onChange={(e) => updatePersonStyle(selectedPerson.id, { shapeType: e.target.value as ShapeType })}
+                  >
+                    <option value="polygon">Soft Polygon</option>
+                    <option value="wavy">Wavy (Flower)</option>
+                    <option value="circle">Circle</option>
+                  </select>
+                </div>
+                
+                {(selectedPerson.shapeType ?? 'polygon') !== 'circle' && (
+                  <>
+                    <div className="inspector-field">
+                      <label>Sides / Petals ({selectedPerson.sides ?? 8})</label>
+                      <input
+                        type="range"
+                        min="3"
+                        max="20"
+                        value={selectedPerson.sides ?? 8}
+                        onChange={(e) => updatePersonStyle(selectedPerson.id, { sides: parseInt(e.target.value) })}
+                      />
+                    </div>
+                    <div className="inspector-field">
+                      <label>Amplitude / Rounding ({selectedPerson.amplitude ?? 2})</label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="20"
+                        value={selectedPerson.amplitude ?? 2}
+                        onChange={(e) => updatePersonStyle(selectedPerson.id, { amplitude: parseFloat(e.target.value) })}
+                      />
+                    </div>
+                  </>
+                )}
 
-            <div className="inspector-field">
-              <label>Photo Image URL</label>
-              <input
-                type="text"
-                placeholder="https://example.com/image.jpg"
-                value={selectedPerson.imageUrl ?? ''}
-                onChange={(e) => updatePersonStyle(selectedPerson.id, { imageUrl: e.target.value })}
-              />
-            </div>
-            <div className="inspector-field">
-              <label>Upload Photo</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => handleImageUpload(e, (base64) => updatePersonStyle(selectedPerson.id, { imageUrl: base64 }))}
-              />
-            </div>
-          </>
-        ) : null}
-        <p style={{ marginTop: '14px' }}>Drag objects directly. Right-click a circle for creation actions. Parent circles auto-fit as contained objects move.</p>
-      </aside>
+                <div className="inspector-field">
+                  <label>Photo Image URL</label>
+                  <input
+                    type="text"
+                    placeholder="https://example.com/image.jpg"
+                    value={selectedPerson.imageUrl ?? ''}
+                    onChange={(e) => updatePersonStyle(selectedPerson.id, { imageUrl: e.target.value })}
+                  />
+                </div>
+                <div className="inspector-field">
+                  <label>Upload Photo</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleImageUpload(e, (base64) => updatePersonStyle(selectedPerson.id, { imageUrl: base64 }))}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </main>
   )
 }
@@ -1425,6 +1936,7 @@ function createInitialGraph() {
         amplitude: person.amplitude ?? 2,
       }
     }),
+    notes: [],
   })
 }
 
@@ -1438,6 +1950,7 @@ function moveCircleSubtree(state: GraphState, circleId: string, nextX: number, n
   subtreeIds.add(circleId)
 
   return {
+    ...state,
     circles: state.circles.map((candidate) =>
       subtreeIds.has(candidate.id) ? { ...candidate, x: candidate.x + deltaX, y: candidate.y + deltaY } : candidate,
     ),

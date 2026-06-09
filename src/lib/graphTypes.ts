@@ -36,6 +36,35 @@ export type PersonNode = {
   is_root: boolean
   created_at: string
   updated_at: string
+  circle_id: string | null
+  role: string
+  avatar: string
+  shape_type: string | null
+  sides: number | null
+  amplitude: number | null
+  image_url: string | null
+}
+
+export type Circle = {
+  id: string
+  board_id: string
+  owner_user_id: string
+  name: string
+  icon: string
+  x: number
+  y: number
+  radius: number
+  min_radius: number
+  parent_id: string | null
+  connected_to: string | null
+  tone: string
+  shape_type: string
+  sides: number
+  amplitude: number
+  image_url: string | null
+  is_root: boolean
+  created_at: string
+  updated_at: string
 }
 
 export type PersonNote = {
@@ -82,6 +111,7 @@ export type Connection = {
 export type BoardGraphPayload = {
   board: Board
   tags: Tag[]
+  circles: Circle[]
   people: PersonNode[]
   notes: PersonNote[]
   personAiNotes: PersonAiNote[]

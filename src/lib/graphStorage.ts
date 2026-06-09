@@ -4,6 +4,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import type {
   BoardGraphPayload,
+  Circle,
   Connection,
   PersonAiNote,
   PersonAiNoteStatus,
@@ -22,12 +23,61 @@ type CreatePersonInput = {
   tagId?: string | null
   x: number
   y: number
+  circleId: string | null
+  role: string
+  avatar: string
+  shapeType: string
+  sides: number
+  amplitude: number
+  imageUrl?: string | null
 }
 
 type UpdatePersonInput = {
   id: string
   name?: string
   tag_id?: string | null
+  circle_id?: string | null
+  role?: string
+  avatar?: string
+  shape_type?: string
+  sides?: number
+  amplitude?: number
+  image_url?: string | null
+}
+
+type CreateCircleInput = {
+  boardId: string
+  ownerUserId: string
+  name: string
+  icon: string
+  x: number
+  y: number
+  radius: number
+  minRadius: number
+  parentId?: string | null
+  connectedTo?: string | null
+  tone: string
+  shapeType: string
+  sides: number
+  amplitude: number
+  imageUrl?: string | null
+}
+
+type UpdateCircleInput = {
+  id: string
+  name?: string
+  icon?: string
+  x?: number
+  y?: number
+  radius?: number
+  min_radius?: number
+  parent_id?: string | null
+  connected_to?: string | null
+  tone?: string
+  shape_type?: string
+  sides?: number
+  amplitude?: number
+  image_url?: string | null
 }
 
 type CreateConnectionInput = {
@@ -215,11 +265,17 @@ export async function loadBoardGraph(user: User): Promise<BoardGraphPayload> {
     await ensureDefaultTags(user.id)
   }
 
-  const [tagsResult, peopleResult, notesResult, personAiNotesResult, connectionsResult] = await Promise.all([
+  const [tagsResult, circlesResult, peopleResult, notesResult, personAiNotesResult, connectionsResult] = await Promise.all([
     client
       .from('tags')
       .select('*')
       .eq('user_id', user.id)
+      .order('created_at', { ascending: true }),
+    client
+      .from('circles')
+      .select('*')
+      .eq('board_id', workspace.board.id)
+      .order('is_root', { ascending: false })
       .order('created_at', { ascending: true }),
     client
       .from('people')
@@ -245,15 +301,74 @@ export async function loadBoardGraph(user: User): Promise<BoardGraphPayload> {
   ])
 
   if (tagsResult.error) throw tagsResult.error
+  if (circlesResult.error) throw circlesResult.error
   if (peopleResult.error) throw peopleResult.error
   if (notesResult.error) throw notesResult.error
   if (personAiNotesResult.error) throw personAiNotesResult.error
   if (connectionsResult.error) throw connectionsResult.error
 
+  const circles = (circlesResult.data ?? []) as Circle[]
+  let people = (peopleResult.data ?? []) as PersonNode[]
+
+  // Reconcile/bootstrap root circle and map loose people to it
+  let rootCircle = circles.find(c => c.is_root)
+  if (!rootCircle) {
+    const { data: newRootCircle, error: rootCircleError } = await client
+      .from('circles')
+      .insert({
+        board_id: workspace.board.id,
+        owner_user_id: user.id,
+        name: 'You',
+        icon: 'YOU',
+        x: 0,
+        y: 0,
+        radius: 126,
+        min_radius: 126,
+        tone: 'blue',
+        shape_type: 'wavy',
+        sides: 12,
+        amplitude: 7,
+        is_root: true,
+      })
+      .select('*')
+      .single()
+
+    if (rootCircleError) throw rootCircleError
+    rootCircle = newRootCircle as Circle
+    circles.push(rootCircle)
+
+    // Re-parent the root person if not already set
+    const rootPerson = people.find(p => p.is_root)
+    if (rootPerson && !rootPerson.circle_id) {
+      const { data: updatedRootPerson, error: rootPersonError } = await client
+        .from('people')
+        .update({ circle_id: rootCircle.id })
+        .eq('id', rootPerson.id)
+        .select('*')
+        .single()
+
+      if (rootPersonError) throw rootPersonError
+      people = people.map(p => p.id === rootPerson.id ? (updatedRootPerson as PersonNode) : p)
+    }
+  }
+
+  // Map any loose legacy people to the root circle
+  const legacyPeopleToUpdate = people.filter(p => !p.circle_id)
+  if (legacyPeopleToUpdate.length > 0 && rootCircle) {
+    const { error: updateError } = await client
+      .from('people')
+      .update({ circle_id: rootCircle.id })
+      .in('id', legacyPeopleToUpdate.map(p => p.id))
+
+    if (updateError) throw updateError
+    people = people.map(p => p.circle_id ? p : { ...p, circle_id: rootCircle!.id })
+  }
+
   return {
     board: workspace.board,
     tags: ((tagsResult.data ?? []) as Tag[]).map(hydrateTagColor),
-    people: (peopleResult.data ?? []) as PersonNode[],
+    circles,
+    people,
     notes: (notesResult.data ?? []) as PersonNote[],
     personAiNotes: (personAiNotesResult.data ?? []).map((row) => mapPersonAiNote(row as Record<string, unknown>)),
     connections: (connectionsResult.data ?? []) as Connection[],
@@ -330,6 +445,13 @@ export async function createPerson(input: CreatePersonInput): Promise<PersonNode
       tag_id: input.tagId ?? null,
       x: input.x,
       y: input.y,
+      circle_id: input.circleId,
+      role: input.role,
+      avatar: input.avatar,
+      shape_type: input.shapeType,
+      sides: input.sides,
+      amplitude: input.amplitude,
+      image_url: input.imageUrl ?? null,
     })
     .select('*')
     .single()
@@ -341,10 +463,17 @@ export async function createPerson(input: CreatePersonInput): Promise<PersonNode
 
 export async function updatePerson(input: UpdatePersonInput): Promise<PersonNode> {
   const client = requireSupabase()
-  const updates: Record<string, string | null> = {}
+  const updates: Record<string, unknown> = {}
 
   if (input.name !== undefined) updates.name = input.name
   if (input.tag_id !== undefined) updates.tag_id = input.tag_id
+  if (input.circle_id !== undefined) updates.circle_id = input.circle_id
+  if (input.role !== undefined) updates.role = input.role
+  if (input.avatar !== undefined) updates.avatar = input.avatar
+  if (input.shape_type !== undefined) updates.shape_type = input.shape_type
+  if (input.sides !== undefined) updates.sides = input.sides
+  if (input.amplitude !== undefined) updates.amplitude = input.amplitude
+  if (input.image_url !== undefined) updates.image_url = input.image_url
 
   const { data, error } = await client
     .from('people')
@@ -356,6 +485,86 @@ export async function updatePerson(input: UpdatePersonInput): Promise<PersonNode
   if (error) throw error
 
   return data as PersonNode
+}
+
+export async function createCircle(input: CreateCircleInput): Promise<Circle> {
+  const client = requireSupabase()
+  const { data, error } = await client
+    .from('circles')
+    .insert({
+      board_id: input.boardId,
+      owner_user_id: input.ownerUserId,
+      name: input.name,
+      icon: input.icon,
+      x: input.x,
+      y: input.y,
+      radius: input.radius,
+      min_radius: input.minRadius,
+      parent_id: input.parentId ?? null,
+      connected_to: input.connectedTo ?? null,
+      tone: input.tone,
+      shape_type: input.shapeType,
+      sides: input.sides,
+      amplitude: input.amplitude,
+      image_url: input.imageUrl ?? null,
+    })
+    .select('*')
+    .single()
+
+  if (error) throw error
+
+  return data as Circle
+}
+
+export async function updateCircle(input: UpdateCircleInput): Promise<Circle> {
+  const client = requireSupabase()
+  const updates: Record<string, unknown> = {}
+
+  if (input.name !== undefined) updates.name = input.name
+  if (input.icon !== undefined) updates.icon = input.icon
+  if (input.x !== undefined) updates.x = input.x
+  if (input.y !== undefined) updates.y = input.y
+  if (input.radius !== undefined) updates.radius = input.radius
+  if (input.min_radius !== undefined) updates.min_radius = input.min_radius
+  if (input.parent_id !== undefined) updates.parent_id = input.parent_id
+  if (input.connected_to !== undefined) updates.connected_to = input.connected_to
+  if (input.tone !== undefined) updates.tone = input.tone
+  if (input.shape_type !== undefined) updates.shape_type = input.shape_type
+  if (input.sides !== undefined) updates.sides = input.sides
+  if (input.amplitude !== undefined) updates.amplitude = input.amplitude
+  if (input.image_url !== undefined) updates.image_url = input.image_url
+
+  const { data, error } = await client
+    .from('circles')
+    .update(updates)
+    .eq('id', input.id)
+    .select('*')
+    .single()
+
+  if (error) throw error
+
+  return data as Circle
+}
+
+export async function moveCircle(id: string, x: number, y: number): Promise<Circle> {
+  const client = requireSupabase()
+  const { data, error } = await client
+    .from('circles')
+    .update({ x, y })
+    .eq('id', id)
+    .select('*')
+    .single()
+
+  if (error) throw error
+
+  return data as Circle
+}
+
+export async function deleteCircle(id: string) {
+  const client = requireSupabase()
+  const { error } = await client.from('circles').delete().eq('id', id)
+
+  if (error) throw error
 }
 
 export async function movePerson(id: string, x: number, y: number): Promise<PersonNode> {
