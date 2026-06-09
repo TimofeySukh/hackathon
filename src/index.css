@@ -548,6 +548,13 @@ input[type='search']::-webkit-search-results-decoration {
   line-height: 1.35;
 }
 
+.onboarding-checklist__hint {
+  margin-top: 5px !important;
+  color: rgba(130, 220, 180, 0.75) !important;
+  font-size: 11px !important;
+  font-style: italic;
+}
+
 .onboarding-checklist__button {
   min-height: 34px;
   padding: 7px 10px;

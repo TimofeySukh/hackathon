@@ -153,15 +153,6 @@ type TagPickerOption =
       label: string
     }
 
-type OnboardingTarget =
-  | 'account'
-  | 'sample-node'
-  | 'inspector'
-  | 'root-node'
-  | 'tag-picker'
-  | 'note-composer'
-  | 'linkedin'
-  | 'none'
 
 type OnboardingChecklistItemId =
   | 'open-person'
@@ -174,18 +165,10 @@ type OnboardingChecklistItem = {
   id: OnboardingChecklistItemId
   title: string
   body: string
-  target: OnboardingTarget
-  actionLabel: string
+  hint: string
 }
 
-type OnboardingOverlayRect = {
-  x: number
-  y: number
-  width: number
-  height: number
-  viewportWidth: number
-  viewportHeight: number
-}
+
 
 const THEME_STORAGE_KEY = 'hackathon-theme'
 const TAG_COLOR_STORAGE_KEY = 'hackathon-tag-colors'
@@ -249,42 +232,37 @@ const LABEL_NODE_LIMIT = 450
 const LABEL_MIN_SCALE = 0.58
 const CONNECTION_NODE_LIMIT = 1200
 const LARGE_GRAPH_SVG_SIZE = 200000
-const ONBOARDING_SPOTLIGHT_PADDING = 12
+
 const ONBOARDING_CHECKLIST_ITEMS: OnboardingChecklistItem[] = [
   {
     id: 'open-person',
     title: 'Open a person',
     body: 'See the notes and tag that make a contact useful later.',
-    target: 'sample-node',
-    actionLabel: 'Open',
+    hint: 'Click any person node on the board',
   },
   {
     id: 'create-contact',
     title: 'Create one contact',
     body: 'Add a new person to the graph and connect them to you.',
-    target: 'root-node',
-    actionLabel: 'Create',
+    hint: `${IS_MAC_PLATFORM ? 'Command' : 'Control'}+Drag from a node, release to create`,
   },
   {
     id: 'add-tag',
     title: 'Add a tag',
     body: 'Tag the new contact so the graph is easier to scan.',
-    target: 'tag-picker',
-    actionLabel: 'Add tag',
+    hint: 'Open a person, then click the tag chip',
   },
   {
     id: 'add-note',
     title: 'Add a note',
     body: 'Save why this person matters. Notes are what make search useful.',
-    target: 'note-composer',
-    actionLabel: 'Add note',
+    hint: 'Open a person, then type in the note area',
   },
   {
     id: 'linkedin-guide',
     title: 'Open LinkedIn import',
     body: 'When ready, use the guide to import your real LinkedIn archive.',
-    target: 'linkedin',
-    actionLabel: 'Open guide',
+    hint: 'Tap the LinkedIn button in the top bar',
   },
 ]
 
@@ -787,9 +765,6 @@ function App() {
   const [isOnboardingStarted, setIsOnboardingStarted] = useState(() =>
     window.localStorage.getItem(ONBOARDING_STARTED_STORAGE_KEY) === 'true',
   )
-  const [onboardingOverlayRect, setOnboardingOverlayRect] = useState<OnboardingOverlayRect | null>(null)
-  const [onboardingCreatedPersonId, setOnboardingCreatedPersonId] = useState<string | null>(null)
-  const [activeOnboardingTarget, setActiveOnboardingTarget] = useState<OnboardingTarget | null>(null)
   const [completedOnboardingItems, setCompletedOnboardingItems] = useState<Record<OnboardingChecklistItemId, boolean>>({
     'open-person': false,
     'create-contact': false,
@@ -890,7 +865,6 @@ function App() {
     !isOnboardingDismissed &&
     (isOnboardingStarted || isAuthenticated) &&
     nonRootPeopleCount <= STARTER_SAMPLE_CONTACTS.length + 1
-  const shouldShowOnboardingSpotlight = shouldShowOnboardingChecklist && activeOnboardingTarget !== null
   const boardNodes = useMemo(
     () =>
       activePeople.map((node) => {
@@ -1658,9 +1632,20 @@ function App() {
   const dismissOnboarding = useCallback(() => {
     setIsOnboardingDismissed(true)
     setIsOnboardingStarted(false)
-    setActiveOnboardingTarget(null)
     window.localStorage.setItem(ONBOARDING_DISMISSED_STORAGE_KEY, 'true')
     window.localStorage.removeItem(ONBOARDING_STARTED_STORAGE_KEY)
+  }, [])
+
+  const startOnboarding = useCallback(() => {
+    setIsOnboardingStarted(true)
+    window.localStorage.setItem(ONBOARDING_STARTED_STORAGE_KEY, 'true')
+  }, [])
+
+  const completeOnboardingItem = useCallback((id: OnboardingChecklistItemId) => {
+    setCompletedOnboardingItems((currentItems) => ({
+      ...currentItems,
+      [id]: true,
+    }))
   }, [])
 
   useEffect(() => {
@@ -2026,7 +2011,10 @@ function App() {
     setNameTagRange(null)
     setNewNoteText('')
     closeTransientUi()
-  }, [closeTransientUi])
+    if (shouldShowOnboardingChecklist && !completedOnboardingItems['open-person']) {
+      completeOnboardingItem('open-person')
+    }
+  }, [closeTransientUi, shouldShowOnboardingChecklist, completedOnboardingItems, completeOnboardingItem])
 
   const finishConnectionDrag = useCallback(
     async (clientX: number, clientY: number) => {
@@ -2072,11 +2060,14 @@ function App() {
         })
         await createConnection(connectionDrag.fromId, createdNode.id)
         openInspectorForNode(createdNode)
+        if (shouldShowOnboardingChecklist && !completedOnboardingItems['create-contact']) {
+          completeOnboardingItem('create-contact')
+        }
       } finally {
         setConnectionDrag(null)
       }
     },
-    [boardNodes, connectionDrag, createConnection, createPerson, isGraphReady, openInspectorForNode],
+    [boardNodes, completedOnboardingItems, completeOnboardingItem, connectionDrag, createConnection, createPerson, isGraphReady, openInspectorForNode, shouldShowOnboardingChecklist],
   )
 
   useEffect(() => {
@@ -2639,6 +2630,9 @@ function App() {
     })
     setTagDraft(selectedTagName)
     closeTagPicker()
+    if (nextTagId && shouldShowOnboardingChecklist && !completedOnboardingItems['add-tag']) {
+      completeOnboardingItem('add-tag')
+    }
   }
 
   async function handleCreateTag() {
@@ -2939,6 +2933,9 @@ function App() {
       ...currentNotes,
       [createdNote.id]: true,
     }))
+    if (shouldShowOnboardingChecklist && !completedOnboardingItems['add-note']) {
+      completeOnboardingItem('add-note')
+    }
     return createdNote
   }
 
@@ -3279,126 +3276,6 @@ function App() {
     activePeople.find((person) => !person.is_root) ?? null
   ), [activePeople])
 
-  const getOnboardingTargetElement = useCallback((target: OnboardingTarget) => {
-    if (target === 'account') return document.querySelector<HTMLElement>('.account-panel__trigger')
-    if (target === 'sample-node') return document.querySelector<HTMLElement>('.graph-node:not(.graph-node--root)')
-    if (target === 'inspector') return inspectorPanelRef.current
-    if (target === 'root-node') return document.querySelector<HTMLElement>('.graph-node--root')
-    if (target === 'tag-picker') return tagTriggerRef.current
-    if (target === 'note-composer') return newNoteTextareaRef.current
-    if (target === 'linkedin') return document.querySelector<HTMLElement>('.linkedin-menu__toggle')
-    return null
-  }, [])
-
-  const updateOnboardingSpotlight = useCallback(() => {
-    if (!shouldShowOnboardingSpotlight || !activeOnboardingTarget || activeOnboardingTarget === 'none') {
-      setOnboardingOverlayRect(null)
-      return
-    }
-
-    const targetElement = getOnboardingTargetElement(activeOnboardingTarget)
-
-    if (!targetElement) {
-      setOnboardingOverlayRect(null)
-      return
-    }
-
-    const rect = targetElement.getBoundingClientRect()
-    const x = Math.max(0, rect.left - ONBOARDING_SPOTLIGHT_PADDING)
-    const y = Math.max(0, rect.top - ONBOARDING_SPOTLIGHT_PADDING)
-    const right = Math.min(window.innerWidth, rect.right + ONBOARDING_SPOTLIGHT_PADDING)
-    const bottom = Math.min(window.innerHeight, rect.bottom + ONBOARDING_SPOTLIGHT_PADDING)
-
-    setOnboardingOverlayRect({
-      x,
-      y,
-      width: Math.max(0, right - x),
-      height: Math.max(0, bottom - y),
-      viewportWidth: window.innerWidth,
-      viewportHeight: window.innerHeight,
-    })
-  }, [activeOnboardingTarget, getOnboardingTargetElement, shouldShowOnboardingSpotlight])
-
-  useEffect(() => {
-    if (!shouldShowOnboardingSpotlight) return
-
-    const frameId = window.requestAnimationFrame(updateOnboardingSpotlight)
-    window.addEventListener('resize', updateOnboardingSpotlight)
-    window.addEventListener('scroll', updateOnboardingSpotlight, true)
-
-    return () => {
-      window.cancelAnimationFrame(frameId)
-      window.removeEventListener('resize', updateOnboardingSpotlight)
-      window.removeEventListener('scroll', updateOnboardingSpotlight, true)
-    }
-  }, [
-    activePeople.length,
-    inspectorNodeId,
-    isAccountMenuOpen,
-    isLinkedInGuideOpen,
-    isLinkedInMenuOpen,
-    isTagPickerOpen,
-    activeOnboardingTarget,
-    shouldShowOnboardingSpotlight,
-    updateOnboardingSpotlight,
-    zoomPercentage,
-  ])
-
-  const createOnboardingContact = useCallback(async () => {
-    const rootPerson = activePeople.find((person) => person.is_root)
-    if (!rootPerson || !isGraphReady) return null
-
-    const existingTourPerson = onboardingCreatedPersonId
-      ? activePeople.find((person) => person.id === onboardingCreatedPersonId) ?? null
-      : null
-
-    if (existingTourPerson) {
-      focusNode(existingTourPerson)
-      return existingTourPerson
-    }
-
-    const createdPerson = await createPerson({
-      name: 'New onboarding contact',
-      tagId: null,
-      x: rootPerson.x + 300,
-      y: rootPerson.y + 80,
-    })
-    await createConnection(rootPerson.id, createdPerson.id)
-    setOnboardingCreatedPersonId(createdPerson.id)
-    focusNode(createdPerson)
-    return createdPerson
-  }, [
-    activePeople,
-    createConnection,
-    createPerson,
-    focusNode,
-    isGraphReady,
-    onboardingCreatedPersonId,
-  ])
-
-  const getOnboardingEditablePerson = useCallback(async () => {
-    if (onboardingCreatedPersonId) {
-      const tourPerson = activePeople.find((person) => person.id === onboardingCreatedPersonId)
-      if (tourPerson) {
-        focusNode(tourPerson)
-        return tourPerson
-      }
-    }
-
-    return createOnboardingContact()
-  }, [activePeople, createOnboardingContact, focusNode, onboardingCreatedPersonId])
-
-  const startOnboarding = useCallback(() => {
-    setIsOnboardingStarted(true)
-    window.localStorage.setItem(ONBOARDING_STARTED_STORAGE_KEY, 'true')
-  }, [])
-
-  const completeOnboardingItem = useCallback((id: OnboardingChecklistItemId) => {
-    setCompletedOnboardingItems((currentItems) => ({
-      ...currentItems,
-      [id]: true,
-    }))
-  }, [])
 
   async function seedStarterSampleLocally() {
     if (!isGraphReady || isRemoteGraphReady) return null
@@ -3456,66 +3333,6 @@ function App() {
     completeOnboardingItem('linkedin-guide')
   }
 
-  async function handleOnboardingChecklistAction(id: OnboardingChecklistItemId) {
-    if (id === 'open-person') {
-      const samplePerson = getFirstSamplePerson()
-      if (samplePerson) {
-        focusNode(samplePerson)
-        setActiveOnboardingTarget('inspector')
-      } else {
-        setActiveOnboardingTarget('sample-node')
-      }
-      completeOnboardingItem(id)
-      return
-    }
-
-    if (id === 'create-contact') {
-      await createOnboardingContact()
-      setActiveOnboardingTarget('inspector')
-      completeOnboardingItem(id)
-      return
-    }
-
-    if (id === 'add-tag') {
-      const editablePerson = await getOnboardingEditablePerson()
-      if (!editablePerson) return
-
-      const existingTag = activeTags.find(
-        (tag) => normalizeTagName(tag.name).toLowerCase() === 'follow up',
-      )
-      const tag = existingTag ?? await createTag('Follow up')
-      const updatedPerson = await updatePerson({ id: editablePerson.id, tag_id: tag.id })
-
-      openInspectorForNode(updatedPerson)
-      setActiveOnboardingTarget('tag-picker')
-      completeOnboardingItem(id)
-      return
-    }
-
-    if (id === 'add-note') {
-      const editablePerson = await getOnboardingEditablePerson()
-      if (!editablePerson) return
-
-      await createNote(
-        'Follow up',
-        'Ask about product analytics and warm intros next week.',
-        editablePerson.id,
-        { syncAi: false },
-      )
-      setNewNoteText('')
-      openInspectorForNode(editablePerson)
-      setActiveOnboardingTarget('note-composer')
-      completeOnboardingItem(id)
-      return
-    }
-
-    setIsLinkedInMenuOpen(true)
-    setIsLinkedInGuideOpen(true)
-    setIsLinkedInUploadOpen(false)
-    setActiveOnboardingTarget('linkedin')
-    completeOnboardingItem(id)
-  }
-
   const selectConnection = useCallback((connectionId: string, event: ReactPointerEvent<SVGPathElement>) => {
     if (!isGraphReady) return
     if (event.pointerType === 'touch') return
@@ -3563,13 +3380,6 @@ function App() {
     : null
   const completedOnboardingCount = ONBOARDING_CHECKLIST_ITEMS.filter((item) => completedOnboardingItems[item.id]).length
   const onboardingChecklistProgress = `${completedOnboardingCount}/${ONBOARDING_CHECKLIST_ITEMS.length}`
-  const onboardingFullBlockerStyle: CSSProperties = {
-    left: 0,
-    top: 0,
-    width: '100vw',
-    height: '100vh',
-  }
-
   return (
     <main className={`app-shell theme-${theme}`}>
       {isLinkedInUploadOpen ? (
@@ -3869,6 +3679,9 @@ function App() {
                 if (nextIsOpen) {
                   setIsLinkedInGuideOpen(false)
                   closeInspectorUi()
+                  if (shouldShowOnboardingChecklist && !completedOnboardingItems['linkedin-guide']) {
+                    completeOnboardingItem('linkedin-guide')
+                  }
                 }
               }}
               aria-expanded={isLinkedInMenuOpen}
@@ -4183,70 +3996,6 @@ function App() {
         </div>
       ) : null}
 
-      {shouldShowOnboardingSpotlight ? (
-        <div className="onboarding-tour">
-          {onboardingOverlayRect ? (
-            <>
-              <div
-                className="onboarding-tour__blocker"
-                style={{
-                  left: 0,
-                  top: 0,
-                  width: '100vw',
-                  height: onboardingOverlayRect.y,
-                }}
-              />
-              <div
-                className="onboarding-tour__blocker"
-                style={{
-                  left: 0,
-                  top: onboardingOverlayRect.y,
-                  width: onboardingOverlayRect.x,
-                  height: onboardingOverlayRect.height,
-                }}
-              />
-              <div
-                className="onboarding-tour__blocker"
-                style={{
-                  left: onboardingOverlayRect.x + onboardingOverlayRect.width,
-                  top: onboardingOverlayRect.y,
-                  width: Math.max(0, onboardingOverlayRect.viewportWidth - onboardingOverlayRect.x - onboardingOverlayRect.width),
-                  height: onboardingOverlayRect.height,
-                }}
-              />
-              <div
-                className="onboarding-tour__blocker"
-                style={{
-                  left: 0,
-                  top: onboardingOverlayRect.y + onboardingOverlayRect.height,
-                  width: '100vw',
-                  height: Math.max(0, onboardingOverlayRect.viewportHeight - onboardingOverlayRect.y - onboardingOverlayRect.height),
-                }}
-              />
-              <div
-                className="onboarding-tour__spotlight"
-                style={{
-                  left: onboardingOverlayRect.x,
-                  top: onboardingOverlayRect.y,
-                  width: onboardingOverlayRect.width,
-                  height: onboardingOverlayRect.height,
-                }}
-              />
-            </>
-          ) : (
-            <div className="onboarding-tour__blocker" style={onboardingFullBlockerStyle} />
-          )}
-          <button
-            type="button"
-            className="onboarding-tour__skip"
-            onClick={() => setActiveOnboardingTarget(null)}
-            aria-label="Stop highlight"
-          >
-            <span aria-hidden="true">x</span>
-            Stop highlight
-          </button>
-        </div>
-      ) : null}
 
       {shouldShowOnboardingChecklist ? (
         <section className="onboarding-checklist" aria-label="Getting started checklist">
@@ -4283,16 +4032,8 @@ function App() {
                   <div className="onboarding-checklist__copy">
                     <h3>{item.title}</h3>
                     <p>{item.body}</p>
+                    {!isComplete && <p className="onboarding-checklist__hint">{item.hint}</p>}
                   </div>
-                  <button
-                    type="button"
-                    className="onboarding-checklist__button"
-                    onClick={() => {
-                      void handleOnboardingChecklistAction(item.id)
-                    }}
-                  >
-                    {isComplete ? 'Show again' : item.actionLabel}
-                  </button>
                 </article>
               )
             })}
