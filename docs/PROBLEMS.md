@@ -61,7 +61,7 @@ When working on the project:
 
 - Status: Resolved
 - Reported behavior: The Flutter application freezes/hangs completely when zooming out and when resizing the window.
-- Notes: Replaced the built-in `InteractiveViewer` (configured with `constrained: false` and a large `boundaryMargin`) with a custom pan/zoom container combining a `GestureDetector`, `Listener` (for scroll wheel), and `Transform`. This aligns with the React version's transform layout model, supports infinite panning, and eliminates the layout/physics loop freezes.
+- Notes: Replaced the built-in `InteractiveViewer` with a custom pan/zoom container combining a `GestureDetector`, `Listener` (for scroll wheel), and `Transform`. The initial implementation still suffered from hangs under continuous zoom-out inputs when clamped at the 0.35 limit, caused by event queue floods and high-frequency parent-widget rebuilds. Resolved by: (1) de-duplicating matrix updates and returning early if target scale and translation match current values (within 1e-7), and (2) wrapping the `Transform` widget in a `ValueListenableBuilder<Matrix4>` to completely isolate high-frequency zoom/pan paint updates from parent-widget rebuilds (matching the React version's GPU-composited transform model).
 
 ## Resolved Problems
 
