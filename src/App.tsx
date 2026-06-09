@@ -888,7 +888,7 @@ function App() {
   const shouldShowOnboardingChecklist =
     isGraphReady &&
     !isOnboardingDismissed &&
-    (isOnboardingStarted || isAuthenticated) &&
+    isOnboardingStarted &&
     nonRootPeopleCount <= STARTER_SAMPLE_CONTACTS.length + 1
   const shouldShowOnboardingSpotlight = shouldShowOnboardingChecklist && activeOnboardingTarget !== null
   const boardNodes = useMemo(
