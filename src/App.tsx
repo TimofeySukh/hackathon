@@ -190,7 +190,6 @@ type OnboardingOverlayRect = {
 const THEME_STORAGE_KEY = 'hackathon-theme'
 const TAG_COLOR_STORAGE_KEY = 'hackathon-tag-colors'
 const ONBOARDING_DISMISSED_STORAGE_KEY = 'hackathon-guided-onboarding-dismissed-v2'
-const ONBOARDING_STARTED_STORAGE_KEY = 'hackathon-guided-onboarding-started-v2'
 const STARTER_SAMPLE_SEEDED_STORAGE_KEY = 'hackathon-starter-sample-seeded-v2'
 const LINKEDIN_TAG_NAME = 'LinkedIn'
 const DEFAULT_LINKEDIN_IMPORT_OPTIONS: LinkedInImportOptions = {
@@ -797,9 +796,6 @@ function App() {
   const [isOnboardingDismissed, setIsOnboardingDismissed] = useState(() =>
     window.localStorage.getItem(ONBOARDING_DISMISSED_STORAGE_KEY) === 'true',
   )
-  const [isOnboardingStarted, setIsOnboardingStarted] = useState(() =>
-    window.localStorage.getItem(ONBOARDING_STARTED_STORAGE_KEY) === 'true',
-  )
   const [onboardingStepIndex, setOnboardingStepIndex] = useState(0)
   const [onboardingOverlayRect, setOnboardingOverlayRect] = useState<OnboardingOverlayRect | null>(null)
   const [onboardingCreatedPersonId, setOnboardingCreatedPersonId] = useState<string | null>(null)
@@ -883,12 +879,10 @@ function App() {
   )
   const activeConnections = isRemoteGraphReady ? connections : localConnections
   const isGraphReady = isRemoteGraphReady || !isAuthenticated
-  const canStartOnboarding = status === 'anonymous' || status === 'unconfigured'
   const nonRootPeopleCount = activePeople.filter((person) => !person.is_root).length
   const shouldShowOnboarding =
     isGraphReady &&
     !isOnboardingDismissed &&
-    (canStartOnboarding || isOnboardingStarted) &&
     nonRootPeopleCount <= STARTER_SAMPLE_CONTACTS.length + 1
   const onboardingStep = ONBOARDING_STEPS[Math.min(onboardingStepIndex, ONBOARDING_STEPS.length - 1)]
   const boardNodes = useMemo(
@@ -1657,21 +1651,8 @@ function App() {
 
   const dismissOnboarding = useCallback(() => {
     setIsOnboardingDismissed(true)
-    setIsOnboardingStarted(false)
     window.localStorage.setItem(ONBOARDING_DISMISSED_STORAGE_KEY, 'true')
-    window.localStorage.removeItem(ONBOARDING_STARTED_STORAGE_KEY)
   }, [])
-
-  useEffect(() => {
-    if (isOnboardingDismissed || isOnboardingStarted || !canStartOnboarding) return
-
-    const frameId = window.requestAnimationFrame(() => {
-      setIsOnboardingStarted(true)
-      window.localStorage.setItem(ONBOARDING_STARTED_STORAGE_KEY, 'true')
-    })
-
-    return () => window.cancelAnimationFrame(frameId)
-  }, [canStartOnboarding, isOnboardingDismissed, isOnboardingStarted])
 
   useEffect(() => {
     window.localStorage.setItem(THEME_STORAGE_KEY, theme)
