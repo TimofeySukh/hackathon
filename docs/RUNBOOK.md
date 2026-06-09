@@ -16,8 +16,6 @@ Current app behavior:
 - persist the selected theme in `localStorage`
 - optionally sign in with Google through Supabase
 - edit an unsigned local in-memory board without a required login
-- show a focused onboarding panel for empty or starter-sized graphs
-- create a 10-contact starter sample for a new signed-in empty board once per browser user
 - open a LinkedIn menu with visual instructions for requesting a LinkedIn data archive
 - sync LinkedIn connections by dragging or selecting a LinkedIn export zip and importing only `Connections.csv`
 - import LinkedIn email addresses and profile URLs only when those opt-in fields are selected in the import dialog
@@ -148,7 +146,6 @@ This writes:
 
 - `fixtures/linkedin/Connections-10000.csv` for inspecting the LinkedIn-compatible CSV rows.
 - `fixtures/linkedin/linkedin-connections-10000.zip` for drag-and-drop testing in the app, with an internal `Connections.csv` file.
-- `fixtures/linkedin/linkedin_archive_sample_10_contacts.zip` is the small archive used as the source for starter sample contacts.
 
 ## Production Auto-Deploy
 

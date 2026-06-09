@@ -10,7 +10,6 @@ import type {
 import { useAuth } from './lib/useAuth'
 import { deleteAccountData, normalizeTagName, searchPeopleWithAi } from './lib/graphStorage'
 import type { Connection, PersonAiNote, PersonNode, PersonNote, Tag } from './lib/graphTypes'
-import { STARTER_SAMPLE_CONTACTS, buildStarterSamplePeople } from './lib/starterSample'
 import { DEFAULT_TAG_COLOR, DEFAULT_TAGS, hexToRgb, normalizeTagColor } from './lib/tagPalette'
 import { useBoardGraph } from './lib/useBoardGraph'
 
@@ -155,8 +154,6 @@ type TagPickerOption =
 
 const THEME_STORAGE_KEY = 'hackathon-theme'
 const TAG_COLOR_STORAGE_KEY = 'hackathon-tag-colors'
-const ONBOARDING_DISMISSED_STORAGE_KEY = 'hackathon-onboarding-dismissed'
-const STARTER_SAMPLE_SEEDED_STORAGE_KEY = 'hackathon-starter-sample-seeded'
 const LINKEDIN_TAG_NAME = 'LinkedIn'
 const DEFAULT_LINKEDIN_IMPORT_OPTIONS: LinkedInImportOptions = {
   includeEmail: false,
@@ -708,9 +705,6 @@ function App() {
   const [aiSearchResults, setAiSearchResults] = useState<SearchResult[]>([])
   const [aiSearchStatus, setAiSearchStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [aiSearchError, setAiSearchError] = useState<string | null>(null)
-  const [isOnboardingDismissed, setIsOnboardingDismissed] = useState(() =>
-    window.localStorage.getItem(ONBOARDING_DISMISSED_STORAGE_KEY) === 'true',
-  )
   const [localPeople, setLocalPeople] = useState<PersonNode[]>([ANONYMOUS_ROOT])
   const [localTags, setLocalTags] = useState<Tag[]>(() => createDefaultLocalTags())
   const [localNotes, setLocalNotes] = useState<PersonNote[]>([])
@@ -765,7 +759,6 @@ function App() {
   const touchPointersRef = useRef(new Map<number, TouchPoint>())
   const pinchGestureRef = useRef<PinchGesture | null>(null)
   const visibleBoardNodesRef = useRef<PersonNode[]>([])
-  const starterSampleInFlightRef = useRef<string | null>(null)
   const gestureScaleRef = useRef(1)
   const trackpadPanRef = useRef<{ active: boolean; timeoutId: number | null }>({
     active: false,
@@ -791,11 +784,6 @@ function App() {
   )
   const activeConnections = isRemoteGraphReady ? connections : localConnections
   const isGraphReady = isRemoteGraphReady || !isAuthenticated
-  const nonRootPeopleCount = activePeople.filter((person) => !person.is_root).length
-  const shouldShowOnboarding =
-    isGraphReady &&
-    !isOnboardingDismissed &&
-    nonRootPeopleCount <= STARTER_SAMPLE_CONTACTS.length
   const boardNodes = useMemo(
     () =>
       activePeople.map((node) => {
@@ -1356,53 +1344,6 @@ function App() {
     return tag
   }
 
-  useEffect(() => {
-    const userId = session?.user?.id
-    if (!userId || !isRemoteGraphReady) return
-    if (people.some((person) => !person.is_root) || connections.length > 0 || notes.length > 0) return
-
-    const storageKey = `${STARTER_SAMPLE_SEEDED_STORAGE_KEY}:${userId}`
-    if (window.localStorage.getItem(storageKey) === 'true') return
-    if (starterSampleInFlightRef.current === userId) return
-
-    const rootPerson = people.find((person) => person.is_root)
-    if (!rootPerson) return
-
-    starterSampleInFlightRef.current = userId
-
-    const seedStarterSample = async () => {
-      const linkedInTag =
-        tags.find((tag) => normalizeTagName(tag.name).toLowerCase() === LINKEDIN_TAG_NAME.toLowerCase()) ??
-        await createRemoteTag(LINKEDIN_TAG_NAME)
-
-      await bulkCreateRemotePeople(buildStarterSamplePeople({
-        rootPersonId: rootPerson.id,
-        tagId: linkedInTag.id,
-        createId: createUuid,
-      }))
-      window.localStorage.setItem(storageKey, 'true')
-    }
-
-    void seedStarterSample()
-      .catch((error: unknown) => {
-        console.error('Unable to create starter sample graph.', error)
-      })
-      .finally(() => {
-        if (starterSampleInFlightRef.current === userId) {
-          starterSampleInFlightRef.current = null
-        }
-      })
-  }, [
-    bulkCreateRemotePeople,
-    connections.length,
-    createRemoteTag,
-    isRemoteGraphReady,
-    notes.length,
-    people,
-    session?.user?.id,
-    tags,
-  ])
-
   async function updateTag(input: { id: string; name?: string; color?: string }) {
     if (isRemoteGraphReady) {
       return updateRemoteTag(input)
@@ -1545,11 +1486,6 @@ function App() {
     setIsTagPickerOpen(false)
     setActiveColorTagId(null)
     setActiveTagOptionIndex(0)
-  }, [])
-
-  const dismissOnboarding = useCallback(() => {
-    setIsOnboardingDismissed(true)
-    window.localStorage.setItem(ONBOARDING_DISMISSED_STORAGE_KEY, 'true')
   }, [])
 
   useEffect(() => {
@@ -1916,21 +1852,6 @@ function App() {
     setNewNoteText('')
     closeTransientUi()
   }, [closeTransientUi])
-
-  const handleCreateOnboardingPerson = useCallback(async () => {
-    const rootPerson = activePeople.find((person) => person.is_root)
-    if (!rootPerson || !isGraphReady) return
-
-    dismissOnboarding()
-    const createdPerson = await createPerson({
-      name: '',
-      tagId: null,
-      x: rootPerson.x + 280,
-      y: rootPerson.y,
-    })
-    await createConnection(rootPerson.id, createdPerson.id)
-    openInspectorForNode(createdPerson)
-  }, [activePeople, createConnection, createPerson, dismissOnboarding, isGraphReady, openInspectorForNode])
 
   const finishConnectionDrag = useCallback(
     async (clientX: number, clientY: number) => {
@@ -3782,79 +3703,6 @@ function App() {
           </button>
         </div>
       </div>
-
-      {shouldShowOnboarding ? (
-        <section className="onboarding-panel" aria-label="Getting started">
-          <div className="onboarding-panel__copy">
-            <span className="onboarding-panel__eyebrow">SocialDataNode</span>
-            <h1 className="onboarding-panel__title">Map the people around your work.</h1>
-            <p className="onboarding-panel__body">
-              Start with one person, add context as notes, then search your network when you need the right intro.
-            </p>
-          </div>
-
-          <div className="onboarding-panel__orbit" aria-hidden="true">
-            {STARTER_SAMPLE_CONTACTS.slice(0, 8).map((contact, index) => (
-              <span
-                key={`${contact.firstName}-${contact.lastName}`}
-                className="onboarding-panel__orbit-dot"
-                style={{ '--orbit-index': index } as CSSProperties}
-              />
-            ))}
-            <span className="onboarding-panel__orbit-root" />
-          </div>
-
-          <div className="onboarding-panel__actions">
-            <button
-              type="button"
-              className="onboarding-panel__button onboarding-panel__button--primary"
-              onClick={() => {
-                void handleCreateOnboardingPerson()
-              }}
-            >
-              Add first person
-            </button>
-            <button
-              type="button"
-              className="onboarding-panel__button"
-              onClick={() => {
-                dismissOnboarding()
-                openLinkedInUpload()
-              }}
-            >
-              Import LinkedIn
-            </button>
-            {!isAuthenticated ? (
-              <button
-                type="button"
-                className="onboarding-panel__button"
-                onClick={() => {
-                  dismissOnboarding()
-                  void signInWithGoogle()
-                }}
-                disabled={status === 'loading' || status === 'unconfigured'}
-              >
-                Sign in to save
-              </button>
-            ) : null}
-          </div>
-
-          <div className="onboarding-panel__steps" aria-label="Starter workflow">
-            <span>Create a person</span>
-            <span>Add notes</span>
-            <span>Search later</span>
-          </div>
-
-          <button
-            type="button"
-            className="onboarding-panel__dismiss"
-            onClick={dismissOnboarding}
-            aria-label="Dismiss onboarding"
-          >
-            x
-          </button>
-        </section>
-      ) : null}
 
       {inspectorNode ? (
         <aside

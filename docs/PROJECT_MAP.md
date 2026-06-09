@@ -14,9 +14,7 @@ The current product is intentionally narrow:
 - a very dense CSS-rendered point grid
 - Supabase-backed Google login
 - editable unsigned local board state when the user is not signed in
-- onboarding overlay for empty or starter-sized graphs
 - one personal board record per signed-in user
-- one 10-contact starter sample for new signed-in empty boards
 - persistent people nodes, reusable colored tags, notes, and undirected connections per signed-in user
 - batched LinkedIn import for people, source notes, and root connections
 - canvas overview rendering for large graphs with a capped interactive DOM/SVG overlay
@@ -64,7 +62,7 @@ Completed tasks can remain listed here when they explain repository history. Liv
 - `README.md`: top-level overview and local development commands.
 - `.env.mcp.example`: local-only MCP environment template for service-role access.
 - `.mcp.json`: project MCP configuration for the local Hackathon board stdio server.
-- `fixtures/linkedin/`: generated large LinkedIn import fixtures for performance testing and the 10-contact starter sample archive.
+- `fixtures/linkedin/`: generated large LinkedIn import fixtures for performance testing.
 - `mcp/server.mjs`: local MCP server that exposes project docs and board graph tooling.
 - `scripts/generate-linkedin-connections.mjs`: generates reproducible `Connections.csv` and ZIP LinkedIn import fixtures.
 - `scripts/seed-demo-user.mjs`: idempotent demo-data seed for one user's board with reusable people, notes, AI summaries, and connections.
