@@ -16,7 +16,7 @@ Current app behavior:
 - persist the selected theme in `localStorage`
 - optionally sign in with Google through Supabase
 - edit an unsigned local in-memory board without a required login
-- show a welcome prompt with basic controls for first-time signed-out visitors, then a compact getting-started checklist with optional spotlight highlights
+- show a guided onboarding tour for first-time signed-out visitors, with spotlighted targets, blocked background controls, and a skippable Google sign-in step
 - create a tagged and noted 10-contact starter sample for a new signed-in empty board once per browser user
 - open a LinkedIn menu with visual instructions for requesting a LinkedIn data archive
 - sync LinkedIn connections by dragging or selecting a LinkedIn export zip and importing only `Connections.csv`
