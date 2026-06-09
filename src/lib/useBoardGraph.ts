@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 
 import type { BoardGraphPayload, Circle, Connection, PersonAiNote, PersonNode, PersonNote, Tag } from './graphTypes'
@@ -359,6 +359,9 @@ export function useBoardGraph(user: User | null) {
     personAiSyncTimersRef.current.set(personId, timerId)
   }
 
+  const uiCircles = useMemo(() => visibleState.circles.map(mapDbCircleToUi), [visibleState.circles])
+  const uiPeople = useMemo(() => visibleState.people.map(mapDbPersonToUi), [visibleState.people])
+
   return {
     board: visibleState.board,
     status: visibleState.status,
@@ -367,8 +370,8 @@ export function useBoardGraph(user: User | null) {
     notes: visibleState.notes,
     personAiNotes: visibleState.personAiNotes,
     connections: visibleState.connections,
-    circles: visibleState.circles.map(mapDbCircleToUi),
-    people: visibleState.people.map(mapDbPersonToUi),
+    circles: uiCircles,
+    people: uiPeople,
 
     async createTag(name: string) {
       try {
