@@ -18,7 +18,7 @@ A persisted social graph board built with React, Vite, and TypeScript.
 - Theme switcher in the top-right corner
 - Optional Google login through Supabase
 - Editable unsigned local board state before signing in
-- Empty or starter-sized graphs show a guided onboarding tour with spotlighted actions and a skip control
+- First-time signed-out visitors see a guided onboarding tour with spotlighted actions and a skip control
 - One personal board record for each signed-in user
 - New signed-in empty boards receive a 10-contact starter sample with varied tags and notes from the LinkedIn sample archive
 - One immutable root node at `0,0` for each signed-in user

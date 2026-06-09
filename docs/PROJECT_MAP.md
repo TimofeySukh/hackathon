@@ -14,7 +14,7 @@ The current product is intentionally narrow:
 - a very dense CSS-rendered point grid
 - Supabase-backed Google login
 - editable unsigned local board state when the user is not signed in
-- guided onboarding tour for empty or starter-sized graphs
+- guided onboarding tour for first-time signed-out visitors
 - one personal board record per signed-in user
 - one tagged and noted 10-contact starter sample for new signed-in empty boards
 - persistent people nodes, reusable colored tags, notes, and undirected connections per signed-in user
