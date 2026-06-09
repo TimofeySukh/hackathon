@@ -49,7 +49,7 @@ When working on the project:
 
 - Status: Open
 - Reported gap: the project needs a landing page.
-- Notes: needs product requirements for public messaging, target audience, routing, auth entry points, and how the landing page coexists with the board-first app. The board now has a guided onboarding tour for first-time signed-out visitors, but this is not a public landing page.
+- Notes: needs product requirements for public messaging, target audience, routing, auth entry points, and how the landing page coexists with the board-first app. The board now has a first-time welcome prompt and getting-started checklist, but this is not a public landing page.
 
 ### Large imported graphs are too slow
 
