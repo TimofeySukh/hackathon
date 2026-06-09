@@ -3569,15 +3569,6 @@ function App() {
   const onboardingPrimaryLabel = getOnboardingPrimaryLabel()
   const isOnboardingPrimaryDisabled =
     onboardingStep.id === 'signin' && !isAuthenticated && status === 'loading'
-  const canSkipOnboardingStep = onboardingStep.id === 'signin'
-  const onboardingTitle =
-    onboardingStep.id === 'signin' && isAuthenticated
-      ? 'Google sign-in is connected'
-      : onboardingStep.title
-  const onboardingBody =
-    onboardingStep.id === 'signin' && isAuthenticated
-      ? 'Your graph is already saved to your account. AI search can use your saved people, tags, and notes.'
-      : onboardingStep.body
   const onboardingStepCount = ONBOARDING_STEPS.length
   const onboardingProgressPercent = `${Math.round(((onboardingStepIndex + 1) / onboardingStepCount) * 100)}%`
   const onboardingFullBlockerStyle: CSSProperties = {
@@ -4220,9 +4211,9 @@ function App() {
             <div className="onboarding-tour__meta">
               Step {onboardingStepIndex + 1} of {onboardingStepCount}
             </div>
-            <h1 className="onboarding-tour__title">{onboardingTitle}</h1>
+            <h1 className="onboarding-tour__title">{onboardingStep.title}</h1>
             <p id="onboarding-tour-body" className="onboarding-tour__body">
-              {onboardingBody}
+              {onboardingStep.body}
             </p>
             <div className="onboarding-tour__actions">
               <button
@@ -4233,15 +4224,6 @@ function App() {
               >
                 Back
               </button>
-              {canSkipOnboardingStep ? (
-                <button
-                  type="button"
-                  className="onboarding-tour__button onboarding-tour__button--muted"
-                  onClick={goToNextOnboardingStep}
-                >
-                  Skip this step
-                </button>
-              ) : null}
               <button
                 type="button"
                 className="onboarding-tour__button onboarding-tour__button--primary"
