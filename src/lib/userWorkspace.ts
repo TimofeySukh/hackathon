@@ -90,6 +90,21 @@ export async function ensureUserWorkspace(user: User): Promise<UserWorkspace> {
     .single()
 
   if (rootInsertResult.error) {
+    if (rootInsertResult.error.code === '23505') {
+      const { data: existingRootPerson, error: fetchError } = await supabase
+        .from('people')
+        .select('*')
+        .eq('board_id', board.id)
+        .eq('is_root', true)
+        .single()
+
+      if (fetchError) throw fetchError
+      return {
+        board,
+        rootPerson: existingRootPerson as PersonNode,
+        isNewRootPerson: false,
+      }
+    }
     throw rootInsertResult.error
   }
 

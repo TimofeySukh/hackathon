@@ -333,9 +333,25 @@ export async function loadBoardGraph(user: User): Promise<BoardGraphPayload> {
       .select('*')
       .single()
 
-    if (rootCircleError) throw rootCircleError
-    rootCircle = newRootCircle as Circle
-    circles.push(rootCircle)
+    if (rootCircleError) {
+      if (rootCircleError.code === '23505') {
+        const { data: existingRootCircle, error: fetchError } = await client
+          .from('circles')
+          .select('*')
+          .eq('board_id', workspace.board.id)
+          .eq('is_root', true)
+          .single()
+
+        if (fetchError) throw fetchError
+        rootCircle = existingRootCircle as Circle
+        circles.push(rootCircle)
+      } else {
+        throw rootCircleError
+      }
+    } else {
+      rootCircle = newRootCircle as Circle
+      circles.push(rootCircle)
+    }
 
     // Re-parent the root person if not already set
     const rootPerson = people.find(p => p.is_root)
