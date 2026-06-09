@@ -1,14 +1,52 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/scheduler.dart';
 import 'image_helper.dart';
 
+class BoardLogger {
+  static File? _logFile;
+
+  static void init() {
+    try {
+      if (!kIsWeb) {
+        _logFile = File('/Users/velizard/Projects/hackathon/flutter_board/app_events.log');
+        if (_logFile!.existsSync()) {
+          _logFile!.deleteSync();
+        }
+        _logFile!.createSync();
+        log('BoardLogger initialized. Writing to ${_logFile!.path}');
+      } else {
+        log('BoardLogger initialized. Running on Web, console logs only.');
+      }
+    } catch (e, stack) {
+      debugPrint('Failed to initialize BoardLogger file: $e\n$stack');
+    }
+  }
+
+  static void log(String message) {
+    final timestamp = DateTime.now().toIso8601String();
+    final logLine = '[$timestamp] $message';
+    debugPrint(logLine);
+
+    if (_logFile != null) {
+      try {
+        _logFile!.writeAsStringSync('$logLine\n', mode: FileMode.append, flush: true);
+      } catch (e) {
+        // Ignored
+      }
+    }
+  }
+}
+
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  BoardLogger.init();
   runApp(const MyApp());
 }
 
@@ -224,7 +262,7 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late List<CircleNode> circles;
   late List<PersonNode> people;
 
@@ -259,10 +297,12 @@ class _MyHomePageState extends State<MyHomePage>
 
   ui.Image? _sharedPersonAvatar;
   final Map<String, TextPainter> _realPersonLabelCache = {};
+  int _buildCount = 0;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     circles = createInitialGraphCircles();
     people = createInitialGraphPeople();
     circles = ensureContainment(circles, people);
@@ -296,12 +336,24 @@ class _MyHomePageState extends State<MyHomePage>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _navigationIdleTimer?.cancel();
     _sharedPersonAvatar?.dispose();
     _fpsTicker?.dispose();
     _fpsNotifier.dispose();
     _transformationController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+    try {
+      final view = ui.PlatformDispatcher.instance.views.first;
+      BoardLogger.log('didChangeMetrics: Window resized. PhysicalSize: ${view.physicalSize}, DPR: ${view.devicePixelRatio}');
+    } catch (e) {
+      BoardLogger.log('didChangeMetrics error: $e');
+    }
   }
 
   Future<void> _initSharedPersonAvatar() async {
@@ -406,14 +458,19 @@ class _MyHomePageState extends State<MyHomePage>
 
   void _setNavigating(bool value) {
     _navigationIdleTimer?.cancel();
+    BoardLogger.log('_setNavigating requested: $value (current: $_isNavigating)');
     if (_isNavigating == value) return;
+    BoardLogger.log('_setNavigating executing setState: isNavigating = $value');
     setState(() => _isNavigating = value);
   }
 
   void _settleNavigationSoon() {
+    BoardLogger.log('_settleNavigationSoon: starting 140ms timer');
     _navigationIdleTimer?.cancel();
     _navigationIdleTimer = Timer(const Duration(milliseconds: 140), () {
+      BoardLogger.log('_settleNavigationSoon timer fired');
       if (mounted) {
+        BoardLogger.log('_settleNavigationSoon executing setState: isNavigating = false');
         setState(() => _isNavigating = false);
       }
     });
@@ -915,6 +972,11 @@ class _MyHomePageState extends State<MyHomePage>
 
   @override
   Widget build(BuildContext context) {
+    _buildCount++;
+    final currentBuildIndex = _buildCount;
+    BoardLogger.log('build_start: #$currentBuildIndex. Circles count: ${circles.length}, People count: ${people.length}');
+    final stopwatch = Stopwatch()..start();
+
     final circlesById = {for (final c in circles) c.id: c};
     final selectedCircle = selectedCircleId != null
         ? circlesById[selectedCircleId]
@@ -938,7 +1000,7 @@ class _MyHomePageState extends State<MyHomePage>
     final sortedCircles = [...circles]
       ..sort((a, b) => getDepth(a.parentId).compareTo(getDepth(b.parentId)));
 
-    return Scaffold(
+    final scaffold = Scaffold(
       body: Stack(
         children: [
           InteractiveViewer(
@@ -947,10 +1009,31 @@ class _MyHomePageState extends State<MyHomePage>
             boundaryMargin: const EdgeInsets.all(5000),
             minScale: 0.35,
             maxScale: 1.8,
-            onInteractionStart: (_) => _setNavigating(true),
-            onInteractionUpdate: (_) => _setNavigating(true),
-            onInteractionEnd: (_) => _settleNavigationSoon(),
-            child: GestureDetector(
+            onInteractionStart: (details) {
+              final scale = _transformationController.value.storage[0];
+              final tx = _transformationController.value.storage[12];
+              final ty = _transformationController.value.storage[13];
+              BoardLogger.log('InteractiveViewer: onInteractionStart. scale: $scale, tx: $tx, ty: $ty, pointerCount: ${details.pointerCount}');
+              _setNavigating(true);
+            },
+            onInteractionUpdate: (details) {
+              final scale = _transformationController.value.storage[0];
+              final tx = _transformationController.value.storage[12];
+              final ty = _transformationController.value.storage[13];
+              BoardLogger.log('InteractiveViewer: onInteractionUpdate. scale: $scale, tx: $tx, ty: $ty, scaleDelta: ${details.scale}, focalPoint: ${details.focalPoint}');
+              _setNavigating(true);
+            },
+            onInteractionEnd: (details) {
+              final scale = _transformationController.value.storage[0];
+              final tx = _transformationController.value.storage[12];
+              final ty = _transformationController.value.storage[13];
+              BoardLogger.log('InteractiveViewer: onInteractionEnd. scale: $scale, tx: $tx, ty: $ty, velocity: ${details.velocity}');
+              _settleNavigationSoon();
+            },
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                BoardLogger.log('InteractiveViewerChild LayoutBuilder. constraints: $constraints');
+                return GestureDetector(
               behavior: HitTestBehavior.translucent,
               onTap: () {
                 setState(() {
@@ -1070,8 +1153,10 @@ class _MyHomePageState extends State<MyHomePage>
                   ],
                 ),
               ),
-            ),
-          ),
+            );
+          },
+        ),
+      ),
           Positioned.fill(
             child: RepaintBoundary(
               child: GestureDetector(
@@ -1278,6 +1363,9 @@ class _MyHomePageState extends State<MyHomePage>
         ],
       ),
     );
+    final elapsed = stopwatch.elapsedMicroseconds;
+    BoardLogger.log('build_end: #$currentBuildIndex. Time: ${elapsed / 1000.0}ms');
+    return scaffold;
   }
 }
 
@@ -1286,6 +1374,8 @@ class _MyHomePageState extends State<MyHomePage>
 class GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
+    BoardLogger.log('GridPainter.paint start. Size: $size');
+    final stopwatch = Stopwatch()..start();
     final bgPaint = Paint()..color = const Color(0xFFF6F7F4);
     canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), bgPaint);
 
@@ -1305,10 +1395,15 @@ class GridPainter extends CustomPainter {
       final paint = (y % 160 == 0) ? thickGridPaint : thinGridPaint;
       canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
     }
+    final elapsed = stopwatch.elapsedMicroseconds;
+    BoardLogger.log('GridPainter.paint end. Time: ${elapsed / 1000.0}ms');
   }
 
   @override
-  bool shouldRepaint(covariant GridPainter oldDelegate) => false;
+  bool shouldRepaint(covariant GridPainter oldDelegate) {
+    BoardLogger.log('GridPainter.shouldRepaint returns false');
+    return false;
+  }
 }
 
 /// Paints circle fill + border (no interactive elements).
@@ -1320,6 +1415,8 @@ class CircleShapePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    BoardLogger.log('CircleShapePainter.paint start for circle "${circle.name}" (${circle.id}). Size: $size, radius: ${circle.radius}, tone: ${circle.tone}');
+    final stopwatch = Stopwatch()..start();
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
 
@@ -1347,16 +1444,20 @@ class CircleShapePainter extends CustomPainter {
         ..strokeWidth = 3.5;
       canvas.drawPath(path, borderPaint);
     }
+    final elapsed = stopwatch.elapsedMicroseconds;
+    BoardLogger.log('CircleShapePainter.paint end for circle "${circle.name}" (${circle.id}). Time: ${elapsed / 1000.0}ms');
   }
 
   @override
   bool shouldRepaint(covariant CircleShapePainter oldDelegate) {
-    return oldDelegate.circle.shapeType != circle.shapeType ||
+    final res = oldDelegate.circle.shapeType != circle.shapeType ||
         oldDelegate.circle.sides != circle.sides ||
         oldDelegate.circle.amplitude != circle.amplitude ||
         oldDelegate.circle.tone != circle.tone ||
         oldDelegate.circle.radius != circle.radius ||
         oldDelegate.isSelected != isSelected;
+    BoardLogger.log('CircleShapePainter.shouldRepaint for circle "${circle.name}" (${circle.id}) returns: $res');
+    return res;
   }
 }
 
@@ -1375,6 +1476,8 @@ class EdgePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    BoardLogger.log('EdgePainter.paint start. Size: $size, circles count: ${circles.length}');
+    final stopwatch = Stopwatch()..start();
     const double shift = halfWorldSize;
 
     final circlePaint = Paint()
@@ -1422,10 +1525,15 @@ class EdgePainter extends CustomPainter {
     if (connectorStart != null && connectorEnd != null) {
       drawCurve(connectorStart!, connectorEnd!, draftPaint);
     }
+    final elapsed = stopwatch.elapsedMicroseconds;
+    BoardLogger.log('EdgePainter.paint end. Time: ${elapsed / 1000.0}ms');
   }
 
   @override
-  bool shouldRepaint(covariant EdgePainter oldDelegate) => true;
+  bool shouldRepaint(covariant EdgePainter oldDelegate) {
+    BoardLogger.log('EdgePainter.shouldRepaint returns true');
+    return true;
+  }
 }
 
 class RealPeoplePainter extends CustomPainter {
@@ -1480,10 +1588,16 @@ class RealPeoplePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (people.isEmpty) return;
-
     final matrix = transformationController.value;
     final double scale = matrix.storage[0];
+    BoardLogger.log('RealPeoplePainter.paint start. Size: $size, scale: $scale, total people: ${people.length}');
+    final stopwatch = Stopwatch()..start();
+
+    if (people.isEmpty) {
+      BoardLogger.log('RealPeoplePainter.paint early exit: people list is empty');
+      return;
+    }
+
     final double tx = matrix.storage[12];
     final double ty = matrix.storage[13];
     final double iconSize = iconScreenSizeForScale(scale);
@@ -1503,7 +1617,10 @@ class RealPeoplePainter extends CustomPainter {
         _visibleIndexes.add(i);
       }
     }
-    if (_visibleIndexes.isEmpty) return;
+    if (_visibleIndexes.isEmpty) {
+      BoardLogger.log('RealPeoplePainter.paint early exit: visibleIndexes is empty');
+      return;
+    }
 
     if (showEdges) {
       final int edgeStride = edgeStrideForDensity(
@@ -1673,6 +1790,8 @@ class RealPeoplePainter extends CustomPainter {
         label.paint(canvas, Offset(cx - label.width / 2, labelY + 2.0));
       }
     }
+    final elapsed = stopwatch.elapsedMicroseconds;
+    BoardLogger.log('RealPeoplePainter.paint end. Visible: ${_visibleIndexes.length}, painted in ${elapsed / 1000.0}ms');
   }
 
   TextPainter _labelPainter(String key, String text, TextStyle style) {
@@ -1688,7 +1807,10 @@ class RealPeoplePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant RealPeoplePainter oldDelegate) => true;
+  bool shouldRepaint(covariant RealPeoplePainter oldDelegate) {
+    BoardLogger.log('RealPeoplePainter.shouldRepaint returns true');
+    return true;
+  }
 }
 
 // ─── Widgets ─────────────────────────────────────────────────────────────────
@@ -2883,9 +3005,13 @@ List<CircleNode> ensureContainment(
   List<CircleNode> circles,
   List<PersonNode> people,
 ) {
+  BoardLogger.log('ensureContainment start. Circles: ${circles.length}, People: ${people.length}');
+  final stopwatch = Stopwatch()..start();
   List<CircleNode> currentCircles = circles.map((c) => c.copyWith()).toList();
 
+  int passes = 0;
   for (int pass = 0; pass < currentCircles.length + 2; pass++) {
+    passes++;
     final circlesById = {for (final c in currentCircles) c.id: c};
     bool changed = false;
 
@@ -2906,6 +3032,8 @@ List<CircleNode> ensureContainment(
     if (!changed) break;
   }
 
+  final elapsed = stopwatch.elapsedMicroseconds;
+  BoardLogger.log('ensureContainment end. Passes: $passes. Time: ${elapsed / 1000.0}ms');
   return currentCircles;
 }
 

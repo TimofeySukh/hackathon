@@ -57,6 +57,12 @@ When working on the project:
 - Reported behavior: the Flutter circle graph prototype dropped to around 40 FPS on a small test set, around 10 FPS near 500 points while moving, and around 2 FPS above 1,000 points.
 - Notes: `flutter_board/lib/main.dart` now paints real working people icons in a screen-space canvas layer with painter hit testing, uses the load panel to add generated people as normal `PersonNode` data inside a normal circle, culls visible people to the viewport, batches avatar rendering through `drawAtlas`, renders people edges as raw line segments with density-based level-of-detail sampling, removes person edges from the transformed world `EdgePainter`, and updates FPS through a `ValueNotifier` instead of rebuilding the board. Validate the result in release/profile mode on the target device or browser because debug Flutter FPS can be misleading.
 
+### Flutter app freezes during zoom-out and window resize
+
+- Status: Open
+- Reported behavior: The Flutter application freezes/hangs completely when zooming out and when resizing the window.
+- Notes: Detailed synchronous event logging is being implemented to diagnose the execution trace right before the freeze, monitoring layout passes, painters (RealPeoplePainter, GridPainter, CircleShapePainter, EdgePainter), and gestures.
+
 ## Resolved Problems
 
 ### DOM/SVG icon stress ceiling was unknown
