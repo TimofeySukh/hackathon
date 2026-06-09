@@ -18,7 +18,9 @@ A persisted social graph board built with React, Vite, and TypeScript.
 - Theme switcher in the top-right corner
 - Optional Google login through Supabase
 - Editable unsigned local board state before signing in
+- Empty or starter-sized graphs show a focused onboarding panel with first actions
 - One personal board record for each signed-in user
+- New signed-in empty boards receive a 10-contact starter sample from the LinkedIn sample archive
 - One immutable root node at `0,0` for each signed-in user
 - Persistent people, colored tags, notes, and undirected connections in Supabase
 - Compact top bar with a rounded search field plus circular tags, account, and theme controls that close other overlays when opened
@@ -105,6 +107,7 @@ For multi-device login, deploy the frontend on one stable server origin and add 
 - `npm run lint` runs ESLint.
 - `npm run mcp:start` starts the local Hackathon board MCP server over stdio.
 - `npm run generate:linkedin-fixture -- --count 10000` generates large LinkedIn import CSV and ZIP fixtures.
+- `fixtures/linkedin/linkedin_archive_sample_10_contacts.zip` is the starter sample archive used to mirror new-user sample data.
 
 ## Product Direction
 
