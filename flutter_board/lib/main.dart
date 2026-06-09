@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/gestures.dart';
 import 'image_helper.dart';
 
 class BoardLogger {
@@ -269,6 +270,9 @@ class _MyHomePageState extends State<MyHomePage>
   final TransformationController _transformationController =
       TransformationController();
 
+  Matrix4 _dragStartMatrix = Matrix4.identity();
+  Offset _dragStartFocalPoint = Offset.zero;
+
   String? selectedCircleId;
   String? selectedPersonId;
   String? draggingPersonId;
@@ -454,6 +458,76 @@ class _MyHomePageState extends State<MyHomePage>
       circles = ensureContainment(circles, people);
       _realPersonLabelCache.clear();
     });
+  }
+
+  void _handleScaleStart(ScaleStartDetails details) {
+    _dragStartMatrix = _transformationController.value.clone();
+    _dragStartFocalPoint = details.localFocalPoint;
+    BoardLogger.log('Gesture: scale start. Start scale: ${_dragStartMatrix.storage[0]}');
+    _setNavigating(true);
+  }
+
+  void _handleScaleUpdate(ScaleUpdateDetails details) {
+    final double s0 = _dragStartMatrix.storage[0];
+    final double tx0 = _dragStartMatrix.storage[12];
+    final double ty0 = _dragStartMatrix.storage[13];
+
+    final double targetScale = (s0 * details.scale).clamp(0.35, 1.8);
+
+    final double wx = (_dragStartFocalPoint.dx - tx0) / s0;
+    final double wy = (_dragStartFocalPoint.dy - ty0) / s0;
+
+    final double fx = details.localFocalPoint.dx;
+    final double fy = details.localFocalPoint.dy;
+
+    final double targetTx = fx - wx * targetScale;
+    final double targetTy = fy - wy * targetScale;
+
+    setState(() {
+      _transformationController.value = Matrix4.identity()
+        ..translateByDouble(targetTx, targetTy, 0.0, 1.0)
+        ..scaleByDouble(targetScale, targetScale, 1.0, 1.0);
+    });
+
+    _setNavigating(true);
+  }
+
+  void _handleScaleEnd(ScaleEndDetails details) {
+    BoardLogger.log('Gesture: scale end.');
+    _settleNavigationSoon();
+  }
+
+  void _handlePointerSignal(PointerSignalEvent pointerSignal) {
+    if (pointerSignal is PointerScrollEvent) {
+      final double dy = pointerSignal.scrollDelta.dy;
+      if (dy != 0.0) {
+        final double scaleChange = dy < 0 ? 1.08 : 0.925;
+        final matrix = _transformationController.value;
+        final double currentScale = matrix.storage[0];
+        final double tx = matrix.storage[12];
+        final double ty = matrix.storage[13];
+
+        final double targetScale = (currentScale * scaleChange).clamp(0.35, 1.8);
+
+        final double px = pointerSignal.localPosition.dx;
+        final double py = pointerSignal.localPosition.dy;
+
+        final double wx = (px - tx) / currentScale;
+        final double wy = (py - ty) / currentScale;
+
+        final double targetTx = px - wx * targetScale;
+        final double targetTy = py - wy * targetScale;
+
+        setState(() {
+          _transformationController.value = Matrix4.identity()
+            ..translateByDouble(targetTx, targetTy, 0.0, 1.0)
+            ..scaleByDouble(targetScale, targetScale, 1.0, 1.0);
+        });
+
+        _setNavigating(true);
+        _settleNavigationSoon();
+      }
+    }
   }
 
   void _setNavigating(bool value) {
@@ -1003,160 +1077,140 @@ class _MyHomePageState extends State<MyHomePage>
     final scaffold = Scaffold(
       body: Stack(
         children: [
-          InteractiveViewer(
-            transformationController: _transformationController,
-            constrained: false,
-            boundaryMargin: const EdgeInsets.all(5000),
-            minScale: 0.35,
-            maxScale: 1.8,
-            onInteractionStart: (details) {
-              final scale = _transformationController.value.storage[0];
-              final tx = _transformationController.value.storage[12];
-              final ty = _transformationController.value.storage[13];
-              BoardLogger.log('InteractiveViewer: onInteractionStart. scale: $scale, tx: $tx, ty: $ty, pointerCount: ${details.pointerCount}');
-              _setNavigating(true);
-            },
-            onInteractionUpdate: (details) {
-              final scale = _transformationController.value.storage[0];
-              final tx = _transformationController.value.storage[12];
-              final ty = _transformationController.value.storage[13];
-              BoardLogger.log('InteractiveViewer: onInteractionUpdate. scale: $scale, tx: $tx, ty: $ty, scaleDelta: ${details.scale}, focalPoint: ${details.focalPoint}');
-              _setNavigating(true);
-            },
-            onInteractionEnd: (details) {
-              final scale = _transformationController.value.storage[0];
-              final tx = _transformationController.value.storage[12];
-              final ty = _transformationController.value.storage[13];
-              BoardLogger.log('InteractiveViewer: onInteractionEnd. scale: $scale, tx: $tx, ty: $ty, velocity: ${details.velocity}');
-              _settleNavigationSoon();
-            },
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                BoardLogger.log('InteractiveViewerChild LayoutBuilder. constraints: $constraints');
-                return GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onTap: () {
-                setState(() {
-                  createMenuWorldPos = null;
-                  createMenuScreenPos = null;
-                  createMenuSourceCircleId = null;
-                });
-              },
-              child: SizedBox(
-                width: worldSize,
-                height: worldSize,
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: RepaintBoundary(
-                        child: CustomPaint(painter: GridPainter()),
-                      ),
-                    ),
-                    // Pass 1: Circle fills and borders
-                    ...sortedCircles.map((circle) {
-                      final double size = circle.radius * 2;
-                      return Positioned(
-                        left: circle.x - circle.radius + halfWorldSize,
-                        top: circle.y - circle.radius + halfWorldSize,
-                        width: size,
-                        height: size,
-                        child: IgnorePointer(
-                          child: RepaintBoundary(
-                            child: CustomPaint(
-                              painter: CircleShapePainter(
-                                circle: circle,
-                                isSelected: selectedCircleId == circle.id,
+          GestureDetector(
+            onScaleStart: _handleScaleStart,
+            onScaleUpdate: _handleScaleUpdate,
+            onScaleEnd: _handleScaleEnd,
+            child: Listener(
+              onPointerSignal: _handlePointerSignal,
+              child: ClipRect(
+                child: Transform(
+                  transform: _transformationController.value,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onTap: () {
+                      setState(() {
+                        createMenuWorldPos = null;
+                        createMenuScreenPos = null;
+                        createMenuSourceCircleId = null;
+                      });
+                    },
+                    child: SizedBox(
+                      width: worldSize,
+                      height: worldSize,
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                            child: RepaintBoundary(
+                              child: CustomPaint(painter: GridPainter()),
+                            ),
+                          ),
+                          // Pass 1: Circle fills and borders
+                          ...sortedCircles.map((circle) {
+                            final double size = circle.radius * 2;
+                            return Positioned(
+                              left: circle.x - circle.radius + halfWorldSize,
+                              top: circle.y - circle.radius + halfWorldSize,
+                              width: size,
+                              height: size,
+                              child: IgnorePointer(
+                                child: RepaintBoundary(
+                                  child: CustomPaint(
+                                    painter: CircleShapePainter(
+                                      circle: circle,
+                                      isSelected: selectedCircleId == circle.id,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }),
+                          // Pass 2: Edge layer
+                          Positioned.fill(
+                            child: RepaintBoundary(
+                              child: CustomPaint(
+                                painter: EdgePainter(
+                                  circles: circles,
+                                  circlesById: circlesById,
+                                  connectorStart: connectorStartPos,
+                                  connectorEnd: connectorEndPos,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      );
-                    }),
-                    // Pass 2: Edge layer
-                    Positioned.fill(
-                      child: RepaintBoundary(
-                        child: CustomPaint(
-                          painter: EdgePainter(
-                            circles: circles,
-                            circlesById: circlesById,
-                            connectorStart: connectorStartPos,
-                            connectorEnd: connectorEndPos,
-                          ),
-                        ),
+                          // Pass 3: Circle interactive elements (hit area, center handle, label)
+                          ...sortedCircles.map((circle) {
+                            final double size = circle.radius * 2;
+                            return Positioned(
+                              left: circle.x - circle.radius + halfWorldSize,
+                              top: circle.y - circle.radius + halfWorldSize,
+                              width: size,
+                              height: size,
+                              child: GestureDetector(
+                                onSecondaryTapUp: (details) {
+                                  _openCircleContextMenu(
+                                    circle,
+                                    details.globalPosition,
+                                  );
+                                },
+                                onLongPressStart: (details) {
+                                  _openCircleContextMenu(
+                                    circle,
+                                    details.globalPosition,
+                                  );
+                                },
+                                onPanStart: (details) {
+                                  _startCircleDrag(circle, details.localPosition);
+                                },
+                                onPanUpdate: (details) {
+                                  _updateCircleDrag(circle, details);
+                                },
+                                onPanEnd: (details) {
+                                  _endCircleDrag();
+                                },
+                                child: CircleInteractiveWidget(
+                                  circle: circle,
+                                  isSelected: selectedCircleId == circle.id,
+                                  onSelect: () {
+                                    setState(() {
+                                      selectedCircleId = circle.id;
+                                      selectedPersonId = null;
+                                      createMenuWorldPos = null;
+                                    });
+                                  },
+                                  onCenterDragStart: (details) {
+                                    if (HardwareKeyboard.instance.isShiftPressed) {
+                                      _startConnector(circle);
+                                    } else {
+                                      _startCircleSubtreeDrag(circle);
+                                    }
+                                  },
+                                  onCenterDragUpdate: (details) {
+                                    if (connectorSourceCircleId != null) {
+                                      _updateConnector(details.globalPosition);
+                                    } else {
+                                      _updateCircleSubtreeDrag(details.delta);
+                                    }
+                                  },
+                                  onCenterDragEnd: (details) {
+                                    if (connectorSourceCircleId != null) {
+                                      _endConnector(details.globalPosition);
+                                    } else {
+                                      _endCircleSubtreeDrag();
+                                    }
+                                  },
+                                ),
+                              ),
+                            );
+                          }),
+                        ],
                       ),
                     ),
-                    // Pass 3: Circle interactive elements (hit area, center handle, label)
-                    ...sortedCircles.map((circle) {
-                      final double size = circle.radius * 2;
-                      return Positioned(
-                        left: circle.x - circle.radius + halfWorldSize,
-                        top: circle.y - circle.radius + halfWorldSize,
-                        width: size,
-                        height: size,
-                        child: GestureDetector(
-                          onSecondaryTapUp: (details) {
-                            _openCircleContextMenu(
-                              circle,
-                              details.globalPosition,
-                            );
-                          },
-                          onLongPressStart: (details) {
-                            _openCircleContextMenu(
-                              circle,
-                              details.globalPosition,
-                            );
-                          },
-                          onPanStart: (details) {
-                            _startCircleDrag(circle, details.localPosition);
-                          },
-                          onPanUpdate: (details) {
-                            _updateCircleDrag(circle, details);
-                          },
-                          onPanEnd: (details) {
-                            _endCircleDrag();
-                          },
-                          child: CircleInteractiveWidget(
-                            circle: circle,
-                            isSelected: selectedCircleId == circle.id,
-                            onSelect: () {
-                              setState(() {
-                                selectedCircleId = circle.id;
-                                selectedPersonId = null;
-                                createMenuWorldPos = null;
-                              });
-                            },
-                            onCenterDragStart: (details) {
-                              if (HardwareKeyboard.instance.isShiftPressed) {
-                                _startConnector(circle);
-                              } else {
-                                _startCircleSubtreeDrag(circle);
-                              }
-                            },
-                            onCenterDragUpdate: (details) {
-                              if (connectorSourceCircleId != null) {
-                                _updateConnector(details.globalPosition);
-                              } else {
-                                _updateCircleSubtreeDrag(details.delta);
-                              }
-                            },
-                            onCenterDragEnd: (details) {
-                              if (connectorSourceCircleId != null) {
-                                _endConnector(details.globalPosition);
-                              } else {
-                                _endCircleSubtreeDrag();
-                              }
-                            },
-                          ),
-                        ),
-                      );
-                    }),
-                  ],
+                  ),
                 ),
               ),
-            );
-          },
-        ),
-      ),
+            ),
+          ),
           Positioned.fill(
             child: RepaintBoundary(
               child: GestureDetector(
