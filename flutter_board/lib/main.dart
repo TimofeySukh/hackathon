@@ -483,11 +483,20 @@ class _MyHomePageState extends State<MyHomePage>
     final double targetTx = fx - wx * targetScale;
     final double targetTy = fy - wy * targetScale;
 
-    setState(() {
-      _transformationController.value = Matrix4.identity()
-        ..translateByDouble(targetTx, targetTy, 0.0, 1.0)
-        ..scaleByDouble(targetScale, targetScale, 1.0, 1.0);
-    });
+    final currentMatrix = _transformationController.value;
+    final double currentScale = currentMatrix.storage[0];
+    final double currentTx = currentMatrix.storage[12];
+    final double currentTy = currentMatrix.storage[13];
+
+    if ((targetScale - currentScale).abs() < 1e-7 &&
+        (targetTx - currentTx).abs() < 1e-7 &&
+        (targetTy - currentTy).abs() < 1e-7) {
+      return;
+    }
+
+    _transformationController.value = Matrix4.identity()
+      ..translateByDouble(targetTx, targetTy, 0.0, 1.0)
+      ..scaleByDouble(targetScale, targetScale, 1.0, 1.0);
 
     _setNavigating(true);
   }
@@ -518,11 +527,15 @@ class _MyHomePageState extends State<MyHomePage>
         final double targetTx = px - wx * targetScale;
         final double targetTy = py - wy * targetScale;
 
-        setState(() {
-          _transformationController.value = Matrix4.identity()
-            ..translateByDouble(targetTx, targetTy, 0.0, 1.0)
-            ..scaleByDouble(targetScale, targetScale, 1.0, 1.0);
-        });
+        if ((targetScale - currentScale).abs() < 1e-7 &&
+            (targetTx - tx).abs() < 1e-7 &&
+            (targetTy - ty).abs() < 1e-7) {
+          return;
+        }
+
+        _transformationController.value = Matrix4.identity()
+          ..translateByDouble(targetTx, targetTy, 0.0, 1.0)
+          ..scaleByDouble(targetScale, targetScale, 1.0, 1.0);
 
         _setNavigating(true);
         _settleNavigationSoon();
@@ -593,11 +606,15 @@ class _MyHomePageState extends State<MyHomePage>
     final double nextTx = px - wx * nextScale;
     final double nextTy = py - wy * nextScale;
 
-    setState(() {
-      _transformationController.value = Matrix4.identity()
-        ..translateByDouble(nextTx, nextTy, 0.0, 1.0)
-        ..scaleByDouble(nextScale, nextScale, 1.0, 1.0);
-    });
+    if ((nextScale - scale).abs() < 1e-7 &&
+        (nextTx - tx).abs() < 1e-7 &&
+        (nextTy - ty).abs() < 1e-7) {
+      return;
+    }
+
+    _transformationController.value = Matrix4.identity()
+      ..translateByDouble(nextTx, nextTy, 0.0, 1.0)
+      ..scaleByDouble(nextScale, nextScale, 1.0, 1.0);
   }
 
   void _resetDemo() {
@@ -1085,8 +1102,14 @@ class _MyHomePageState extends State<MyHomePage>
             child: Listener(
               onPointerSignal: _handlePointerSignal,
               child: ClipRect(
-                child: Transform(
-                  transform: _transformationController.value,
+                child: ValueListenableBuilder<Matrix4>(
+                  valueListenable: _transformationController,
+                  builder: (context, matrix, child) {
+                    return Transform(
+                      transform: matrix,
+                      child: child,
+                    );
+                  },
                   child: OverflowBox(
                     minWidth: worldSize,
                     maxWidth: worldSize,
