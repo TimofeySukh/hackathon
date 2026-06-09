@@ -1078,6 +1078,7 @@ class _MyHomePageState extends State<MyHomePage>
       body: Stack(
         children: [
           GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onScaleStart: _handleScaleStart,
             onScaleUpdate: _handleScaleUpdate,
             onScaleEnd: _handleScaleEnd,
@@ -1086,124 +1087,131 @@ class _MyHomePageState extends State<MyHomePage>
               child: ClipRect(
                 child: Transform(
                   transform: _transformationController.value,
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onTap: () {
-                      setState(() {
-                        createMenuWorldPos = null;
-                        createMenuScreenPos = null;
-                        createMenuSourceCircleId = null;
-                      });
-                    },
-                    child: SizedBox(
-                      width: worldSize,
-                      height: worldSize,
-                      child: Stack(
-                        children: [
-                          Positioned.fill(
-                            child: RepaintBoundary(
-                              child: CustomPaint(painter: GridPainter()),
+                  child: OverflowBox(
+                    minWidth: worldSize,
+                    maxWidth: worldSize,
+                    minHeight: worldSize,
+                    maxHeight: worldSize,
+                    alignment: Alignment.topLeft,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTap: () {
+                        setState(() {
+                          createMenuWorldPos = null;
+                          createMenuScreenPos = null;
+                          createMenuSourceCircleId = null;
+                        });
+                      },
+                      child: SizedBox(
+                        width: worldSize,
+                        height: worldSize,
+                        child: Stack(
+                          children: [
+                            Positioned.fill(
+                              child: RepaintBoundary(
+                                child: CustomPaint(painter: GridPainter()),
+                              ),
                             ),
-                          ),
-                          // Pass 1: Circle fills and borders
-                          ...sortedCircles.map((circle) {
-                            final double size = circle.radius * 2;
-                            return Positioned(
-                              left: circle.x - circle.radius + halfWorldSize,
-                              top: circle.y - circle.radius + halfWorldSize,
-                              width: size,
-                              height: size,
-                              child: IgnorePointer(
-                                child: RepaintBoundary(
-                                  child: CustomPaint(
-                                    painter: CircleShapePainter(
-                                      circle: circle,
-                                      isSelected: selectedCircleId == circle.id,
+                            // Pass 1: Circle fills and borders
+                            ...sortedCircles.map((circle) {
+                              final double size = circle.radius * 2;
+                              return Positioned(
+                                left: circle.x - circle.radius + halfWorldSize,
+                                top: circle.y - circle.radius + halfWorldSize,
+                                width: size,
+                                height: size,
+                                child: IgnorePointer(
+                                  child: RepaintBoundary(
+                                    child: CustomPaint(
+                                      painter: CircleShapePainter(
+                                        circle: circle,
+                                        isSelected: selectedCircleId == circle.id,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            );
-                          }),
-                          // Pass 2: Edge layer
-                          Positioned.fill(
-                            child: RepaintBoundary(
-                              child: CustomPaint(
-                                painter: EdgePainter(
-                                  circles: circles,
-                                  circlesById: circlesById,
-                                  connectorStart: connectorStartPos,
-                                  connectorEnd: connectorEndPos,
+                              );
+                            }),
+                            // Pass 2: Edge layer
+                            Positioned.fill(
+                              child: RepaintBoundary(
+                                child: CustomPaint(
+                                  painter: EdgePainter(
+                                    circles: circles,
+                                    circlesById: circlesById,
+                                    connectorStart: connectorStartPos,
+                                    connectorEnd: connectorEndPos,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                          // Pass 3: Circle interactive elements (hit area, center handle, label)
-                          ...sortedCircles.map((circle) {
-                            final double size = circle.radius * 2;
-                            return Positioned(
-                              left: circle.x - circle.radius + halfWorldSize,
-                              top: circle.y - circle.radius + halfWorldSize,
-                              width: size,
-                              height: size,
-                              child: GestureDetector(
-                                onSecondaryTapUp: (details) {
-                                  _openCircleContextMenu(
-                                    circle,
-                                    details.globalPosition,
-                                  );
-                                },
-                                onLongPressStart: (details) {
-                                  _openCircleContextMenu(
-                                    circle,
-                                    details.globalPosition,
-                                  );
-                                },
-                                onPanStart: (details) {
-                                  _startCircleDrag(circle, details.localPosition);
-                                },
-                                onPanUpdate: (details) {
-                                  _updateCircleDrag(circle, details);
-                                },
-                                onPanEnd: (details) {
-                                  _endCircleDrag();
-                                },
-                                child: CircleInteractiveWidget(
-                                  circle: circle,
-                                  isSelected: selectedCircleId == circle.id,
-                                  onSelect: () {
-                                    setState(() {
-                                      selectedCircleId = circle.id;
-                                      selectedPersonId = null;
-                                      createMenuWorldPos = null;
-                                    });
+                            // Pass 3: Circle interactive elements (hit area, center handle, label)
+                            ...sortedCircles.map((circle) {
+                              final double size = circle.radius * 2;
+                              return Positioned(
+                                left: circle.x - circle.radius + halfWorldSize,
+                                top: circle.y - circle.radius + halfWorldSize,
+                                width: size,
+                                height: size,
+                                child: GestureDetector(
+                                  onSecondaryTapUp: (details) {
+                                    _openCircleContextMenu(
+                                      circle,
+                                      details.globalPosition,
+                                    );
                                   },
-                                  onCenterDragStart: (details) {
-                                    if (HardwareKeyboard.instance.isShiftPressed) {
-                                      _startConnector(circle);
-                                    } else {
-                                      _startCircleSubtreeDrag(circle);
-                                    }
+                                  onLongPressStart: (details) {
+                                    _openCircleContextMenu(
+                                      circle,
+                                      details.globalPosition,
+                                    );
                                   },
-                                  onCenterDragUpdate: (details) {
-                                    if (connectorSourceCircleId != null) {
-                                      _updateConnector(details.globalPosition);
-                                    } else {
-                                      _updateCircleSubtreeDrag(details.delta);
-                                    }
+                                  onPanStart: (details) {
+                                    _startCircleDrag(circle, details.localPosition);
                                   },
-                                  onCenterDragEnd: (details) {
-                                    if (connectorSourceCircleId != null) {
-                                      _endConnector(details.globalPosition);
-                                    } else {
-                                      _endCircleSubtreeDrag();
-                                    }
+                                  onPanUpdate: (details) {
+                                    _updateCircleDrag(circle, details);
                                   },
+                                  onPanEnd: (details) {
+                                    _endCircleDrag();
+                                  },
+                                  child: CircleInteractiveWidget(
+                                    circle: circle,
+                                    isSelected: selectedCircleId == circle.id,
+                                    onSelect: () {
+                                      setState(() {
+                                        selectedCircleId = circle.id;
+                                        selectedPersonId = null;
+                                        createMenuWorldPos = null;
+                                      });
+                                    },
+                                    onCenterDragStart: (details) {
+                                      if (HardwareKeyboard.instance.isShiftPressed) {
+                                        _startConnector(circle);
+                                      } else {
+                                        _startCircleSubtreeDrag(circle);
+                                      }
+                                    },
+                                    onCenterDragUpdate: (details) {
+                                      if (connectorSourceCircleId != null) {
+                                        _updateConnector(details.globalPosition);
+                                      } else {
+                                        _updateCircleSubtreeDrag(details.delta);
+                                      }
+                                    },
+                                    onCenterDragEnd: (details) {
+                                      if (connectorSourceCircleId != null) {
+                                        _endConnector(details.globalPosition);
+                                      } else {
+                                        _endCircleSubtreeDrag();
+                                      }
+                                    },
+                                  ),
                                 ),
-                              ),
-                            );
-                          }),
-                        ],
+                              );
+                            }),
+                          ],
+                        ),
                       ),
                     ),
                   ),
