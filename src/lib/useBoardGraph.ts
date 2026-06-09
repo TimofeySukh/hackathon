@@ -195,8 +195,11 @@ export function useBoardGraph(user: User | null) {
         let errMsg = 'Unable to load board data.'
         if (error instanceof Error) {
           errMsg = error.message
-        } else if (error && typeof error === 'object' && 'message' in error && typeof (error as any).message === 'string') {
-          errMsg = (error as any).message
+        } else if (error && typeof error === 'object' && 'message' in error) {
+          const candidate = error as { message: unknown }
+          if (typeof candidate.message === 'string') {
+            errMsg = candidate.message
+          }
         }
 
         setGraphState({
