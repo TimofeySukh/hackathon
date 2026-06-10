@@ -34,6 +34,7 @@ type PersonNode = {
   sides?: number
   amplitude?: number
   imageUrl?: string
+  isFavorite?: boolean
 }
 
 type Connection = {
@@ -371,6 +372,15 @@ function App() {
       ),
     }))
     setSelectedItem(null)
+  }
+
+  function togglePersonFavorite(personId: string) {
+    setGraph((current) => ({
+      ...current,
+      people: current.people.map((p) =>
+        p.id === personId ? { ...p, isFavorite: !p.isFavorite } : p
+      ),
+    }))
   }
 
   function deleteCircle(circleId: string) {
@@ -1480,6 +1490,17 @@ function App() {
           {/* PASS 4: People Icons and Labels */}
           {graph.people.map((person) => {
             const isSelected = selectedItem?.type === 'person' && selectedItem?.id === person.id;
+            const parentCircle = circlesById.get(person.circleId)
+            const personColor = parentCircle ? MATERIAL_TONES[parentCircle.tone].centerBg : '#3F51B5'
+            const strokeColor = person.isFavorite
+              ? '#fbbf24' // Yellow (Amber 400)
+              : isSelected
+              ? '#2563eb' // Blue
+              : personColor // Group tone
+            const strokeWidth = person.isFavorite
+              ? (isSelected ? 4 : 3)
+              : (isSelected ? 2.5 : 1.5)
+
             return (
               <div
                 key={person.id}
@@ -1513,6 +1534,45 @@ function App() {
                     placeItems: 'center',
                   }}
                 >
+                  {/* Star Favorite Button overlay */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      togglePersonFavorite(person.id)
+                    }}
+                    onPointerDown={(e) => {
+                      e.stopPropagation()
+                    }}
+                    style={{
+                      position: 'absolute',
+                      top: -6,
+                      right: -6,
+                      width: 18,
+                      height: 18,
+                      borderRadius: '50%',
+                      background: '#ffffff',
+                      border: '1.5px solid rgba(0,0,0,0.08)',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.12)',
+                      display: 'grid',
+                      placeItems: 'center',
+                      cursor: 'pointer',
+                      zIndex: 12,
+                      padding: 0,
+                      outline: 'none',
+                    }}
+                    title={person.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                  >
+                    <svg viewBox="0 0 24 24" style={{ width: 11, height: 11 }}>
+                      <path
+                        d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
+                        fill={person.isFavorite ? '#fbbf24' : 'none'}
+                        stroke={person.isFavorite ? '#d97706' : '#94a3b8'}
+                        strokeWidth={2.5}
+                      />
+                    </svg>
+                  </button>
+
                   <svg viewBox="0 0 40 40" style={{ width: 40, height: 40, overflow: 'visible' }}>
                     <defs>
                       <clipPath id={`clip-${person.id}`}>
@@ -1523,10 +1583,7 @@ function App() {
                       <g>
                         <path
                           d={getNodePath(20, 20, 18, person.shapeType ?? 'polygon', person.sides ?? 8, person.amplitude ?? 2)}
-                          fill={(() => {
-                            const parentCircle = circlesById.get(person.circleId)
-                            return parentCircle ? MATERIAL_TONES[parentCircle.tone].centerBg : '#3F51B5'
-                          })()}
+                          fill={personColor}
                         />
                         <image
                           href={person.imageUrl}
@@ -1540,20 +1597,17 @@ function App() {
                         <path
                           d={getNodePath(20, 20, 18, person.shapeType ?? 'polygon', person.sides ?? 8, person.amplitude ?? 2)}
                           fill="none"
-                          stroke={isSelected ? '#2563eb' : '#ffffff'}
-                          strokeWidth={isSelected ? 2.5 : 1.5}
+                          stroke={strokeColor}
+                          strokeWidth={strokeWidth}
                         />
                       </g>
                     ) : (
                       <g>
                         <path
                           d={getNodePath(20, 20, 18, person.shapeType ?? 'polygon', person.sides ?? 8, person.amplitude ?? 2)}
-                          fill={(() => {
-                            const parentCircle = circlesById.get(person.circleId)
-                            return parentCircle ? MATERIAL_TONES[parentCircle.tone].centerBg : '#3F51B5'
-                          })()}
-                          stroke={isSelected ? '#2563eb' : '#ffffff'}
-                          strokeWidth={isSelected ? 2.5 : 1.5}
+                          fill={personColor}
+                          stroke={strokeColor}
+                          strokeWidth={strokeWidth}
                         />
                         <text
                           x="20"
@@ -1866,6 +1920,35 @@ function App() {
                     <dd>{circlesById.get(selectedPerson.circleId)?.name}</dd>
                   </div>
                 </dl>
+
+                <div className="inspector-field" style={{ marginTop: '8px', marginBottom: '8px' }}>
+                  <button
+                    type="button"
+                    className="primary-action"
+                    style={{
+                      background: selectedPerson.isFavorite ? '#fbbf24' : 'transparent',
+                      color: selectedPerson.isFavorite ? '#1c2528' : 'rgba(28, 37, 40, 0.8)',
+                      border: '1.5px solid #fbbf24',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      fontWeight: 700,
+                      width: '100%',
+                    }}
+                    onClick={() => togglePersonFavorite(selectedPerson.id)}
+                  >
+                    <svg viewBox="0 0 24 24" style={{ width: 14, height: 14 }}>
+                      <path
+                        d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
+                        fill={selectedPerson.isFavorite ? '#fbbf24' : 'none'}
+                        stroke={selectedPerson.isFavorite ? '#b45309' : 'currentColor'}
+                        strokeWidth={2}
+                      />
+                    </svg>
+                    {selectedPerson.isFavorite ? 'Starred (Favorite)' : 'Add to Favorites'}
+                  </button>
+                </div>
 
                 <div className="inspector-field">
                   <label>Shape Type</label>
