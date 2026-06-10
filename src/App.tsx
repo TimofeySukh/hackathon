@@ -413,6 +413,15 @@ function App() {
     setSelectedItem(null)
   }
 
+  function togglePersonFavorite(personId: string) {
+    setGraph((current) => ({
+      ...current,
+      people: current.people.map((p) =>
+        p.id === personId ? { ...p, isFavorite: !p.isFavorite } : p
+      ),
+    }))
+  }
+
   function addPersonNote(personId: string, title: string, body: string) {
     setGraph((current) => ({
       ...current,
@@ -1580,10 +1589,14 @@ function App() {
             const isSelected = selectedItem?.type === 'person' && selectedItem?.id === person.id;
             const parentCircle = circlesById.get(person.circleId)
             const personColor = parentCircle ? MATERIAL_TONES[parentCircle.tone].centerBg : '#3F51B5'
-            const strokeColor = isSelected
+            const strokeColor = person.isFavorite
+              ? '#fbbf24' // Yellow (Amber 400)
+              : isSelected
               ? '#2563eb' // Blue
               : personColor // Group tone
-            const strokeWidth = isSelected ? 2.5 : 1.5
+            const strokeWidth = person.isFavorite
+              ? (isSelected ? 4 : 3)
+              : (isSelected ? 2.5 : 1.5)
 
             return (
               <div
@@ -1618,65 +1631,6 @@ function App() {
                     placeItems: 'center',
                   }}
                 >
-                  {/* Notes Button overlay */}
-                  <button
-                    type="button"
-                    className="notes-btn"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setOpenNotesPersonId(openNotesPersonId === person.id ? null : person.id)
-                    }}
-                    onPointerDown={(e) => {
-                      e.stopPropagation()
-                    }}
-                    style={{
-                      position: 'absolute',
-                      top: -6,
-                      right: -6,
-                      width: 20,
-                      height: 20,
-                      borderRadius: '50%',
-                      background: '#ffffff',
-                      border: '1.5px solid rgba(0,0,0,0.08)',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.12)',
-                      display: 'grid',
-                      placeItems: 'center',
-                      cursor: 'pointer',
-                      zIndex: 12,
-                      padding: 0,
-                      outline: 'none',
-                    }}
-                    title="Notes"
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke={person.notes && person.notes.length > 0 ? '#2563eb' : '#94a3b8'} strokeWidth={2.5} style={{ width: 11, height: 11 }}>
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                      <polyline points="14 2 14 8 20 8" />
-                      <line x1="16" y1="13" x2="8" y2="13" />
-                      <line x1="16" y1="17" x2="8" y2="17" />
-                    </svg>
-                    {person.notes && person.notes.length > 0 && (
-                      <span
-                        style={{
-                          position: 'absolute',
-                          bottom: -3,
-                          right: -3,
-                          width: 10,
-                          height: 10,
-                          borderRadius: '50%',
-                          background: '#2563eb',
-                          color: '#ffffff',
-                          fontSize: '7px',
-                          fontWeight: 'bold',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        {person.notes.length}
-                      </span>
-                    )}
-                  </button>
-
                   <svg viewBox="0 0 40 40" style={{ width: 40, height: 40, overflow: 'visible' }}>
                     <defs>
                       <clipPath id={`clip-${person.id}`}>
@@ -1879,206 +1833,6 @@ function App() {
                   )}
                 </div>
                 <strong className="person-label">{person.name}</strong>
-
-                {/* Notes Popover */}
-                {openNotesPersonId === person.id && (
-                  <div
-                    className="notes-popover"
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onPointerUp={(e) => e.stopPropagation()}
-                    onClick={(e) => e.stopPropagation()}
-                    style={{
-                      position: 'absolute',
-                      left: 75,
-                      top: -20,
-                      width: 280,
-                      backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                      backdropFilter: 'blur(8px)',
-                      borderRadius: 12,
-                      border: '1px solid rgba(0,0,0,0.1)',
-                      boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)',
-                      padding: 14,
-                      zIndex: 200,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 12,
-                      textAlign: 'left',
-                      fontFamily: 'system-ui, -apple-system, sans-serif',
-                    }}
-                  >
-                    {/* Header */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(0,0,0,0.06)', paddingBottom: 6 }}>
-                      <span style={{ fontWeight: 700, fontSize: 13, color: '#1f2937' }}>Notes for {person.name}</span>
-                      <button
-                        type="button"
-                        onClick={() => setOpenNotesPersonId(null)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          padding: 2,
-                          color: '#9ca3af',
-                          display: 'grid',
-                          placeItems: 'center',
-                        }}
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} style={{ width: 14, height: 14 }}>
-                          <line x1="18" y1="6" x2="6" y2="18" />
-                          <line x1="6" y1="6" x2="18" y2="18" />
-                        </svg>
-                      </button>
-                    </div>
-
-                    {/* Notes list */}
-                    <div
-                      style={{
-                        maxHeight: 180,
-                        overflowY: 'auto',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 10,
-                        paddingRight: 4,
-                      }}
-                    >
-                      {(!person.notes || person.notes.length === 0) ? (
-                        <span style={{ fontSize: 11, color: '#9ca3af', fontStyle: 'italic', textAlign: 'center', margin: '10px 0' }}>
-                          No notes yet. Add one below.
-                        </span>
-                      ) : (
-                        person.notes.map((note) => (
-                          <div
-                            key={note.id}
-                            style={{
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: 4,
-                              backgroundColor: '#f9fafb',
-                              border: '1px solid #e5e7eb',
-                              borderRadius: 8,
-                              padding: 8,
-                              position: 'relative',
-                            }}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => deletePersonNote(person.id, note.id)}
-                              style={{
-                                position: 'absolute',
-                                top: 6,
-                                right: 6,
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                color: '#ef4444',
-                                padding: 2,
-                              }}
-                              title="Delete note"
-                            >
-                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ width: 12, height: 12 }}>
-                                <polyline points="3 6 5 6 21 6" />
-                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                              </svg>
-                            </button>
-
-                            <input
-                              type="text"
-                              value={note.title}
-                              onChange={(e) => updatePersonNote(person.id, note.id, e.target.value, note.body)}
-                              placeholder="Note title"
-                              style={{
-                                fontSize: 11,
-                                fontWeight: 600,
-                                border: 'none',
-                                background: 'transparent',
-                                padding: 0,
-                                color: '#374151',
-                                width: 'calc(100% - 16px)',
-                                outline: 'none',
-                              }}
-                            />
-
-                            <textarea
-                              value={note.body}
-                              onChange={(e) => updatePersonNote(person.id, note.id, note.title, e.target.value)}
-                              placeholder="Note content..."
-                              rows={2}
-                              style={{
-                                fontSize: 11,
-                                border: 'none',
-                                background: 'transparent',
-                                padding: 0,
-                                color: '#4b5563',
-                                resize: 'none',
-                                outline: 'none',
-                                width: '100%',
-                              }}
-                            />
-                          </div>
-                        ))
-                      )}
-                    </div>
-
-                    {/* Add note form */}
-                    <div
-                      style={{
-                        borderTop: '1px solid rgba(0,0,0,0.06)',
-                        paddingTop: 10,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 6,
-                      }}
-                    >
-                      <input
-                        type="text"
-                        placeholder="New note title..."
-                        value={newNoteTitle}
-                        onChange={(e) => setNewNoteTitle(e.target.value)}
-                        style={{
-                          fontSize: 11,
-                          padding: '6px 8px',
-                          borderRadius: 6,
-                          border: '1px solid #d1d5db',
-                          outline: 'none',
-                        }}
-                      />
-                      <textarea
-                        placeholder="Write a note..."
-                        value={newNoteBody}
-                        onChange={(e) => setNewNoteBody(e.target.value)}
-                        rows={2}
-                        style={{
-                          fontSize: 11,
-                          padding: '6px 8px',
-                          borderRadius: 6,
-                          border: '1px solid #d1d5db',
-                          resize: 'none',
-                          outline: 'none',
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!newNoteTitle.trim() && !newNoteBody.trim()) return
-                          addPersonNote(person.id, newNoteTitle.trim() || 'Untitled Note', newNoteBody.trim())
-                          setNewNoteTitle('')
-                          setNewNoteBody('')
-                        }}
-                        style={{
-                          backgroundColor: '#2563eb',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: 6,
-                          padding: '6px 12px',
-                          fontSize: 11,
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Add Note
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             )
           })}
@@ -2214,7 +1968,37 @@ function App() {
             )}
             {selectedPerson && (
               <>
-                <dl>
+                {/* Favorite Star Button at top-right of inspector */}
+                <button
+                  type="button"
+                  className="star-favorite-btn"
+                  onClick={() => togglePersonFavorite(selectedPerson.id)}
+                  style={{
+                    position: 'absolute',
+                    top: 18,
+                    right: 18,
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'grid',
+                    placeItems: 'center',
+                    padding: 4,
+                    zIndex: 20,
+                    outline: 'none',
+                  }}
+                  title={selectedPerson.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                >
+                  <svg viewBox="0 0 24 24" style={{ width: 20, height: 20 }}>
+                    <path
+                      d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
+                      fill={selectedPerson.isFavorite ? '#fbbf24' : 'none'}
+                      stroke={selectedPerson.isFavorite ? '#d97706' : '#94a3b8'}
+                      strokeWidth={2}
+                    />
+                  </svg>
+                </button>
+
+                <dl style={{ paddingRight: '28px' }}>
                   <div>
                     <dt>Role</dt>
                     <dd>{selectedPerson.role}</dd>
@@ -2364,69 +2148,85 @@ function App() {
                   </div>
                 </div>
 
-                <div className="inspector-field">
-                  <label>Shape Type</label>
-                  <select
-                    value={selectedPerson.shapeType ?? 'polygon'}
-                    onChange={(e) => updatePersonStyle(selectedPerson.id, { shapeType: e.target.value as ShapeType })}
-                  >
-                    <option value="polygon">Soft Polygon</option>
-                    <option value="wavy">Wavy (Flower)</option>
-                    <option value="circle">Circle</option>
-                  </select>
-                </div>
-                
-                {(selectedPerson.shapeType ?? 'polygon') !== 'circle' && (
-                  <>
+                {/* Collapsible Appearance Settings */}
+                <details style={{ marginTop: '14px', cursor: 'pointer' }}>
+                  <summary style={{ fontWeight: 650, fontSize: '12.5px', color: '#4b5563', padding: '6px 0', borderTop: '1px solid #e5e7eb', outline: 'none' }}>
+                    Style & Appearance
+                  </summary>
+                  <div style={{ padding: '8px 0', display: 'flex', flexDirection: 'column', gap: '10px', cursor: 'default' }}>
                     <div className="inspector-field">
-                      <label>Sides / Petals ({selectedPerson.sides ?? 8})</label>
+                      <label>Shape Type</label>
+                      <select
+                        value={selectedPerson.shapeType ?? 'polygon'}
+                        onChange={(e) => updatePersonStyle(selectedPerson.id, { shapeType: e.target.value as ShapeType })}
+                      >
+                        <option value="polygon">Soft Polygon</option>
+                        <option value="wavy">Wavy (Flower)</option>
+                        <option value="circle">Circle</option>
+                      </select>
+                    </div>
+                    
+                    {(selectedPerson.shapeType ?? 'polygon') !== 'circle' && (
+                      <>
+                        <div className="inspector-field">
+                          <label>Sides / Petals ({selectedPerson.sides ?? 8})</label>
+                          <input
+                            type="range"
+                            min="3"
+                            max="20"
+                            value={selectedPerson.sides ?? 8}
+                            onChange={(e) => updatePersonStyle(selectedPerson.id, { sides: parseInt(e.target.value) })}
+                          />
+                        </div>
+                        <div className="inspector-field">
+                          <label>Amplitude / Rounding ({selectedPerson.amplitude ?? 2})</label>
+                          <input
+                            type="range"
+                            min="0"
+                            max="20"
+                            value={selectedPerson.amplitude ?? 2}
+                            onChange={(e) => updatePersonStyle(selectedPerson.id, { amplitude: parseFloat(e.target.value) })}
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    <div className="inspector-field">
+                      <label>Photo Image URL</label>
                       <input
-                        type="range"
-                        min="3"
-                        max="20"
-                        value={selectedPerson.sides ?? 8}
-                        onChange={(e) => updatePersonStyle(selectedPerson.id, { sides: parseInt(e.target.value) })}
+                        type="text"
+                        placeholder="https://example.com/image.jpg"
+                        value={selectedPerson.imageUrl ?? ''}
+                        onChange={(e) => updatePersonStyle(selectedPerson.id, { imageUrl: e.target.value })}
                       />
                     </div>
                     <div className="inspector-field">
-                      <label>Amplitude / Rounding ({selectedPerson.amplitude ?? 2})</label>
+                      <label>Upload Photo</label>
                       <input
-                        type="range"
-                        min="0"
-                        max="20"
-                        value={selectedPerson.amplitude ?? 2}
-                        onChange={(e) => updatePersonStyle(selectedPerson.id, { amplitude: parseFloat(e.target.value) })}
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleImageUpload(e, (base64) => updatePersonStyle(selectedPerson.id, { imageUrl: base64 }))}
                       />
                     </div>
-                  </>
-                )}
+                  </div>
+                </details>
 
-                <div className="inspector-field">
-                  <label>Photo Image URL</label>
-                  <input
-                    type="text"
-                    placeholder="https://example.com/image.jpg"
-                    value={selectedPerson.imageUrl ?? ''}
-                    onChange={(e) => updatePersonStyle(selectedPerson.id, { imageUrl: e.target.value })}
-                  />
-                </div>
-                <div className="inspector-field">
-                  <label>Upload Photo</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleImageUpload(e, (base64) => updatePersonStyle(selectedPerson.id, { imageUrl: base64 }))}
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  className="primary-action"
-                  style={{ marginTop: '16px', background: '#dc2626' }}
-                  onClick={() => deletePerson(selectedPerson.id)}
-                >
-                  Delete Person
-                </button>
+                {/* Collapsible Actions */}
+                <details style={{ marginTop: '8px', cursor: 'pointer' }}>
+                  <summary style={{ fontWeight: 650, fontSize: '12.5px', color: '#4b5563', padding: '6px 0', borderTop: '1px solid #e5e7eb', outline: 'none' }}>
+                    Actions
+                  </summary>
+                  <div style={{ padding: '8px 0', cursor: 'default' }}>
+                    <button
+                      type="button"
+                      className="primary-action"
+                      style={{ background: '#dc2626', width: '100%' }}
+                      onClick={() => deletePerson(selectedPerson.id)}
+                    >
+                      Delete Person
+                    </button>
+                  </div>
+                </details>
               </>
             )}
             {selectedConnection && (() => {
