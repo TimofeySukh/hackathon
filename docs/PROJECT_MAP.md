@@ -57,6 +57,9 @@ Completed tasks can remain listed here when they explain repository history. Liv
 - `docs/PROBLEMS.md`: known open and resolved problems that must stay visible across work sessions.
 - `docs/product-vision.md`: product direction and scope.
 - `docs/project-structure.md`: file-by-file project structure notes.
+- `docs/DESIGN_SYSTEM.md`: Material 3 design language, tokens, and component recipes that all UI must follow.
+- `docs/features/`: one document per user-facing feature (look and behavior), with a template and index.
+- `docs/DESIGN_LOG.md`: append-only log of durable design decisions.
 - `README.md`: top-level overview and local development commands.
 - `.env.mcp.example`: local-only MCP environment template for service-role access.
 - `.mcp.json`: project MCP configuration for the local Hackathon board stdio server.
@@ -86,6 +89,7 @@ Task ownership is tracked in Linear. Code ownership is not split by directory ye
 - Link any implementation task or pull request back to the relevant Linear issue.
 - Update `docs/product-vision.md` when product scope changes.
 - Update `docs/project-structure.md` and `docs/ARCHITECTURE.md` when source structure or boundaries change.
+- Follow `docs/DESIGN_SYSTEM.md` for UI work, keep a feature doc under `docs/features/` for each feature, and log durable design decisions in `docs/DESIGN_LOG.md`.
 - Keep the local MCP server aligned with the Supabase schema and documentation resources.
 - Keep Supabase Auth redirect URLs and Google OAuth origins aligned with every deployed frontend origin.
 - Remember that commits on `main` deploy to the primary production site within about 3 minutes after they reach GitHub.
