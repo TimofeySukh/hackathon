@@ -93,6 +93,7 @@ Contains the board experience:
 - drag node repositioning
 - double-click and double-tap board node creation
 - proximity blob groups that form when a dragged person is dropped near another person or touching an existing blob area
+- blob-area dragging that moves every non-root member in the group together
 - theme toggle
 - infinite board surface positioning
 
@@ -171,6 +172,7 @@ It currently supports:
 - one manually refreshed AI summary record per person in the database with `status`, plain-text `summary`, structured JSON data, and sync error state
 - double-click on the empty board with a mouse, or double-tap the empty board on touch devices, to create a new person
 - drag a person close to another person, or touching an existing blob area, and release to create or extend a soft blob group
+- drag the middle of a blob area to move the whole blob group
 - blob groups keep the color of the first stationary target person and arrange members around the group center
 - selected-node detail cards with a large name field, searchable tag selection/creation/deletion, compact auto-saving notes, and person deletion
 - single-click opening for the node-anchored inspector

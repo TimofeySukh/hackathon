@@ -2839,6 +2839,64 @@ function App() {
     void createPersonAtClientPoint(event.clientX, event.clientY)
   }
 
+  const startNodeDrag = useCallback((nodeIds: string[], clientX: number, clientY: number, pointerId: number) => {
+    const dragNodeIds = nodeIds.filter((nodeId) => {
+      const node = nodesById[nodeId]
+      return node && !node.is_root
+    })
+    if (dragNodeIds.length === 0) return false
+
+    const originPositions = Object.fromEntries(
+      dragNodeIds.map((nodeId) => {
+        const dragNode = nodesById[nodeId]
+        return [nodeId, { x: dragNode.x, y: dragNode.y }]
+      }),
+    ) as Record<string, Offset>
+    const nextNodeDrag = {
+      nodeIds: dragNodeIds,
+      startClientX: clientX,
+      startClientY: clientY,
+      originPositions,
+    }
+
+    activePointerIdRef.current = pointerId
+    boardDragRef.current.active = false
+    setIsDraggingBoard(false)
+    nodeDragStateRef.current = nextNodeDrag
+    setNodeDrag(nextNodeDrag)
+    return true
+  }, [nodesById])
+
+  const startNodeGroupInteraction = useCallback(
+    (groupId: string, event: ReactPointerEvent<SVGPathElement>) => {
+      if (event.button !== 0 || !event.isPrimary || nodeDrag || connectionDrag) return
+      if (!isGraphReady) return
+
+      const group = nodeGroupsRef.current.find((candidateGroup) => candidateGroup.id === groupId)
+      if (!group) return
+
+      event.preventDefault()
+      event.stopPropagation()
+
+      const didStartDrag = startNodeDrag(group.memberIds, event.clientX, event.clientY, event.pointerId)
+      if (!didStartDrag) return
+
+      event.currentTarget.setPointerCapture(event.pointerId)
+      setSelectedNodeId(null)
+      setInspectorNodeId(null)
+      setSelectedConnectionId(null)
+      setConnectionMenuPosition(null)
+      setMultiSelectedNodeIds(
+        group.memberIds.filter((nodeId) => {
+          const node = nodesById[nodeId]
+          return node && !node.is_root
+        }),
+      )
+      closeTransientUi()
+    },
+    [closeTransientUi, connectionDrag, isGraphReady, nodeDrag, nodesById, startNodeDrag],
+  )
+
   const startNodeInteraction = useCallback((node: PersonNode, event: ReactPointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return
 
@@ -2868,7 +2926,6 @@ function App() {
 
     if (!isGraphReady) return
 
-    activePointerIdRef.current = event.pointerId
     if (!node.is_root) {
       const dragNodeIds =
         multiSelectedNodeIdSet.has(node.id) && multiSelectedNodeIds.length > 1
@@ -2876,23 +2933,17 @@ function App() {
               .filter((candidateNode) => multiSelectedNodeIdSet.has(candidateNode.id) && !candidateNode.is_root)
               .map((candidateNode) => candidateNode.id)
           : [node.id]
-      const originPositions = Object.fromEntries(
-        dragNodeIds.map((nodeId) => {
-          const dragNode = nodesById[nodeId]
-          return [nodeId, { x: dragNode.x, y: dragNode.y }]
-        }),
-      ) as Record<string, Offset>
-      const nextNodeDrag = {
-        nodeIds: dragNodeIds,
-        startClientX: event.clientX,
-        startClientY: event.clientY,
-        originPositions,
-      }
-      nodeDragStateRef.current = nextNodeDrag
-      setNodeDrag(nextNodeDrag)
+      startNodeDrag(dragNodeIds, event.clientX, event.clientY, event.pointerId)
       return
     }
-  }, [beginTouchPinch, isGraphReady, multiSelectedNodeIdSet, multiSelectedNodeIds.length, nodesById, visibleBoardNodes])
+  }, [
+    beginTouchPinch,
+    isGraphReady,
+    multiSelectedNodeIdSet,
+    multiSelectedNodeIds.length,
+    startNodeDrag,
+    visibleBoardNodes,
+  ])
 
   const markTrackpadPanActive = useCallback(() => {
     trackpadPanRef.current.active = true
@@ -4868,6 +4919,7 @@ function App() {
                   fill: groupBubble.fill,
                   stroke: groupBubble.stroke,
                 }}
+                onPointerDown={(event) => startNodeGroupInteraction(groupBubble.id, event)}
               />
             ))}
 
