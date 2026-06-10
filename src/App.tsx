@@ -778,6 +778,24 @@ function arrangeGroupMembers(nodes: PersonNode[], memberIds: string[]) {
   return positions
 }
 
+function getDraggedNodePositions(currentNodeDrag: NodeDrag, currentPositions: Record<string, Offset>) {
+  return currentNodeDrag.nodeIds.reduce<Record<string, Offset>>((positions, nodeId) => {
+    const finalPosition = currentPositions[nodeId] ?? currentNodeDrag.originPositions[nodeId]
+    if (finalPosition) positions[nodeId] = finalPosition
+    return positions
+  }, {})
+}
+
+function getNodeDragCenter(nodeIds: string[], positions: Record<string, Offset>) {
+  const nodes = nodeIds.map((nodeId) => positions[nodeId]).filter(Boolean) as Offset[]
+  if (nodes.length === 0) return null
+
+  return {
+    x: nodes.reduce((sum, node) => sum + node.x, 0) / nodes.length,
+    y: nodes.reduce((sum, node) => sum + node.y, 0) / nodes.length,
+  }
+}
+
 type GraphEdgeProps = {
   edge: Connection
   fromNode: PersonNode
@@ -2228,13 +2246,23 @@ function App() {
 
       const currentNodes = boardNodesRef.current
       const draggedIdSet = new Set(draggedNodeIds)
-      const draggedNodes = draggedNodeIds.map((nodeId) => currentNodes.find((node) => node.id === nodeId)).filter(Boolean) as PersonNode[]
-      if (draggedNodes.length === 0) return false
+      const draggedPositions = getDraggedNodePositions(currentNodeDrag, draggedPositionsRef.current)
+      const draggedCenter = getNodeDragCenter(draggedNodeIds, draggedPositions)
+      if (!draggedCenter) return false
 
-      const draggedCenter = {
-        x: draggedNodes.reduce((sum, node) => sum + node.x, 0) / draggedNodes.length,
-        y: draggedNodes.reduce((sum, node) => sum + node.y, 0) / draggedNodes.length,
+      const currentGroups = nodeGroupsRef.current
+      const candidateGroupNodes = currentNodes.filter((node) => !draggedIdSet.has(node.id))
+      const groupBubbles = getNodeGroupBubbles(currentGroups, candidateGroupNodes)
+      const targetBubble = groupBubbles.find((bubble) => isPointInSvgPath(draggedCenter, bubble.path))
+      if (targetBubble) {
+        const targetGroup = currentGroups.find((group) => group.id === targetBubble.id) ?? null
+        const targetMemberId = targetGroup?.memberIds.find((memberId) => !draggedIdSet.has(memberId))
+        const targetNode = targetMemberId ? currentNodes.find((node) => node.id === targetMemberId) ?? null : null
+        if (targetNode) {
+          return addNodesToGroup(draggedNodeIds, targetNode, targetGroup)
+        }
       }
+
       const targetNode = currentNodes
         .filter((node) => !node.is_root && !draggedIdSet.has(node.id))
         .map((node) => ({ node, distance: Math.hypot(node.x - draggedCenter.x, node.y - draggedCenter.y) }))
@@ -2245,8 +2273,8 @@ function App() {
         return addNodesToGroup(draggedNodeIds, targetNode)
       }
 
-      if (draggedNodes.length === 1) {
-        return addNodeToContainingGroup(draggedNodes[0].id, draggedNodes[0])
+      if (draggedNodeIds.length === 1) {
+        return addNodeToContainingGroup(draggedNodeIds[0], draggedCenter)
       }
 
       return false

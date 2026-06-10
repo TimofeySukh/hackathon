@@ -92,7 +92,7 @@ Contains the board experience:
 - viewport-capped interactive social graph node and connection rendering
 - drag node repositioning
 - double-click and double-tap board node creation
-- proximity blob groups that form when a dragged person is dropped near another person
+- proximity blob groups that form when a dragged person is dropped near another person or inside an existing blob area
 - theme toggle
 - infinite board surface positioning
 
@@ -170,7 +170,7 @@ It currently supports:
 - dense graph canvas overview drawing with capped interactive DOM/SVG rendering near the viewport
 - one manually refreshed AI summary record per person in the database with `status`, plain-text `summary`, structured JSON data, and sync error state
 - double-click on the empty board with a mouse, or double-tap the empty board on touch devices, to create a new person
-- drag a person close to another person and release to create or extend a soft blob group
+- drag a person close to another person, or into an existing blob area, and release to create or extend a soft blob group
 - blob groups keep the color of the first stationary target person and arrange members around the group center
 - selected-node detail cards with a large name field, searchable tag selection/creation/deletion, compact auto-saving notes, and person deletion
 - single-click opening for the node-anchored inspector

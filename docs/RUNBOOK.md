@@ -37,7 +37,7 @@ Current app behavior:
 - export graph data, delete graph data, or delete account data from the account menu
 - keep large graphs responsive with a canvas overview layer, viewport-capped DOM nodes, capped SVG connections, and label level-of-detail
 - drag a right-click selection box to select multiple people, then drag one of them to move the group
-- create people with a board double-click or double-tap, and form soft blob groups by dropping one person near another
+- create people with a board double-click or double-tap, and form soft blob groups by dropping one person near another or inside an existing blob area
 - use a mobile layout with the search field and account/theme controls at the top and the Tags control docked near the bottom-left safe area
 - avoid selecting connection lines on coarse touch pointers so mobile board panning does not accidentally open the delete-connection menu
 - simplify some heavy visual effects while dragging and on very dense boards to keep navigation responsive
@@ -402,7 +402,7 @@ Manual verification:
 19. Open the top-bar tag menu, toggle a tag color palette from its swatch, change the color, and confirm the selected person inspector still shows the chosen tag with a visible color accent after the picker closes.
 20. Create a new person with a double-click, confirm the inspector opens automatically, confirm an empty person focuses the name field, then fill the note capture textarea and save a new note both with `Cmd/Ctrl + Enter` and by blurring the textarea.
 21. Create a note by typing into the `Create new note` field, confirm saved notes start collapsed by default, expand one with the chevron, press Enter in the title to open the body, delete a note from the icon button, reload, and confirm note changes persist.
-22. Drop one person near another, confirm a small blob group appears in the stationary target person's color, then add a third person and confirm the group keeps its original color while members arrange around the center.
+22. Drop one person near another, confirm a small blob group appears in the stationary target person's color, then add a third person by dropping it inside the blob area and confirm the group keeps its original color while members arrange around the center.
 23. Open the top-left Tags menu, create enough tags to overflow the panel, scroll to the lower tags, adjust a lower tag color, and confirm the palette remains reachable.
 24. Open the top-left Tags menu, create a tag, adjust its color, toggle one tag off with the visibility checkbox, and confirm both tagged nodes and their connections disappear. Use `Select all` and `Clear all` to confirm bulk visibility controls work.
 25. Open the search layer and verify that typing a person name, tag, or note text returns local matching people.
