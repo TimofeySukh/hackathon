@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react'
+import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react'
 
 type CircleTone = 'blue' | 'red' | 'green' | 'amber' | 'violet'
 
@@ -36,9 +36,16 @@ type PersonNode = {
   imageUrl?: string
 }
 
+type Connection = {
+  id: string
+  fromId: string
+  toId: string
+}
+
 type GraphState = {
   circles: CircleNode[]
   people: PersonNode[]
+  connections: Connection[]
 }
 
 type StressSettings = {
@@ -54,7 +61,8 @@ type Camera = {
 }
 
 type DragConnector = {
-  sourceCircleId: string
+  sourceId: string
+  sourceType: 'circle' | 'person'
   startX: number
   startY: number
   endX: number
@@ -215,6 +223,7 @@ const DEFAULT_STATE: GraphState = {
     { id: 'p15', name: 'Lina', role: 'Media', x: 423, y: 4, circleId: 'market', avatar: 'LI', shapeType: 'polygon', sides: 12, amplitude: 2 },
     { id: 'p16', name: 'Yara', role: 'Analyst', x: 580, y: 198, circleId: 'market', avatar: 'YA', shapeType: 'polygon', sides: 8, amplitude: 2 },
   ],
+  connections: [],
 }
 
 const TONE_LABELS: Record<CircleTone, string> = {
@@ -331,11 +340,17 @@ function App() {
   const resizeCircleRef = useRef<ResizeCircleState | null>(null)
   const [graph, setGraph] = useState(createInitialGraph)
   const [camera, setCamera] = useState<Camera>({ x: window.innerWidth / 2, y: window.innerHeight / 2, scale: 0.82 })
+  const cameraRef = useRef(camera)
+
   const [connector, setConnector] = useState<DragConnector | null>(null)
   const [createMenu, setCreateMenu] = useState<CreateMenu | null>(null)
   const [selectedItem, setSelectedItem] = useState<SelectedItem>({ type: 'circle', id: 'you' })
   const [stress, setStress] = useState<StressSettings>({ count: 0, showLabels: false, showEdges: true })
   const fps = useFrameRate()
+
+  useEffect(() => {
+    cameraRef.current = camera
+  }, [camera])
 
   const circlesById = useMemo(() => new Map(graph.circles.map((circle) => [circle.id, circle])), [graph.circles])
   const stressPeople = useMemo(() => generateStressPeople(stress.count), [stress.count])
@@ -377,6 +392,47 @@ function App() {
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [camera, circlesById, stress, stressPeople, stressSprites])
+
+  useEffect(() => {
+    const surface = surfaceRef.current
+    if (!surface) return
+
+    function handleWheel(event: WheelEvent) {
+      event.preventDefault()
+      const activeSurface = surfaceRef.current
+      if (!activeSurface) return
+      const rect = activeSurface.getBoundingClientRect()
+      if (!rect) return
+
+      const pointer = { x: event.clientX - rect.left, y: event.clientY - rect.top }
+      const currentCamera = cameraRef.current
+      const before = {
+        x: (pointer.x - currentCamera.x) / currentCamera.scale,
+        y: (pointer.y - currentCamera.y) / currentCamera.scale,
+      }
+
+      if (event.ctrlKey) {
+        const zoomIntensity = 0.015
+        const nextScale = clamp(currentCamera.scale * Math.exp(-event.deltaY * zoomIntensity), MIN_SCALE, MAX_SCALE)
+        setCamera({
+          scale: nextScale,
+          x: pointer.x - before.x * nextScale,
+          y: pointer.y - before.y * nextScale,
+        })
+      } else {
+        setCamera((current) => ({
+          ...current,
+          x: current.x - event.deltaX,
+          y: current.y - event.deltaY,
+        }))
+      }
+    }
+
+    surface.addEventListener('wheel', handleWheel, { passive: false })
+    return () => {
+      surface.removeEventListener('wheel', handleWheel)
+    }
+  }, [])
 
   function screenToWorld(point: { x: number; y: number }) {
     return {
@@ -462,44 +518,80 @@ function App() {
 
     const distance = Math.hypot(connector.endX - connector.startX, connector.endY - connector.startY)
     if (distance > CONNECT_THRESHOLD) {
-      setCreateMenu({
-        sourceCircleId: connector.sourceCircleId,
-        x: connector.endX,
-        y: connector.endY,
-        screenX: event.clientX,
-        screenY: event.clientY,
-      })
+      const targetPerson = graph.people.find(
+        (p) => Math.hypot(p.x - connector.endX, p.y - connector.endY) < 30
+      )
+      const targetCircle = graph.circles.find(
+        (c) => Math.hypot(c.x - connector.endX, c.y - connector.endY) < 30
+      )
+
+      if (targetPerson && targetPerson.id !== connector.sourceId) {
+        setGraph((current) => ({
+          ...current,
+          connections: [
+            ...current.connections,
+            {
+              id: `conn-${Date.now()}`,
+              fromId: connector.sourceId,
+              toId: targetPerson.id,
+            },
+          ],
+        }))
+      } else if (targetCircle && targetCircle.id !== connector.sourceId) {
+        if (connector.sourceType === 'circle') {
+          setGraph((current) => ({
+            ...current,
+            circles: current.circles.map((c) =>
+              c.id === connector.sourceId ? { ...c, connectedTo: targetCircle.id } : c
+            ),
+          }))
+        } else {
+          setGraph((current) => ({
+            ...current,
+            connections: [
+              ...current.connections,
+              {
+                id: `conn-${Date.now()}`,
+                fromId: connector.sourceId,
+                toId: targetCircle.id,
+              },
+            ],
+          }))
+        }
+      } else {
+        if (connector.sourceType === 'circle') {
+          setCreateMenu({
+            sourceCircleId: connector.sourceId,
+            x: connector.endX,
+            y: connector.endY,
+            screenX: event.clientX,
+            screenY: event.clientY,
+          })
+        }
+      }
     }
     setConnector(null)
   }
 
-  function handleWheel(event: ReactWheelEvent<HTMLDivElement>) {
-    event.preventDefault()
-    const rect = surfaceRef.current?.getBoundingClientRect()
-    if (!rect) return
-
-    const pointer = { x: event.clientX - rect.left, y: event.clientY - rect.top }
-    const before = screenToWorld(pointer)
-    const nextScale = clamp(camera.scale * Math.exp(-event.deltaY * 0.001), MIN_SCALE, MAX_SCALE)
-    setCamera({
-      scale: nextScale,
-      x: pointer.x - before.x * nextScale,
-      y: pointer.y - before.y * nextScale,
-    })
-  }
-
-  function startConnector(event: ReactPointerEvent<HTMLElement>, circle: CircleNode) {
+  function startConnector(
+    event: ReactPointerEvent<HTMLElement>,
+    sourceId: string,
+    sourceType: 'circle' | 'person',
+    startX: number,
+    startY: number
+  ) {
     event.preventDefault()
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
     setCreateMenu(null)
-    setSelectedItem({ type: 'circle', id: circle.id })
+    setSelectedItem({ type: sourceType, id: sourceId })
     setConnector({
-      sourceCircleId: circle.id,
-      startX: circle.x,
-      startY: circle.y,
-      endX: circle.x,
-      endY: circle.y,
+      sourceId,
+      sourceType,
+      startX,
+      startY,
+      endX: startX,
+      endY: startY,
     })
   }
 
@@ -518,12 +610,11 @@ function App() {
   }
 
   function startCircleCenterDrag(event: ReactPointerEvent<HTMLButtonElement>, circle: CircleNode) {
-    if (event.shiftKey) {
-      startConnector(event, circle)
-      return
-    }
+    startConnector(event, circle.id, 'circle', circle.x, circle.y)
+  }
 
-    startCircleMove(event, circle)
+  function startPersonConnection(event: ReactPointerEvent<HTMLElement>, person: PersonNode) {
+    startConnector(event, person.id, 'person', person.x, person.y)
   }
 
   function startCircleSurfaceDrag(event: ReactPointerEvent<HTMLElement>, circle: CircleNode) {
@@ -556,7 +647,7 @@ function App() {
     })
   }
 
-  function startPersonMove(event: ReactPointerEvent<HTMLButtonElement>, person: PersonNode) {
+  function startPersonMove(event: ReactPointerEvent<HTMLElement>, person: PersonNode) {
     event.preventDefault()
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -809,7 +900,6 @@ function App() {
         onPointerMove={handleSurfacePointerMove}
         onPointerUp={handleSurfacePointerUp}
         onPointerCancel={handleSurfacePointerUp}
-        onWheel={handleWheel}
       >
         <canvas ref={stressCanvasRef} className="stress-canvas-layer" aria-hidden="true" />
 
@@ -860,6 +950,21 @@ function App() {
               if (!circle) return null
               return <path key={person.id} className="edge edge--person" d={makeCurve(circle, person)} />
             })}
+            {(graph.connections || []).map((conn) => {
+              const sourceNode = graph.people.find((p) => p.id === conn.fromId) || circlesById.get(conn.fromId)
+              const targetNode = graph.people.find((p) => p.id === conn.toId) || circlesById.get(conn.toId)
+              if (!sourceNode || !targetNode) return null
+              return (
+                <path
+                  key={conn.id}
+                  className="edge edge--custom"
+                  d={makeCurve(sourceNode, targetNode)}
+                  stroke="#2563eb"
+                  strokeWidth={2}
+                  fill="none"
+                />
+              )
+            })}
             {connector ? <path className="edge edge--draft" d={makeCurve({ x: connector.startX, y: connector.startY }, { x: connector.endX, y: connector.endY })} /> : null}
           </svg>
 
@@ -879,9 +984,7 @@ function App() {
               onPointerDown={(event) => startCircleSurfaceDrag(event, circle)}
             >
               <span className="circle__label">{circle.name}</span>
-              <button
-                type="button"
-                className={`circle-center ${selectedItem.type === 'circle' && selectedItem.id === circle.id ? 'is-selected' : ''}`}
+              <div
                 style={{
                   position: 'absolute',
                   left: circle.radius,
@@ -889,142 +992,331 @@ function App() {
                   width: 40,
                   height: 40,
                   transform: 'translate(-50%, -50%)',
-                  background: circle.imageUrl ? 'transparent' : MATERIAL_TONES[circle.tone].centerBg,
-                  border: 'none',
-                  borderRadius: '50%',
-                  display: 'grid',
-                  placeItems: 'center',
-                  cursor: 'grab',
-                  padding: 0,
-                  outline: 'none',
+                  pointerEvents: 'none',
                 }}
-                onPointerDown={(event) => startCircleCenterDrag(event, circle)}
-                onClick={(event) => {
-                  event.stopPropagation()
-                  setSelectedItem({ type: 'circle', id: circle.id })
-                }}
-                title="Drag to move. Shift-drag to create from this center."
               >
-                {circle.imageUrl ? (
-                  <svg viewBox="0 0 40 40" style={{ width: 40, height: 40, borderRadius: '50%' }}>
-                    <clipPath id={`clip-center-${circle.id}`}>
-                      <circle cx="20" cy="20" r="17" />
-                    </clipPath>
-                    <circle cx="20" cy="20" r="17" fill={MATERIAL_TONES[circle.tone].centerBg} />
-                    <image
-                      href={circle.imageUrl}
-                      x="3"
-                      y="3"
-                      width="34"
-                      height="34"
-                      preserveAspectRatio="xMidYMid slice"
-                      clipPath={`url(#clip-center-${circle.id})`}
+                <button
+                  type="button"
+                  className={`circle-center ${selectedItem.type === 'circle' && selectedItem.id === circle.id ? 'is-selected' : ''}`}
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    background: circle.imageUrl ? 'transparent' : MATERIAL_TONES[circle.tone].centerBg,
+                    border: 'none',
+                    borderRadius: '50%',
+                    display: 'grid',
+                    placeItems: 'center',
+                    cursor: 'crosshair',
+                    padding: 0,
+                    outline: 'none',
+                    pointerEvents: 'auto',
+                  }}
+                  onPointerDown={(event) => startCircleCenterDrag(event, circle)}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setSelectedItem({ type: 'circle', id: circle.id })
+                  }}
+                  title="Drag to connect. Drag empty space inside circle to move."
+                >
+                  {circle.imageUrl ? (
+                    <svg viewBox="0 0 40 40" style={{ width: 40, height: 40, borderRadius: '50%' }}>
+                      <clipPath id={`clip-center-${circle.id}`}>
+                        <circle cx="20" cy="20" r="17" />
+                      </clipPath>
+                      <circle cx="20" cy="20" r="17" fill={MATERIAL_TONES[circle.tone].centerBg} />
+                      <image
+                        href={circle.imageUrl}
+                        x="3"
+                        y="3"
+                        width="34"
+                        height="34"
+                        preserveAspectRatio="xMidYMid slice"
+                        clipPath={`url(#clip-center-${circle.id})`}
+                      />
+                      <circle cx="20" cy="20" r="18.5" fill="none" stroke="#ffffff" strokeWidth="3" />
+                    </svg>
+                  ) : (
+                    <span style={{ color: '#ffffff', fontSize: 10, fontWeight: 900 }}>{circle.icon}</span>
+                  )}
+                </button>
+
+                {selectedItem.type === 'circle' && selectedItem.id === circle.id && (
+                  <>
+                    {/* Top dot */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: -6,
+                        left: 20,
+                        transform: 'translateX(-50%)',
+                        width: 10,
+                        height: 10,
+                        borderRadius: '50%',
+                        background: MATERIAL_TONES[circle.tone].centerBg,
+                        border: '2px solid #ffffff',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                        cursor: 'crosshair',
+                        zIndex: 10,
+                        pointerEvents: 'auto',
+                      }}
+                      onPointerDown={(e) => startConnector(e, circle.id, 'circle', circle.x, circle.y)}
                     />
-                    <circle cx="20" cy="20" r="18.5" fill="none" stroke="#ffffff" strokeWidth="3" />
-                  </svg>
-                ) : (
-                  <span style={{ color: '#ffffff', fontSize: 10, fontWeight: 900 }}>{circle.icon}</span>
+                    {/* Bottom dot */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        bottom: -6,
+                        left: 20,
+                        transform: 'translateX(-50%)',
+                        width: 10,
+                        height: 10,
+                        borderRadius: '50%',
+                        background: MATERIAL_TONES[circle.tone].centerBg,
+                        border: '2px solid #ffffff',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                        cursor: 'crosshair',
+                        zIndex: 10,
+                        pointerEvents: 'auto',
+                      }}
+                      onPointerDown={(e) => startConnector(e, circle.id, 'circle', circle.x, circle.y)}
+                    />
+                    {/* Left dot */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left: -6,
+                        top: 20,
+                        transform: 'translateY(-50%)',
+                        width: 10,
+                        height: 10,
+                        borderRadius: '50%',
+                        background: MATERIAL_TONES[circle.tone].centerBg,
+                        border: '2px solid #ffffff',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                        cursor: 'crosshair',
+                        zIndex: 10,
+                        pointerEvents: 'auto',
+                      }}
+                      onPointerDown={(e) => startConnector(e, circle.id, 'circle', circle.x, circle.y)}
+                    />
+                    {/* Right dot */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        right: -6,
+                        top: 20,
+                        transform: 'translateY(-50%)',
+                        width: 10,
+                        height: 10,
+                        borderRadius: '50%',
+                        background: MATERIAL_TONES[circle.tone].centerBg,
+                        border: '2px solid #ffffff',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                        cursor: 'crosshair',
+                        zIndex: 10,
+                        pointerEvents: 'auto',
+                      }}
+                      onPointerDown={(e) => startConnector(e, circle.id, 'circle', circle.x, circle.y)}
+                    />
+                  </>
                 )}
-              </button>
+              </div>
             </section>
           ))}
 
           {/* PASS 4: People Icons and Labels */}
-          {graph.people.map((person) => (
-            <button
-              key={person.id}
-              type="button"
-              className={`person-icon-only ${selectedItem.type === 'person' && selectedItem.id === person.id ? 'is-selected' : ''}`}
-              style={{
-                position: 'absolute',
-                left: 0,
-                top: 0,
-                width: 100,
-                height: 80,
-                transform: `translate(${person.x - 50}px, ${person.y - 20}px)`,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                background: 'transparent',
-                border: 'none',
-                cursor: 'grab',
-                outline: 'none',
-              }}
-              onPointerDown={(event) => startPersonMove(event, person)}
-              onClick={() => setSelectedItem({ type: 'person', id: person.id })}
-              aria-label={`Select ${person.name}`}
-              title="Drag to move this person"
-            >
+          {graph.people.map((person) => {
+            const isSelected = selectedItem.type === 'person' && selectedItem.id === person.id;
+            return (
               <div
-                className={`person-avatar-shape ${selectedItem.type === 'person' && selectedItem.id === person.id ? 'is-selected' : ''}`}
+                key={person.id}
+                className={`person-icon-only ${isSelected ? 'is-selected' : ''}`}
                 style={{
-                  position: 'relative',
-                  width: 40,
-                  height: 40,
-                  display: 'grid',
-                  placeItems: 'center',
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  width: 100,
+                  height: 80,
+                  transform: `translate(${person.x - 50}px, ${person.y - 20}px)`,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'grab',
+                  outline: 'none',
                 }}
+                onPointerDown={(event) => startPersonMove(event, person)}
+                onClick={() => setSelectedItem({ type: 'person', id: person.id })}
+                title="Drag to move this person"
               >
-                <svg viewBox="0 0 40 40" style={{ width: 40, height: 40, overflow: 'visible' }}>
-                  <defs>
-                    <clipPath id={`clip-${person.id}`}>
-                      <path d={getNodePath(20, 20, 18, person.shapeType ?? 'polygon', person.sides ?? 8, person.amplitude ?? 2)} />
-                    </clipPath>
-                  </defs>
-                  {person.imageUrl ? (
-                    <g>
-                      <path
-                        d={getNodePath(20, 20, 18, person.shapeType ?? 'polygon', person.sides ?? 8, person.amplitude ?? 2)}
-                        fill={(() => {
-                          const parentCircle = circlesById.get(person.circleId)
-                          return parentCircle ? MATERIAL_TONES[parentCircle.tone].centerBg : '#3F51B5'
-                        })()}
+                <div
+                  className={`person-avatar-shape ${isSelected ? 'is-selected' : ''}`}
+                  style={{
+                    position: 'relative',
+                    width: 40,
+                    height: 40,
+                    display: 'grid',
+                    placeItems: 'center',
+                  }}
+                >
+                  <svg viewBox="0 0 40 40" style={{ width: 40, height: 40, overflow: 'visible' }}>
+                    <defs>
+                      <clipPath id={`clip-${person.id}`}>
+                        <path d={getNodePath(20, 20, 18, person.shapeType ?? 'polygon', person.sides ?? 8, person.amplitude ?? 2)} />
+                      </clipPath>
+                    </defs>
+                    {person.imageUrl ? (
+                      <g>
+                        <path
+                          d={getNodePath(20, 20, 18, person.shapeType ?? 'polygon', person.sides ?? 8, person.amplitude ?? 2)}
+                          fill={(() => {
+                            const parentCircle = circlesById.get(person.circleId)
+                            return parentCircle ? MATERIAL_TONES[parentCircle.tone].centerBg : '#3F51B5'
+                          })()}
+                        />
+                        <image
+                          href={person.imageUrl}
+                          x="0"
+                          y="0"
+                          width="40"
+                          height="40"
+                          preserveAspectRatio="xMidYMid slice"
+                          clipPath={`url(#clip-${person.id})`}
+                        />
+                        <path
+                          d={getNodePath(20, 20, 18, person.shapeType ?? 'polygon', person.sides ?? 8, person.amplitude ?? 2)}
+                          fill="none"
+                          stroke={isSelected ? '#2563eb' : '#ffffff'}
+                          strokeWidth={isSelected ? 2.5 : 1.5}
+                        />
+                      </g>
+                    ) : (
+                      <g>
+                        <path
+                          d={getNodePath(20, 20, 18, person.shapeType ?? 'polygon', person.sides ?? 8, person.amplitude ?? 2)}
+                          fill={(() => {
+                            const parentCircle = circlesById.get(person.circleId)
+                            return parentCircle ? MATERIAL_TONES[parentCircle.tone].centerBg : '#3F51B5'
+                          })()}
+                          stroke={isSelected ? '#2563eb' : '#ffffff'}
+                          strokeWidth={isSelected ? 2.5 : 1.5}
+                        />
+                        <text
+                          x="20"
+                          y="21"
+                          fill="#ffffff"
+                          fontSize="11"
+                          fontWeight="900"
+                          textAnchor="middle"
+                          dominantBaseline="middle"
+                        >
+                          {person.avatar}
+                        </text>
+                      </g>
+                    )}
+                  </svg>
+
+                  {/* 4 connection dots around selected person's avatar */}
+                  {isSelected && (
+                    <>
+                      {/* Top dot */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: -6,
+                          left: 20,
+                          transform: 'translateX(-50%)',
+                          width: 10,
+                          height: 10,
+                          borderRadius: '50%',
+                          background: '#2563eb',
+                          border: '2px solid #ffffff',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                          cursor: 'crosshair',
+                          zIndex: 10,
+                        }}
+                        onPointerDown={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          startPersonConnection(e, person)
+                        }}
                       />
-                      <image
-                        href={person.imageUrl}
-                        x="0"
-                        y="0"
-                        width="40"
-                        height="40"
-                        preserveAspectRatio="xMidYMid slice"
-                        clipPath={`url(#clip-${person.id})`}
+                      {/* Bottom dot */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          bottom: -6,
+                          left: 20,
+                          transform: 'translateX(-50%)',
+                          width: 10,
+                          height: 10,
+                          borderRadius: '50%',
+                          background: '#2563eb',
+                          border: '2px solid #ffffff',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                          cursor: 'crosshair',
+                          zIndex: 10,
+                        }}
+                        onPointerDown={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          startPersonConnection(e, person)
+                        }}
                       />
-                      <path
-                        d={getNodePath(20, 20, 18, person.shapeType ?? 'polygon', person.sides ?? 8, person.amplitude ?? 2)}
-                        fill="none"
-                        stroke={selectedItem.type === 'person' && selectedItem.id === person.id ? '#2563eb' : '#ffffff'}
-                        strokeWidth={selectedItem.type === 'person' && selectedItem.id === person.id ? 2.5 : 1.5}
+                      {/* Left dot */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: -6,
+                          top: 20,
+                          transform: 'translateY(-50%)',
+                          width: 10,
+                          height: 10,
+                          borderRadius: '50%',
+                          background: '#2563eb',
+                          border: '2px solid #ffffff',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                          cursor: 'crosshair',
+                          zIndex: 10,
+                        }}
+                        onPointerDown={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          startPersonConnection(e, person)
+                        }}
                       />
-                    </g>
-                  ) : (
-                    <g>
-                      <path
-                        d={getNodePath(20, 20, 18, person.shapeType ?? 'polygon', person.sides ?? 8, person.amplitude ?? 2)}
-                        fill={(() => {
-                          const parentCircle = circlesById.get(person.circleId)
-                          return parentCircle ? MATERIAL_TONES[parentCircle.tone].centerBg : '#3F51B5'
-                        })()}
-                        stroke={selectedItem.type === 'person' && selectedItem.id === person.id ? '#2563eb' : '#ffffff'}
-                        strokeWidth={selectedItem.type === 'person' && selectedItem.id === person.id ? 2.5 : 1.5}
+                      {/* Right dot */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          right: -6,
+                          top: 20,
+                          transform: 'translateY(-50%)',
+                          width: 10,
+                          height: 10,
+                          borderRadius: '50%',
+                          background: '#2563eb',
+                          border: '2px solid #ffffff',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                          cursor: 'crosshair',
+                          zIndex: 10,
+                        }}
+                        onPointerDown={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          startPersonConnection(e, person)
+                        }}
                       />
-                      <text
-                        x="20"
-                        y="21"
-                        fill="#ffffff"
-                        fontSize="11"
-                        fontWeight="900"
-                        textAnchor="middle"
-                        dominantBaseline="middle"
-                      >
-                        {person.avatar}
-                      </text>
-                    </g>
+                    </>
                   )}
-                </svg>
+                </div>
+                <strong className="person-label">{person.name}</strong>
               </div>
-              <strong className="person-label">{person.name}</strong>
-            </button>
-          ))}
+            )
+          })}
 
         </div>
       </div>
@@ -1425,6 +1717,7 @@ function createInitialGraph() {
         amplitude: person.amplitude ?? 2,
       }
     }),
+    connections: [],
   })
 }
 
@@ -1438,6 +1731,7 @@ function moveCircleSubtree(state: GraphState, circleId: string, nextX: number, n
   subtreeIds.add(circleId)
 
   return {
+    ...state,
     circles: state.circles.map((candidate) =>
       subtreeIds.has(candidate.id) ? { ...candidate, x: candidate.x + deltaX, y: candidate.y + deltaY } : candidate,
     ),
