@@ -145,7 +145,7 @@ svg {
 .help-panel {
   position: absolute;
   z-index: 9;
-  right: 16px;
+  left: 16px;
   bottom: 16px;
   display: grid;
   width: min(330px, calc(100vw - 32px));
@@ -499,7 +499,7 @@ svg {
 .inspector {
   position: absolute;
   z-index: 10;
-  left: 16px;
+  right: 16px;
   bottom: 16px;
   display: grid;
   width: min(342px, calc(100vw - 32px));

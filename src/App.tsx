@@ -1586,16 +1586,16 @@ function App() {
 
           {/* PASS 4: People Icons and Labels */}
           {graph.people.map((person) => {
-            const isSelected = selectedItem?.type === 'person' && selectedItem?.id === person.id;
+            const isSelected = selectedItem?.type === 'person' && selectedItem?.id === person.id
             const parentCircle = circlesById.get(person.circleId)
             const personColor = parentCircle ? MATERIAL_TONES[parentCircle.tone].centerBg : '#3F51B5'
             const strokeColor = person.isFavorite
-              ? '#fbbf24' // Yellow (Amber 400)
+              ? '#ffff00' // Highly vibrant neon yellow
               : isSelected
               ? '#2563eb' // Blue
               : personColor // Group tone
             const strokeWidth = person.isFavorite
-              ? (isSelected ? 4 : 3)
+              ? (isSelected ? 5.5 : 4.5)
               : (isSelected ? 2.5 : 1.5)
 
             return (
@@ -1639,6 +1639,14 @@ function App() {
                     </defs>
                     {person.imageUrl ? (
                       <g>
+                        {/* Outer stroke path (drawn first) at double width */}
+                        <path
+                          d={getNodePath(20, 20, 18, person.shapeType ?? 'polygon', person.sides ?? 8, person.amplitude ?? 2)}
+                          fill="none"
+                          stroke={strokeColor}
+                          strokeWidth={strokeWidth * 2}
+                        />
+                        {/* Background cover */}
                         <path
                           d={getNodePath(20, 20, 18, person.shapeType ?? 'polygon', person.sides ?? 8, person.amplitude ?? 2)}
                           fill={personColor}
@@ -1652,20 +1660,20 @@ function App() {
                           preserveAspectRatio="xMidYMid slice"
                           clipPath={`url(#clip-${person.id})`}
                         />
+                      </g>
+                    ) : (
+                      <g>
+                        {/* Outer stroke path (drawn first) at double width */}
                         <path
                           d={getNodePath(20, 20, 18, person.shapeType ?? 'polygon', person.sides ?? 8, person.amplitude ?? 2)}
                           fill="none"
                           stroke={strokeColor}
-                          strokeWidth={strokeWidth}
+                          strokeWidth={strokeWidth * 2}
                         />
-                      </g>
-                    ) : (
-                      <g>
+                        {/* Background cover */}
                         <path
                           d={getNodePath(20, 20, 18, person.shapeType ?? 'polygon', person.sides ?? 8, person.amplitude ?? 2)}
                           fill={personColor}
-                          stroke={strokeColor}
-                          strokeWidth={strokeWidth}
                         />
                         <text
                           x="20"
@@ -1842,18 +1850,33 @@ function App() {
 
       {createMenu ? (
         <div className="create-menu" style={menuPosition(createMenu)}>
-          <button type="button" onClick={createPerson}>
-            <PersonIcon />
-            <span>Add person here</span>
-          </button>
-          <button type="button" onClick={() => createCircle('nested')}>
-            <SubsetIcon />
-            <span>Add subset inside source circle</span>
-          </button>
-          <button type="button" onClick={() => createCircle('external')}>
-            <CircleIcon />
-            <span>Create connected circle outside</span>
-          </button>
+          {createMenu.dragSourceType === 'person' ? (
+            <>
+              <button type="button" onClick={createPerson}>
+                <PersonIcon />
+                <span>Add person</span>
+              </button>
+              <button type="button" onClick={() => createCircle('external')}>
+                <CircleIcon />
+                <span>Add circle</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" onClick={createPerson}>
+                <PersonIcon />
+                <span>Add person here</span>
+              </button>
+              <button type="button" onClick={() => createCircle('nested')}>
+                <SubsetIcon />
+                <span>Add subset inside source circle</span>
+              </button>
+              <button type="button" onClick={() => createCircle('external')}>
+                <CircleIcon />
+                <span>Create connected circle outside</span>
+              </button>
+            </>
+          )}
         </div>
       ) : null}
 
@@ -1895,75 +1918,91 @@ function App() {
                   </div>
                 </dl>
 
-                <div className="inspector-field">
-                  <label>Shape Type</label>
-                  <select
-                    value={selectedCircle.shapeType ?? 'wavy'}
-                    onChange={(e) => updateCircleStyle(selectedCircle.id, { shapeType: e.target.value as ShapeType })}
-                  >
-                    <option value="wavy">Wavy (Flower)</option>
-                    <option value="polygon">Soft Polygon</option>
-                    <option value="circle">Circle</option>
-                  </select>
-                </div>
-                
-                {(selectedCircle.shapeType ?? 'wavy') !== 'circle' && (
-                  <>
+                {/* Collapsible Appearance Settings */}
+                <details style={{ marginTop: '14px', cursor: 'pointer' }}>
+                  <summary style={{ fontWeight: 650, fontSize: '12.5px', color: '#4b5563', padding: '6px 0', borderTop: '1px solid #e5e7eb', outline: 'none' }}>
+                    Style & Appearance
+                  </summary>
+                  <div style={{ padding: '8px 0', display: 'flex', flexDirection: 'column', gap: '10px', cursor: 'default' }}>
                     <div className="inspector-field">
-                      <label>Sides / Petals ({selectedCircle.sides ?? 8})</label>
+                      <label>Shape Type</label>
+                      <select
+                        value={selectedCircle.shapeType ?? 'wavy'}
+                        onChange={(e) => updateCircleStyle(selectedCircle.id, { shapeType: e.target.value as ShapeType })}
+                      >
+                        <option value="wavy">Wavy (Flower)</option>
+                        <option value="polygon">Soft Polygon</option>
+                        <option value="circle">Circle</option>
+                      </select>
+                    </div>
+                    
+                    {(selectedCircle.shapeType ?? 'wavy') !== 'circle' && (
+                      <>
+                        <div className="inspector-field">
+                          <label>Sides / Petals ({selectedCircle.sides ?? 8})</label>
+                          <input
+                            type="range"
+                            min="3"
+                            max="60"
+                            value={selectedCircle.sides ?? 8}
+                            onChange={(e) => updateCircleStyle(selectedCircle.id, { sides: parseInt(e.target.value) })}
+                          />
+                        </div>
+                        <div className="inspector-field">
+                          <label>Amplitude / Rounding ({selectedCircle.amplitude ?? 5})</label>
+                          <input
+                            type="range"
+                            min="0"
+                            max="50"
+                            value={selectedCircle.amplitude ?? 5}
+                            onChange={(e) => updateCircleStyle(selectedCircle.id, { amplitude: parseFloat(e.target.value) })}
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    <div className="inspector-field">
+                      <label>Center Image URL</label>
                       <input
-                        type="range"
-                        min="3"
-                        max="60"
-                        value={selectedCircle.sides ?? 8}
-                        onChange={(e) => updateCircleStyle(selectedCircle.id, { sides: parseInt(e.target.value) })}
+                        type="text"
+                        placeholder="https://example.com/image.jpg"
+                        value={selectedCircle.imageUrl ?? ''}
+                        onChange={(e) => updateCircleStyle(selectedCircle.id, { imageUrl: e.target.value })}
                       />
                     </div>
                     <div className="inspector-field">
-                      <label>Amplitude / Rounding ({selectedCircle.amplitude ?? 5})</label>
+                      <label>Upload Photo</label>
                       <input
-                        type="range"
-                        min="0"
-                        max="50"
-                        value={selectedCircle.amplitude ?? 5}
-                        onChange={(e) => updateCircleStyle(selectedCircle.id, { amplitude: parseFloat(e.target.value) })}
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleImageUpload(e, (base64) => updateCircleStyle(selectedCircle.id, { imageUrl: base64 }))}
                       />
                     </div>
-                  </>
-                )}
+                  </div>
+                </details>
 
-                <div className="inspector-field">
-                  <label>Center Image URL</label>
-                  <input
-                    type="text"
-                    placeholder="https://example.com/image.jpg"
-                    value={selectedCircle.imageUrl ?? ''}
-                    onChange={(e) => updateCircleStyle(selectedCircle.id, { imageUrl: e.target.value })}
-                  />
-                </div>
-                <div className="inspector-field">
-                  <label>Upload Photo</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleImageUpload(e, (base64) => updateCircleStyle(selectedCircle.id, { imageUrl: base64 }))}
-                  />
-                </div>
+                {/* Collapsible Actions */}
+                <details style={{ marginTop: '8px', cursor: 'pointer' }}>
+                  <summary style={{ fontWeight: 650, fontSize: '12.5px', color: '#4b5563', padding: '6px 0', borderTop: '1px solid #e5e7eb', outline: 'none' }}>
+                    Actions
+                  </summary>
+                  <div style={{ padding: '8px 0', display: 'flex', flexDirection: 'column', gap: '8px', cursor: 'default' }}>
+                    <button type="button" className="primary-action" onClick={addDemoCluster}>
+                      Add 3 demo people
+                    </button>
 
-                <button type="button" className="primary-action" onClick={addDemoCluster} style={{ marginTop: '8px' }}>
-                  Add 3 demo people
-                </button>
-
-                {selectedCircle.id !== 'you' && (
-                  <button
-                    type="button"
-                    className="primary-action"
-                    style={{ marginTop: '16px', background: '#dc2626' }}
-                    onClick={() => deleteCircle(selectedCircle.id)}
-                  >
-                    Delete Circle
-                  </button>
-                )}
+                    {selectedCircle.id !== 'you' && (
+                      <button
+                        type="button"
+                        className="primary-action"
+                        style={{ background: '#dc2626' }}
+                        onClick={() => deleteCircle(selectedCircle.id)}
+                      >
+                        Delete Circle
+                      </button>
+                    )}
+                  </div>
+                </details>
               </>
             )}
             {selectedPerson && (
@@ -1991,7 +2030,7 @@ function App() {
                   <svg viewBox="0 0 24 24" style={{ width: 20, height: 20 }}>
                     <path
                       d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
-                      fill={selectedPerson.isFavorite ? '#fbbf24' : 'none'}
+                      fill={selectedPerson.isFavorite ? '#ffd600' : 'none'}
                       stroke={selectedPerson.isFavorite ? '#d97706' : '#94a3b8'}
                       strokeWidth={2}
                     />
