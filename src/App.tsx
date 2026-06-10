@@ -2565,8 +2565,12 @@ function App() {
       event.preventDefault()
       const nextX = boardDragRef.current.originX + event.clientX - boardDragRef.current.startX
       const nextY = boardDragRef.current.originY + event.clientY - boardDragRef.current.startY
-      if (Math.hypot(event.clientX - boardDragRef.current.startX, event.clientY - boardDragRef.current.startY) > NODE_CLICK_DRAG_THRESHOLD) {
+      if (
+        !boardDragRef.current.moved &&
+        Math.hypot(event.clientX - boardDragRef.current.startX, event.clientY - boardDragRef.current.startY) > NODE_CLICK_DRAG_THRESHOLD
+      ) {
         boardDragRef.current.moved = true
+        setIsDraggingBoard(true)
       }
 
       queueViewportUpdate({ x: nextX, y: nextY }, viewportRef.current.scale)
@@ -2593,7 +2597,6 @@ function App() {
               active: true,
               moved: false,
             }
-            setIsDraggingBoard(true)
           }
           return
         }
@@ -2795,7 +2798,6 @@ function App() {
       moved: false,
     }
 
-    setIsDraggingBoard(true)
     setInspectorNodeId(null)
   }
 
