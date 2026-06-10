@@ -764,7 +764,7 @@ function App() {
     })
   }
 
-  function startCircleMove(event: ReactPointerEvent<HTMLElement>, circle: CircleNode) {
+  function startCircleMove(event: ReactPointerEvent<Element>, circle: CircleNode) {
     event.preventDefault()
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -790,7 +790,7 @@ function App() {
     startConnector(event, person.id, 'person', person.x, person.y)
   }
 
-  function startCircleSurfaceDrag(event: ReactPointerEvent<HTMLElement>, circle: CircleNode) {
+  function startCircleSurfaceDrag(event: ReactPointerEvent<Element>, circle: CircleNode) {
     if (event.button !== 0) return
 
     const world = screenToWorld({ x: event.clientX, y: event.clientY })
@@ -806,7 +806,7 @@ function App() {
     startCircleMove(event, circle)
   }
 
-  function openCircleCreateMenu(event: ReactMouseEvent<HTMLElement>, circle: CircleNode) {
+  function openCircleCreateMenu(event: ReactMouseEvent<Element>, circle: CircleNode) {
     event.preventDefault()
     event.stopPropagation()
     const world = screenToWorld({ x: event.clientX, y: event.clientY })
@@ -836,7 +836,7 @@ function App() {
     }
   }
 
-  function startCircleResize(event: ReactPointerEvent<HTMLElement>, circle: CircleNode) {
+  function startCircleResize(event: ReactPointerEvent<Element>, circle: CircleNode) {
     event.preventDefault()
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -1196,7 +1196,7 @@ function App() {
                 pointerEvents: 'none',
               }}
             >
-              <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible' }}>
+              <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible', pointerEvents: 'none' }}>
                 <path
                   d={getNodePath(
                     circle.radius,
@@ -1210,6 +1210,9 @@ function App() {
                   stroke={selectedItem?.type === 'circle' && selectedItem?.id === circle.id ? MATERIAL_TONES[circle.tone].border : 'none'}
                   strokeWidth={selectedItem?.type === 'circle' && selectedItem?.id === circle.id ? 3.5 : 0}
                   filter="drop-shadow(0px 8px 16px rgba(0,0,0,0.06))"
+                  style={{ pointerEvents: 'auto', cursor: 'grab' }}
+                  onContextMenu={(event) => openCircleCreateMenu(event, circle)}
+                  onPointerDown={(event) => startCircleSurfaceDrag(event, circle)}
                 />
               </svg>
             </div>
@@ -1275,9 +1278,8 @@ function App() {
                 transform: `translate(${circle.x - circle.radius}px, ${circle.y - circle.radius}px)`,
                 background: 'transparent',
                 border: 'none',
+                pointerEvents: 'none',
               }}
-              onContextMenu={(event) => openCircleCreateMenu(event, circle)}
-              onPointerDown={(event) => startCircleSurfaceDrag(event, circle)}
             >
               <span className="circle__label">{circle.name}</span>
               <div
