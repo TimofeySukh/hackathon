@@ -40,7 +40,7 @@ Current app behavior:
 - create people with a board double-click or double-tap, and form soft blob groups by dropping one person near another or touching an existing blob area
 - use a mobile layout with the search field and account/theme controls at the top and the Tags control docked near the bottom-left safe area
 - avoid selecting connection lines on coarse touch pointers so mobile board panning does not accidentally open the delete-connection menu
-- simplify some heavy visual effects while dragging and on very dense boards to keep navigation responsive
+- simplify some heavy visual effects on very dense boards to keep navigation responsive
 - avoid browser-fragile `color-mix()` styling for tag accents and disable heavy blur compositing on Firefox
 
 There is no multiplayer or drawing toolset yet.

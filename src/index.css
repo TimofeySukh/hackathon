@@ -1602,7 +1602,6 @@ input[type='search']::-webkit-search-results-decoration {
     center;
 }
 
-.board-viewport.is-dragging .board-surface,
 .board-viewport.is-very-dense-graph .board-surface {
   background-image:
     radial-gradient(circle, var(--grid-dot) 0 var(--dot-size), transparent calc(var(--dot-size) + 0.2px)),
@@ -1625,7 +1624,6 @@ input[type='search']::-webkit-search-results-decoration {
   pointer-events: none;
 }
 
-.board-viewport.is-dragging .board-surface::after,
 .board-viewport.is-very-dense-graph .board-surface::after {
   display: none;
 }
