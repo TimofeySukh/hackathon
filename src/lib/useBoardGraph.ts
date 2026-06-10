@@ -1,14 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 
-import type { BoardGraphPayload, Connection, PersonAiNote, PersonNode, PersonNote, Tag } from './graphTypes'
+import type { BoardGraphPayload, Connection, NodeGroup, PersonAiNote, PersonNode, PersonNote, Tag } from './graphTypes'
 import {
   bulkCreateGraph,
-  createConnection,
   createNote,
   createPerson,
   createTag,
-  deleteConnection,
   deleteGraphData,
   deleteNote,
   deletePerson,
@@ -17,6 +15,7 @@ import {
   invokePersonAiNoteSync,
   loadBoardGraph,
   movePerson,
+  saveNodeGroups as saveRemoteNodeGroups,
   upsertPersonAiNoteStatus,
   updateNote,
   updatePerson,
@@ -33,6 +32,7 @@ type GraphState = {
   notes: PersonNote[]
   personAiNotes: PersonAiNote[]
   connections: Connection[]
+  nodeGroups: NodeGroup[]
   status: GraphStatus
   error: string | null
 }
@@ -44,6 +44,7 @@ const EMPTY_GRAPH_STATE: GraphState = {
   notes: [],
   personAiNotes: [],
   connections: [],
+  nodeGroups: [],
   status: 'idle',
   error: null,
 }
@@ -81,7 +82,8 @@ export function useBoardGraph(user: User | null) {
           tags: payload.tags,
           notes: payload.notes,
           personAiNotes: payload.personAiNotes,
-          connections: payload.connections,
+          connections: [],
+          nodeGroups: payload.nodeGroups,
           status: 'ready',
           error: null,
         })
@@ -141,16 +143,6 @@ export function useBoardGraph(user: User | null) {
       personAiNotes: currentState.personAiNotes.some((entry) => entry.id === personAiNote.id)
         ? currentState.personAiNotes.map((entry) => (entry.id === personAiNote.id ? personAiNote : entry))
         : [...currentState.personAiNotes, personAiNote],
-      error: null,
-    }))
-  }
-
-  const applyConnection = (connection: Connection) => {
-    setGraphState((currentState) => ({
-      ...currentState,
-      connections: currentState.connections.some((entry) => entry.id === connection.id)
-        ? currentState.connections
-        : [...currentState.connections, connection],
       error: null,
     }))
   }
@@ -229,6 +221,7 @@ export function useBoardGraph(user: User | null) {
           notes: [],
           personAiNotes: [],
           connections: [],
+          nodeGroups: [],
           people: currentState.people.filter((person) => person.is_root).map((person) => ({
             ...person,
             tag_id: null,
@@ -313,7 +306,7 @@ export function useBoardGraph(user: User | null) {
           ...currentState,
           people: [...currentState.people, ...payload.people],
           notes: [...currentState.notes, ...payload.notes],
-          connections: [...currentState.connections, ...payload.connections],
+          connections: [],
           error: null,
         }))
 
@@ -352,9 +345,13 @@ export function useBoardGraph(user: User | null) {
           people: currentState.people.filter((person) => person.id !== id),
           notes: currentState.notes.filter((note) => note.person_id !== id),
           personAiNotes: currentState.personAiNotes.filter((note) => note.person_id !== id),
-          connections: currentState.connections.filter(
-            (connection) => connection.person_a_id !== id && connection.person_b_id !== id,
-          ),
+          connections: [],
+          nodeGroups: currentState.nodeGroups
+            .map((group) => ({
+              ...group,
+              memberIds: group.memberIds.filter((memberId) => memberId !== id),
+            }))
+            .filter((group) => group.memberIds.length >= 2),
           error: null,
         }))
       } catch (error) {
@@ -362,34 +359,30 @@ export function useBoardGraph(user: User | null) {
         throw error
       }
     },
-    async createConnection(firstPersonId: string, secondPersonId: string) {
+    async saveNodeGroups(groups: NodeGroup[]) {
       try {
         const { boardId, userId } = ensureUserAndBoard()
-        const connection = await createConnection({
-          boardId,
-          ownerUserId: userId,
-          firstPersonId,
-          secondPersonId,
-        })
-        applyConnection(connection)
-        return connection
+        const savedGroups = await saveRemoteNodeGroups(boardId, userId, groups)
+        setGraphState((currentState) => ({
+          ...currentState,
+          nodeGroups: savedGroups,
+          error: null,
+        }))
+        return savedGroups
       } catch (error) {
         setError(error)
         throw error
       }
     },
-    async deleteConnection(id: string) {
-      try {
-        await deleteConnection(id)
-        setGraphState((currentState) => ({
-          ...currentState,
-          connections: currentState.connections.filter((connection) => connection.id !== id),
-          error: null,
-        }))
-      } catch (error) {
-        setError(error)
-        throw error
-      }
+    async createConnection() {
+      return null
+    },
+    async deleteConnection() {
+      setGraphState((currentState) => ({
+        ...currentState,
+        connections: [],
+        error: null,
+      }))
     },
     async createNote(title: string, body: string, personId: string, options?: { syncAi?: boolean }) {
       void options

@@ -64,13 +64,15 @@ Deno.serve(async (req) => {
     }
 
     const userId = user.id
-    const [connectionsResult, notesResult, personAiNotesResult] = await Promise.all([
+    const [legacyConnectionsResult, nodeGroupsResult, notesResult, personAiNotesResult] = await Promise.all([
       supabase.from('connections').delete().eq('owner_user_id', userId),
+      supabase.from('node_groups').delete().eq('owner_user_id', userId),
       supabase.from('notes').delete().eq('owner_user_id', userId),
       supabase.from('person_ai_notes').delete().eq('owner_user_id', userId),
     ])
 
-    if (connectionsResult.error) throw connectionsResult.error
+    if (legacyConnectionsResult.error) throw legacyConnectionsResult.error
+    if (nodeGroupsResult.error) throw nodeGroupsResult.error
     if (notesResult.error) throw notesResult.error
     if (personAiNotesResult.error) throw personAiNotesResult.error
 

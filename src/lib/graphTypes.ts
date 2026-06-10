@@ -79,6 +79,14 @@ export type Connection = {
   created_at: string
 }
 
+export type NodeGroup = {
+  id: string
+  boardId: string
+  memberIds: string[]
+  color: string
+  createdAt: string
+}
+
 export type BoardGraphPayload = {
   board: Board
   tags: Tag[]
@@ -86,4 +94,5 @@ export type BoardGraphPayload = {
   notes: PersonNote[]
   personAiNotes: PersonAiNote[]
   connections: Connection[]
+  nodeGroups: NodeGroup[]
 }

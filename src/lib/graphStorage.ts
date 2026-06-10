@@ -5,6 +5,7 @@ import { supabase } from './supabase'
 import type {
   BoardGraphPayload,
   Connection,
+  NodeGroup,
   PersonAiNote,
   PersonAiNoteStatus,
   PersonAiStructuredSummary,
@@ -29,13 +30,6 @@ type UpdatePersonInput = {
   id: string
   name?: string
   tag_id?: string | null
-}
-
-type CreateConnectionInput = {
-  boardId: string
-  ownerUserId: string
-  firstPersonId: string
-  secondPersonId: string
 }
 
 type CreateNoteInput = {
@@ -135,12 +129,6 @@ async function readFunctionError(error: unknown) {
   } catch {
     return error.message
   }
-}
-
-function canonicalizeConnection(firstPersonId: string, secondPersonId: string) {
-  return firstPersonId < secondPersonId
-    ? { personAId: firstPersonId, personBId: secondPersonId }
-    : { personAId: secondPersonId, personBId: firstPersonId }
 }
 
 function chunkArray<T>(items: T[], chunkSize: number) {
@@ -245,7 +233,14 @@ export async function loadBoardGraph(user: User): Promise<BoardGraphPayload> {
     await ensureDefaultTags(user.id)
   }
 
-  const [tagsResult, peopleResult, notesResult, personAiNotesResult, connectionsResult] = await Promise.all([
+  const [
+    tagsResult,
+    peopleResult,
+    notesResult,
+    personAiNotesResult,
+    nodeGroupsResult,
+    legacyConnectionsDeleteResult,
+  ] = await Promise.all([
     client
       .from('tags')
       .select('*')
@@ -268,17 +263,19 @@ export async function loadBoardGraph(user: User): Promise<BoardGraphPayload> {
       .eq('owner_user_id', user.id)
       .order('created_at', { ascending: true }),
     client
-      .from('connections')
+      .from('node_groups')
       .select('*')
       .eq('board_id', workspace.board.id)
       .order('created_at', { ascending: true }),
+    client.from('connections').delete().eq('board_id', workspace.board.id),
   ])
 
   if (tagsResult.error) throw tagsResult.error
   if (peopleResult.error) throw peopleResult.error
   if (notesResult.error) throw notesResult.error
   if (personAiNotesResult.error) throw personAiNotesResult.error
-  if (connectionsResult.error) throw connectionsResult.error
+  if (nodeGroupsResult.error) throw nodeGroupsResult.error
+  if (legacyConnectionsDeleteResult.error) throw legacyConnectionsDeleteResult.error
 
   return {
     board: workspace.board,
@@ -286,7 +283,20 @@ export async function loadBoardGraph(user: User): Promise<BoardGraphPayload> {
     people: (peopleResult.data ?? []) as PersonNode[],
     notes: (notesResult.data ?? []) as PersonNote[],
     personAiNotes: (personAiNotesResult.data ?? []).map((row) => mapPersonAiNote(row as Record<string, unknown>)),
-    connections: (connectionsResult.data ?? []) as Connection[],
+    connections: [],
+    nodeGroups: ((nodeGroupsResult.data ?? []) as Array<{
+      id: string
+      board_id: string
+      member_ids: string[]
+      color: string
+      created_at: string
+    }>).map((group) => ({
+      id: group.id,
+      boardId: group.board_id,
+      memberIds: group.member_ids,
+      color: group.color,
+      createdAt: group.created_at,
+    })),
   }
 }
 
@@ -378,7 +388,6 @@ export async function bulkCreateGraph(input: BulkCreateGraphInput): Promise<{
   const client = requireSupabase()
   const people: PersonNode[] = []
   const notes: PersonNote[] = []
-  const connections: Connection[] = []
   const personRows = input.people.map((person) => ({
     id: person.id,
     board_id: input.boardId,
@@ -412,27 +421,7 @@ export async function bulkCreateGraph(input: BulkCreateGraphInput): Promise<{
     notes.push(...((data ?? []) as PersonNote[]))
   }
 
-  const connectionRows = input.people
-    .filter((person) => person.connectToPersonId && person.connectToPersonId !== person.id)
-    .map((person) => {
-      const { personAId, personBId } = canonicalizeConnection(person.connectToPersonId ?? '', person.id)
-
-      return {
-        board_id: input.boardId,
-        owner_user_id: input.ownerUserId,
-        person_a_id: personAId,
-        person_b_id: personBId,
-      }
-    })
-
-  for (const chunk of chunkArray(connectionRows, BULK_INSERT_CHUNK_SIZE)) {
-    const { data, error } = await client.from('connections').insert(chunk).select('*')
-
-    if (error) throw error
-    connections.push(...((data ?? []) as Connection[]))
-  }
-
-  return { people, notes, connections }
+  return { people, notes, connections: [] }
 }
 
 export async function updatePerson(input: UpdatePersonInput): Promise<PersonNode> {
@@ -471,47 +460,6 @@ export async function movePerson(id: string, x: number, y: number): Promise<Pers
 export async function deletePerson(id: string) {
   const client = requireSupabase()
   const { error } = await client.from('people').delete().eq('id', id)
-
-  if (error) throw error
-}
-
-export async function createConnection(input: CreateConnectionInput): Promise<Connection> {
-  const client = requireSupabase()
-  const { personAId, personBId } = canonicalizeConnection(input.firstPersonId, input.secondPersonId)
-
-  const { data, error } = await client
-    .from('connections')
-    .insert({
-      board_id: input.boardId,
-      owner_user_id: input.ownerUserId,
-      person_a_id: personAId,
-      person_b_id: personBId,
-    })
-    .select('*')
-    .single()
-
-  if (error?.code === '23505') {
-    const existing = await client
-      .from('connections')
-      .select('*')
-      .eq('board_id', input.boardId)
-      .eq('person_a_id', personAId)
-      .eq('person_b_id', personBId)
-      .single()
-
-    if (existing.error) throw existing.error
-
-    return existing.data as Connection
-  }
-
-  if (error) throw error
-
-  return data as Connection
-}
-
-export async function deleteConnection(id: string) {
-  const client = requireSupabase()
-  const { error } = await client.from('connections').delete().eq('id', id)
 
   if (error) throw error
 }
@@ -563,13 +511,15 @@ export async function deleteNote(id: string) {
 export async function deleteGraphData(userId: string) {
   const client = requireSupabase()
 
-  const [connectionsResult, notesResult, personAiNotesResult] = await Promise.all([
+  const [legacyConnectionsResult, nodeGroupsResult, notesResult, personAiNotesResult] = await Promise.all([
     client.from('connections').delete().eq('owner_user_id', userId),
+    client.from('node_groups').delete().eq('owner_user_id', userId),
     client.from('notes').delete().eq('owner_user_id', userId),
     client.from('person_ai_notes').delete().eq('owner_user_id', userId),
   ])
 
-  if (connectionsResult.error) throw connectionsResult.error
+  if (legacyConnectionsResult.error) throw legacyConnectionsResult.error
+  if (nodeGroupsResult.error) throw nodeGroupsResult.error
   if (notesResult.error) throw notesResult.error
   if (personAiNotesResult.error) throw personAiNotesResult.error
 
@@ -584,6 +534,45 @@ export async function deleteGraphData(userId: string) {
   const tagsResult = await client.from('tags').delete().eq('user_id', userId)
 
   if (tagsResult.error) throw tagsResult.error
+}
+
+export async function saveNodeGroups(boardId: string, ownerUserId: string, groups: NodeGroup[]) {
+  const client = requireSupabase()
+  const deleteResult = await client.from('node_groups').delete().eq('board_id', boardId)
+
+  if (deleteResult.error) throw deleteResult.error
+  if (groups.length === 0) return []
+
+  const rows = groups.map((group) => ({
+    id: group.id,
+    board_id: boardId,
+    owner_user_id: ownerUserId,
+    member_ids: group.memberIds,
+    color: group.color,
+    created_at: group.createdAt,
+  }))
+
+  const { data, error } = await client
+    .from('node_groups')
+    .insert(rows)
+    .select('*')
+    .order('created_at', { ascending: true })
+
+  if (error) throw error
+
+  return ((data ?? []) as Array<{
+    id: string
+    board_id: string
+    member_ids: string[]
+    color: string
+    created_at: string
+  }>).map((group) => ({
+    id: group.id,
+    boardId: group.board_id,
+    memberIds: group.member_ids,
+    color: group.color,
+    createdAt: group.created_at,
+  }))
 }
 
 export async function deleteAccountData() {

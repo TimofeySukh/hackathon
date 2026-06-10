@@ -22,7 +22,7 @@ A persisted social graph board built with React, Vite, and TypeScript.
 - Editable unsigned local board state that persists in the browser before signing in
 - One personal board record for each signed-in user
 - One immutable root node at `0,0` for each signed-in user
-- Persistent people, colored tags, notes, and undirected connections in Supabase
+- Persistent people, colored tags, notes, and blob-group membership in Supabase
 - Compact top bar with a rounded search field plus circular tags, account, and theme controls that close other overlays when opened
 - Account menu graph import, graph export, graph deletion, and account-data deletion controls
 - The selected inspector tag keeps a visible color accent even when the picker is closed
@@ -33,13 +33,12 @@ A persisted social graph board built with React, Vite, and TypeScript.
 - AI summaries refresh manually from the selected-person inspector instead of after every note edit
 - AI search sends only up to 40 browser-selected candidates and strips email addresses and URLs before provider calls
 - LinkedIn import defaults to name, company, position, and connected date; email addresses and profile URLs are opt-in
-- LinkedIn import creates people, source notes, and root connections in Supabase batches
+- LinkedIn import creates people and source notes in Supabase batches
 - Large graphs use a canvas overview layer plus a capped interactive DOM/SVG overlay near the viewport
 - Newly created people open their inspector automatically
 - Single-click a person to open that inspector directly on the board
 - Opening the inspector pans the board enough to keep it visible and opens it at a consistent size before later zoom changes affect it
-- Click the widened connection-line target to delete it from the inline menu or with Backspace
-- Drag a person to move them with their connected lines
+- Drag a person to move them
 - Dark blue-black theme inspired by the provided reference
 - Light theme designed to match the same visual language
 - High-contrast point grid across the board

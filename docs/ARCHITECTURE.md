@@ -41,7 +41,7 @@ The backend boundary remains intentionally narrow: Supabase Auth provides identi
 - `supabase/functions/delete-account-data/index.ts` clears the signed-in user's graph rows, AI summaries, profile fields, and root-person identity fields without deleting the Auth user.
 - `src/index.css` contains the full visual system.
 
-The board grid is simulated by shifting layered CSS backgrounds according to a camera offset. Large graph previews are drawn on a viewport-sized canvas. React renders only a capped interactive subset of nodes and connections around the viewport, plus selected or pinned nodes.
+The board grid is simulated by shifting layered CSS backgrounds according to a camera offset. Large graph previews are drawn on a viewport-sized canvas. React renders only a capped interactive subset of nodes around the viewport, plus selected or pinned nodes.
 
 ## Current Product Boundaries
 
@@ -63,9 +63,9 @@ Current scope:
 - one reusable user-owned tag per person
 - multiple notes per person
 - at most one manually refreshed AI summary record per person with a top-level text summary plus structured JSON fields
-- undirected person-to-person connections
+- blob-group membership
 - a people search overlay over names, tags, notes, and AI-generated search explanations
-- batch LinkedIn import that inserts people, notes, and root connections in chunks instead of one request per row
+- batch LinkedIn import that inserts people and notes in chunks instead of one request per row
 - dense graph rendering with canvas overview drawing, viewport culling, label LOD, and capped SVG/DOM overlays
 
 Out of scope for the current version:

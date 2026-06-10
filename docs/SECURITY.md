@@ -9,7 +9,7 @@ The app has two storage modes:
 - signed-out local board state in browser `localStorage`
 - signed-in Supabase-backed private board state
 
-Signed-in data currently stored in Supabase includes profiles, boards, people, tags, notes, AI summaries, and connections. This is sensitive relationship data. Treat it as private user data.
+Signed-in data currently stored in Supabase includes profiles, boards, people, tags, notes, AI summaries, and blob-group membership. This is sensitive relationship data. Treat it as private user data.
 
 LinkedIn archive import is parsed in the browser. The archive itself is not uploaded as a file. The default import stores the contact name, company, position, connected date, and source marker. Email addresses and LinkedIn profile URLs are opt-in fields in the import dialog.
 
@@ -17,9 +17,9 @@ LinkedIn archive import is parsed in the browser. The archive itself is not uplo
 
 Current database controls:
 
-- row-level security is enabled on `profiles`, `boards`, `tags`, `people`, `notes`, `connections`, and `person_ai_notes`
+- row-level security is enabled on `profiles`, `boards`, `tags`, `people`, `notes`, `node_groups`, `connections`, and `person_ai_notes`
 - user-owned RLS policies scope rows with `auth.uid()`
-- triggers validate tag, note, AI-note, and connection ownership
+- triggers validate tag, note, AI-note, node-group, and legacy connection ownership
 - root people are protected against deletion and movement
 - graph writes go through the frontend graph storage layer rather than direct UI calls scattered through components
 
@@ -69,7 +69,7 @@ The product value depends on search across relationship data, so removing cloud 
 - store only normalized contact fields that the product actually uses
 - expose clear sync status and last-updated timestamps
 
-The app now provides graph import, graph export, graph deletion, and account-data deletion controls from the account menu. Graph import replaces the current graph after confirmation and restores people, tags, notes, and connections from a SocialDataNode JSON export. Account-data deletion clears graph rows, AI summaries, tags, profile fields, and root-person identity fields while preserving the Auth user record because the current root-person trigger intentionally blocks root deletion.
+The app now provides graph import, graph export, graph deletion, and account-data deletion controls from the account menu. Graph import replaces the current graph after confirmation and restores people, tags, notes, and blob groups from a SocialDataNode JSON export. Account-data deletion clears graph rows, AI summaries, tags, blob groups, profile fields, and root-person identity fields while preserving the Auth user record because the current root-person trigger intentionally blocks root deletion.
 
 This preserves searchable cloud data while reducing hidden retention and user surprise.
 

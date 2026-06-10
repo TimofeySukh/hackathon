@@ -180,13 +180,12 @@ It currently supports:
 - automatic board panning to keep the node-anchored inspector inside the viewport
 - inspector opening at a consistent size regardless of current zoom, then scaling with later zoom changes
 - continued trackpad panning over the inspector when the gesture starts on the board
-- connection line selection with a widened hit target, inline deletion, and Backspace deletion
-- connection line selection is disabled for coarse touch pointers so mobile pan gestures are not interrupted by the delete menu
+- graph-line interactions are dormant while saved connections are disabled
 - a compact top bar with a capped-width search field, circular tags/account/theme controls, and exclusive overlay behavior
 - a keyboard-first inspector that treats `#tag` in the name field as a tag command and uses one capture textarea for new notes
 - local people search while typing plus candidate-limited natural-language AI search on Enter when signed in
 - graph import, graph export, graph deletion, and account-data deletion controls in the account menu
-- batched LinkedIn import that creates people, notes, and root connections in chunks
+- batched LinkedIn import that creates people and notes in chunks
 - drag repositioning for non-root nodes
 - persisted node renaming
 - grid movement through background offset changes

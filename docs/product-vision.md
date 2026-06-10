@@ -26,7 +26,7 @@ Users should be able to open the page and immediately:
 4. move across the board with a trackpad, mouse drag, or mouse wheel
 5. switch between dark and light visual modes
 6. optionally sign in with Google to claim a personal board space
-7. save people, notes, tags, and connections to a private personal graph
+7. save people, notes, tags, and blob groups to a private personal graph
 
 ## Visual Goal
 

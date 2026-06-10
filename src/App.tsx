@@ -10,7 +10,7 @@ import type {
 
 import { useAuth } from './lib/useAuth'
 import { deleteAccountData, normalizeTagName, searchPeopleWithAi } from './lib/graphStorage'
-import type { Connection, PersonAiNote, PersonNode, PersonNote, Tag } from './lib/graphTypes'
+import type { Connection, NodeGroup, PersonAiNote, PersonNode, PersonNote, Tag } from './lib/graphTypes'
 import { DEFAULT_TAG_COLOR, DEFAULT_TAGS, hexToRgb, normalizeTagColor } from './lib/tagPalette'
 import { useBoardGraph } from './lib/useBoardGraph'
 
@@ -59,14 +59,6 @@ type AreaSelection = {
   viewportTop: number
 }
 
-type NodeGroup = {
-  id: string
-  boardId: string
-  memberIds: string[]
-  color: string
-  createdAt: string
-}
-
 type NodeGroupBubble = {
   id: string
   path: string
@@ -79,7 +71,7 @@ type LocalGraphState = {
   people: PersonNode[]
   tags: Tag[]
   notes: PersonNote[]
-  connections: Connection[]
+  nodeGroups: NodeGroup[]
 }
 
 type TapState = {
@@ -587,7 +579,7 @@ function createDefaultLocalGraph(): LocalGraphState {
     people: [ANONYMOUS_ROOT],
     tags: createDefaultLocalTags(),
     notes: [],
-    connections: [],
+    nodeGroups: [],
   }
 }
 
@@ -634,32 +626,34 @@ function sanitizeLocalGraph(input: Partial<LocalGraphState> | null | undefined):
         }))
     : []
 
-  const connections = Array.isArray(input?.connections)
-    ? input.connections
-        .filter(
-          (connection) =>
-            connection &&
-            typeof connection.id === 'string' &&
-            personIds.has(connection.person_a_id) &&
-            personIds.has(connection.person_b_id) &&
-            connection.person_a_id !== connection.person_b_id,
-        )
-        .map((connection) => ({
-          ...connection,
-          board_id: ANONYMOUS_BOARD.id,
-          owner_user_id: ANONYMOUS_BOARD.user_id,
-        }))
-    : []
+  const nodeGroups = sanitizeNodeGroups(
+    Array.isArray(input?.nodeGroups) ? input.nodeGroups : [],
+    ANONYMOUS_BOARD.id,
+    normalizedPeople,
+  )
 
-  return { people: normalizedPeople, tags, notes, connections }
+  return { people: normalizedPeople, tags, notes, nodeGroups }
 }
 
 function loadLocalGraph() {
   try {
     const savedGraph = window.localStorage.getItem(LOCAL_GRAPH_STORAGE_KEY)
-    if (!savedGraph) return createDefaultLocalGraph()
+    if (!savedGraph) {
+      return {
+        ...createDefaultLocalGraph(),
+        nodeGroups: sanitizeNodeGroups(loadLegacyNodeGroups(ANONYMOUS_BOARD.id), ANONYMOUS_BOARD.id, [ANONYMOUS_ROOT]),
+      }
+    }
 
-    return sanitizeLocalGraph(JSON.parse(savedGraph) as Partial<LocalGraphState>)
+    const graph = sanitizeLocalGraph(JSON.parse(savedGraph) as Partial<LocalGraphState>)
+    if (graph.nodeGroups.length === 0) {
+      return {
+        ...graph,
+        nodeGroups: sanitizeNodeGroups(loadLegacyNodeGroups(ANONYMOUS_BOARD.id), ANONYMOUS_BOARD.id, graph.people),
+      }
+    }
+
+    return graph
   } catch {
     window.localStorage.removeItem(LOCAL_GRAPH_STORAGE_KEY)
     return createDefaultLocalGraph()
@@ -668,6 +662,7 @@ function loadLocalGraph() {
 
 function saveLocalGraph(graph: LocalGraphState) {
   window.localStorage.setItem(LOCAL_GRAPH_STORAGE_KEY, JSON.stringify(sanitizeLocalGraph(graph)))
+  window.localStorage.removeItem(getNodeGroupStorageKey(ANONYMOUS_BOARD.id))
 }
 
 function parseGraphImport(text: string) {
@@ -677,6 +672,8 @@ function parseGraphImport(text: string) {
     tags: Tag[]
     notes: PersonNote[]
     connections: Connection[]
+    node_groups: NodeGroup[]
+    nodeGroups: NodeGroup[]
   }>
 
   if (parsedPayload.format !== 'hackathon-board-graph') {
@@ -687,7 +684,7 @@ function parseGraphImport(text: string) {
     people: parsedPayload.people,
     tags: parsedPayload.tags,
     notes: parsedPayload.notes,
-    connections: parsedPayload.connections,
+    nodeGroups: parsedPayload.nodeGroups ?? parsedPayload.node_groups,
   })
 }
 
@@ -695,7 +692,7 @@ function getNodeGroupStorageKey(boardId: string) {
   return `${NODE_GROUP_STORAGE_KEY}:${boardId}`
 }
 
-function loadNodeGroups(boardId: string): NodeGroup[] {
+function loadLegacyNodeGroups(boardId: string): NodeGroup[] {
   try {
     const savedGroups = window.localStorage.getItem(getNodeGroupStorageKey(boardId))
     if (!savedGroups) return []
@@ -715,16 +712,6 @@ function loadNodeGroups(boardId: string): NodeGroup[] {
   } catch {
     return []
   }
-}
-
-function saveNodeGroups(boardId: string, groups: NodeGroup[]) {
-  const storageKey = getNodeGroupStorageKey(boardId)
-  if (groups.length === 0) {
-    window.localStorage.removeItem(storageKey)
-    return
-  }
-
-  window.localStorage.setItem(storageKey, JSON.stringify(groups))
 }
 
 function sanitizeNodeGroups(groups: NodeGroup[], boardId: string, nodes: PersonNode[]) {
@@ -1042,15 +1029,13 @@ function App() {
     tags,
     notes,
     personAiNotes,
-    connections,
+    nodeGroups: remoteNodeGroups,
     status: graphStatus,
     error: graphError,
     createPerson: createRemotePerson,
     updatePerson: updateRemotePerson,
     movePerson: moveRemotePerson,
     deletePerson: deleteRemotePerson,
-    createConnection: createRemoteConnection,
-    deleteConnection: deleteRemoteConnection,
     createTag: createRemoteTag,
     deleteTag: deleteRemoteTag,
     updateTag: updateRemoteTag,
@@ -1060,6 +1045,7 @@ function App() {
     refreshPersonAiNote,
     deleteCurrentGraphData,
     bulkCreatePeople: bulkCreateRemotePeople,
+    saveNodeGroups: saveRemoteNodeGroups,
   } = useBoardGraph(session?.user ?? null)
 
   const [theme, setTheme] = useState<Theme>(() => {
@@ -1120,7 +1106,7 @@ function App() {
   const [localPeople, setLocalPeople] = useState<PersonNode[]>(initialLocalGraph.people)
   const [localTags, setLocalTags] = useState<Tag[]>(initialLocalGraph.tags)
   const [localNotes, setLocalNotes] = useState<PersonNote[]>(initialLocalGraph.notes)
-  const [localConnections, setLocalConnections] = useState<Connection[]>(initialLocalGraph.connections)
+  const [localNodeGroups, setLocalNodeGroups] = useState<NodeGroup[]>(initialLocalGraph.nodeGroups)
 
   const boardRef = useRef<HTMLElement | null>(null)
   const boardSurfaceRef = useRef<HTMLDivElement | null>(null)
@@ -1194,11 +1180,11 @@ function App() {
   const activePeople = isRemoteGraphReady ? people : localPeople
   const activeTags = isRemoteGraphReady ? tags : localTags
   const activeNotes = isRemoteGraphReady ? notes : localNotes
+  const activeNodeGroups = isRemoteGraphReady ? remoteNodeGroups : localNodeGroups
   const activePersonAiNotes = useMemo(
     () => (isRemoteGraphReady ? personAiNotes : []),
     [isRemoteGraphReady, personAiNotes],
   )
-  const activeConnections = isRemoteGraphReady ? connections : localConnections
   const activeBoardId = activeBoard?.id ?? ANONYMOUS_BOARD.id
   const isGraphReady = isRemoteGraphReady || !isAuthenticated
   const boardNodes = useMemo(
@@ -1209,9 +1195,9 @@ function App() {
       }),
     [activePeople, draggedPositions],
   )
-  const boardConnections = useMemo(
-    () => activeConnections,
-    [activeConnections],
+  const boardConnections = useMemo<Connection[]>(
+    () => [],
+    [],
   )
   const nodesById = useMemo(
     () => Object.fromEntries(boardNodes.map((node) => [node.id, node])) as Record<string, PersonNode>,
@@ -1693,46 +1679,25 @@ function App() {
 
     setLocalPeople((currentPeople) => currentPeople.filter((person) => person.id !== id || person.is_root))
     setLocalNotes((currentNotes) => currentNotes.filter((note) => note.person_id !== id))
-    setLocalConnections((currentConnections) =>
-      currentConnections.filter((connection) => connection.person_a_id !== id && connection.person_b_id !== id),
+    setLocalNodeGroups((currentGroups) =>
+      currentGroups
+        .map((group) => ({
+          ...group,
+          memberIds: group.memberIds.filter((memberId) => memberId !== id),
+        }))
+        .filter((group) => group.memberIds.length >= 2),
     )
   }, [deleteRemotePerson, isRemoteGraphReady])
 
   const createConnection = useCallback(async (firstPersonId: string, secondPersonId: string) => {
-    if (isRemoteGraphReady) {
-      return createRemoteConnection(firstPersonId, secondPersonId)
-    }
-
-    if (firstPersonId === secondPersonId) {
-      throw new Error('Cannot connect a person to themselves.')
-    }
-
-    const [personAId, personBId] =
-      firstPersonId < secondPersonId ? [firstPersonId, secondPersonId] : [secondPersonId, firstPersonId]
-    const existingConnection = localConnections.find(
-      (connection) => connection.person_a_id === personAId && connection.person_b_id === personBId,
-    )
-    if (existingConnection) return existingConnection
-
-    const connection: Connection = {
-      id: createLocalId('local-connection'),
-      board_id: ANONYMOUS_BOARD.id,
-      owner_user_id: ANONYMOUS_BOARD.user_id,
-      person_a_id: personAId,
-      person_b_id: personBId,
-      created_at: new Date().toISOString(),
-    }
-    setLocalConnections((currentConnections) => [...currentConnections, connection])
-    return connection
-  }, [createRemoteConnection, isRemoteGraphReady, localConnections])
+    void firstPersonId
+    void secondPersonId
+    return null
+  }, [])
 
   const deleteConnection = useCallback(async (id: string) => {
-    if (isRemoteGraphReady) {
-      return deleteRemoteConnection(id)
-    }
-
-    setLocalConnections((currentConnections) => currentConnections.filter((connection) => connection.id !== id))
-  }, [deleteRemoteConnection, isRemoteGraphReady])
+    void id
+  }, [])
 
   async function createTag(name: string) {
     if (isRemoteGraphReady) {
@@ -1885,37 +1850,36 @@ function App() {
       people: localPeople,
       tags: localTags,
       notes: localNotes,
-      connections: localConnections,
+      nodeGroups: localNodeGroups,
     })
-  }, [isRemoteGraphReady, localConnections, localNotes, localPeople, localTags])
+  }, [isRemoteGraphReady, localNodeGroups, localNotes, localPeople, localTags])
 
   useEffect(() => {
     visibleBoardNodesRef.current = renderedBoardNodes
   }, [renderedBoardNodes])
 
   useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      const loadedGroups = sanitizeNodeGroups(loadNodeGroups(activeBoardId), activeBoardId, boardNodesRef.current)
-      nodeGroupsRef.current = loadedGroups
-      setNodeGroups(loadedGroups)
-    }, 0)
-
-    return () => window.clearTimeout(timeoutId)
-  }, [activeBoardId])
+    const loadedGroups = sanitizeNodeGroups(activeNodeGroups, activeBoardId, boardNodesRef.current)
+    nodeGroupsRef.current = loadedGroups
+    setNodeGroups(loadedGroups)
+  }, [activeBoardId, activeNodeGroups])
 
   useEffect(() => {
     setNodeGroups((currentGroups) => {
       const nextGroups = sanitizeNodeGroups(currentGroups, activeBoardId, boardNodes)
       if (JSON.stringify(nextGroups) === JSON.stringify(currentGroups)) {
-        saveNodeGroups(activeBoardId, currentGroups)
         return currentGroups
       }
 
       nodeGroupsRef.current = nextGroups
-      saveNodeGroups(activeBoardId, nextGroups)
+      if (isRemoteGraphReady) {
+        void saveRemoteNodeGroups(nextGroups)
+      } else {
+        setLocalNodeGroups(nextGroups)
+      }
       return nextGroups
     })
-  }, [activeBoardId, boardNodes])
+  }, [activeBoardId, boardNodes, isRemoteGraphReady, saveRemoteNodeGroups])
 
   useEffect(() => {
     graphCanvasDataRef.current = {
@@ -2328,10 +2292,14 @@ function App() {
         boardNodesRef.current,
       )
       nodeGroupsRef.current = nextGroups
-      saveNodeGroups(activeBoardId, nextGroups)
+      if (isRemoteGraphReady) {
+        void saveRemoteNodeGroups(nextGroups)
+      } else {
+        setLocalNodeGroups(nextGroups)
+      }
       return nextGroups
     })
-  }, [activeBoardId])
+  }, [activeBoardId, isRemoteGraphReady, saveRemoteNodeGroups])
 
   const addNodesToGroup = useCallback(
     async (memberIds: string[], targetNode: PersonNode, existingGroup: NodeGroup | null = null) => {
@@ -3384,9 +3352,24 @@ function App() {
 
   const handleDeleteSelectedNode = useCallback(async (nodeId: string) => {
     await deletePerson(nodeId)
+    const nextGroups = sanitizeNodeGroups(
+      nodeGroupsRef.current.map((group) => ({
+        ...group,
+        memberIds: group.memberIds.filter((memberId) => memberId !== nodeId),
+      })),
+      activeBoardId,
+      boardNodesRef.current.filter((node) => node.id !== nodeId),
+    )
+    nodeGroupsRef.current = nextGroups
+    setNodeGroups(nextGroups)
+    if (isRemoteGraphReady) {
+      await saveRemoteNodeGroups(nextGroups)
+    } else {
+      setLocalNodeGroups(nextGroups)
+    }
     setInspectorNodeId((currentNodeId) => (currentNodeId === nodeId ? null : currentNodeId))
     setSelectedNodeId(null)
-  }, [deletePerson])
+  }, [activeBoardId, deletePerson, isRemoteGraphReady, saveRemoteNodeGroups])
 
   const handleDeleteSelectedConnection = useCallback(async (connectionId?: string | null) => {
     const targetConnectionId = connectionId ?? selectedConnectionId
@@ -3705,7 +3688,7 @@ function App() {
       tags: activeTags,
       notes: activeNotes,
       person_ai_notes: activePersonAiNotes,
-      connections: activeConnections,
+      node_groups: nodeGroups,
     }
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
       type: 'application/json',
@@ -3725,10 +3708,10 @@ function App() {
     setLocalPeople(importedGraph.people)
     setLocalTags(importedGraph.tags)
     setLocalNotes(importedGraph.notes)
-    setLocalConnections(importedGraph.connections)
+    setLocalNodeGroups(importedGraph.nodeGroups)
     saveLocalGraph(importedGraph)
-    setNodeGroups([])
-    saveNodeGroups(activeBoardId, [])
+    nodeGroupsRef.current = importedGraph.nodeGroups
+    setNodeGroups(importedGraph.nodeGroups)
     setInspectorNodeId(null)
     setSelectedNodeId(null)
     setSelectedConnectionId(null)
@@ -3751,6 +3734,7 @@ function App() {
       tagIdMap.set(tag.id, savedTag.id)
     }
 
+    const importedPeople: PersonNode[] = [rootNode]
     const personIdMap = new Map<string, string>()
     for (const person of importedGraph.people) {
       if (person.is_root) {
@@ -3768,6 +3752,7 @@ function App() {
         y: person.y,
       })
       personIdMap.set(person.id, createdPerson.id)
+      importedPeople.push(createdPerson)
     }
 
     for (const note of importedGraph.notes) {
@@ -3776,15 +3761,18 @@ function App() {
       await createNote(note.title, note.body, personId, { syncAi: false })
     }
 
-    for (const connection of importedGraph.connections) {
-      const firstPersonId = personIdMap.get(connection.person_a_id)
-      const secondPersonId = personIdMap.get(connection.person_b_id)
-      if (!firstPersonId || !secondPersonId || firstPersonId === secondPersonId) continue
-      await createConnection(firstPersonId, secondPersonId)
-    }
-
-    setNodeGroups([])
-    saveNodeGroups(activeBoardId, [])
+    const importedGroups = sanitizeNodeGroups(
+      importedGraph.nodeGroups.map((group) => ({
+        ...group,
+        boardId: activeBoardId,
+        memberIds: group.memberIds.map((memberId) => personIdMap.get(memberId)).filter(Boolean) as string[],
+      })),
+      activeBoardId,
+      importedPeople,
+    )
+    nodeGroupsRef.current = importedGroups
+    setNodeGroups(importedGroups)
+    await saveRemoteNodeGroups(importedGroups)
     setInspectorNodeId(null)
     setSelectedNodeId(null)
     setSelectedConnectionId(null)
@@ -3815,7 +3803,7 @@ function App() {
 
       setGraphImportStatus({
         state: 'success',
-        message: `Imported ${Math.max(0, importedGraph.people.length - 1)} people, ${importedGraph.tags.length} tags, ${importedGraph.notes.length} notes, and ${importedGraph.connections.length} connections.`,
+        message: `Imported ${Math.max(0, importedGraph.people.length - 1)} people, ${importedGraph.tags.length} tags, ${importedGraph.notes.length} notes, and ${importedGraph.nodeGroups.length} blob groups.`,
       })
     } catch (error) {
       setGraphImportStatus({
@@ -3830,7 +3818,7 @@ function App() {
   }
   async function handleDeleteGraphData() {
     const shouldDelete = window.confirm(
-      'Delete this graph data? This removes people, notes, tags, connections, and AI summaries from this board.',
+      'Delete this graph data? This removes people, notes, tags, blob groups, and AI summaries from this board.',
     )
     if (!shouldDelete) return
 
@@ -3844,9 +3832,8 @@ function App() {
     setLocalPeople([ANONYMOUS_ROOT])
     setLocalTags(createDefaultLocalTags())
     setLocalNotes([])
-    setLocalConnections([])
+    setLocalNodeGroups([])
     setNodeGroups([])
-    saveNodeGroups(activeBoardId, [])
     setInspectorNodeId(null)
     setSelectedNodeId(null)
   }

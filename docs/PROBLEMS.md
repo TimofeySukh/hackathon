@@ -49,7 +49,7 @@ When working on the project:
 
 - Status: Open
 - Reported behavior: 60-100 contacts load acceptably, but around 3000 contacts the board becomes extremely laggy.
-- Notes: the product target should support at least 10000 imported contacts. A reproducible LinkedIn fixture can be generated with `npm run generate:linkedin-fixture -- --count 10000`; it writes `fixtures/linkedin/Connections-10000.csv` and `fixtures/linkedin/linkedin-connections-10000.zip`. The app now uses batched LinkedIn inserts, a canvas overview layer, viewport-capped interactive DOM nodes, capped SVG connections, and label LOD. This still needs live timing against a signed-in Supabase project with the 10000-contact ZIP before marking resolved.
+- Notes: the product target should support at least 10000 imported contacts. A reproducible LinkedIn fixture can be generated with `npm run generate:linkedin-fixture -- --count 10000`; it writes `fixtures/linkedin/Connections-10000.csv` and `fixtures/linkedin/linkedin-connections-10000.zip`. The app now uses batched LinkedIn inserts, a canvas overview layer, viewport-capped interactive DOM nodes, disabled saved connections, and label LOD. This still needs live timing against a signed-in Supabase project with the 10000-contact ZIP before marking resolved.
 
 ## Resolved Problems
 

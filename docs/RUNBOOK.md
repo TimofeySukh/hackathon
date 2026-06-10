@@ -20,10 +20,10 @@ Current app behavior:
 - open a LinkedIn menu with visual instructions for requesting a LinkedIn data archive
 - sync LinkedIn connections by dragging or selecting a LinkedIn export zip and importing only `Connections.csv`
 - import LinkedIn email addresses and profile URLs only when those opt-in fields are selected in the import dialog
-- import LinkedIn people, source notes, and root connections through batched Supabase inserts
+- import LinkedIn people and source notes through batched Supabase inserts
 - create one personal board record for each signed-in user
 - create one immutable root person at `0,0` for each signed-in user
-- persist people, colored tags, notes, and undirected connections in Supabase
+- persist people, colored tags, notes, and blob-group membership in Supabase
 - open the top-left Tags menu to create tags, rename them, and choose tag colors from presets or a custom picker
 - scroll the top-left Tags menu when the tag list or open color palette exceeds the viewport
 - keep signed-out edits in browser `localStorage` unless the user signs in
@@ -35,11 +35,11 @@ Current app behavior:
 - open a people search layer, match locally while typing, and run natural-language AI search on Enter when signed in
 - limit AI search to up to 40 browser-selected candidate people and sanitize email addresses and URLs before provider calls
 - import graph data, export graph data, delete graph data, or delete account data from the account menu
-- keep large graphs responsive with a canvas overview layer, viewport-capped DOM nodes, capped SVG connections, and label level-of-detail
+- keep large graphs responsive with a canvas overview layer, viewport-capped DOM nodes, and label level-of-detail
 - drag a right-click selection box to select multiple people, then drag one of them to move the group
 - create people with a board double-click or double-tap, form soft blob groups by dropping one person near another or touching an existing blob area, and drag the middle of a blob area to move the whole blob group
 - use a mobile layout with the search field and account/theme controls at the top and the Tags control docked near the bottom-left safe area
-- avoid selecting connection lines on coarse touch pointers so mobile board panning does not accidentally open the delete-connection menu
+- avoid graph-line interactions while connections are disabled
 - simplify some heavy visual effects on very dense boards to keep navigation responsive
 - avoid browser-fragile `color-mix()` styling for tag accents and disable heavy blur compositing on Firefox
 
@@ -393,7 +393,7 @@ Manual verification:
 10. Sign in with Google and confirm the account state appears.
 11. Confirm the signed-in account gets a root node at `0,0`.
 12. Double-click the empty board to create a new person, confirm the inspector opens, then reload and confirm the person persists.
-13. Drag a non-root person to a new position, confirm connected lines follow it, then reload and confirm the coordinates persist.
+13. Drag a non-root person to a new position, then reload and confirm the coordinates persist.
 14. Click a person near a viewport edge and confirm the board pans enough to keep the inspector visible, and that the inspector opens at a consistent size regardless of the current zoom.
 15. Start trackpad panning on the board, pass over the inspector, and confirm panning continues; then start a trackpad gesture on the inspector and confirm it does not begin board panning.
 16. Confirm the inspector opens as a compact panel with only a large name field, the tag picker, notes, and the delete-person action.
@@ -404,7 +404,7 @@ Manual verification:
 21. Create a note by typing into the `Create new note` field, confirm saved notes start collapsed by default, expand one with the chevron, press Enter in the title to open the body, delete a note from the icon button, reload, and confirm note changes persist.
 22. Drop one person near another, confirm a small blob group appears in the stationary target person's color, then add a third person by dropping it so the node touches the blob area and confirm the group keeps its original color while members arrange around the center. Drop a person near a grouped member but outside the blob area and confirm it does not join the group. Drag the middle of the blob area and confirm the whole group moves together.
 23. Open the top-left Tags menu, create enough tags to overflow the panel, scroll to the lower tags, adjust a lower tag color, and confirm the palette remains reachable.
-24. Open the top-left Tags menu, create a tag, adjust its color, toggle one tag off with the visibility checkbox, and confirm both tagged nodes and their connections disappear. Use `Select all` and `Clear all` to confirm bulk visibility controls work.
+24. Open the top-left Tags menu, create a tag, adjust its color, toggle one tag off with the visibility checkbox, and confirm tagged nodes disappear. Use `Select all` and `Clear all` to confirm bulk visibility controls work.
 25. Open the search layer and verify that typing a person name, tag, or note text returns local matching people.
 26. Press Enter with a natural-language query and verify AI search returns ranked people with reasons.
 27. Click a search result and verify the board recenters on that person and opens the inspector.
@@ -412,8 +412,8 @@ Manual verification:
 29. Edit an existing note, blur the input, confirm the AI summary does not refresh automatically, then press Refresh and confirm the same `person_ai_notes` row updates its `updated_at`, `summary`, and `structured_summary`.
 30. Open the LinkedIn import dialog and confirm email addresses and profile URLs are opt-in fields that default off.
 31. Export graph data from the account menu and confirm a JSON file downloads.
-32. Import that JSON from the account menu and confirm people, tags, notes, and connections are restored after the replacement confirmation.
-33. Delete graph data from the account menu and confirm people, notes, tags, connections, and AI summaries are cleared while the root person remains.
+32. Import that JSON from the account menu and confirm people, tags, notes, and blob groups are restored after the replacement confirmation.
+33. Delete graph data from the account menu and confirm people, notes, tags, blob groups, and AI summaries are cleared while the root person remains.
 34. Import `fixtures/linkedin/linkedin-connections-10000.zip` on a signed-in test account and confirm the import status advances as a batch import rather than one row at a time.
 35. Pan and zoom the 10000-contact board and confirm the canvas overview remains visible while labels and interactive nodes are capped around the viewport.
 36. Sign out and confirm the anonymous board state returns, then reload and confirm the anonymous graph is still present.
@@ -423,7 +423,7 @@ Supabase verification:
 1. Confirm a row exists in `profiles` for the signed-in user.
 2. Confirm a single row exists in `boards` for the signed-in user.
 3. Confirm a single root row exists in `people` for the signed-in user with `is_root = true`, `x = 0`, and `y = 0`.
-4. Confirm `tags`, `notes`, `person_ai_notes`, and `connections` rows are created for user actions.
+4. Confirm `tags`, `notes`, `person_ai_notes`, and `node_groups` rows are created for user actions. Confirm new user actions do not create `connections` rows.
 5. Confirm `person_ai_notes.status` moves through `pending` and then `created` after pressing the selected person's AI summary Refresh button.
 6. Confirm `person_ai_notes.structured_summary` contains the keys `summary`, `traits`, `interests`, `relationship_context`, and `open_questions`.
 7. Confirm row-level security prevents reading or updating another user's board data.

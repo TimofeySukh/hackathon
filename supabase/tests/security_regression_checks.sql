@@ -18,6 +18,7 @@ begin
       'tags',
       'people',
       'notes',
+      'node_groups',
       'connections',
       'person_ai_notes'
     )
@@ -33,6 +34,7 @@ begin
     'tags',
     'people',
     'notes',
+    'node_groups',
     'connections',
     'person_ai_notes'
   ]
@@ -60,12 +62,13 @@ begin
       'tags',
       'people',
       'notes',
+      'node_groups',
       'connections',
       'person_ai_notes'
     )
     and roles @> array['authenticated']::name[];
 
-  if policy_count < 22 then
+  if policy_count < 25 then
     raise exception 'Expected authenticated RLS policies are missing. Found only % policies.', policy_count;
   end if;
 end $$;
