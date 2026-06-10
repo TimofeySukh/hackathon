@@ -1700,6 +1700,16 @@ input[type='search']::-webkit-search-results-decoration {
   cursor: grabbing;
 }
 
+.node-group-orbit {
+  fill: none;
+  cursor: grab;
+  pointer-events: stroke;
+}
+
+.node-group-orbit:active {
+  cursor: grabbing;
+}
+
 .graph-edge-hit {
   fill: none;
   stroke: rgba(0, 0, 0, 0.001);

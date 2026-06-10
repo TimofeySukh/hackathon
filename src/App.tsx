@@ -65,6 +65,8 @@ type NodeGroupBubble = {
   hull: Offset[]
   fill: string
   stroke: string
+  center: Offset
+  ringRadii: number[]
 }
 
 type LocalGraphState = {
@@ -231,12 +233,29 @@ const DOUBLE_TAP_MS = 330
 const DOUBLE_TAP_DISTANCE = 22
 const GROUP_DROP_DISTANCE = 86
 const GROUP_MEMBER_SPACING = 72
+// Tag-sector + pyramid packing for a group. The circle is split into equal
+// angular sectors — one per tag, plus one for untagged people. Inside a sector
+// people form a pyramid pointing at the centre: the innermost ring holds 1, the
+// next 3, then 5, 7… (odd numbers). A K-ring pyramid holds K². Partial pyramids
+// fill from the outermost ring inward, so the apex (centre) fills last. Equal
+// radial gaps between rings and angular gaps between sectors keep them distinct,
+// and the empty core stays grabbable for dragging the whole cluster.
+const GROUP_ZONE_WIDTH = 130 // radial gap between consecutive rings (the "прослойка")
+const GROUP_CORE_RADIUS = 70 // empty centre kept as the cluster drag handle
+const GROUP_ROW_SPACING = 132 // arc distance between neighbours on a full ring
+const GROUP_ORBIT_BAND_WIDTH = 70 // thickness of each filled orbit shell (< zone, leaves a gap)
 const GROUP_BLOB_NODE_RADIUS = 12
 const GROUP_BLOB_PADDING = 28
 const GROUP_BLOB_SAMPLE_POINTS = 18
-const LINKEDIN_RING_CAPACITIES = [10, 40]
-const LINKEDIN_RING_RADIUS = 260
-const LINKEDIN_RING_STEP = 190
+// Nested-ring layout. One row of people sits at the centre of each equal-width
+// zone, so the radial gap between rings and the arc gap between neighbours are
+// both constant. Capacity of a ring is just its circumference / spacing, so it
+// grows smoothly with radius. The very centre is left empty as a grab handle:
+// the group bubble (convex hull) still covers the hole, so grabbing the middle
+// drags the whole cluster instead of an individual person.
+const LINKEDIN_ROW_SPACING = 92 // arc distance between neighbours on a ring
+const LINKEDIN_ZONE_WIDTH = 92 // equal radial gap between consecutive rings
+const LINKEDIN_CORE_RADIUS = 130 // empty centre reserved as the cluster drag handle
 const LINKEDIN_GRID_SPACING = 170
 const RENDER_MARGIN_SCREEN_PX = 700
 const RENDER_BOUNDS_PAN_THRESHOLD = 320
@@ -247,12 +266,16 @@ const LABEL_MIN_SCALE = 0.58
 const CONNECTION_NODE_LIMIT = 1200
 const LARGE_GRAPH_SVG_SIZE = 200000
 
-function getLinkedInRingCapacity(ringIndex: number) {
-  if (ringIndex < LINKEDIN_RING_CAPACITIES.length) {
-    return LINKEDIN_RING_CAPACITIES[ringIndex]
-  }
+// Radius of the row of people for a given ring, measured to the centre of its
+// zone, leaving an empty core of LINKEDIN_CORE_RADIUS in the middle.
+function getLinkedInRingRadius(ringIndex: number) {
+  return LINKEDIN_CORE_RADIUS + (ringIndex + 0.5) * LINKEDIN_ZONE_WIDTH
+}
 
-  return 100 + (ringIndex - 2) * 50
+// Capacity = how many evenly-spaced people fit on this ring's circumference.
+function getLinkedInRingCapacity(ringIndex: number) {
+  const circumference = Math.PI * 2 * getLinkedInRingRadius(ringIndex)
+  return Math.max(1, Math.round(circumference / LINKEDIN_ROW_SPACING))
 }
 
 function parseCsvRows(csv: string) {
@@ -421,7 +444,7 @@ function getRingSlotPosition(slotIndex: number, angleStart: number, angleEnd: nu
   }
 
   const capacity = getScaledCapacity(ringIndex)
-  const radius = LINKEDIN_RING_RADIUS + ringIndex * LINKEDIN_RING_STEP
+  const radius = getLinkedInRingRadius(ringIndex)
   const progress = capacity === 1 ? 0.5 : (remainingSlot + 0.5) / capacity
   const angle = angleStart + (angleEnd - angleStart) * progress
 
@@ -761,12 +784,30 @@ function getNodeGroupBubbles(groups: NodeGroup[], nodes: PersonNode[]): NodeGrou
       const path = hull ? getSmoothClosedPath(hull) : null
       if (!path) return null
 
+      // Centre + the radius of each occupied ring, so we can draw concentric
+      // "electron cloud" orbits around the cluster.
+      const center = {
+        x: members.reduce((sum, node) => sum + node.x, 0) / members.length,
+        y: members.reduce((sum, node) => sum + node.y, 0) / members.length,
+      }
+      const maxDistance = members.reduce(
+        (max, node) => Math.max(max, Math.hypot(node.x - center.x, node.y - center.y)),
+        0,
+      )
+      const ringRadii: number[] = []
+      for (let ring = 0; getGroupRingRadius(ring) <= maxDistance + GROUP_BLOB_NODE_RADIUS; ring += 1) {
+        ringRadii.push(getGroupRingRadius(ring))
+      }
+      if (ringRadii.length === 0) ringRadii.push(getGroupRingRadius(0))
+
       return {
         id: group.id,
         path,
         hull,
         fill: rgbaFromHex(color, 0.18),
-        stroke: rgbaFromHex(color, 0.64),
+        stroke: rgbaFromHex(color, 0.5),
+        center,
+        ringRadii,
       }
     })
     .filter(Boolean) as NodeGroupBubble[]
@@ -879,6 +920,67 @@ function isPointTouchingPolygon(point: Offset, polygon: Offset[], radius: number
   return isPointInPolygon(point, polygon) || getDistanceToPolygon(point, polygon) <= radius
 }
 
+function getGroupRingRadius(ringIndex: number) {
+  return GROUP_CORE_RADIUS + (ringIndex + 0.5) * GROUP_ZONE_WIDTH
+}
+
+// How many people sit on each ring of a pyramid that holds `count` people.
+// Rings are indexed from the centre out (ring 0 = apex). A full pyramid is
+// 1, 3, 5, … (ring k holds 2k+1, total of K rings = K²). When the count is not
+// a perfect square the outermost rings fill first and the apex fills last.
+// Lays out a group as ONE filled circle. The primary-category people fill the
+// concentric rings normally. "Outsiders" (people whose tag differs from the
+// group's main category) are clustered into a small pyramid wedge on one side:
+// 1 of them on the innermost ring, 3 on the next, 5 on the next… (a triangle
+// pointing at the centre), with the primary people filling the rest of each ring.
+function placeCircleWithPyramid(
+  mainMembers: PersonNode[],
+  outsiderMembers: PersonNode[],
+  centerX: number,
+  centerY: number,
+  positions: Map<string, Offset>,
+) {
+  const total = mainMembers.length + outsiderMembers.length
+  const pyramidDirection = Math.PI / 2 // outsiders cluster toward the bottom
+  let mainIndex = 0
+  let outsiderIndex = 0
+  let ringIndex = 0
+
+  while (mainIndex + outsiderIndex < total) {
+    const radius = getGroupRingRadius(ringIndex)
+    const capacity = Math.max(1, Math.round((Math.PI * 2 * radius) / GROUP_ROW_SPACING))
+    const remainingTotal = total - mainIndex - outsiderIndex
+    const countOnRing = Math.min(capacity, remainingTotal)
+
+    const remainingMain = mainMembers.length - mainIndex
+    const remainingOutsiders = outsiderMembers.length - outsiderIndex
+    // Pyramid: 1 outsider on ring 0, 3 on ring 1, 5 on ring 2…
+    let outsidersOnRing = Math.min(2 * ringIndex + 1, remainingOutsiders, countOnRing)
+    let mainOnRing = countOnRing - outsidersOnRing
+    if (mainOnRing > remainingMain) {
+      outsidersOnRing += mainOnRing - remainingMain
+      mainOnRing = remainingMain
+    }
+
+    const step = (Math.PI * 2) / countOnRing
+    // Centre the outsider block on the pyramid direction; primary people take the
+    // remaining slots around the rest of the ring.
+    const startSlot = -Math.floor((outsidersOnRing - 1) / 2)
+
+    for (let slot = 0; slot < countOnRing; slot += 1) {
+      const angle = pyramidDirection + (startSlot + slot) * step
+      const isOutsider = slot < outsidersOnRing
+      const node = isOutsider ? outsiderMembers[outsiderIndex++] : mainMembers[mainIndex++]
+      positions.set(node.id, {
+        x: centerX + Math.cos(angle) * radius,
+        y: centerY + Math.sin(angle) * radius,
+      })
+    }
+
+    ringIndex += 1
+  }
+}
+
 function arrangeGroupMembers(nodes: PersonNode[], memberIds: string[]) {
   const members = memberIds.map((nodeId) => nodes.find((node) => node.id === nodeId)).filter(Boolean) as PersonNode[]
   if (members.length < 2) return new Map<string, Offset>()
@@ -902,21 +1004,33 @@ function arrangeGroupMembers(nodes: PersonNode[], memberIds: string[]) {
     return positions
   }
 
-  const radius = GROUP_MEMBER_SPACING + Math.max(0, members.length - 3) * 12
-  const sortedMembers = [...members].sort((left, right) => {
-    const leftAngle = Math.atan2(left.y - centerY, left.x - centerX)
-    const rightAngle = Math.atan2(right.y - centerY, right.x - centerX)
-    return leftAngle - rightAngle
-  })
+  // The group's primary category is its most common tag. Everyone else is an
+  // "outsider" and gets clustered into the pyramid wedge.
+  const tagCounts = new Map<string, number>()
+  for (const node of members) {
+    const key = node.tag_id ?? ''
+    tagCounts.set(key, (tagCounts.get(key) ?? 0) + 1)
+  }
+  let primaryKey = ''
+  let primaryCount = -1
+  for (const [key, count] of tagCounts) {
+    if (count > primaryCount) {
+      primaryKey = key
+      primaryCount = count
+    }
+  }
 
-  sortedMembers.forEach((node, index) => {
-    const angle = -Math.PI / 2 + (index * Math.PI * 2) / sortedMembers.length
-    positions.set(node.id, {
-      x: centerX + Math.cos(angle) * radius,
-      y: centerY + Math.sin(angle) * radius,
+  const mainMembers = members.filter((node) => (node.tag_id ?? '') === primaryKey)
+  // Group outsiders by their own tag so same-tag outsiders stay adjacent.
+  const outsiderMembers = members
+    .filter((node) => (node.tag_id ?? '') !== primaryKey)
+    .sort((left, right) => {
+      const leftKey = left.tag_id ?? ''
+      const rightKey = right.tag_id ?? ''
+      return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0
     })
-  })
 
+  placeCircleWithPyramid(mainMembers, outsiderMembers, centerX, centerY, positions)
   return positions
 }
 
@@ -1838,6 +1952,45 @@ function App() {
   useEffect(() => {
     draggedPositionsRef.current = draggedPositions
   }, [draggedPositions])
+
+  // One-time re-pack of every existing group into the current layout, throttled
+  // to a few writes at a time so it never floods the backend. Guarded by
+  // localStorage so reloads don't replay it — bump the version to force again.
+  const didAutoRepackRef = useRef(false)
+  useEffect(() => {
+    if (didAutoRepackRef.current) return
+    if (!isGraphReady) return
+    if (nodeGroups.length === 0 || boardNodes.length === 0) return
+    didAutoRepackRef.current = true
+
+    const repackVersion = 'group-layout-v8'
+    if (window.localStorage.getItem('hackathon-group-repack') === repackVersion) return
+    window.localStorage.setItem('hackathon-group-repack', repackVersion)
+
+    const moves: Array<{ id: string; x: number; y: number }> = []
+    for (const group of nodeGroups) {
+      const positions = arrangeGroupMembers(boardNodes, group.memberIds)
+      for (const [nodeId, position] of positions) {
+        const node = boardNodes.find((candidate) => candidate.id === nodeId)
+        if (!node || node.is_root) continue
+        moves.push({ id: nodeId, x: position.x, y: position.y })
+      }
+    }
+
+    let cancelled = false
+    const runInBatches = async () => {
+      const batchSize = 6
+      for (let index = 0; index < moves.length && !cancelled; index += batchSize) {
+        const batch = moves.slice(index, index + batchSize)
+        await Promise.all(batch.map((move) => movePerson(move.id, move.x, move.y)))
+      }
+    }
+    void runInBatches()
+
+    return () => {
+      cancelled = true
+    }
+  }, [isGraphReady, nodeGroups, boardNodes, movePerson])
 
   useEffect(() => {
     areaSelectionRef.current = areaSelection
@@ -4898,16 +5051,27 @@ function App() {
             aria-hidden="true"
           >
             {visibleNodeGroupBubbles.map((groupBubble) => (
-              <path
-                key={groupBubble.id}
-                className="node-group-bubble"
-                d={groupBubble.path}
-                style={{
-                  fill: groupBubble.fill,
-                  stroke: groupBubble.stroke,
-                }}
-                onPointerDown={(event) => startNodeGroupInteraction(groupBubble.id, event)}
-              />
+              <g key={groupBubble.id}>
+                {/* Invisible blob = the drag target for moving the whole cluster. */}
+                <path
+                  className="node-group-bubble"
+                  d={groupBubble.path}
+                  style={{ fill: 'transparent', stroke: 'transparent' }}
+                  onPointerDown={(event) => startNodeGroupInteraction(groupBubble.id, event)}
+                />
+                {/* Concentric filled "electron cloud" shells with transparent gaps. */}
+                {groupBubble.ringRadii.map((radius, index) => (
+                  <circle
+                    key={index}
+                    className="node-group-orbit"
+                    cx={groupBubble.center.x}
+                    cy={groupBubble.center.y}
+                    r={radius}
+                    style={{ stroke: groupBubble.fill, strokeWidth: GROUP_ORBIT_BAND_WIDTH }}
+                    onPointerDown={(event) => startNodeGroupInteraction(groupBubble.id, event)}
+                  />
+                ))}
+              </g>
             ))}
 
             {renderedBoardConnections.map((edge) => {

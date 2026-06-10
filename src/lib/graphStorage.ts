@@ -226,6 +226,12 @@ function isMissingColorColumnError(error: { message?: string; code?: string } | 
   )
 }
 
+// True when a query failed because the table is missing (migration not applied)
+// or PostgREST's schema cache hasn't picked it up yet.
+function isMissingTableError(error: { code?: string; message?: string } | null) {
+  return !!error && (error.code === 'PGRST205' || /schema cache|does not exist/i.test(error.message ?? ''))
+}
+
 export async function loadBoardGraph(user: User): Promise<BoardGraphPayload> {
   const client = requireSupabase()
   const workspace = await ensureUserWorkspace(user)
@@ -274,8 +280,16 @@ export async function loadBoardGraph(user: User): Promise<BoardGraphPayload> {
   if (peopleResult.error) throw peopleResult.error
   if (notesResult.error) throw notesResult.error
   if (personAiNotesResult.error) throw personAiNotesResult.error
-  if (nodeGroupsResult.error) throw nodeGroupsResult.error
   if (legacyConnectionsDeleteResult.error) throw legacyConnectionsDeleteResult.error
+
+  // The node_groups table is added by a later migration. If it hasn't been
+  // applied yet, don't break the whole board load — just start with no groups.
+  if (nodeGroupsResult.error && !isMissingTableError(nodeGroupsResult.error)) {
+    throw nodeGroupsResult.error
+  }
+  if (nodeGroupsResult.error) {
+    console.warn('node_groups table missing — run the add_node_groups migration to enable groups.')
+  }
 
   return {
     board: workspace.board,
@@ -540,6 +554,12 @@ export async function saveNodeGroups(boardId: string, ownerUserId: string, group
   const client = requireSupabase()
   const deleteResult = await client.from('node_groups').delete().eq('board_id', boardId)
 
+  // Without the node_groups table, keep groups in local state for the session
+  // instead of failing the whole board update.
+  if (deleteResult.error && isMissingTableError(deleteResult.error)) {
+    console.warn('node_groups table missing — group changes are session-only until the migration is applied.')
+    return groups
+  }
   if (deleteResult.error) throw deleteResult.error
   if (groups.length === 0) return []
 
@@ -558,6 +578,10 @@ export async function saveNodeGroups(boardId: string, ownerUserId: string, group
     .select('*')
     .order('created_at', { ascending: true })
 
+  if (error && isMissingTableError(error)) {
+    console.warn('node_groups table missing — group changes are session-only until the migration is applied.')
+    return groups
+  }
   if (error) throw error
 
   return ((data ?? []) as Array<{

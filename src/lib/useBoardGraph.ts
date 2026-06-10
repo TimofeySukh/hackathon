@@ -91,10 +91,21 @@ export function useBoardGraph(user: User | null) {
       .catch((error: unknown) => {
         if (!isMounted) return
 
+        // Surface the real reason instead of the generic fallback — Supabase
+        // rejects with a PostgrestError object that is not `instanceof Error`.
+        console.error('loadBoardGraph failed:', error)
+        const detail =
+          error instanceof Error
+            ? error.message
+            : typeof error === 'object' && error !== null
+              ? ((error as { message?: string; details?: string; hint?: string; code?: string }).message ??
+                  JSON.stringify(error))
+              : String(error)
+
         setGraphState({
           ...EMPTY_GRAPH_STATE,
           status: 'idle',
-          error: error instanceof Error ? error.message : 'Unable to load board data.',
+          error: `Unable to load board data: ${detail}`,
         })
       })
 
@@ -148,9 +159,17 @@ export function useBoardGraph(user: User | null) {
   }
 
   const setError = (error: unknown) => {
+    console.error('Board update failed:', error)
+    const detail =
+      error instanceof Error
+        ? error.message
+        : typeof error === 'object' && error !== null
+          ? ((error as { message?: string }).message ?? JSON.stringify(error))
+          : String(error)
+
     setGraphState((currentState) => ({
       ...currentState,
-      error: error instanceof Error ? error.message : 'Board update failed.',
+      error: `Board update failed: ${detail}`,
     }))
   }
 
