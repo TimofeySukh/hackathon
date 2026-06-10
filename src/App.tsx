@@ -1012,6 +1012,7 @@ function App() {
                     padding: 0,
                     outline: 'none',
                     pointerEvents: 'auto',
+                    transform: 'none',
                   }}
                   onPointerDown={(event) => startCircleCenterDrag(event, circle)}
                   onClick={(event) => {
