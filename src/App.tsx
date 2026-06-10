@@ -211,7 +211,7 @@ const GRID_GAP = 12
 const MAJOR_GRID_GAP = 96
 const DOT_SIZE = 0.65
 const MAJOR_DOT_SIZE = 2
-const TAG_PRESET_COLORS = ['#ff6b6b', '#ff9f43', '#ffd93d', '#4cd137', '#2ed573', '#1e90ff', '#3742fa', '#a55eea', '#ff7eb6', '#8affd6']
+const TAG_PRESET_COLORS = ['#ff6b6b', '#ff9f43', '#ffd93d', '#4f7cff', '#1e90ff', '#3742fa', '#a55eea', '#8b5cf6', '#ff7eb6', '#d946ef']
 const NODE_CLICK_DRAG_THRESHOLD = 4
 const NODE_RADIUS = 9
 const NODE_HIT_RADIUS = 31
@@ -1201,7 +1201,7 @@ function App() {
 
     if (connections.length <= 20000 && view.scale >= 0.16) {
       context.beginPath()
-      context.strokeStyle = canvasTheme === 'light' ? 'rgba(33, 98, 73, 0.16)' : 'rgba(138, 255, 214, 0.12)'
+      context.strokeStyle = canvasTheme === 'light' ? 'rgba(79, 124, 255, 0.16)' : 'rgba(138, 255, 214, 0.12)'
       context.lineWidth = Math.max(0.6, Math.min(1.2, view.scale))
 
       let drawnConnections = 0
@@ -1224,7 +1224,7 @@ function App() {
       context.stroke()
     }
 
-    const defaultFill = canvasTheme === 'light' ? 'rgba(62, 158, 118, 0.72)' : 'rgba(138, 255, 214, 0.72)'
+    const defaultFill = canvasTheme === 'light' ? 'rgba(79, 124, 255, 0.76)' : 'rgba(138, 255, 214, 0.72)'
     const radius = Math.max(1.2, Math.min(3.2, 2.4 * view.scale))
 
     for (const { node, screen } of visibleNodes) {

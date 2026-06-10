@@ -1,9 +1,9 @@
-export const DEFAULT_TAG_COLOR = '#8affd6'
+export const DEFAULT_TAG_COLOR = '#4f7cff'
 
 export const DEFAULT_TAGS = [
   { name: 'Work', color: '#ff4d4d' },
   { name: 'Friends', color: '#3f7cff' },
-  { name: 'Family', color: '#39c795' },
+  { name: 'Family', color: '#a855f7' },
 ] as const
 
 export function isHexColor(value: string) {

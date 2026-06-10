@@ -404,7 +404,7 @@ input[type='search']::-webkit-search-results-decoration {
   padding: 9px 12px;
   border: 1px solid var(--button-border);
   border-radius: 999px;
-  background: rgba(138, 255, 214, 0.08);
+  background: rgba(79, 124, 255, 0.08);
   color: var(--panel-text);
   cursor: pointer;
   font-size: 12px;
@@ -476,7 +476,7 @@ input[type='search']::-webkit-search-results-decoration {
 
 .tags-menu__name-input:focus {
   border-color: var(--button-border);
-  background: rgba(138, 255, 214, 0.08);
+  background: rgba(79, 124, 255, 0.08);
 }
 
 .tags-menu__delete {
@@ -512,7 +512,7 @@ input[type='search']::-webkit-search-results-decoration {
 }
 
 .tags-menu__visibility-toggle.is-active {
-  background: rgba(138, 255, 214, 0.14);
+  background: rgba(79, 124, 255, 0.14);
   color: var(--panel-text);
 }
 
@@ -564,15 +564,15 @@ input[type='search']::-webkit-search-results-decoration {
 }
 
 .tags-menu__preset.is-selected {
-  border-color: #8affd6;
+  border-color: #4f7cff;
   box-shadow:
-    0 0 0 2px rgba(138, 255, 214, 0.24),
+    0 0 0 2px rgba(79, 124, 255, 0.24),
     0 10px 22px rgba(0, 0, 0, 0.12);
 }
 
 .tags-menu__new {
   width: 100%;
-  background: rgba(138, 255, 214, 0.14);
+  background: rgba(79, 124, 255, 0.14);
   border-radius: 999px;
 }
 
@@ -899,13 +899,13 @@ input[type='search']::-webkit-search-results-decoration {
 }
 
 .theme-light .linkedin-upload__dropzone {
-  border-color: rgba(29, 145, 102, 0.34);
-  background: rgba(137, 212, 170, 0.12);
+  border-color: rgba(79, 124, 255, 0.32);
+  background: rgba(79, 124, 255, 0.1);
 }
 
 .linkedin-upload__dropzone.is-active {
-  border-color: rgba(138, 255, 214, 0.88);
-  background: rgba(138, 255, 214, 0.16);
+  border-color: rgba(79, 124, 255, 0.72);
+  background: rgba(79, 124, 255, 0.14);
   transform: translateY(-1px);
 }
 
@@ -995,7 +995,7 @@ input[type='search']::-webkit-search-results-decoration {
 }
 
 .theme-light .linkedin-upload__status.is-success {
-  color: #1f7c59;
+  color: #315dce;
 }
 
 .linkedin-upload__status.is-error {
@@ -1573,9 +1573,9 @@ input[type='search']::-webkit-search-results-decoration {
 .board-selection-box {
   position: absolute;
   z-index: 7;
-  border: 1px solid rgba(138, 255, 214, 0.88);
-  background: rgba(138, 255, 214, 0.14);
-  box-shadow: inset 0 0 0 1px rgba(138, 255, 214, 0.18);
+  border: 1px solid rgba(79, 124, 255, 0.76);
+  background: rgba(79, 124, 255, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(79, 124, 255, 0.18);
   pointer-events: none;
 }
 
@@ -1706,20 +1706,20 @@ input[type='search']::-webkit-search-results-decoration {
 }
 
 .theme-light .graph-edge {
-  stroke: rgba(33, 98, 73, 0.34);
+  stroke: rgba(63, 87, 150, 0.32);
   filter: none;
 }
 
 .theme-light .graph-edge--preview {
-  stroke: rgba(38, 140, 97, 0.52);
+  stroke: rgba(79, 124, 255, 0.52);
 }
 
 .theme-light .graph-edge.is-selected {
-  stroke: rgba(38, 140, 97, 0.82);
+  stroke: rgba(79, 124, 255, 0.82);
 }
 
 .theme-light .graph-edge-hit:hover + .graph-edge {
-  stroke: rgba(38, 140, 97, 0.72);
+  stroke: rgba(79, 124, 255, 0.72);
 }
 
 @media (pointer: coarse) {
@@ -1832,8 +1832,8 @@ input[type='search']::-webkit-search-results-decoration {
 }
 
 .theme-light .graph-node__dot {
-  background: var(--node-color, rgba(62, 158, 118, 0.74));
-  box-shadow: 0 0 18px rgba(88, 191, 145, 0.18);
+  background: var(--node-color, rgba(79, 124, 255, 0.78));
+  box-shadow: 0 0 18px rgba(79, 124, 255, 0.16);
 }
 
 @supports (-moz-appearance: none) {
@@ -1869,7 +1869,7 @@ input[type='search']::-webkit-search-results-decoration {
 }
 
 .theme-light .graph-node__label {
-  color: rgba(22, 52, 39, 0.78);
+  color: rgba(29, 41, 69, 0.8);
 }
 
 .graph-node--root .graph-node__dot {
@@ -1887,10 +1887,10 @@ input[type='search']::-webkit-search-results-decoration {
 }
 
 .theme-light .graph-node--root .graph-node__dot {
-  background: #3aaa7e;
+  background: #4f7cff;
   box-shadow:
-    0 0 0 5px rgba(58, 170, 126, 0.12),
-    0 0 22px rgba(58, 170, 126, 0.18);
+    0 0 0 5px rgba(79, 124, 255, 0.12),
+    0 0 22px rgba(79, 124, 255, 0.2);
 }
 
 .graph-node.is-selected .graph-node__label {
@@ -1904,13 +1904,13 @@ input[type='search']::-webkit-search-results-decoration {
 }
 
 .theme-light .graph-node.is-selected .graph-node__label {
-  color: #184432;
+  color: #1d2945;
 }
 
 .theme-light .graph-node.is-selected .graph-node__button::before {
-  border-color: rgba(58, 170, 126, 0.9);
-  background: rgba(58, 170, 126, 0.1);
-  box-shadow: 0 0 0 1px rgba(58, 170, 126, 0.14);
+  border-color: rgba(79, 124, 255, 0.9);
+  background: rgba(79, 124, 255, 0.1);
+  box-shadow: 0 0 0 1px rgba(79, 124, 255, 0.14);
 }
 
 .board-viewport.is-very-dense-graph .graph-connections {
@@ -1931,9 +1931,9 @@ input[type='search']::-webkit-search-results-decoration {
 }
 
 .theme-light .graph-node__input {
-  border-color: rgba(22, 81, 58, 0.16);
+  border-color: rgba(55, 66, 122, 0.16);
   background: rgba(255, 255, 255, 0.96);
-  color: #0f3626;
+  color: #17213b;
 }
 
 .node-inspector {
