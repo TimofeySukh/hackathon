@@ -529,7 +529,7 @@ function App() {
         setGraph((current) => ({
           ...current,
           connections: [
-            ...current.connections,
+            ...(current.connections || []),
             {
               id: `conn-${Date.now()}`,
               fromId: connector.sourceId,
@@ -549,7 +549,7 @@ function App() {
           setGraph((current) => ({
             ...current,
             connections: [
-              ...current.connections,
+              ...(current.connections || []),
               {
                 id: `conn-${Date.now()}`,
                 fromId: connector.sourceId,
