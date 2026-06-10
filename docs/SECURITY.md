@@ -6,7 +6,7 @@ This document records the current security and privacy model for the social grap
 
 The app has two storage modes:
 
-- signed-out local board state in browser memory
+- signed-out local board state in browser `localStorage`
 - signed-in Supabase-backed private board state
 
 Signed-in data currently stored in Supabase includes profiles, boards, people, tags, notes, AI summaries, and connections. This is sensitive relationship data. Treat it as private user data.

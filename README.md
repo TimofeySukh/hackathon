@@ -6,7 +6,7 @@ A persisted social graph board built with React, Vite, and TypeScript.
 
 - A single central node as the starting point of the graph
 - Create a new node by double-clicking the empty board, or double-tapping it on touch devices
-- Drag a person close to another person, or into an existing blob area, to create or extend a soft blob group
+- Drag a person close to another person, or touching an existing blob area, to create or extend a soft blob group
 - Blob groups keep the color of the first stationary target person
 - Curved lines between connected nodes
 - New nodes appear immediately with an empty inline name field
@@ -18,14 +18,14 @@ A persisted social graph board built with React, Vite, and TypeScript.
 - No drawing tools or side panels
 - Light theme by default, with a theme switcher in the top-right corner
 - Optional Google login through Supabase
-- Editable unsigned local board state before signing in
+- Editable unsigned local board state that persists in the browser before signing in
 - One personal board record for each signed-in user
 - One immutable root node at `0,0` for each signed-in user
 - Persistent people, colored tags, notes, and undirected connections in Supabase
 - Compact top bar with a rounded search field plus circular tags, account, and theme controls that close other overlays when opened
 - Account menu export, graph deletion, and account-data deletion controls
 - The selected inspector tag keeps a visible color accent even when the picker is closed
-- Signed-out users can edit a local in-memory board without a required login
+- Signed-out users can edit a browser-local board without a required login
 - Minimal selected-person inspector with a Notion-like large name field, a single-tag chip flow, and keyboard-first note capture
 - Typing `#` inside the name field opens tag selection and removes the `#tag` token from the saved name after applying the tag
 - New notes are captured in one textarea and saved on blur or with `Cmd/Ctrl + Enter`, using the first line as the rendered title

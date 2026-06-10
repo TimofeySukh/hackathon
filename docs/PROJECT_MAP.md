@@ -13,7 +13,7 @@ The current product is intentionally narrow:
 - a top-left LinkedIn menu with archive-request instructions and minimized `Connections.csv` zip import
 - a very dense CSS-rendered point grid
 - Supabase-backed Google login
-- editable unsigned local board state when the user is not signed in
+- editable browser-local board state when the user is not signed in
 - one personal board record per signed-in user
 - persistent people nodes, reusable colored tags, notes, and undirected connections per signed-in user
 - batched LinkedIn import for people, source notes, and root connections

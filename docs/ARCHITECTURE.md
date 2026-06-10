@@ -11,7 +11,7 @@ Runtime boundaries:
 - Vite owns local development and production bundling.
 - CSS owns the visual board surface, theme tokens, and responsive layout.
 - The browser owns theme persistence through `localStorage`.
-- The browser owns unsigned local graph state for users who have not signed in.
+- The browser owns unsigned local graph state in `localStorage` for users who have not signed in.
 - Supabase owns Google authentication and user-owned graph records.
 - Supabase Edge Functions own server-side AI provider calls for AI note enrichment and people search.
 - `docs/SECURITY.md` owns the security, privacy, data-minimization, and hardening model.

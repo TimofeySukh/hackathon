@@ -16,7 +16,7 @@ Current app behavior:
 - open in the light theme by default when no saved theme exists
 - persist the selected theme in `localStorage`
 - optionally sign in with Google through Supabase
-- edit an unsigned local in-memory board without a required login
+- edit an unsigned browser-local board without a required login
 - open a LinkedIn menu with visual instructions for requesting a LinkedIn data archive
 - sync LinkedIn connections by dragging or selecting a LinkedIn export zip and importing only `Connections.csv`
 - import LinkedIn email addresses and profile URLs only when those opt-in fields are selected in the import dialog
@@ -26,7 +26,7 @@ Current app behavior:
 - persist people, colored tags, notes, and undirected connections in Supabase
 - open the top-left Tags menu to create tags, rename them, and choose tag colors from presets or a custom picker
 - scroll the top-left Tags menu when the tag list or open color palette exceeds the viewport
-- keep signed-out edits local to the current browser session unless the user signs in
+- keep signed-out edits in browser `localStorage` unless the user signs in
 - allow one separate AI summary row per person in Supabase
 - refresh the selected person's AI summary manually from the inspector
 - call a Supabase Edge Function that sends sanitized selected-person context to Gemini with OpenRouter fallback and rewrites `person_ai_notes`
@@ -37,7 +37,7 @@ Current app behavior:
 - export graph data, delete graph data, or delete account data from the account menu
 - keep large graphs responsive with a canvas overview layer, viewport-capped DOM nodes, capped SVG connections, and label level-of-detail
 - drag a right-click selection box to select multiple people, then drag one of them to move the group
-- create people with a board double-click or double-tap, and form soft blob groups by dropping one person near another or inside an existing blob area
+- create people with a board double-click or double-tap, and form soft blob groups by dropping one person near another or touching an existing blob area
 - use a mobile layout with the search field and account/theme controls at the top and the Tags control docked near the bottom-left safe area
 - avoid selecting connection lines on coarse touch pointers so mobile board panning does not accidentally open the delete-connection menu
 - simplify some heavy visual effects while dragging and on very dense boards to keep navigation responsive
@@ -402,7 +402,7 @@ Manual verification:
 19. Open the top-bar tag menu, toggle a tag color palette from its swatch, change the color, and confirm the selected person inspector still shows the chosen tag with a visible color accent after the picker closes.
 20. Create a new person with a double-click, confirm the inspector opens automatically, confirm an empty person focuses the name field, then fill the note capture textarea and save a new note both with `Cmd/Ctrl + Enter` and by blurring the textarea.
 21. Create a note by typing into the `Create new note` field, confirm saved notes start collapsed by default, expand one with the chevron, press Enter in the title to open the body, delete a note from the icon button, reload, and confirm note changes persist.
-22. Drop one person near another, confirm a small blob group appears in the stationary target person's color, then add a third person by dropping it inside the blob area and confirm the group keeps its original color while members arrange around the center.
+22. Drop one person near another, confirm a small blob group appears in the stationary target person's color, then add a third person by dropping it so the node touches the blob area and confirm the group keeps its original color while members arrange around the center. Drop a person near a grouped member but outside the blob area and confirm it does not join the group.
 23. Open the top-left Tags menu, create enough tags to overflow the panel, scroll to the lower tags, adjust a lower tag color, and confirm the palette remains reachable.
 24. Open the top-left Tags menu, create a tag, adjust its color, toggle one tag off with the visibility checkbox, and confirm both tagged nodes and their connections disappear. Use `Select all` and `Clear all` to confirm bulk visibility controls work.
 25. Open the search layer and verify that typing a person name, tag, or note text returns local matching people.
@@ -415,7 +415,7 @@ Manual verification:
 32. Delete graph data from the account menu and confirm people, notes, tags, connections, and AI summaries are cleared while the root person remains.
 33. Import `fixtures/linkedin/linkedin-connections-10000.zip` on a signed-in test account and confirm the import status advances as a batch import rather than one row at a time.
 34. Pan and zoom the 10000-contact board and confirm the canvas overview remains visible while labels and interactive nodes are capped around the viewport.
-35. Sign out and confirm the anonymous board state returns.
+35. Sign out and confirm the anonymous board state returns, then reload and confirm the anonymous graph is still present.
 
 Supabase verification:
 

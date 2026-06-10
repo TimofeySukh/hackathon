@@ -75,6 +75,13 @@ type NodeGroupBubble = {
   stroke: string
 }
 
+type LocalGraphState = {
+  people: PersonNode[]
+  tags: Tag[]
+  notes: PersonNote[]
+  connections: Connection[]
+}
+
 type TapState = {
   time: number
   clientX: number
@@ -178,6 +185,7 @@ type TagPickerOption =
 const THEME_STORAGE_KEY = 'hackathon-theme'
 const TAG_COLOR_STORAGE_KEY = 'hackathon-tag-colors'
 const NODE_GROUP_STORAGE_KEY = 'hackathon-node-groups'
+const LOCAL_GRAPH_STORAGE_KEY = 'hackathon-local-graph'
 const LINKEDIN_TAG_NAME = 'LinkedIn'
 const DEFAULT_LINKEDIN_IMPORT_OPTIONS: LinkedInImportOptions = {
   includeEmail: false,
@@ -569,6 +577,94 @@ function createDefaultLocalTags(): Tag[] {
   }))
 }
 
+function createDefaultLocalGraph(): LocalGraphState {
+  return {
+    people: [ANONYMOUS_ROOT],
+    tags: createDefaultLocalTags(),
+    notes: [],
+    connections: [],
+  }
+}
+
+function sanitizeLocalGraph(input: Partial<LocalGraphState> | null | undefined): LocalGraphState {
+  const defaults = createDefaultLocalGraph()
+  const people = Array.isArray(input?.people)
+    ? input.people.filter((person) => person && typeof person.id === 'string')
+    : defaults.people
+  const normalizedPeople = [
+    ANONYMOUS_ROOT,
+    ...people
+      .filter((person) => person.id !== ANONYMOUS_ROOT.id && !person.is_root)
+      .map((person) => ({
+        ...person,
+        board_id: ANONYMOUS_BOARD.id,
+        owner_user_id: ANONYMOUS_BOARD.user_id,
+        is_root: false,
+      })),
+  ]
+  const personIds = new Set(normalizedPeople.map((person) => person.id))
+
+  const savedTags = Array.isArray(input?.tags)
+    ? input.tags
+        .filter((tag) => tag && typeof tag.id === 'string' && typeof tag.name === 'string')
+        .map((tag) => ({
+          ...tag,
+          user_id: ANONYMOUS_BOARD.user_id,
+          normalized_name: normalizeTagName(tag.normalized_name || tag.name).toLowerCase(),
+          color: normalizeTagColor(tag.color ?? DEFAULT_TAG_COLOR),
+        }))
+    : []
+  const tagNames = new Set(savedTags.map((tag) => tag.normalized_name))
+  const tags = [
+    ...savedTags,
+    ...defaults.tags.filter((tag) => !tagNames.has(tag.normalized_name)),
+  ]
+
+  const notes = Array.isArray(input?.notes)
+    ? input.notes
+        .filter((note) => note && typeof note.id === 'string' && personIds.has(note.person_id))
+        .map((note) => ({
+          ...note,
+          owner_user_id: ANONYMOUS_BOARD.user_id,
+        }))
+    : []
+
+  const connections = Array.isArray(input?.connections)
+    ? input.connections
+        .filter(
+          (connection) =>
+            connection &&
+            typeof connection.id === 'string' &&
+            personIds.has(connection.person_a_id) &&
+            personIds.has(connection.person_b_id) &&
+            connection.person_a_id !== connection.person_b_id,
+        )
+        .map((connection) => ({
+          ...connection,
+          board_id: ANONYMOUS_BOARD.id,
+          owner_user_id: ANONYMOUS_BOARD.user_id,
+        }))
+    : []
+
+  return { people: normalizedPeople, tags, notes, connections }
+}
+
+function loadLocalGraph() {
+  try {
+    const savedGraph = window.localStorage.getItem(LOCAL_GRAPH_STORAGE_KEY)
+    if (!savedGraph) return createDefaultLocalGraph()
+
+    return sanitizeLocalGraph(JSON.parse(savedGraph) as Partial<LocalGraphState>)
+  } catch {
+    window.localStorage.removeItem(LOCAL_GRAPH_STORAGE_KEY)
+    return createDefaultLocalGraph()
+  }
+}
+
+function saveLocalGraph(graph: LocalGraphState) {
+  window.localStorage.setItem(LOCAL_GRAPH_STORAGE_KEY, JSON.stringify(sanitizeLocalGraph(graph)))
+}
+
 function getNodeGroupStorageKey(boardId: string) {
   return `${NODE_GROUP_STORAGE_KEY}:${boardId}`
 }
@@ -742,6 +838,32 @@ function isPointInPolygon(point: Offset, polygon: Offset[]) {
   }
 
   return isInside
+}
+
+function getDistanceToSegment(point: Offset, start: Offset, end: Offset) {
+  const segmentX = end.x - start.x
+  const segmentY = end.y - start.y
+  const lengthSquared = segmentX * segmentX + segmentY * segmentY
+  if (lengthSquared === 0) return Math.hypot(point.x - start.x, point.y - start.y)
+
+  const projection = Math.max(
+    0,
+    Math.min(1, ((point.x - start.x) * segmentX + (point.y - start.y) * segmentY) / lengthSquared),
+  )
+  const projectedX = start.x + projection * segmentX
+  const projectedY = start.y + projection * segmentY
+  return Math.hypot(point.x - projectedX, point.y - projectedY)
+}
+
+function getDistanceToPolygon(point: Offset, polygon: Offset[]) {
+  return polygon.reduce((minDistance, vertex, index) => {
+    const nextVertex = polygon[(index + 1) % polygon.length]
+    return Math.min(minDistance, getDistanceToSegment(point, vertex, nextVertex))
+  }, Number.POSITIVE_INFINITY)
+}
+
+function isPointTouchingPolygon(point: Offset, polygon: Offset[], radius: number) {
+  return isPointInPolygon(point, polygon) || getDistanceToPolygon(point, polygon) <= radius
 }
 
 function arrangeGroupMembers(nodes: PersonNode[], memberIds: string[]) {
@@ -964,10 +1086,11 @@ function App() {
   const [aiSearchResults, setAiSearchResults] = useState<SearchResult[]>([])
   const [aiSearchStatus, setAiSearchStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [aiSearchError, setAiSearchError] = useState<string | null>(null)
-  const [localPeople, setLocalPeople] = useState<PersonNode[]>([ANONYMOUS_ROOT])
-  const [localTags, setLocalTags] = useState<Tag[]>(() => createDefaultLocalTags())
-  const [localNotes, setLocalNotes] = useState<PersonNote[]>([])
-  const [localConnections, setLocalConnections] = useState<Connection[]>([])
+  const [initialLocalGraph] = useState(() => loadLocalGraph())
+  const [localPeople, setLocalPeople] = useState<PersonNode[]>(initialLocalGraph.people)
+  const [localTags, setLocalTags] = useState<Tag[]>(initialLocalGraph.tags)
+  const [localNotes, setLocalNotes] = useState<PersonNote[]>(initialLocalGraph.notes)
+  const [localConnections, setLocalConnections] = useState<Connection[]>(initialLocalGraph.connections)
 
   const boardRef = useRef<HTMLElement | null>(null)
   const boardSurfaceRef = useRef<HTMLDivElement | null>(null)
@@ -1725,6 +1848,17 @@ function App() {
   }, [areaSelection])
 
   useEffect(() => {
+    if (isRemoteGraphReady) return
+
+    saveLocalGraph({
+      people: localPeople,
+      tags: localTags,
+      notes: localNotes,
+      connections: localConnections,
+    })
+  }, [isRemoteGraphReady, localConnections, localNotes, localPeople, localTags])
+
+  useEffect(() => {
     visibleBoardNodesRef.current = renderedBoardNodes
   }, [renderedBoardNodes])
 
@@ -2208,7 +2342,7 @@ function App() {
       const currentNodes = boardNodesRef.current
       const currentGroups = nodeGroupsRef.current
       const groupBubbles = getNodeGroupBubbles(currentGroups, currentNodes)
-      const targetBubble = groupBubbles.find((bubble) => isPointInPolygon(point, bubble.hull))
+      const targetBubble = groupBubbles.find((bubble) => isPointTouchingPolygon(point, bubble.hull, NODE_RADIUS))
       if (!targetBubble) return false
 
       const targetGroup = currentGroups.find((group) => group.id === targetBubble.id) ?? null
@@ -2256,11 +2390,14 @@ function App() {
       const draggedPositions = getDraggedNodePositions(currentNodeDrag, draggedPositionsRef.current)
       const draggedCenter = getNodeDragCenter(draggedNodeIds, draggedPositions)
       if (!draggedCenter) return false
+      const draggedPoints = draggedNodeIds.map((nodeId) => draggedPositions[nodeId]).filter(Boolean) as Offset[]
 
       const currentGroups = nodeGroupsRef.current
       const candidateGroupNodes = currentNodes.filter((node) => !draggedIdSet.has(node.id))
       const groupBubbles = getNodeGroupBubbles(currentGroups, candidateGroupNodes)
-      const targetBubble = groupBubbles.find((bubble) => isPointInPolygon(draggedCenter, bubble.hull))
+      const targetBubble = groupBubbles.find((bubble) =>
+        draggedPoints.some((point) => isPointTouchingPolygon(point, bubble.hull, NODE_RADIUS)),
+      )
       if (targetBubble) {
         const targetGroup = currentGroups.find((group) => group.id === targetBubble.id) ?? null
         const targetMemberId = targetGroup?.memberIds.find((memberId) => !draggedIdSet.has(memberId))
@@ -2277,6 +2414,7 @@ function App() {
         .sort((left, right) => left.distance - right.distance)[0]?.node ?? null
 
       if (targetNode) {
+        if (getNodeGroupForNode(currentGroups, targetNode.id)) return false
         return addNodesToGroup(draggedNodeIds, targetNode)
       }
 
@@ -3516,6 +3654,8 @@ function App() {
     setLocalTags(createDefaultLocalTags())
     setLocalNotes([])
     setLocalConnections([])
+    setNodeGroups([])
+    saveNodeGroups(activeBoardId, [])
     setInspectorNodeId(null)
     setSelectedNodeId(null)
   }
