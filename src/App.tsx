@@ -22,6 +22,12 @@ type CircleNode = {
   imageUrl?: string
 }
 
+type PersonNote = {
+  id: string
+  title: string
+  body: string
+}
+
 type PersonNode = {
   id: string
   name: string
@@ -35,6 +41,7 @@ type PersonNode = {
   amplitude?: number
   imageUrl?: string
   isFavorite?: boolean
+  notes?: PersonNote[]
 }
 
 type Connection = {
@@ -214,8 +221,37 @@ const DEFAULT_STATE: GraphState = {
     },
   ],
   people: [
-    { id: 'p1', name: 'Mia', role: 'Close friend', x: -62, y: -54, circleId: 'you', avatar: 'MI', shapeType: 'polygon', sides: 8, amplitude: 2 },
-    { id: 'p2', name: 'Noah', role: 'Founder friend', x: 58, y: -6, circleId: 'you', avatar: 'NO', shapeType: 'polygon', sides: 10, amplitude: 2 },
+    {
+      id: 'p1',
+      name: 'Mia',
+      role: 'Close friend',
+      x: -62,
+      y: -54,
+      circleId: 'you',
+      avatar: 'MI',
+      shapeType: 'polygon',
+      sides: 8,
+      amplitude: 2,
+      notes: [
+        { id: 'note-1', title: 'Gift ideas', body: 'Likes sci-fi books and matcha latte' },
+        { id: 'note-2', title: 'Meeting notes', body: 'Sync up next Tuesday about project timeline' }
+      ]
+    },
+    {
+      id: 'p2',
+      name: 'Noah',
+      role: 'Founder friend',
+      x: 58,
+      y: -6,
+      circleId: 'you',
+      avatar: 'NO',
+      shapeType: 'polygon',
+      sides: 10,
+      amplitude: 2,
+      notes: [
+        { id: 'note-3', title: 'Joint project', body: 'Wants to co-host a demo next month' }
+      ]
+    },
     { id: 'p3', name: 'Ava', role: 'Design', x: 34, y: 67, circleId: 'you', avatar: 'AV', shapeType: 'polygon', sides: 11, amplitude: 2 },
     { id: 'p4', name: 'Sofia', role: 'Portugal', x: 168, y: -472, circleId: 'eu-network', avatar: 'SO', shapeType: 'polygon', sides: 9, amplitude: 2 },
     { id: 'p5', name: 'Lucas', role: 'Germany', x: 28, y: -610, circleId: 'eu-network', avatar: 'LU', shapeType: 'polygon', sides: 12, amplitude: 2 },
@@ -359,6 +395,9 @@ function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [centerBehavior, setCenterBehavior] = useState<'connect' | 'move'>('connect')
   const [hoveredConnId, setHoveredConnId] = useState<string | null>(null)
+  const [openNotesPersonId, setOpenNotesPersonId] = useState<string | null>(null)
+  const [newNoteTitle, setNewNoteTitle] = useState('')
+  const [newNoteBody, setNewNoteBody] = useState('')
 
   const settingsButtonRef = useRef<HTMLButtonElement>(null)
   const settingsPanelRef = useRef<HTMLDivElement>(null)
@@ -374,12 +413,45 @@ function App() {
     setSelectedItem(null)
   }
 
-  function togglePersonFavorite(personId: string) {
+  function addPersonNote(personId: string, title: string, body: string) {
     setGraph((current) => ({
       ...current,
-      people: current.people.map((p) =>
-        p.id === personId ? { ...p, isFavorite: !p.isFavorite } : p
-      ),
+      people: current.people.map((p) => {
+        if (p.id === personId) {
+          const notes = p.notes ? [...p.notes] : []
+          notes.push({ id: `note-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, title, body })
+          return { ...p, notes }
+        }
+        return p
+      }),
+    }))
+  }
+
+  function updatePersonNote(personId: string, noteId: string, title: string, body: string) {
+    setGraph((current) => ({
+      ...current,
+      people: current.people.map((p) => {
+        if (p.id === personId && p.notes) {
+          const notes = p.notes.map((n) =>
+            n.id === noteId ? { ...n, title, body } : n
+          )
+          return { ...p, notes }
+        }
+        return p
+      }),
+    }))
+  }
+
+  function deletePersonNote(personId: string, noteId: string) {
+    setGraph((current) => ({
+      ...current,
+      people: current.people.map((p) => {
+        if (p.id === personId && p.notes) {
+          const notes = p.notes.filter((n) => n.id !== noteId)
+          return { ...p, notes }
+        }
+        return p
+      }),
     }))
   }
 
@@ -470,6 +542,21 @@ function App() {
       document.removeEventListener('pointerdown', handleOutsideClick)
     }
   }, [showSettings])
+
+  useEffect(() => {
+    function handleOutsideNotesClick(event: PointerEvent) {
+      if (openNotesPersonId === null) return
+      const target = event.target as HTMLElement
+      if (target.closest('.notes-popover') || target.closest('.notes-btn')) {
+        return
+      }
+      setOpenNotesPersonId(null)
+    }
+    document.addEventListener('pointerdown', handleOutsideNotesClick)
+    return () => {
+      document.removeEventListener('pointerdown', handleOutsideNotesClick)
+    }
+  }, [openNotesPersonId])
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -593,6 +680,7 @@ function App() {
     event.currentTarget.setPointerCapture(event.pointerId)
     setCreateMenu(null)
     setSelectedItem(null)
+    setOpenNotesPersonId(null)
     panRef.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -1492,14 +1580,10 @@ function App() {
             const isSelected = selectedItem?.type === 'person' && selectedItem?.id === person.id;
             const parentCircle = circlesById.get(person.circleId)
             const personColor = parentCircle ? MATERIAL_TONES[parentCircle.tone].centerBg : '#3F51B5'
-            const strokeColor = person.isFavorite
-              ? '#fbbf24' // Yellow (Amber 400)
-              : isSelected
+            const strokeColor = isSelected
               ? '#2563eb' // Blue
               : personColor // Group tone
-            const strokeWidth = person.isFavorite
-              ? (isSelected ? 4 : 3)
-              : (isSelected ? 2.5 : 1.5)
+            const strokeWidth = isSelected ? 2.5 : 1.5
 
             return (
               <div
@@ -1534,12 +1618,13 @@ function App() {
                     placeItems: 'center',
                   }}
                 >
-                  {/* Star Favorite Button overlay */}
+                  {/* Notes Button overlay */}
                   <button
                     type="button"
+                    className="notes-btn"
                     onClick={(e) => {
                       e.stopPropagation()
-                      togglePersonFavorite(person.id)
+                      setOpenNotesPersonId(openNotesPersonId === person.id ? null : person.id)
                     }}
                     onPointerDown={(e) => {
                       e.stopPropagation()
@@ -1548,8 +1633,8 @@ function App() {
                       position: 'absolute',
                       top: -6,
                       right: -6,
-                      width: 18,
-                      height: 18,
+                      width: 20,
+                      height: 20,
                       borderRadius: '50%',
                       background: '#ffffff',
                       border: '1.5px solid rgba(0,0,0,0.08)',
@@ -1561,16 +1646,35 @@ function App() {
                       padding: 0,
                       outline: 'none',
                     }}
-                    title={person.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                    title="Notes"
                   >
-                    <svg viewBox="0 0 24 24" style={{ width: 11, height: 11 }}>
-                      <path
-                        d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
-                        fill={person.isFavorite ? '#fbbf24' : 'none'}
-                        stroke={person.isFavorite ? '#d97706' : '#94a3b8'}
-                        strokeWidth={2.5}
-                      />
+                    <svg viewBox="0 0 24 24" fill="none" stroke={person.notes && person.notes.length > 0 ? '#2563eb' : '#94a3b8'} strokeWidth={2.5} style={{ width: 11, height: 11 }}>
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                      <line x1="16" y1="13" x2="8" y2="13" />
+                      <line x1="16" y1="17" x2="8" y2="17" />
                     </svg>
+                    {person.notes && person.notes.length > 0 && (
+                      <span
+                        style={{
+                          position: 'absolute',
+                          bottom: -3,
+                          right: -3,
+                          width: 10,
+                          height: 10,
+                          borderRadius: '50%',
+                          background: '#2563eb',
+                          color: '#ffffff',
+                          fontSize: '7px',
+                          fontWeight: 'bold',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        {person.notes.length}
+                      </span>
+                    )}
                   </button>
 
                   <svg viewBox="0 0 40 40" style={{ width: 40, height: 40, overflow: 'visible' }}>
@@ -1775,6 +1879,206 @@ function App() {
                   )}
                 </div>
                 <strong className="person-label">{person.name}</strong>
+
+                {/* Notes Popover */}
+                {openNotesPersonId === person.id && (
+                  <div
+                    className="notes-popover"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onPointerUp={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      position: 'absolute',
+                      left: 75,
+                      top: -20,
+                      width: 280,
+                      backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                      backdropFilter: 'blur(8px)',
+                      borderRadius: 12,
+                      border: '1px solid rgba(0,0,0,0.1)',
+                      boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)',
+                      padding: 14,
+                      zIndex: 200,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 12,
+                      textAlign: 'left',
+                      fontFamily: 'system-ui, -apple-system, sans-serif',
+                    }}
+                  >
+                    {/* Header */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(0,0,0,0.06)', paddingBottom: 6 }}>
+                      <span style={{ fontWeight: 700, fontSize: 13, color: '#1f2937' }}>Notes for {person.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setOpenNotesPersonId(null)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: 2,
+                          color: '#9ca3af',
+                          display: 'grid',
+                          placeItems: 'center',
+                        }}
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} style={{ width: 14, height: 14 }}>
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    {/* Notes list */}
+                    <div
+                      style={{
+                        maxHeight: 180,
+                        overflowY: 'auto',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 10,
+                        paddingRight: 4,
+                      }}
+                    >
+                      {(!person.notes || person.notes.length === 0) ? (
+                        <span style={{ fontSize: 11, color: '#9ca3af', fontStyle: 'italic', textAlign: 'center', margin: '10px 0' }}>
+                          No notes yet. Add one below.
+                        </span>
+                      ) : (
+                        person.notes.map((note) => (
+                          <div
+                            key={note.id}
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 4,
+                              backgroundColor: '#f9fafb',
+                              border: '1px solid #e5e7eb',
+                              borderRadius: 8,
+                              padding: 8,
+                              position: 'relative',
+                            }}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => deletePersonNote(person.id, note.id)}
+                              style={{
+                                position: 'absolute',
+                                top: 6,
+                                right: 6,
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: '#ef4444',
+                                padding: 2,
+                              }}
+                              title="Delete note"
+                            >
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ width: 12, height: 12 }}>
+                                <polyline points="3 6 5 6 21 6" />
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                              </svg>
+                            </button>
+
+                            <input
+                              type="text"
+                              value={note.title}
+                              onChange={(e) => updatePersonNote(person.id, note.id, e.target.value, note.body)}
+                              placeholder="Note title"
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 600,
+                                border: 'none',
+                                background: 'transparent',
+                                padding: 0,
+                                color: '#374151',
+                                width: 'calc(100% - 16px)',
+                                outline: 'none',
+                              }}
+                            />
+
+                            <textarea
+                              value={note.body}
+                              onChange={(e) => updatePersonNote(person.id, note.id, note.title, e.target.value)}
+                              placeholder="Note content..."
+                              rows={2}
+                              style={{
+                                fontSize: 11,
+                                border: 'none',
+                                background: 'transparent',
+                                padding: 0,
+                                color: '#4b5563',
+                                resize: 'none',
+                                outline: 'none',
+                                width: '100%',
+                              }}
+                            />
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    {/* Add note form */}
+                    <div
+                      style={{
+                        borderTop: '1px solid rgba(0,0,0,0.06)',
+                        paddingTop: 10,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 6,
+                      }}
+                    >
+                      <input
+                        type="text"
+                        placeholder="New note title..."
+                        value={newNoteTitle}
+                        onChange={(e) => setNewNoteTitle(e.target.value)}
+                        style={{
+                          fontSize: 11,
+                          padding: '6px 8px',
+                          borderRadius: 6,
+                          border: '1px solid #d1d5db',
+                          outline: 'none',
+                        }}
+                      />
+                      <textarea
+                        placeholder="Write a note..."
+                        value={newNoteBody}
+                        onChange={(e) => setNewNoteBody(e.target.value)}
+                        rows={2}
+                        style={{
+                          fontSize: 11,
+                          padding: '6px 8px',
+                          borderRadius: 6,
+                          border: '1px solid #d1d5db',
+                          resize: 'none',
+                          outline: 'none',
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!newNoteTitle.trim() && !newNoteBody.trim()) return
+                          addPersonNote(person.id, newNoteTitle.trim() || 'Untitled Note', newNoteBody.trim())
+                          setNewNoteTitle('')
+                          setNewNoteBody('')
+                        }}
+                        style={{
+                          backgroundColor: '#2563eb',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: 6,
+                          padding: '6px 12px',
+                          fontSize: 11,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Add Note
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })}
@@ -1921,33 +2225,143 @@ function App() {
                   </div>
                 </dl>
 
-                <div className="inspector-field" style={{ marginTop: '8px', marginBottom: '8px' }}>
-                  <button
-                    type="button"
-                    className="primary-action"
-                    style={{
-                      background: selectedPerson.isFavorite ? '#fbbf24' : 'transparent',
-                      color: selectedPerson.isFavorite ? '#1c2528' : 'rgba(28, 37, 40, 0.8)',
-                      border: '1.5px solid #fbbf24',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px',
-                      fontWeight: 700,
-                      width: '100%',
-                    }}
-                    onClick={() => togglePersonFavorite(selectedPerson.id)}
-                  >
-                    <svg viewBox="0 0 24 24" style={{ width: 14, height: 14 }}>
-                      <path
-                        d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
-                        fill={selectedPerson.isFavorite ? '#fbbf24' : 'none'}
-                        stroke={selectedPerson.isFavorite ? '#b45309' : 'currentColor'}
-                        strokeWidth={2}
-                      />
-                    </svg>
-                    {selectedPerson.isFavorite ? 'Starred (Favorite)' : 'Add to Favorites'}
-                  </button>
+                <div className="inspector-notes-section" style={{ marginTop: '16px', borderTop: '1px solid #e5e7eb', paddingTop: '16px' }}>
+                  <h4 style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: 'bold', color: '#1f2937' }}>Notes</h4>
+
+                  {/* Scrollable list */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+                    {(!selectedPerson.notes || selectedPerson.notes.length === 0) ? (
+                      <span style={{ fontSize: '11px', color: '#9ca3af', fontStyle: 'italic' }}>No notes yet.</span>
+                    ) : (
+                      selectedPerson.notes.map((note) => (
+                        <div
+                          key={note.id}
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '4px',
+                            backgroundColor: '#f9fafb',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '8px',
+                            padding: '8px',
+                            position: 'relative',
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => deletePersonNote(selectedPerson.id, note.id)}
+                            style={{
+                              position: 'absolute',
+                              top: '6px',
+                              right: '6px',
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: '#ef4444',
+                              padding: '2px',
+                            }}
+                            title="Delete note"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ width: '12px', height: '12px' }}>
+                              <polyline points="3 6 5 6 21 6" />
+                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                            </svg>
+                          </button>
+
+                          <input
+                            type="text"
+                            value={note.title}
+                            onChange={(e) => updatePersonNote(selectedPerson.id, note.id, e.target.value, note.body)}
+                            placeholder="Note title"
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              border: 'none',
+                              background: 'transparent',
+                              padding: 0,
+                              color: '#374151',
+                              width: 'calc(100% - 16px)',
+                              outline: 'none',
+                            }}
+                          />
+
+                          <textarea
+                            value={note.body}
+                            onChange={(e) => updatePersonNote(selectedPerson.id, note.id, note.title, e.target.value)}
+                            placeholder="Note content..."
+                            rows={2}
+                            style={{
+                              fontSize: '11px',
+                              border: 'none',
+                              background: 'transparent',
+                              padding: 0,
+                              color: '#4b5563',
+                              resize: 'none',
+                              outline: 'none',
+                              width: '100%',
+                            }}
+                          />
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Add note fields */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <input
+                      type="text"
+                      placeholder="New note title..."
+                      value={newNoteTitle}
+                      onChange={(e) => setNewNoteTitle(e.target.value)}
+                      style={{
+                        fontSize: '11px',
+                        padding: '6px 8px',
+                        borderRadius: '6px',
+                        border: '1px solid #d1d5db',
+                        outline: 'none',
+                        width: '100%',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                    <textarea
+                      placeholder="Write a note..."
+                      value={newNoteBody}
+                      onChange={(e) => setNewNoteBody(e.target.value)}
+                      rows={2}
+                      style={{
+                        fontSize: '11px',
+                        padding: '6px 8px',
+                        borderRadius: '6px',
+                        border: '1px solid #d1d5db',
+                        resize: 'none',
+                        outline: 'none',
+                        width: '100%',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!newNoteTitle.trim() && !newNoteBody.trim()) return
+                        addPersonNote(selectedPerson.id, newNoteTitle.trim() || 'Untitled Note', newNoteBody.trim())
+                        setNewNoteTitle('')
+                        setNewNoteBody('')
+                      }}
+                      style={{
+                        backgroundColor: '#2563eb',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '6px 12px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        width: '100%',
+                      }}
+                    >
+                      Add Note
+                    </button>
+                  </div>
                 </div>
 
                 <div className="inspector-field">
