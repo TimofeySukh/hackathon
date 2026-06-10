@@ -171,29 +171,29 @@ input[type='search']::-webkit-search-results-decoration {
 }
 
 .theme-light {
-  --app-bg: #f3f7fc;
-  --text-strong: #162a42;
-  --toggle-bg: rgba(255, 251, 244, 0.92);
-  --toggle-border: rgba(48, 83, 126, 0.18);
-  --toggle-thumb: linear-gradient(135deg, #a8d2ff 0%, #629bbf 100%);
-  --toggle-label: #1f4568;
-  --panel-bg: rgba(255, 252, 247, 0.9);
-  --panel-border: rgba(48, 83, 126, 0.16);
-  --panel-text: #162a42;
-  --panel-muted: rgba(31, 69, 104, 0.68);
+  --app-bg: #f3f6fc;
+  --text-strong: #15233c;
+  --toggle-bg: rgba(255, 255, 255, 0.92);
+  --toggle-border: rgba(47, 107, 196, 0.3);
+  --toggle-thumb: linear-gradient(135deg, #6f9bdc 0%, #2f6bc4 100%);
+  --toggle-label: #1d4276;
+  --panel-bg: rgba(255, 255, 255, 0.92);
+  --panel-border: rgba(47, 107, 196, 0.26);
+  --panel-text: #15233c;
+  --panel-muted: rgba(31, 60, 102, 0.66);
   --panel-error: #9d2f22;
-  --button-bg: rgba(137, 180, 212, 0.14);
-  --button-border: rgba(48, 83, 126, 0.18);
-  --grid-dot: rgba(36, 68, 104, 0.1);
-  --grid-dot-major: rgba(43, 83, 128, 0.2);
-  --grid-dot-hover: rgba(29, 94, 160, 0.66);
-  --grid-dot-major-hover: rgba(20, 77, 132, 0.82);
-  --grid-glow-a: rgba(133, 178, 223, 0.16);
-  --grid-glow-b: rgba(242, 248, 255, 0);
+  --button-bg: rgba(47, 107, 196, 0.14);
+  --button-border: rgba(47, 107, 196, 0.32);
+  --grid-dot: rgba(47, 107, 196, 0.16);
+  --grid-dot-major: rgba(47, 107, 196, 0.3);
+  --grid-dot-hover: rgba(47, 107, 196, 0.7);
+  --grid-dot-major-hover: rgba(28, 74, 150, 0.9);
+  --grid-glow-a: rgba(190, 212, 244, 0.4);
+  --grid-glow-b: rgba(243, 246, 252, 0);
   background:
-    radial-gradient(circle at top left, rgba(158, 201, 244, 0.34), transparent 34%),
-    radial-gradient(circle at right center, rgba(188, 217, 255, 0.26), transparent 28%),
-    radial-gradient(circle at 50% 100%, rgba(213, 233, 255, 0.3), transparent 30%),
+    radial-gradient(circle at top left, rgba(196, 218, 248, 0.46), transparent 34%),
+    radial-gradient(circle at right center, rgba(210, 228, 250, 0.32), transparent 28%),
+    radial-gradient(circle at 50% 100%, rgba(222, 236, 252, 0.34), transparent 30%),
     var(--app-bg);
   color: var(--text-strong);
 }
