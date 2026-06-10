@@ -69,7 +69,7 @@ The product value depends on search across relationship data, so removing cloud 
 - store only normalized contact fields that the product actually uses
 - expose clear sync status and last-updated timestamps
 
-The app now provides graph export, graph deletion, and account-data deletion controls from the account menu. Account-data deletion clears graph rows, AI summaries, tags, profile fields, and root-person identity fields while preserving the Auth user record because the current root-person trigger intentionally blocks root deletion.
+The app now provides graph import, graph export, graph deletion, and account-data deletion controls from the account menu. Graph import replaces the current graph after confirmation and restores people, tags, notes, and connections from a SocialDataNode JSON export. Account-data deletion clears graph rows, AI summaries, tags, profile fields, and root-person identity fields while preserving the Auth user record because the current root-person trigger intentionally blocks root deletion.
 
 This preserves searchable cloud data while reducing hidden retention and user surprise.
 

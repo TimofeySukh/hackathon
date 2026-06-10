@@ -806,6 +806,21 @@ input[type='search']::-webkit-search-results-decoration {
   font-weight: 600;
 }
 
+.account-panel__import-status {
+  color: var(--panel-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.account-panel__import-status.is-success {
+  color: #315dce;
+}
+
+.account-panel__import-status.is-error {
+  color: var(--panel-error);
+}
+
 .account-panel__button {
   flex: 0 0 auto;
   padding: 9px 12px;
@@ -826,6 +841,10 @@ input[type='search']::-webkit-search-results-decoration {
 .account-panel__button:disabled {
   cursor: not-allowed;
   opacity: 0.56;
+}
+
+.account-panel__file-input {
+  display: none;
 }
 
 .account-panel__divider {

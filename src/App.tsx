@@ -120,6 +120,11 @@ type LinkedInImportStatus = {
   message: string | null
 }
 
+type GraphImportStatus = {
+  state: 'idle' | 'loading' | 'success' | 'error'
+  message: string | null
+}
+
 type LinkedInImportOptions = {
   includeEmail: boolean
   includeUrl: boolean
@@ -665,6 +670,27 @@ function saveLocalGraph(graph: LocalGraphState) {
   window.localStorage.setItem(LOCAL_GRAPH_STORAGE_KEY, JSON.stringify(sanitizeLocalGraph(graph)))
 }
 
+function parseGraphImport(text: string) {
+  const parsedPayload = JSON.parse(text) as Partial<{
+    format: string
+    people: PersonNode[]
+    tags: Tag[]
+    notes: PersonNote[]
+    connections: Connection[]
+  }>
+
+  if (parsedPayload.format !== 'hackathon-board-graph') {
+    throw new Error('This file is not a SocialDataNode graph export.')
+  }
+
+  return sanitizeLocalGraph({
+    people: parsedPayload.people,
+    tags: parsedPayload.tags,
+    notes: parsedPayload.notes,
+    connections: parsedPayload.connections,
+  })
+}
+
 function getNodeGroupStorageKey(boardId: string) {
   return `${NODE_GROUP_STORAGE_KEY}:${boardId}`
 }
@@ -1069,6 +1095,10 @@ function App() {
     DEFAULT_LINKEDIN_IMPORT_OPTIONS,
   )
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
+  const [graphImportStatus, setGraphImportStatus] = useState<GraphImportStatus>({
+    state: 'idle',
+    message: null,
+  })
   const [activeColorTagId, setActiveColorTagId] = useState<string | null>(null)
   const [tagColorDrafts, setTagColorDrafts] = useState<Record<string, string>>(() =>
     loadTagColorDrafts(),
@@ -1099,6 +1129,7 @@ function App() {
   const tagsMenuRef = useRef<HTMLDivElement | null>(null)
   const linkedInMenuRef = useRef<HTMLDivElement | null>(null)
   const linkedInFileInputRef = useRef<HTMLInputElement | null>(null)
+  const graphImportFileInputRef = useRef<HTMLInputElement | null>(null)
   const searchPanelRef = useRef<HTMLDivElement | null>(null)
   const accountPanelRef = useRef<HTMLDivElement | null>(null)
   const inspectorPanelRef = useRef<HTMLElement | null>(null)
@@ -3639,6 +3670,113 @@ function App() {
     URL.revokeObjectURL(url)
   }
 
+  function replaceLocalGraph(importedGraph: LocalGraphState) {
+    setLocalPeople(importedGraph.people)
+    setLocalTags(importedGraph.tags)
+    setLocalNotes(importedGraph.notes)
+    setLocalConnections(importedGraph.connections)
+    saveLocalGraph(importedGraph)
+    setNodeGroups([])
+    saveNodeGroups(activeBoardId, [])
+    setInspectorNodeId(null)
+    setSelectedNodeId(null)
+    setSelectedConnectionId(null)
+    setConnectionMenuPosition(null)
+  }
+
+  async function replaceRemoteGraph(importedGraph: LocalGraphState) {
+    const rootNode = activePeople.find((person) => person.is_root)
+    if (!rootNode) throw new Error('Root person was not found.')
+
+    await deleteCurrentGraphData()
+
+    const tagIdMap = new Map<string, string>()
+    for (const tag of importedGraph.tags) {
+      const createdTag = await createTag(tag.name)
+      const normalizedColor = normalizeTagColor(tag.color ?? DEFAULT_TAG_COLOR)
+      const savedTag = createdTag.color === normalizedColor
+        ? createdTag
+        : await updateTag({ id: createdTag.id, color: normalizedColor })
+      tagIdMap.set(tag.id, savedTag.id)
+    }
+
+    const personIdMap = new Map<string, string>()
+    for (const person of importedGraph.people) {
+      if (person.is_root) {
+        personIdMap.set(person.id, rootNode.id)
+        if (person.name.trim() && person.name !== rootNode.name) {
+          await updatePerson({ id: rootNode.id, name: person.name, tag_id: null })
+        }
+        continue
+      }
+
+      const createdPerson = await createPerson({
+        name: person.name,
+        tagId: person.tag_id ? tagIdMap.get(person.tag_id) ?? null : null,
+        x: person.x,
+        y: person.y,
+      })
+      personIdMap.set(person.id, createdPerson.id)
+    }
+
+    for (const note of importedGraph.notes) {
+      const personId = personIdMap.get(note.person_id)
+      if (!personId) continue
+      await createNote(note.title, note.body, personId, { syncAi: false })
+    }
+
+    for (const connection of importedGraph.connections) {
+      const firstPersonId = personIdMap.get(connection.person_a_id)
+      const secondPersonId = personIdMap.get(connection.person_b_id)
+      if (!firstPersonId || !secondPersonId || firstPersonId === secondPersonId) continue
+      await createConnection(firstPersonId, secondPersonId)
+    }
+
+    setNodeGroups([])
+    saveNodeGroups(activeBoardId, [])
+    setInspectorNodeId(null)
+    setSelectedNodeId(null)
+    setSelectedConnectionId(null)
+    setConnectionMenuPosition(null)
+  }
+
+  async function handleImportGraphFile(file: File | null) {
+    if (!file || graphImportStatus.state === 'loading') return
+
+    setGraphImportStatus({ state: 'loading', message: 'Importing graph...' })
+
+    try {
+      const importedGraph = parseGraphImport(await file.text())
+      const shouldImport = window.confirm(
+        'Import this graph? This replaces the current graph data in this board.',
+      )
+
+      if (!shouldImport) {
+        setGraphImportStatus({ state: 'idle', message: null })
+        return
+      }
+
+      if (isRemoteGraphReady) {
+        await replaceRemoteGraph(importedGraph)
+      } else {
+        replaceLocalGraph(importedGraph)
+      }
+
+      setGraphImportStatus({
+        state: 'success',
+        message: `Imported ${Math.max(0, importedGraph.people.length - 1)} people, ${importedGraph.tags.length} tags, ${importedGraph.notes.length} notes, and ${importedGraph.connections.length} connections.`,
+      })
+    } catch (error) {
+      setGraphImportStatus({
+        state: 'error',
+        message: error instanceof Error ? error.message : 'Unable to import graph.',
+      })
+    } finally {
+      if (graphImportFileInputRef.current) {
+        graphImportFileInputRef.current.value = ''
+      }
+    }
+  }
   async function handleDeleteGraphData() {
     const shouldDelete = window.confirm(
       'Delete this graph data? This removes people, notes, tags, connections, and AI summaries from this board.',
@@ -4239,6 +4377,14 @@ function App() {
                     <button type="button" className="account-panel__button" onClick={handleExportGraph}>
                       Export graph
                     </button>
+                    <button
+                      type="button"
+                      className="account-panel__button"
+                      onClick={() => graphImportFileInputRef.current?.click()}
+                      disabled={graphImportStatus.state === 'loading'}
+                    >
+                      Import graph
+                    </button>
                     <button type="button" className="account-panel__button" onClick={() => void handleDeleteGraphData()}>
                       Delete graph data
                     </button>
@@ -4274,11 +4420,33 @@ function App() {
                     <button type="button" className="account-panel__button" onClick={handleExportGraph}>
                       Export local graph
                     </button>
+                    <button
+                      type="button"
+                      className="account-panel__button"
+                      onClick={() => graphImportFileInputRef.current?.click()}
+                      disabled={graphImportStatus.state === 'loading'}
+                    >
+                      Import local graph
+                    </button>
                     <button type="button" className="account-panel__button" onClick={() => void handleDeleteGraphData()}>
                       Clear local graph
                     </button>
                   </>
                 )}
+                <input
+                  ref={graphImportFileInputRef}
+                  className="account-panel__file-input"
+                  type="file"
+                  accept="application/json,.json"
+                  onChange={(event) => {
+                    void handleImportGraphFile(event.target.files?.[0] ?? null)
+                  }}
+                />
+                {graphImportStatus.message ? (
+                  <span className={`account-panel__import-status is-${graphImportStatus.state}`}>
+                    {graphImportStatus.message}
+                  </span>
+                ) : null}
                 {error ? <span className="account-panel__error">{error}</span> : null}
               </div>
             ) : null}

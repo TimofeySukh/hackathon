@@ -34,7 +34,7 @@ Current app behavior:
 - autosave person names shortly after typing or when the name field loses focus
 - open a people search layer, match locally while typing, and run natural-language AI search on Enter when signed in
 - limit AI search to up to 40 browser-selected candidate people and sanitize email addresses and URLs before provider calls
-- export graph data, delete graph data, or delete account data from the account menu
+- import graph data, export graph data, delete graph data, or delete account data from the account menu
 - keep large graphs responsive with a canvas overview layer, viewport-capped DOM nodes, capped SVG connections, and label level-of-detail
 - drag a right-click selection box to select multiple people, then drag one of them to move the group
 - create people with a board double-click or double-tap, and form soft blob groups by dropping one person near another or touching an existing blob area
@@ -412,10 +412,11 @@ Manual verification:
 29. Edit an existing note, blur the input, confirm the AI summary does not refresh automatically, then press Refresh and confirm the same `person_ai_notes` row updates its `updated_at`, `summary`, and `structured_summary`.
 30. Open the LinkedIn import dialog and confirm email addresses and profile URLs are opt-in fields that default off.
 31. Export graph data from the account menu and confirm a JSON file downloads.
-32. Delete graph data from the account menu and confirm people, notes, tags, connections, and AI summaries are cleared while the root person remains.
-33. Import `fixtures/linkedin/linkedin-connections-10000.zip` on a signed-in test account and confirm the import status advances as a batch import rather than one row at a time.
-34. Pan and zoom the 10000-contact board and confirm the canvas overview remains visible while labels and interactive nodes are capped around the viewport.
-35. Sign out and confirm the anonymous board state returns, then reload and confirm the anonymous graph is still present.
+32. Import that JSON from the account menu and confirm people, tags, notes, and connections are restored after the replacement confirmation.
+33. Delete graph data from the account menu and confirm people, notes, tags, connections, and AI summaries are cleared while the root person remains.
+34. Import `fixtures/linkedin/linkedin-connections-10000.zip` on a signed-in test account and confirm the import status advances as a batch import rather than one row at a time.
+35. Pan and zoom the 10000-contact board and confirm the canvas overview remains visible while labels and interactive nodes are capped around the viewport.
+36. Sign out and confirm the anonymous board state returns, then reload and confirm the anonymous graph is still present.
 
 Supabase verification:
 

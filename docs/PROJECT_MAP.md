@@ -21,7 +21,7 @@ The current product is intentionally narrow:
 - a top-left Tags menu for creating tags, renaming them, changing tag colors, and toggling tag visibility on the board
 - a node-anchored inspector for editing the selected person that opens on single click
 - a people search layer that matches locally while typing and can run candidate-limited AI search on Enter when signed in
-- account menu graph export, graph deletion, and account-data deletion controls
+- account menu graph import, graph export, graph deletion, and account-data deletion controls
 - no collaboration yet
 
 ## Active Work

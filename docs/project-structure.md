@@ -183,7 +183,7 @@ It currently supports:
 - a compact top bar with a capped-width search field, circular tags/account/theme controls, and exclusive overlay behavior
 - a keyboard-first inspector that treats `#tag` in the name field as a tag command and uses one capture textarea for new notes
 - local people search while typing plus candidate-limited natural-language AI search on Enter when signed in
-- graph export, graph deletion, and account-data deletion controls in the account menu
+- graph import, graph export, graph deletion, and account-data deletion controls in the account menu
 - batched LinkedIn import that creates people, notes, and root connections in chunks
 - drag repositioning for non-root nodes
 - persisted node renaming
