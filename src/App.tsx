@@ -88,6 +88,10 @@ type SelectedItem =
       type: 'person'
       id: string
     }
+  | {
+      type: 'connection'
+      id: string
+    }
   | null
 
 type PanState = {
@@ -353,6 +357,10 @@ function App() {
 
   const [showSettings, setShowSettings] = useState(false)
   const [centerBehavior, setCenterBehavior] = useState<'connect' | 'move'>('connect')
+  const [hoveredConnId, setHoveredConnId] = useState<string | null>(null)
+
+  const settingsButtonRef = useRef<HTMLButtonElement>(null)
+  const settingsPanelRef = useRef<HTMLDivElement>(null)
 
   function deletePerson(personId: string) {
     setGraph((current) => ({
@@ -365,9 +373,93 @@ function App() {
     setSelectedItem(null)
   }
 
+  function deleteCircle(circleId: string) {
+    if (circleId === 'you') return
+
+    setGraph((current) => {
+      // 1. Gather all descendant circle IDs recursively
+      const deletedCircleIds = new Set<string>([circleId])
+      let expanded = true
+      while (expanded) {
+        expanded = false
+        for (const c of current.circles) {
+          if (c.parentId && deletedCircleIds.has(c.parentId) && !deletedCircleIds.has(c.id)) {
+            deletedCircleIds.add(c.id)
+            expanded = true
+          }
+        }
+      }
+
+      // 2. Identify people inside those circles
+      const deletedPeopleIds = new Set<string>()
+      for (const p of current.people) {
+        if (deletedCircleIds.has(p.circleId)) {
+          deletedPeopleIds.add(p.id)
+        }
+      }
+
+      // 3. Filter circles: remove deleted, update connectedTo if it points to a deleted circle
+      const nextCircles = current.circles
+        .filter((c) => !deletedCircleIds.has(c.id))
+        .map((c) => {
+          if (c.connectedTo && deletedCircleIds.has(c.connectedTo)) {
+            return { ...c, connectedTo: 'you' }
+          }
+          return c
+        })
+
+      // 4. Filter people: remove deleted
+      const nextPeople = current.people.filter((p) => !deletedPeopleIds.has(p.id))
+
+      // 5. Filter connections: remove if fromId or toId is deleted
+      const nextConnections = (current.connections || []).filter(
+        (conn) =>
+          !deletedPeopleIds.has(conn.fromId) &&
+          !deletedCircleIds.has(conn.fromId) &&
+          !deletedPeopleIds.has(conn.toId) &&
+          !deletedCircleIds.has(conn.toId)
+      )
+
+      return ensureContainment({
+        ...current,
+        circles: nextCircles,
+        people: nextPeople,
+        connections: nextConnections,
+      })
+    })
+
+    setSelectedItem(null)
+  }
+
+  function deleteConnection(connId: string) {
+    setGraph((current) => ({
+      ...current,
+      connections: (current.connections || []).filter((conn) => conn.id !== connId),
+    }))
+    setSelectedItem(null)
+  }
+
   useEffect(() => {
     cameraRef.current = camera
   }, [camera])
+
+  useEffect(() => {
+    function handleOutsideClick(event: PointerEvent) {
+      if (
+        showSettings &&
+        settingsPanelRef.current &&
+        !settingsPanelRef.current.contains(event.target as Node) &&
+        settingsButtonRef.current &&
+        !settingsButtonRef.current.contains(event.target as Node)
+      ) {
+        setShowSettings(false)
+      }
+    }
+    document.addEventListener('pointerdown', handleOutsideClick)
+    return () => {
+      document.removeEventListener('pointerdown', handleOutsideClick)
+    }
+  }, [showSettings])
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -384,6 +476,10 @@ function App() {
 
         if (selectedItem?.type === 'person') {
           deletePerson(selectedItem.id)
+        } else if (selectedItem?.type === 'circle') {
+          deleteCircle(selectedItem.id)
+        } else if (selectedItem?.type === 'connection') {
+          deleteConnection(selectedItem.id)
         }
       }
     }
@@ -412,6 +508,7 @@ function App() {
   }, [graph.circles, circlesById])
   const selectedCircle = selectedItem?.type === 'circle' ? circlesById.get(selectedItem.id) ?? null : null
   const selectedPerson = selectedItem?.type === 'person' ? graph.people.find((person) => person.id === selectedItem.id) ?? null : null
+  const selectedConnection = selectedItem?.type === 'connection' ? (graph.connections || []).find((conn) => conn.id === selectedItem.id) ?? null : null
 
   useEffect(() => {
     const canvas = stressCanvasRef.current
@@ -580,12 +677,29 @@ function App() {
         }))
       } else if (targetCircle && targetCircle.id !== connector.sourceId) {
         if (connector.sourceType === 'circle') {
-          setGraph((current) => ({
-            ...current,
-            circles: current.circles.map((c) =>
-              c.id === connector.sourceId ? { ...c, connectedTo: targetCircle.id } : c
-            ),
-          }))
+          setGraph((current) => {
+            const srcCircle = current.circles.find((c) => c.id === connector.sourceId)
+            if (srcCircle && !srcCircle.connectedTo) {
+              return {
+                ...current,
+                circles: current.circles.map((c) =>
+                  c.id === connector.sourceId ? { ...c, connectedTo: targetCircle.id } : c
+                ),
+              }
+            } else {
+              return {
+                ...current,
+                connections: [
+                  ...(current.connections || []),
+                  {
+                    id: `conn-${Date.now()}`,
+                    fromId: connector.sourceId,
+                    toId: targetCircle.id,
+                  },
+                ],
+              }
+            }
+          })
         } else {
           setGraph((current) => ({
             ...current,
@@ -924,6 +1038,7 @@ function App() {
             <ResetIcon />
           </button>
           <button
+            ref={settingsButtonRef}
             type="button"
             onClick={() => setShowSettings(!showSettings)}
             aria-label="Settings"
@@ -938,6 +1053,7 @@ function App() {
 
       {showSettings && (
         <div
+          ref={settingsPanelRef}
           className="settings-panel"
           style={{
             position: 'absolute',
@@ -1115,15 +1231,34 @@ function App() {
               const sourceNode = graph.people.find((p) => p.id === conn.fromId) || circlesById.get(conn.fromId)
               const targetNode = graph.people.find((p) => p.id === conn.toId) || circlesById.get(conn.toId)
               if (!sourceNode || !targetNode) return null
+              const isSelected = selectedItem?.type === 'connection' && selectedItem?.id === conn.id
+              const isHovered = hoveredConnId === conn.id
               return (
-                <path
-                  key={conn.id}
-                  className="edge edge--custom"
-                  d={makeCurve(sourceNode, targetNode)}
-                  stroke="#2563eb"
-                  strokeWidth={2}
-                  fill="none"
-                />
+                <g key={conn.id}>
+                  {/* Invisible overlay for easier hovering and clicking */}
+                  <path
+                    d={makeCurve(sourceNode, targetNode)}
+                    stroke="transparent"
+                    strokeWidth={16}
+                    fill="none"
+                    style={{ cursor: 'pointer', pointerEvents: 'stroke' }}
+                    onPointerDown={(e) => {
+                      e.stopPropagation()
+                      setSelectedItem({ type: 'connection', id: conn.id })
+                    }}
+                    onMouseEnter={() => setHoveredConnId(conn.id)}
+                    onMouseLeave={() => setHoveredConnId(null)}
+                  />
+                  {/* Visible path */}
+                  <path
+                    className={`edge edge--custom ${isSelected ? 'is-selected' : ''}`}
+                    d={makeCurve(sourceNode, targetNode)}
+                    stroke={isSelected ? '#2563eb' : isHovered ? '#64748b' : '#94a3b8'}
+                    strokeWidth={isSelected ? 4 : isHovered ? 3 : 2}
+                    fill="none"
+                    style={{ pointerEvents: 'none' }}
+                  />
+                </g>
               )
             })}
             {connector ? <path className="edge edge--draft" d={makeCurve({ x: connector.startX, y: connector.startY }, { x: connector.endX, y: connector.endY })} /> : null}
@@ -1210,78 +1345,122 @@ function App() {
                     <div
                       style={{
                         position: 'absolute',
-                        top: -6,
+                        top: 0,
                         left: 20,
-                        transform: 'translateX(-50%)',
-                        width: 10,
-                        height: 10,
-                        borderRadius: '50%',
-                        background: MATERIAL_TONES[circle.tone].centerBg,
-                        border: '2px solid #ffffff',
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                        transform: 'translate(-50%, -50%)',
+                        width: 30,
+                        height: 30,
+                        display: 'grid',
+                        placeItems: 'center',
                         cursor: 'crosshair',
                         zIndex: 10,
                         pointerEvents: 'auto',
+                        background: 'transparent',
                       }}
                       onPointerDown={(e) => startConnector(e, circle.id, 'circle', circle.x, circle.y)}
-                    />
+                    >
+                      <div
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: '50%',
+                          background: MATERIAL_TONES[circle.tone].centerBg,
+                          border: '2px solid #ffffff',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                          pointerEvents: 'none',
+                        }}
+                      />
+                    </div>
                     {/* Bottom dot */}
                     <div
                       style={{
                         position: 'absolute',
-                        bottom: -6,
+                        top: 40,
                         left: 20,
-                        transform: 'translateX(-50%)',
-                        width: 10,
-                        height: 10,
-                        borderRadius: '50%',
-                        background: MATERIAL_TONES[circle.tone].centerBg,
-                        border: '2px solid #ffffff',
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                        transform: 'translate(-50%, -50%)',
+                        width: 30,
+                        height: 30,
+                        display: 'grid',
+                        placeItems: 'center',
                         cursor: 'crosshair',
                         zIndex: 10,
                         pointerEvents: 'auto',
+                        background: 'transparent',
                       }}
                       onPointerDown={(e) => startConnector(e, circle.id, 'circle', circle.x, circle.y)}
-                    />
+                    >
+                      <div
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: '50%',
+                          background: MATERIAL_TONES[circle.tone].centerBg,
+                          border: '2px solid #ffffff',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                          pointerEvents: 'none',
+                        }}
+                      />
+                    </div>
                     {/* Left dot */}
                     <div
                       style={{
                         position: 'absolute',
-                        left: -6,
                         top: 20,
-                        transform: 'translateY(-50%)',
-                        width: 10,
-                        height: 10,
-                        borderRadius: '50%',
-                        background: MATERIAL_TONES[circle.tone].centerBg,
-                        border: '2px solid #ffffff',
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                        left: 0,
+                        transform: 'translate(-50%, -50%)',
+                        width: 30,
+                        height: 30,
+                        display: 'grid',
+                        placeItems: 'center',
                         cursor: 'crosshair',
                         zIndex: 10,
                         pointerEvents: 'auto',
+                        background: 'transparent',
                       }}
                       onPointerDown={(e) => startConnector(e, circle.id, 'circle', circle.x, circle.y)}
-                    />
+                    >
+                      <div
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: '50%',
+                          background: MATERIAL_TONES[circle.tone].centerBg,
+                          border: '2px solid #ffffff',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                          pointerEvents: 'none',
+                        }}
+                      />
+                    </div>
                     {/* Right dot */}
                     <div
                       style={{
                         position: 'absolute',
-                        right: -6,
                         top: 20,
-                        transform: 'translateY(-50%)',
-                        width: 10,
-                        height: 10,
-                        borderRadius: '50%',
-                        background: MATERIAL_TONES[circle.tone].centerBg,
-                        border: '2px solid #ffffff',
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                        left: 40,
+                        transform: 'translate(-50%, -50%)',
+                        width: 30,
+                        height: 30,
+                        display: 'grid',
+                        placeItems: 'center',
                         cursor: 'crosshair',
                         zIndex: 10,
                         pointerEvents: 'auto',
+                        background: 'transparent',
                       }}
                       onPointerDown={(e) => startConnector(e, circle.id, 'circle', circle.x, circle.y)}
-                    />
+                    >
+                      <div
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: '50%',
+                          background: MATERIAL_TONES[circle.tone].centerBg,
+                          border: '2px solid #ffffff',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                          pointerEvents: 'none',
+                        }}
+                      />
+                    </div>
                   </>
                 )}
               </div>
@@ -1388,90 +1567,134 @@ function App() {
                       <div
                         style={{
                           position: 'absolute',
-                          top: -6,
+                          top: 0,
                           left: 20,
-                          transform: 'translateX(-50%)',
-                          width: 10,
-                          height: 10,
-                          borderRadius: '50%',
-                          background: '#2563eb',
-                          border: '2px solid #ffffff',
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                          transform: 'translate(-50%, -50%)',
+                          width: 30,
+                          height: 30,
+                          display: 'grid',
+                          placeItems: 'center',
                           cursor: 'crosshair',
                           zIndex: 10,
+                          background: 'transparent',
                         }}
                         onPointerDown={(e) => {
                           e.preventDefault()
                           e.stopPropagation()
                           startPersonConnection(e, person)
                         }}
-                      />
+                      >
+                        <div
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: '50%',
+                            background: '#2563eb',
+                            border: '2px solid #ffffff',
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                            pointerEvents: 'none',
+                          }}
+                        />
+                      </div>
                       {/* Bottom dot */}
                       <div
                         style={{
                           position: 'absolute',
-                          bottom: -6,
+                          top: 40,
                           left: 20,
-                          transform: 'translateX(-50%)',
-                          width: 10,
-                          height: 10,
-                          borderRadius: '50%',
-                          background: '#2563eb',
-                          border: '2px solid #ffffff',
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                          transform: 'translate(-50%, -50%)',
+                          width: 30,
+                          height: 30,
+                          display: 'grid',
+                          placeItems: 'center',
                           cursor: 'crosshair',
                           zIndex: 10,
+                          background: 'transparent',
                         }}
                         onPointerDown={(e) => {
                           e.preventDefault()
                           e.stopPropagation()
                           startPersonConnection(e, person)
                         }}
-                      />
+                      >
+                        <div
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: '50%',
+                            background: '#2563eb',
+                            border: '2px solid #ffffff',
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                            pointerEvents: 'none',
+                          }}
+                        />
+                      </div>
                       {/* Left dot */}
                       <div
                         style={{
                           position: 'absolute',
-                          left: -6,
                           top: 20,
-                          transform: 'translateY(-50%)',
-                          width: 10,
-                          height: 10,
-                          borderRadius: '50%',
-                          background: '#2563eb',
-                          border: '2px solid #ffffff',
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                          left: 0,
+                          transform: 'translate(-50%, -50%)',
+                          width: 30,
+                          height: 30,
+                          display: 'grid',
+                          placeItems: 'center',
                           cursor: 'crosshair',
                           zIndex: 10,
+                          background: 'transparent',
                         }}
                         onPointerDown={(e) => {
                           e.preventDefault()
                           e.stopPropagation()
                           startPersonConnection(e, person)
                         }}
-                      />
+                      >
+                        <div
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: '50%',
+                            background: '#2563eb',
+                            border: '2px solid #ffffff',
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                            pointerEvents: 'none',
+                          }}
+                        />
+                      </div>
                       {/* Right dot */}
                       <div
                         style={{
                           position: 'absolute',
-                          right: -6,
                           top: 20,
-                          transform: 'translateY(-50%)',
-                          width: 10,
-                          height: 10,
-                          borderRadius: '50%',
-                          background: '#2563eb',
-                          border: '2px solid #ffffff',
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                          left: 40,
+                          transform: 'translate(-50%, -50%)',
+                          width: 30,
+                          height: 30,
+                          display: 'grid',
+                          placeItems: 'center',
                           cursor: 'crosshair',
                           zIndex: 10,
+                          background: 'transparent',
                         }}
                         onPointerDown={(e) => {
                           e.preventDefault()
                           e.stopPropagation()
                           startPersonConnection(e, person)
                         }}
-                      />
+                      >
+                        <div
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: '50%',
+                            background: '#2563eb',
+                            border: '2px solid #ffffff',
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                            pointerEvents: 'none',
+                          }}
+                        />
+                      </div>
                     </>
                   )}
                 </div>
@@ -1503,12 +1726,20 @@ function App() {
       <aside className="inspector" aria-label="Selection details" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 120px)' }}>
         {selectedItem ? (
           <>
-            <span className="inspector__eyebrow">{selectedItem.type === 'circle' ? 'Circle center' : 'Person'}</span>
-            <input
-              value={selectedCircle?.name ?? selectedPerson?.name ?? ''}
-              onChange={(event) => renameSelected(event.target.value)}
-              aria-label="Selected item name"
-            />
+            <span className="inspector__eyebrow">
+              {selectedItem.type === 'circle' ? 'Circle center' : selectedItem.type === 'person' ? 'Person' : 'Connection'}
+            </span>
+            {selectedItem.type !== 'connection' ? (
+              <input
+                value={selectedCircle?.name ?? selectedPerson?.name ?? ''}
+                onChange={(event) => renameSelected(event.target.value)}
+                aria-label="Selected item name"
+              />
+            ) : (
+              <div style={{ fontSize: '15px', fontWeight: 600, padding: '4px 0 12px 0', borderBottom: '1px solid rgba(28, 37, 40, 0.08)' }}>
+                Relationship Link
+              </div>
+            )}
             {selectedCircle && (
               <>
                 <dl>
@@ -1588,6 +1819,17 @@ function App() {
                 <button type="button" className="primary-action" onClick={addDemoCluster} style={{ marginTop: '8px' }}>
                   Add 3 demo people
                 </button>
+
+                {selectedCircle.id !== 'you' && (
+                  <button
+                    type="button"
+                    className="primary-action"
+                    style={{ marginTop: '16px', background: '#dc2626' }}
+                    onClick={() => deleteCircle(selectedCircle.id)}
+                  >
+                    Delete Circle
+                  </button>
+                )}
               </>
             )}
             {selectedPerson && (
@@ -1668,6 +1910,33 @@ function App() {
                 </button>
               </>
             )}
+            {selectedConnection && (() => {
+              const fromNode = graph.people.find((p) => p.id === selectedConnection.fromId) || circlesById.get(selectedConnection.fromId)
+              const toNode = graph.people.find((p) => p.id === selectedConnection.toId) || circlesById.get(selectedConnection.toId)
+              return (
+                <>
+                  <dl>
+                    <div>
+                      <dt>From</dt>
+                      <dd>{fromNode ? fromNode.name : 'Unknown'}</dd>
+                    </div>
+                    <div>
+                      <dt>To</dt>
+                      <dd>{toNode ? toNode.name : 'Unknown'}</dd>
+                    </div>
+                  </dl>
+
+                  <button
+                    type="button"
+                    className="primary-action"
+                    style={{ marginTop: '16px', background: '#dc2626' }}
+                    onClick={() => deleteConnection(selectedConnection.id)}
+                  >
+                    Delete Connection
+                  </button>
+                </>
+              )
+            })()}
           </>
         ) : (
           <div style={{ display: 'grid', placeItems: 'center', height: '100px', color: 'rgba(28, 37, 40, 0.52)' }}>
