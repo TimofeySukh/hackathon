@@ -1345,13 +1345,14 @@ function App() {
                     <div
                       style={{
                         position: 'absolute',
-                        top: 0,
-                        left: 20,
-                        transform: 'translate(-50%, -50%)',
+                        top: -20,
+                        left: 5,
                         width: 30,
-                        height: 30,
-                        display: 'grid',
-                        placeItems: 'center',
+                        height: 20,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'flex-end',
                         cursor: 'crosshair',
                         zIndex: 10,
                         pointerEvents: 'auto',
@@ -1368,6 +1369,7 @@ function App() {
                           border: '2px solid #ffffff',
                           boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
                           pointerEvents: 'none',
+                          marginBottom: '-5px',
                         }}
                       />
                     </div>
@@ -1376,12 +1378,13 @@ function App() {
                       style={{
                         position: 'absolute',
                         top: 40,
-                        left: 20,
-                        transform: 'translate(-50%, -50%)',
+                        left: 5,
                         width: 30,
-                        height: 30,
-                        display: 'grid',
-                        placeItems: 'center',
+                        height: 20,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'flex-start',
                         cursor: 'crosshair',
                         zIndex: 10,
                         pointerEvents: 'auto',
@@ -1398,6 +1401,7 @@ function App() {
                           border: '2px solid #ffffff',
                           boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
                           pointerEvents: 'none',
+                          marginTop: '-5px',
                         }}
                       />
                     </div>
@@ -1405,13 +1409,14 @@ function App() {
                     <div
                       style={{
                         position: 'absolute',
-                        top: 20,
-                        left: 0,
-                        transform: 'translate(-50%, -50%)',
-                        width: 30,
+                        top: 5,
+                        left: -20,
+                        width: 20,
                         height: 30,
-                        display: 'grid',
-                        placeItems: 'center',
+                        display: 'flex',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'flex-end',
                         cursor: 'crosshair',
                         zIndex: 10,
                         pointerEvents: 'auto',
@@ -1428,6 +1433,7 @@ function App() {
                           border: '2px solid #ffffff',
                           boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
                           pointerEvents: 'none',
+                          marginRight: '-5px',
                         }}
                       />
                     </div>
@@ -1435,13 +1441,14 @@ function App() {
                     <div
                       style={{
                         position: 'absolute',
-                        top: 20,
+                        top: 5,
                         left: 40,
-                        transform: 'translate(-50%, -50%)',
-                        width: 30,
+                        width: 20,
                         height: 30,
-                        display: 'grid',
-                        placeItems: 'center',
+                        display: 'flex',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'flex-start',
                         cursor: 'crosshair',
                         zIndex: 10,
                         pointerEvents: 'auto',
@@ -1458,6 +1465,7 @@ function App() {
                           border: '2px solid #ffffff',
                           boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
                           pointerEvents: 'none',
+                          marginLeft: '-5px',
                         }}
                       />
                     </div>
@@ -1567,15 +1575,17 @@ function App() {
                       <div
                         style={{
                           position: 'absolute',
-                          top: 0,
-                          left: 20,
-                          transform: 'translate(-50%, -50%)',
+                          top: -20,
+                          left: 5,
                           width: 30,
-                          height: 30,
-                          display: 'grid',
-                          placeItems: 'center',
+                          height: 20,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'flex-end',
                           cursor: 'crosshair',
                           zIndex: 10,
+                          pointerEvents: 'auto',
                           background: 'transparent',
                         }}
                         onPointerDown={(e) => {
@@ -1593,6 +1603,7 @@ function App() {
                             border: '2px solid #ffffff',
                             boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
                             pointerEvents: 'none',
+                            marginBottom: '-5px',
                           }}
                         />
                       </div>
@@ -1601,14 +1612,16 @@ function App() {
                         style={{
                           position: 'absolute',
                           top: 40,
-                          left: 20,
-                          transform: 'translate(-50%, -50%)',
+                          left: 5,
                           width: 30,
-                          height: 30,
-                          display: 'grid',
-                          placeItems: 'center',
+                          height: 20,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'flex-start',
                           cursor: 'crosshair',
                           zIndex: 10,
+                          pointerEvents: 'auto',
                           background: 'transparent',
                         }}
                         onPointerDown={(e) => {
@@ -1626,6 +1639,7 @@ function App() {
                             border: '2px solid #ffffff',
                             boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
                             pointerEvents: 'none',
+                            marginTop: '-5px',
                           }}
                         />
                       </div>
@@ -1633,15 +1647,17 @@ function App() {
                       <div
                         style={{
                           position: 'absolute',
-                          top: 20,
-                          left: 0,
-                          transform: 'translate(-50%, -50%)',
-                          width: 30,
+                          top: 5,
+                          left: -20,
+                          width: 20,
                           height: 30,
-                          display: 'grid',
-                          placeItems: 'center',
+                          display: 'flex',
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'flex-end',
                           cursor: 'crosshair',
                           zIndex: 10,
+                          pointerEvents: 'auto',
                           background: 'transparent',
                         }}
                         onPointerDown={(e) => {
@@ -1659,6 +1675,7 @@ function App() {
                             border: '2px solid #ffffff',
                             boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
                             pointerEvents: 'none',
+                            marginRight: '-5px',
                           }}
                         />
                       </div>
@@ -1666,15 +1683,17 @@ function App() {
                       <div
                         style={{
                           position: 'absolute',
-                          top: 20,
+                          top: 5,
                           left: 40,
-                          transform: 'translate(-50%, -50%)',
-                          width: 30,
+                          width: 20,
                           height: 30,
-                          display: 'grid',
-                          placeItems: 'center',
+                          display: 'flex',
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'flex-start',
                           cursor: 'crosshair',
                           zIndex: 10,
+                          pointerEvents: 'auto',
                           background: 'transparent',
                         }}
                         onPointerDown={(e) => {
@@ -1692,6 +1711,7 @@ function App() {
                             border: '2px solid #ffffff',
                             boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
                             pointerEvents: 'none',
+                            marginLeft: '-5px',
                           }}
                         />
                       </div>
