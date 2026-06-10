@@ -29,19 +29,6 @@ Current visible prototype behavior:
 - zooms toward the cursor with the mouse wheel and through the toolbar
 - stores all visible prototype state only in the current browser session
 - does not call Supabase, auth, database persistence, LinkedIn import, notes, or AI search from the visible screen
-
-Current Flutter prototype behavior in `flutter_board/`:
-
-- ports the circle graph board visual model to Flutter
-- keeps normal circles, inspector UI, and controls as Flutter widgets
-- renders real working people icons in a screen-space canvas layer with painter hit testing and drag support, instead of creating one Flutter widget per person or painting them inside the transformed world canvas
-- uses the load panel to add generated people to a normal circle as real graph data, not through a separate synthetic icon renderer
-- renders real people edges as batched raw line segments
-- applies viewport culling, zoom-aware icon sizes, label suppression at low zoom, and edge level-of-detail sampling for dense views
-- preprocesses `flutter_board/assets/shared_person_avatar.png` into a small flower-clipped avatar sprite before rendering people
-- keeps people icons on flower shapes by default, with normalized flower amplitude across small and large nodes
-- updates the load-panel FPS label through a `ValueNotifier` so the whole board does not rebuild every half second
-
 There is no multiplayer or drawing toolset yet.
 
 ## Local Setup
@@ -110,22 +97,6 @@ Start the development server:
 
 ```bash
 npm run dev
-```
-
-Run the Flutter circle graph prototype in Chrome:
-
-```bash
-cd flutter_board
-flutter run -d chrome
-```
-
-Run Flutter checks for the circle graph prototype:
-
-```bash
-cd flutter_board
-flutter analyze
-flutter test
-flutter build web
 ```
 
 Start the local project MCP server manually when you want to test it outside the app:
