@@ -70,6 +70,7 @@ type NodeGroup = {
 type NodeGroupBubble = {
   id: string
   path: string
+  hull: Offset[]
   fill: string
   stroke: string
 }
@@ -647,12 +648,14 @@ function getNodeGroupBubbles(groups: NodeGroup[], nodes: PersonNode[]): NodeGrou
       if (members.length < 2) return null
 
       const color = normalizeTagColor(group.color)
-      const path = getGroupBubblePath(members)
+      const hull = getGroupBubbleHull(members)
+      const path = hull ? getSmoothClosedPath(hull) : null
       if (!path) return null
 
       return {
         id: group.id,
         path,
+        hull,
         fill: rgbaFromHex(color, 0.18),
         stroke: rgbaFromHex(color, 0.64),
       }
@@ -660,7 +663,7 @@ function getNodeGroupBubbles(groups: NodeGroup[], nodes: PersonNode[]): NodeGrou
     .filter(Boolean) as NodeGroupBubble[]
 }
 
-function getGroupBubblePath(nodes: PersonNode[]) {
+function getGroupBubbleHull(nodes: PersonNode[]) {
   const points: Offset[] = []
   const radius = GROUP_BLOB_NODE_RADIUS + GROUP_BLOB_PADDING
 
@@ -678,7 +681,7 @@ function getGroupBubblePath(nodes: PersonNode[]) {
   const hull = getConvexHull(points)
   if (hull.length < 3) return null
 
-  return getSmoothClosedPath(hull)
+  return hull
 }
 
 function getConvexHull(points: Offset[]) {
@@ -725,16 +728,20 @@ function getSmoothClosedPath(points: Offset[]) {
   return commands.join(' ')
 }
 
-function isPointInSvgPath(point: Offset, path: string) {
-  const svgElement = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-  const pathElement = document.createElementNS('http://www.w3.org/2000/svg', 'path')
-  pathElement.setAttribute('d', path)
-  svgElement.append(pathElement)
-  const svgPoint = svgElement.createSVGPoint()
-  svgPoint.x = point.x
-  svgPoint.y = point.y
+function isPointInPolygon(point: Offset, polygon: Offset[]) {
+  let isInside = false
 
-  return pathElement.isPointInFill(svgPoint)
+  for (let index = 0, previousIndex = polygon.length - 1; index < polygon.length; previousIndex = index, index += 1) {
+    const current = polygon[index]
+    const previous = polygon[previousIndex]
+    const crossesY = current.y > point.y !== previous.y > point.y
+    if (!crossesY) continue
+
+    const crossingX = ((previous.x - current.x) * (point.y - current.y)) / (previous.y - current.y) + current.x
+    if (point.x < crossingX) isInside = !isInside
+  }
+
+  return isInside
 }
 
 function arrangeGroupMembers(nodes: PersonNode[], memberIds: string[]) {
@@ -2201,7 +2208,7 @@ function App() {
       const currentNodes = boardNodesRef.current
       const currentGroups = nodeGroupsRef.current
       const groupBubbles = getNodeGroupBubbles(currentGroups, currentNodes)
-      const targetBubble = groupBubbles.find((bubble) => isPointInSvgPath(point, bubble.path))
+      const targetBubble = groupBubbles.find((bubble) => isPointInPolygon(point, bubble.hull))
       if (!targetBubble) return false
 
       const targetGroup = currentGroups.find((group) => group.id === targetBubble.id) ?? null
@@ -2253,7 +2260,7 @@ function App() {
       const currentGroups = nodeGroupsRef.current
       const candidateGroupNodes = currentNodes.filter((node) => !draggedIdSet.has(node.id))
       const groupBubbles = getNodeGroupBubbles(currentGroups, candidateGroupNodes)
-      const targetBubble = groupBubbles.find((bubble) => isPointInSvgPath(draggedCenter, bubble.path))
+      const targetBubble = groupBubbles.find((bubble) => isPointInPolygon(draggedCenter, bubble.hull))
       if (targetBubble) {
         const targetGroup = currentGroups.find((group) => group.id === targetBubble.id) ?? null
         const targetMemberId = targetGroup?.memberIds.find((memberId) => !draggedIdSet.has(memberId))
