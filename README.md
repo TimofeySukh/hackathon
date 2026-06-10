@@ -16,7 +16,7 @@ A persisted social graph board built with React, Vite, and TypeScript.
 - Infinite canvas-style navigation by scrolling on a trackpad
 - Cursor-centered zoom in and out with the mouse wheel
 - No drawing tools or side panels
-- Theme switcher in the top-right corner
+- Light theme by default, with a theme switcher in the top-right corner
 - Optional Google login through Supabase
 - Editable unsigned local board state before signing in
 - One personal board record for each signed-in user

@@ -891,7 +891,7 @@ function App() {
 
   const [theme, setTheme] = useState<Theme>(() => {
     const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY)
-    return savedTheme === 'light' ? 'light' : 'dark'
+    return savedTheme === 'dark' ? 'dark' : 'light'
   })
   const [zoomPercentage, setZoomPercentage] = useState(100)
   const [renderBounds, setRenderBounds] = useState<WorldBounds | null>(null)
@@ -980,7 +980,7 @@ function App() {
     connections: [],
     nodesById: {},
     tagColorById: {},
-    theme: 'dark',
+    theme: 'light',
   })
   const pendingViewportRef = useRef<{ offset: Offset; scale: number } | null>(null)
   const viewportFrameRef = useRef<number | null>(null)

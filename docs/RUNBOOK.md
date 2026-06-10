@@ -13,6 +13,7 @@ Current app behavior:
 - scroll on a trackpad to pan the board
 - zoom toward the cursor with the mouse wheel
 - switch between dark and light themes
+- open in the light theme by default when no saved theme exists
 - persist the selected theme in `localStorage`
 - optionally sign in with Google through Supabase
 - edit an unsigned local in-memory board without a required login
