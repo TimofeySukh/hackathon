@@ -3,6 +3,7 @@ import type {
   CSSProperties,
   DragEvent as ReactDragEvent,
   KeyboardEvent as ReactKeyboardEvent,
+  MouseEvent as ReactMouseEvent,
   PointerEvent as ReactPointerEvent,
   WheelEvent as ReactWheelEvent,
 } from 'react'
@@ -56,6 +57,27 @@ type AreaSelection = {
   currentClientY: number
   viewportLeft: number
   viewportTop: number
+}
+
+type NodeGroup = {
+  id: string
+  boardId: string
+  memberIds: string[]
+  color: string
+  createdAt: string
+}
+
+type NodeGroupBubble = {
+  id: string
+  path: string
+  fill: string
+  stroke: string
+}
+
+type TapState = {
+  time: number
+  clientX: number
+  clientY: number
 }
 
 type NoteDraft = {
@@ -154,6 +176,7 @@ type TagPickerOption =
 
 const THEME_STORAGE_KEY = 'hackathon-theme'
 const TAG_COLOR_STORAGE_KEY = 'hackathon-tag-colors'
+const NODE_GROUP_STORAGE_KEY = 'hackathon-node-groups'
 const LINKEDIN_TAG_NAME = 'LinkedIn'
 const DEFAULT_LINKEDIN_IMPORT_OPTIONS: LinkedInImportOptions = {
   includeEmail: false,
@@ -193,12 +216,18 @@ const NODE_CLICK_DRAG_THRESHOLD = 4
 const NODE_RADIUS = 9
 const NODE_HIT_RADIUS = 31
 const MIN_LINK_VISIBLE_LENGTH = 2
-const CREATE_THRESHOLD = 18
+const CONNECTION_CREATE_THRESHOLD = 18
 const WHEEL_ZOOM_INTENSITY = 0.0016
 const INSPECTOR_ANCHOR_GAP = 40
 const INSPECTOR_VIEWPORT_MARGIN = 16
 const TRACKPAD_PAN_IDLE_MS = 320
-const IS_MAC_PLATFORM = /Mac|iPhone|iPad|iPod/i.test(window.navigator.platform)
+const DOUBLE_TAP_MS = 330
+const DOUBLE_TAP_DISTANCE = 22
+const GROUP_DROP_DISTANCE = 86
+const GROUP_MEMBER_SPACING = 72
+const GROUP_BLOB_NODE_RADIUS = 12
+const GROUP_BLOB_PADDING = 28
+const GROUP_BLOB_SAMPLE_POINTS = 18
 const LINKEDIN_RING_CAPACITIES = [10, 40]
 const LINKEDIN_RING_RADIUS = 260
 const LINKEDIN_RING_STEP = 190
@@ -539,6 +568,216 @@ function createDefaultLocalTags(): Tag[] {
   }))
 }
 
+function getNodeGroupStorageKey(boardId: string) {
+  return `${NODE_GROUP_STORAGE_KEY}:${boardId}`
+}
+
+function loadNodeGroups(boardId: string): NodeGroup[] {
+  try {
+    const savedGroups = window.localStorage.getItem(getNodeGroupStorageKey(boardId))
+    if (!savedGroups) return []
+
+    const parsedGroups = JSON.parse(savedGroups) as NodeGroup[]
+    if (!Array.isArray(parsedGroups)) return []
+
+    return parsedGroups.filter(
+      (group) =>
+        group &&
+        group.boardId === boardId &&
+        typeof group.id === 'string' &&
+        Array.isArray(group.memberIds) &&
+        group.memberIds.length >= 2 &&
+        typeof group.color === 'string',
+    )
+  } catch {
+    return []
+  }
+}
+
+function saveNodeGroups(boardId: string, groups: NodeGroup[]) {
+  const storageKey = getNodeGroupStorageKey(boardId)
+  if (groups.length === 0) {
+    window.localStorage.removeItem(storageKey)
+    return
+  }
+
+  window.localStorage.setItem(storageKey, JSON.stringify(groups))
+}
+
+function sanitizeNodeGroups(groups: NodeGroup[], boardId: string, nodes: PersonNode[]) {
+  const nodeIds = new Set(nodes.map((node) => node.id))
+  const assignedNodeIds = new Set<string>()
+  const nextGroups: NodeGroup[] = []
+
+  for (const group of groups) {
+    const memberIds = group.memberIds.filter((nodeId) => nodeIds.has(nodeId) && !assignedNodeIds.has(nodeId))
+    if (memberIds.length < 2) continue
+
+    for (const nodeId of memberIds) assignedNodeIds.add(nodeId)
+    nextGroups.push({
+      ...group,
+      boardId,
+      memberIds,
+      color: normalizeTagColor(group.color),
+    })
+  }
+
+  return nextGroups
+}
+
+function getNodeGroupForNode(groups: NodeGroup[], nodeId: string) {
+  return groups.find((group) => group.memberIds.includes(nodeId)) ?? null
+}
+
+function getNodeDisplayColor(node: PersonNode, tagColorById: Record<string, string>) {
+  if (node.is_root) return DEFAULT_TAG_COLOR
+  return node.tag_id ? tagColorById[node.tag_id] ?? DEFAULT_TAG_COLOR : DEFAULT_TAG_COLOR
+}
+
+function rgbaFromHex(color: string, alpha: number) {
+  return `rgb(${hexToRgb(color)} / ${alpha})`
+}
+
+function getNodeGroupBubbles(groups: NodeGroup[], nodes: PersonNode[]): NodeGroupBubble[] {
+  const nodesById = new Map(nodes.map((node) => [node.id, node]))
+
+  return groups
+    .map((group) => {
+      const members = group.memberIds.map((nodeId) => nodesById.get(nodeId)).filter(Boolean) as PersonNode[]
+      if (members.length < 2) return null
+
+      const color = normalizeTagColor(group.color)
+      const path = getGroupBubblePath(members)
+      if (!path) return null
+
+      return {
+        id: group.id,
+        path,
+        fill: rgbaFromHex(color, 0.18),
+        stroke: rgbaFromHex(color, 0.64),
+      }
+    })
+    .filter(Boolean) as NodeGroupBubble[]
+}
+
+function getGroupBubblePath(nodes: PersonNode[]) {
+  const points: Offset[] = []
+  const radius = GROUP_BLOB_NODE_RADIUS + GROUP_BLOB_PADDING
+
+  for (const node of nodes) {
+    for (let index = 0; index < GROUP_BLOB_SAMPLE_POINTS; index += 1) {
+      const angle = (index * Math.PI * 2) / GROUP_BLOB_SAMPLE_POINTS
+      const wobble = index % 2 === 0 ? 2 : -1
+      points.push({
+        x: node.x + Math.cos(angle) * (radius + wobble),
+        y: node.y + Math.sin(angle) * (radius - wobble),
+      })
+    }
+  }
+
+  const hull = getConvexHull(points)
+  if (hull.length < 3) return null
+
+  return getSmoothClosedPath(hull)
+}
+
+function getConvexHull(points: Offset[]) {
+  const sortedPoints = [...points].sort((left, right) => left.x - right.x || left.y - right.y)
+  if (sortedPoints.length <= 1) return sortedPoints
+
+  const cross = (origin: Offset, left: Offset, right: Offset) =>
+    (left.x - origin.x) * (right.y - origin.y) - (left.y - origin.y) * (right.x - origin.x)
+  const lower: Offset[] = []
+  for (const point of sortedPoints) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], point) <= 0) {
+      lower.pop()
+    }
+    lower.push(point)
+  }
+
+  const upper: Offset[] = []
+  for (let index = sortedPoints.length - 1; index >= 0; index -= 1) {
+    const point = sortedPoints[index]
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], point) <= 0) {
+      upper.pop()
+    }
+    upper.push(point)
+  }
+
+  lower.pop()
+  upper.pop()
+  return [...lower, ...upper]
+}
+
+function getSmoothClosedPath(points: Offset[]) {
+  const first = points[0]
+  const commands = [`M ${first.x} ${first.y}`]
+
+  for (let index = 0; index < points.length; index += 1) {
+    const current = points[index]
+    const next = points[(index + 1) % points.length]
+    const midX = (current.x + next.x) / 2
+    const midY = (current.y + next.y) / 2
+    commands.push(`Q ${current.x} ${current.y} ${midX} ${midY}`)
+  }
+
+  commands.push('Z')
+  return commands.join(' ')
+}
+
+function isPointInSvgPath(point: Offset, path: string) {
+  const svgElement = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+  const pathElement = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+  pathElement.setAttribute('d', path)
+  svgElement.append(pathElement)
+  const svgPoint = svgElement.createSVGPoint()
+  svgPoint.x = point.x
+  svgPoint.y = point.y
+
+  return pathElement.isPointInFill(svgPoint)
+}
+
+function arrangeGroupMembers(nodes: PersonNode[], memberIds: string[]) {
+  const members = memberIds.map((nodeId) => nodes.find((node) => node.id === nodeId)).filter(Boolean) as PersonNode[]
+  if (members.length < 2) return new Map<string, Offset>()
+
+  const centerX = members.reduce((sum, node) => sum + node.x, 0) / members.length
+  const centerY = members.reduce((sum, node) => sum + node.y, 0) / members.length
+  const positions = new Map<string, Offset>()
+
+  if (members.length === 2) {
+    const [first, second] = members
+    const angle = Math.atan2(second.y - first.y, second.x - first.x) || 0
+    const halfSpacing = GROUP_MEMBER_SPACING / 2
+    positions.set(first.id, {
+      x: centerX - Math.cos(angle) * halfSpacing,
+      y: centerY - Math.sin(angle) * halfSpacing,
+    })
+    positions.set(second.id, {
+      x: centerX + Math.cos(angle) * halfSpacing,
+      y: centerY + Math.sin(angle) * halfSpacing,
+    })
+    return positions
+  }
+
+  const radius = GROUP_MEMBER_SPACING + Math.max(0, members.length - 3) * 12
+  const sortedMembers = [...members].sort((left, right) => {
+    const leftAngle = Math.atan2(left.y - centerY, left.x - centerX)
+    const rightAngle = Math.atan2(right.y - centerY, right.x - centerX)
+    return leftAngle - rightAngle
+  })
+
+  sortedMembers.forEach((node, index) => {
+    const angle = -Math.PI / 2 + (index * Math.PI * 2) / sortedMembers.length
+    positions.set(node.id, {
+      x: centerX + Math.cos(angle) * radius,
+      y: centerY + Math.sin(angle) * radius,
+    })
+  })
+
+  return positions
+}
+
 type GraphEdgeProps = {
   edge: Connection
   fromNode: PersonNode
@@ -579,7 +818,6 @@ type GraphNodeProps = {
   isSelected: boolean
   tagColor: string | null
   showLabel: boolean
-  connectionModifierLabel: string
   onPointerDown: (node: PersonNode, event: ReactPointerEvent<HTMLButtonElement>) => void
   onClick: (node: PersonNode) => void
 }
@@ -589,7 +827,6 @@ const GraphNodeCard = memo(function GraphNodeCard({
   isSelected,
   tagColor,
   showLabel,
-  connectionModifierLabel,
   onPointerDown,
   onClick,
 }: GraphNodeProps) {
@@ -606,11 +843,7 @@ const GraphNodeCard = memo(function GraphNodeCard({
       <button
         type="button"
         className="graph-node__button"
-        title={
-          node.is_root
-            ? `Hold ${connectionModifierLabel} and drag to connect`
-            : `Drag to move. Hold ${connectionModifierLabel} and drag to connect.`
-        }
+        title={node.is_root ? 'Double click the board to create a person' : 'Drag to move'}
         onPointerDown={(event) => onPointerDown(node, event)}
         onClick={(event) => {
           event.stopPropagation()
@@ -669,6 +902,7 @@ function App() {
   const [connectionDrag, setConnectionDrag] = useState<ConnectionDrag | null>(null)
   const [nodeDrag, setNodeDrag] = useState<NodeDrag | null>(null)
   const [draggedPositions, setDraggedPositions] = useState<Record<string, Offset>>({})
+  const [nodeGroups, setNodeGroups] = useState<NodeGroup[]>([])
   const [multiSelectedNodeIds, setMultiSelectedNodeIds] = useState<string[]>([])
   const [areaSelection, setAreaSelection] = useState<AreaSelection | null>(null)
   const [nameDraft, setNameDraft] = useState('')
@@ -709,7 +943,6 @@ function App() {
   const [localTags, setLocalTags] = useState<Tag[]>(() => createDefaultLocalTags())
   const [localNotes, setLocalNotes] = useState<PersonNote[]>([])
   const [localConnections, setLocalConnections] = useState<Connection[]>([])
-  const connectionModifierLabel = IS_MAC_PLATFORM ? 'Command' : 'Control'
 
   const boardRef = useRef<HTMLElement | null>(null)
   const boardSurfaceRef = useRef<HTMLDivElement | null>(null)
@@ -753,8 +986,11 @@ function App() {
   const viewportFrameRef = useRef<number | null>(null)
   const connectionDragStateRef = useRef<ConnectionDrag | null>(null)
   const nodeDragStateRef = useRef<NodeDrag | null>(null)
+  const boardNodesRef = useRef<PersonNode[]>([])
+  const nodeGroupsRef = useRef<NodeGroup[]>([])
   const draggedPositionsRef = useRef<Record<string, Offset>>({})
   const areaSelectionRef = useRef<AreaSelection | null>(null)
+  const lastBoardTapRef = useRef<TapState | null>(null)
   const activePointerIdRef = useRef<number | null>(null)
   const touchPointersRef = useRef(new Map<number, TouchPoint>())
   const pinchGestureRef = useRef<PinchGesture | null>(null)
@@ -770,6 +1006,7 @@ function App() {
     originX: 0,
     originY: 0,
     active: false,
+    moved: false,
   })
 
   const isAuthenticated = status === 'authenticated' && Boolean(session?.user)
@@ -783,6 +1020,7 @@ function App() {
     [isRemoteGraphReady, personAiNotes],
   )
   const activeConnections = isRemoteGraphReady ? connections : localConnections
+  const activeBoardId = activeBoard?.id ?? ANONYMOUS_BOARD.id
   const isGraphReady = isRemoteGraphReady || !isAuthenticated
   const boardNodes = useMemo(
     () =>
@@ -847,6 +1085,10 @@ function App() {
         (edge) => visibleNodesById[edge.person_a_id] && visibleNodesById[edge.person_b_id],
       ),
     [boardConnections, visibleNodesById],
+  )
+  const visibleNodeGroupBubbles = useMemo(
+    () => getNodeGroupBubbles(nodeGroups, visibleBoardNodes),
+    [nodeGroups, visibleBoardNodes],
   )
   const pinnedRenderNodeIds = useMemo(() => {
     const nodeIds = new Set<string>()
@@ -1448,6 +1690,14 @@ function App() {
   }, [nodeDrag])
 
   useEffect(() => {
+    boardNodesRef.current = boardNodes
+  }, [boardNodes])
+
+  useEffect(() => {
+    nodeGroupsRef.current = nodeGroups
+  }, [nodeGroups])
+
+  useEffect(() => {
     draggedPositionsRef.current = draggedPositions
   }, [draggedPositions])
 
@@ -1458,6 +1708,30 @@ function App() {
   useEffect(() => {
     visibleBoardNodesRef.current = renderedBoardNodes
   }, [renderedBoardNodes])
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      const loadedGroups = sanitizeNodeGroups(loadNodeGroups(activeBoardId), activeBoardId, boardNodesRef.current)
+      nodeGroupsRef.current = loadedGroups
+      setNodeGroups(loadedGroups)
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [activeBoardId])
+
+  useEffect(() => {
+    setNodeGroups((currentGroups) => {
+      const nextGroups = sanitizeNodeGroups(currentGroups, activeBoardId, boardNodes)
+      if (JSON.stringify(nextGroups) === JSON.stringify(currentGroups)) {
+        saveNodeGroups(activeBoardId, currentGroups)
+        return currentGroups
+      }
+
+      nodeGroupsRef.current = nextGroups
+      saveNodeGroups(activeBoardId, nextGroups)
+      return nextGroups
+    })
+  }, [activeBoardId, boardNodes])
 
   useEffect(() => {
     graphCanvasDataRef.current = {
@@ -1853,6 +2127,139 @@ function App() {
     closeTransientUi()
   }, [closeTransientUi])
 
+  const applyNodeGroup = useCallback((group: NodeGroup) => {
+    setNodeGroups((currentGroups) => {
+      const groupMemberIds = new Set(group.memberIds)
+      const nextGroups = sanitizeNodeGroups(
+        [
+          ...currentGroups
+            .filter((currentGroup) => currentGroup.id !== group.id)
+            .map((currentGroup) => ({
+              ...currentGroup,
+              memberIds: currentGroup.memberIds.filter((memberId) => !groupMemberIds.has(memberId)),
+            })),
+          group,
+        ],
+        activeBoardId,
+        boardNodesRef.current,
+      )
+      nodeGroupsRef.current = nextGroups
+      saveNodeGroups(activeBoardId, nextGroups)
+      return nextGroups
+    })
+  }, [activeBoardId])
+
+  const addNodesToGroup = useCallback(
+    async (memberIds: string[], targetNode: PersonNode, existingGroup: NodeGroup | null = null) => {
+      if (memberIds.length === 0) return false
+
+      const currentNodes = boardNodesRef.current
+      const currentGroups = nodeGroupsRef.current
+      const targetGroup = existingGroup ?? getNodeGroupForNode(currentGroups, targetNode.id)
+      const currentMemberIds = targetGroup?.memberIds ?? [targetNode.id]
+      const nextMemberIds = Array.from(new Set([...currentMemberIds, ...memberIds]))
+      if (nextMemberIds.length < 2) return false
+
+      const nextGroup: NodeGroup = {
+        id: targetGroup?.id ?? createLocalId('node-group'),
+        boardId: activeBoardId,
+        memberIds: nextMemberIds,
+        color: targetGroup?.color ?? getNodeDisplayColor(targetNode, tagColorById),
+        createdAt: targetGroup?.createdAt ?? new Date().toISOString(),
+      }
+      const nextPositions = arrangeGroupMembers(currentNodes, nextMemberIds)
+      if (nextPositions.size === 0) return false
+
+      applyNodeGroup(nextGroup)
+
+      await Promise.all(
+        Array.from(nextPositions.entries()).map(([nodeId, position]) => {
+          const node = currentNodes.find((candidateNode) => candidateNode.id === nodeId)
+          if (!node || node.is_root) return Promise.resolve()
+          return movePerson(nodeId, position.x, position.y)
+        }),
+      )
+      return true
+    },
+    [activeBoardId, applyNodeGroup, movePerson, tagColorById],
+  )
+
+  const addNodeToContainingGroup = useCallback(
+    async (nodeId: string, point: Offset) => {
+      const currentNodes = boardNodesRef.current
+      const currentGroups = nodeGroupsRef.current
+      const groupBubbles = getNodeGroupBubbles(currentGroups, currentNodes)
+      const targetBubble = groupBubbles.find((bubble) => isPointInSvgPath(point, bubble.path))
+      if (!targetBubble) return false
+
+      const targetGroup = currentGroups.find((group) => group.id === targetBubble.id) ?? null
+      const targetNode = targetGroup
+        ? currentNodes.find((node) => node.id === targetGroup.memberIds[0]) ?? null
+        : null
+      if (!targetNode) return false
+
+      return addNodesToGroup([nodeId], targetNode, targetGroup)
+    },
+    [addNodesToGroup],
+  )
+
+  const createPersonAtClientPoint = useCallback(
+    async (clientX: number, clientY: number) => {
+      if (!isGraphReady) return
+
+      const view = viewportRef.current
+      const worldPoint = screenToWorld(clientX, clientY, boardRef.current, view.offset, view.scale)
+      if (!worldPoint) return
+
+      const createdNode = await createPerson({
+        name: '',
+        tagId: null,
+        x: worldPoint.x,
+        y: worldPoint.y,
+      })
+      boardNodesRef.current = [...boardNodesRef.current, createdNode]
+      await addNodeToContainingGroup(createdNode.id, worldPoint)
+      openInspectorForNode(createdNode)
+    },
+    [addNodeToContainingGroup, createPerson, isGraphReady, openInspectorForNode],
+  )
+
+  const finishNodeGroupDrop = useCallback(
+    async (currentNodeDrag: NodeDrag) => {
+      const draggedNodeIds = currentNodeDrag.nodeIds.filter((nodeId) => {
+        const node = boardNodesRef.current.find((candidateNode) => candidateNode.id === nodeId)
+        return node && !node.is_root
+      })
+      if (draggedNodeIds.length === 0) return false
+
+      const currentNodes = boardNodesRef.current
+      const draggedIdSet = new Set(draggedNodeIds)
+      const draggedNodes = draggedNodeIds.map((nodeId) => currentNodes.find((node) => node.id === nodeId)).filter(Boolean) as PersonNode[]
+      if (draggedNodes.length === 0) return false
+
+      const draggedCenter = {
+        x: draggedNodes.reduce((sum, node) => sum + node.x, 0) / draggedNodes.length,
+        y: draggedNodes.reduce((sum, node) => sum + node.y, 0) / draggedNodes.length,
+      }
+      const targetNode = currentNodes
+        .filter((node) => !node.is_root && !draggedIdSet.has(node.id))
+        .map((node) => ({ node, distance: Math.hypot(node.x - draggedCenter.x, node.y - draggedCenter.y) }))
+        .filter(({ distance }) => distance <= GROUP_DROP_DISTANCE)
+        .sort((left, right) => left.distance - right.distance)[0]?.node ?? null
+
+      if (targetNode) {
+        return addNodesToGroup(draggedNodeIds, targetNode)
+      }
+
+      if (draggedNodes.length === 1) {
+        return addNodeToContainingGroup(draggedNodes[0].id, draggedNodes[0])
+      }
+
+      return false
+    },
+    [addNodeToContainingGroup, addNodesToGroup],
+  )
+
   const finishConnectionDrag = useCallback(
     async (clientX: number, clientY: number) => {
       if (!connectionDrag || !isGraphReady) {
@@ -1865,7 +2272,7 @@ function App() {
         clientY - connectionDrag.startClientY,
       )
 
-      if (distance < CREATE_THRESHOLD) {
+      if (distance < CONNECTION_CREATE_THRESHOLD) {
         setConnectionDrag(null)
         return
       }
@@ -1991,6 +2398,9 @@ function App() {
       event.preventDefault()
       const nextX = boardDragRef.current.originX + event.clientX - boardDragRef.current.startX
       const nextY = boardDragRef.current.originY + event.clientY - boardDragRef.current.startY
+      if (Math.hypot(event.clientX - boardDragRef.current.startX, event.clientY - boardDragRef.current.startY) > NODE_CLICK_DRAG_THRESHOLD) {
+        boardDragRef.current.moved = true
+      }
 
       queueViewportUpdate({ x: nextX, y: nextY }, viewportRef.current.scale)
     }
@@ -2014,6 +2424,7 @@ function App() {
               originX: viewportRef.current.offset.x,
               originY: viewportRef.current.offset.y,
               active: true,
+              moved: false,
             }
             setIsDraggingBoard(true)
           }
@@ -2096,6 +2507,13 @@ function App() {
             })
 
             if (movedNodeIds.length > 0) {
+              boardNodesRef.current = boardNodesRef.current.map((node) => {
+                const finalPosition = draggedPositionsRef.current[node.id]
+                return finalPosition ? { ...node, ...finalPosition } : node
+              })
+              const didGroupDrop = await finishNodeGroupDrop(currentNodeDrag)
+              if (didGroupDrop) return
+
               await Promise.all(
                 movedNodeIds.map((nodeId) => {
                   const finalPosition = draggedPositionsRef.current[nodeId]
@@ -2116,9 +2534,29 @@ function App() {
           return
         }
 
+        const didTapBoard = boardDragRef.current.active && !boardDragRef.current.moved
         boardDragRef.current.active = false
         activePointerIdRef.current = null
         setIsDraggingBoard(false)
+
+        if (didTapBoard && event.pointerType !== 'mouse') {
+          const lastTap = lastBoardTapRef.current
+          const isDoubleTap =
+            lastTap &&
+            event.timeStamp - lastTap.time <= DOUBLE_TAP_MS &&
+            Math.hypot(event.clientX - lastTap.clientX, event.clientY - lastTap.clientY) <= DOUBLE_TAP_DISTANCE
+
+          if (isDoubleTap) {
+            lastBoardTapRef.current = null
+            await createPersonAtClientPoint(event.clientX, event.clientY)
+          } else {
+            lastBoardTapRef.current = {
+              time: event.timeStamp,
+              clientX: event.clientX,
+              clientY: event.clientY,
+            }
+          }
+        }
       })()
     }
 
@@ -2133,7 +2571,7 @@ function App() {
       touchPointers.clear()
       pinchGestureRef.current = null
     }
-  }, [finishConnectionDrag, movePerson, queueViewportUpdate, updateTouchPinch])
+  }, [createPersonAtClientPoint, finishConnectionDrag, finishNodeGroupDrop, movePerson, queueViewportUpdate, updateTouchPinch])
 
   function startBoardDragging(event: ReactPointerEvent<HTMLElement>) {
     if (event.pointerType === 'touch') {
@@ -2187,10 +2625,18 @@ function App() {
       originX: viewportRef.current.offset.x,
       originY: viewportRef.current.offset.y,
       active: true,
+      moved: false,
     }
 
     setIsDraggingBoard(true)
     setInspectorNodeId(null)
+  }
+
+  function handleBoardDoubleClick(event: ReactMouseEvent<HTMLElement>) {
+    if (event.target instanceof Element && event.target.closest('.graph-node, .connection-menu')) return
+
+    event.preventDefault()
+    void createPersonAtClientPoint(event.clientX, event.clientY)
   }
 
   const startNodeInteraction = useCallback((node: PersonNode, event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -2223,9 +2669,7 @@ function App() {
     if (!isGraphReady) return
 
     activePointerIdRef.current = event.pointerId
-    const isConnectionModifierPressed = IS_MAC_PLATFORM ? event.metaKey : event.ctrlKey
-
-    if (!isConnectionModifierPressed && !node.is_root) {
+    if (!node.is_root) {
       const dragNodeIds =
         multiSelectedNodeIdSet.has(node.id) && multiSelectedNodeIds.length > 1
           ? visibleBoardNodes
@@ -2248,28 +2692,6 @@ function App() {
       setNodeDrag(nextNodeDrag)
       return
     }
-
-    if (!isConnectionModifierPressed) return
-
-    const view = viewportRef.current
-    const worldPoint = screenToWorld(
-      event.clientX,
-      event.clientY,
-      boardRef.current,
-      view.offset,
-      view.scale,
-    )
-    const nextConnectionDrag = {
-      fromId: node.id,
-      startClientX: event.clientX,
-      startClientY: event.clientY,
-      clientX: event.clientX,
-      clientY: event.clientY,
-      worldX: worldPoint?.x ?? node.x,
-      worldY: worldPoint?.y ?? node.y,
-    }
-    connectionDragStateRef.current = nextConnectionDrag
-    setConnectionDrag(nextConnectionDrag)
   }, [beginTouchPinch, isGraphReady, multiSelectedNodeIdSet, multiSelectedNodeIds.length, nodesById, visibleBoardNodes])
 
   const markTrackpadPanActive = useCallback(() => {
@@ -4071,6 +4493,7 @@ function App() {
           flushDraftNoteOnBoardPointerDown()
           startBoardDragging(event)
         }}
+        onDoubleClick={handleBoardDoubleClick}
         onContextMenu={(event) => {
           event.preventDefault()
         }}
@@ -4097,6 +4520,18 @@ function App() {
             viewBox={`${-LARGE_GRAPH_SVG_SIZE / 2} ${-LARGE_GRAPH_SVG_SIZE / 2} ${LARGE_GRAPH_SVG_SIZE} ${LARGE_GRAPH_SVG_SIZE}`}
             aria-hidden="true"
           >
+            {visibleNodeGroupBubbles.map((groupBubble) => (
+              <path
+                key={groupBubble.id}
+                className="node-group-bubble"
+                d={groupBubble.path}
+                style={{
+                  fill: groupBubble.fill,
+                  stroke: groupBubble.stroke,
+                }}
+              />
+            ))}
+
             {renderedBoardConnections.map((edge) => {
               const fromNode = nodesById[edge.person_a_id]
               const toNode = nodesById[edge.person_b_id]
@@ -4128,7 +4563,6 @@ function App() {
               isSelected={node.id === selectedNode?.id || multiSelectedNodeIdSet.has(node.id)}
               tagColor={node.tag_id ? tagColorById[node.tag_id] : null}
               showLabel={shouldShowGraphLabels || node.is_root || node.id === selectedNode?.id}
-              connectionModifierLabel={connectionModifierLabel}
               onPointerDown={startNodeInteraction}
               onClick={handleNodeClick}
             />

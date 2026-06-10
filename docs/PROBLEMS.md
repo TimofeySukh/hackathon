@@ -15,12 +15,6 @@ When working on the project:
 
 ## Open Problems
 
-### Windows laptops cannot add new nodes
-
-- Status: Open
-- Reported behavior: the button or gesture for adding a new node does not work on Windows laptops.
-- Notes: needs reproduction details, including browser, input device, and whether the expected action is modifier-drag, a button, or another control.
-
 ### No LinkedIn sync
 
 - Status: Open
@@ -58,6 +52,12 @@ When working on the project:
 - Notes: the product target should support at least 10000 imported contacts. A reproducible LinkedIn fixture can be generated with `npm run generate:linkedin-fixture -- --count 10000`; it writes `fixtures/linkedin/Connections-10000.csv` and `fixtures/linkedin/linkedin-connections-10000.zip`. The app now uses batched LinkedIn inserts, a canvas overview layer, viewport-capped interactive DOM nodes, capped SVG connections, and label LOD. This still needs live timing against a signed-in Supabase project with the 10000-contact ZIP before marking resolved.
 
 ## Resolved Problems
+
+### Windows laptops cannot add new nodes
+
+- Status: Resolved
+- Reported behavior: the button or gesture for adding a new node does not work on Windows laptops.
+- Resolution: replaced modifier-dependent node growth with double-click creation on the empty board and double-tap creation on touch devices, so node creation no longer depends on platform-specific modifier keys.
 
 ### npm audit reports transitive vulnerabilities
 

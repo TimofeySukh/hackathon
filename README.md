@@ -5,8 +5,9 @@ A persisted social graph board built with React, Vite, and TypeScript.
 ## Current Experience
 
 - A single central node as the starting point of the graph
-- Create a new node by dragging a connection out from any existing node
-- If you drop on another node, the two existing nodes connect directly
+- Create a new node by double-clicking the empty board, or double-tapping it on touch devices
+- Drag a person close to another person to create or extend a soft blob group
+- Blob groups keep the color of the first stationary target person
 - Curved lines between connected nodes
 - New nodes appear immediately with an empty inline name field
 - Compact obsidian-like nodes with labels
@@ -38,7 +39,6 @@ A persisted social graph board built with React, Vite, and TypeScript.
 - Opening the inspector pans the board enough to keep it visible and opens it at a consistent size before later zoom changes affect it
 - Click the widened connection-line target to delete it from the inline menu or with Backspace
 - Drag a person to move them with their connected lines
-- Hold `Command` on macOS, or `Control` on other platforms, and drag a person to create a connection
 - Dark green-black theme inspired by the provided reference
 - Light theme designed to match the same visual language
 - High-contrast point grid across the board

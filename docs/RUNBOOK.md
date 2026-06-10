@@ -36,6 +36,7 @@ Current app behavior:
 - export graph data, delete graph data, or delete account data from the account menu
 - keep large graphs responsive with a canvas overview layer, viewport-capped DOM nodes, capped SVG connections, and label level-of-detail
 - drag a right-click selection box to select multiple people, then drag one of them to move the group
+- create people with a board double-click or double-tap, and form soft blob groups by dropping one person near another
 - use a mobile layout with the search field and account/theme controls at the top and the Tags control docked near the bottom-left safe area
 - avoid selecting connection lines on coarse touch pointers so mobile board panning does not accidentally open the delete-connection menu
 - simplify some heavy visual effects while dragging and on very dense boards to keep navigation responsive
@@ -390,7 +391,7 @@ Manual verification:
 9. Reload the page and confirm the selected theme is preserved.
 10. Sign in with Google and confirm the account state appears.
 11. Confirm the signed-in account gets a root node at `0,0`.
-12. Drag out from a node to create a new connected person and confirm it persists after reload.
+12. Double-click the empty board to create a new person, confirm the inspector opens, then reload and confirm the person persists.
 13. Drag a non-root person to a new position, confirm connected lines follow it, then reload and confirm the coordinates persist.
 14. Click a person near a viewport edge and confirm the board pans enough to keep the inspector visible, and that the inspector opens at a consistent size regardless of the current zoom.
 15. Start trackpad panning on the board, pass over the inspector, and confirm panning continues; then start a trackpad gesture on the inspector and confirm it does not begin board panning.
@@ -398,9 +399,9 @@ Manual verification:
 17. Type `#` inside the inspector name field, confirm the tag dropdown opens, choose a tag with ArrowUp/ArrowDown plus Enter, and verify the applied tag is removed from the saved name text.
 18. Use the tag chip or `+ add tag` ghost button to open the inspector tag dropdown, create a new tag from the same field, delete an unused tag with the `x` confirmation flow, and confirm the single selected tag persists after reload.
 19. Open the top-bar tag menu, toggle a tag color palette from its swatch, change the color, and confirm the selected person inspector still shows the chosen tag with a visible color accent after the picker closes.
-20. Create a new person, confirm the inspector opens automatically, confirm an empty person focuses the name field, then fill the note capture textarea and save a new note both with `Cmd/Ctrl + Enter` and by blurring the textarea.
+20. Create a new person with a double-click, confirm the inspector opens automatically, confirm an empty person focuses the name field, then fill the note capture textarea and save a new note both with `Cmd/Ctrl + Enter` and by blurring the textarea.
 21. Create a note by typing into the `Create new note` field, confirm saved notes start collapsed by default, expand one with the chevron, press Enter in the title to open the body, delete a note from the icon button, reload, and confirm note changes persist.
-22. Create a connection between two existing people, confirm reload preserves it, then click the widened line target and confirm `Delete connection` or Backspace removes it.
+22. Drop one person near another, confirm a small blob group appears in the stationary target person's color, then add a third person and confirm the group keeps its original color while members arrange around the center.
 23. Open the top-left Tags menu, create enough tags to overflow the panel, scroll to the lower tags, adjust a lower tag color, and confirm the palette remains reachable.
 24. Open the top-left Tags menu, create a tag, adjust its color, toggle one tag off with the visibility checkbox, and confirm both tagged nodes and their connections disappear. Use `Select all` and `Clear all` to confirm bulk visibility controls work.
 25. Open the search layer and verify that typing a person name, tag, or note text returns local matching people.

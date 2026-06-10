@@ -1671,6 +1671,13 @@ input[type='search']::-webkit-search-results-decoration {
   pointer-events: none;
 }
 
+.node-group-bubble {
+  stroke-width: 2;
+  stroke-linejoin: round;
+  pointer-events: none;
+  filter: drop-shadow(0 18px 34px rgba(0, 0, 0, 0.16));
+}
+
 .graph-edge-hit {
   fill: none;
   stroke: rgba(0, 0, 0, 0.001);
@@ -1766,8 +1773,12 @@ input[type='search']::-webkit-search-results-decoration {
   border: 0;
   background: transparent;
   transform: translate(-50%, -50%);
-  cursor: crosshair;
+  cursor: grab;
   touch-action: none;
+}
+
+.graph-node__button:active {
+  cursor: grabbing;
 }
 
 .graph-node__button::before {
