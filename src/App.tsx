@@ -75,6 +75,8 @@ type CreateMenu = {
   y: number
   screenX: number
   screenY: number
+  dragSourceId?: string
+  dragSourceType?: 'circle' | 'person'
 }
 
 type SelectedItem =
@@ -86,6 +88,7 @@ type SelectedItem =
       type: 'person'
       id: string
     }
+  | null
 
 type PanState = {
   pointerId: number
@@ -348,9 +351,46 @@ function App() {
   const [stress, setStress] = useState<StressSettings>({ count: 0, showLabels: false, showEdges: true })
   const fps = useFrameRate()
 
+  const [showSettings, setShowSettings] = useState(false)
+  const [centerBehavior, setCenterBehavior] = useState<'connect' | 'move'>('connect')
+
+  function deletePerson(personId: string) {
+    setGraph((current) => ({
+      ...current,
+      people: current.people.filter((p) => p.id !== personId),
+      connections: (current.connections || []).filter(
+        (conn) => conn.fromId !== personId && conn.toId !== personId
+      ),
+    }))
+    setSelectedItem(null)
+  }
+
   useEffect(() => {
     cameraRef.current = camera
   }, [camera])
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        const activeEl = document.activeElement
+        if (
+          activeEl &&
+          (activeEl.tagName === 'INPUT' ||
+            activeEl.tagName === 'TEXTAREA' ||
+            activeEl.getAttribute('contenteditable') === 'true')
+        ) {
+          return
+        }
+
+        if (selectedItem?.type === 'person') {
+          deletePerson(selectedItem.id)
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedItem])
 
   const circlesById = useMemo(() => new Map(graph.circles.map((circle) => [circle.id, circle])), [graph.circles])
   const stressPeople = useMemo(() => generateStressPeople(stress.count), [stress.count])
@@ -370,8 +410,8 @@ function App() {
     }
     return [...graph.circles].sort((a, b) => getDepth(a.parentId) - getDepth(b.parentId))
   }, [graph.circles, circlesById])
-  const selectedCircle = selectedItem.type === 'circle' ? circlesById.get(selectedItem.id) ?? null : null
-  const selectedPerson = selectedItem.type === 'person' ? graph.people.find((person) => person.id === selectedItem.id) ?? null : null
+  const selectedCircle = selectedItem?.type === 'circle' ? circlesById.get(selectedItem.id) ?? null : null
+  const selectedPerson = selectedItem?.type === 'person' ? graph.people.find((person) => person.id === selectedItem.id) ?? null : null
 
   useEffect(() => {
     const canvas = stressCanvasRef.current
@@ -445,6 +485,7 @@ function App() {
     if (event.button !== 0 || event.target !== event.currentTarget) return
     event.currentTarget.setPointerCapture(event.pointerId)
     setCreateMenu(null)
+    setSelectedItem(null)
     panRef.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -566,6 +607,20 @@ function App() {
             y: connector.endY,
             screenX: event.clientX,
             screenY: event.clientY,
+            dragSourceId: connector.sourceId,
+            dragSourceType: 'circle',
+          })
+        } else if (connector.sourceType === 'person') {
+          const person = graph.people.find((p) => p.id === connector.sourceId)
+          const sourceCircleId = person ? person.circleId : 'you'
+          setCreateMenu({
+            sourceCircleId,
+            x: connector.endX,
+            y: connector.endY,
+            screenX: event.clientX,
+            screenY: event.clientY,
+            dragSourceId: connector.sourceId,
+            dragSourceType: 'person',
           })
         }
       }
@@ -610,7 +665,11 @@ function App() {
   }
 
   function startCircleCenterDrag(event: ReactPointerEvent<HTMLButtonElement>, circle: CircleNode) {
-    startConnector(event, circle.id, 'circle', circle.x, circle.y)
+    if (centerBehavior === 'connect') {
+      startConnector(event, circle.id, 'circle', circle.x, circle.y)
+    } else {
+      startCircleMove(event, circle)
+    }
   }
 
   function startPersonConnection(event: ReactPointerEvent<HTMLElement>, person: PersonNode) {
@@ -683,8 +742,8 @@ function App() {
 
     const id = `person-${Date.now()}`
     const sides = Math.floor(Math.random() * 5) + 8
-    setGraph((current) =>
-      ensureContainment({
+    setGraph((current) => {
+      const nextGraph = ensureContainment({
         ...current,
         people: [
           ...current.people,
@@ -701,8 +760,22 @@ function App() {
             amplitude: 2,
           },
         ],
-      }),
-    )
+      })
+      if (createMenu.dragSourceType === 'person' && createMenu.dragSourceId) {
+        return {
+          ...nextGraph,
+          connections: [
+            ...(nextGraph.connections || []),
+            {
+              id: `conn-${Date.now()}`,
+              fromId: createMenu.dragSourceId,
+              toId: id,
+            },
+          ],
+        }
+      }
+      return nextGraph
+    })
     setSelectedItem({ type: 'person', id })
     setCreateMenu(null)
   }
@@ -715,8 +788,8 @@ function App() {
 
     const id = `circle-${Date.now()}`
     const isNested = mode === 'nested'
-    setGraph((current) =>
-      ensureContainment({
+    setGraph((current) => {
+      const nextGraph = ensureContainment({
         ...current,
         circles: [
           ...current.circles,
@@ -736,8 +809,22 @@ function App() {
             amplitude: isNested ? 4 : 8,
           },
         ],
-      }),
-    )
+      })
+      if (createMenu.dragSourceType === 'person' && createMenu.dragSourceId) {
+        return {
+          ...nextGraph,
+          connections: [
+            ...(nextGraph.connections || []),
+            {
+              id: `conn-${Date.now()}`,
+              fromId: createMenu.dragSourceId,
+              toId: id,
+            },
+          ],
+        }
+      }
+      return nextGraph
+    })
     setSelectedItem({ type: 'circle', id })
     setCreateMenu(null)
   }
@@ -774,6 +861,7 @@ function App() {
   }
 
   function renameSelected(value: string) {
+    if (!selectedItem) return
     if (selectedItem.type === 'circle') {
       setGraph((current) => ({
         ...current,
@@ -835,8 +923,81 @@ function App() {
           <button type="button" onClick={resetDemo} aria-label="Reset demo">
             <ResetIcon />
           </button>
+          <button
+            type="button"
+            onClick={() => setShowSettings(!showSettings)}
+            aria-label="Settings"
+            style={{
+              background: showSettings ? 'rgba(28, 37, 40, 0.07)' : 'transparent',
+            }}
+          >
+            <SettingsIcon />
+          </button>
         </div>
       </div>
+
+      {showSettings && (
+        <div
+          className="settings-panel"
+          style={{
+            position: 'absolute',
+            zIndex: 10,
+            top: '72px',
+            right: '16px',
+            width: '280px',
+            padding: '16px',
+            borderRadius: '12px',
+            border: '1.5px solid #c4c7c8',
+            background: '#ffffff',
+            boxShadow: 'var(--panel-shadow)',
+          }}
+        >
+          <strong style={{ fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Settings
+          </strong>
+          <div style={{ marginTop: '12px', display: 'grid', gap: '8px' }}>
+            <label style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(28, 37, 40, 0.64)' }}>
+              Circle Center Drag Behavior
+            </label>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+              <button
+                type="button"
+                onClick={() => setCenterBehavior('connect')}
+                style={{
+                  flex: 1,
+                  padding: '8px',
+                  fontSize: '12px',
+                  fontWeight: 800,
+                  borderRadius: '6px',
+                  border: '1px solid #c4c7c8',
+                  background: centerBehavior === 'connect' ? '#1c2528' : '#ffffff',
+                  color: centerBehavior === 'connect' ? '#ffffff' : '#1c2528',
+                  cursor: 'pointer',
+                }}
+              >
+                Draw Connection
+              </button>
+              <button
+                type="button"
+                onClick={() => setCenterBehavior('move')}
+                style={{
+                  flex: 1,
+                  padding: '8px',
+                  fontSize: '12px',
+                  fontWeight: 800,
+                  borderRadius: '6px',
+                  border: '1px solid #c4c7c8',
+                  background: centerBehavior === 'move' ? '#1c2528' : '#ffffff',
+                  color: centerBehavior === 'move' ? '#ffffff' : '#1c2528',
+                  cursor: 'pointer',
+                }}
+              >
+                Move Circle
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <section className="stress-panel" aria-label="Icon stress test controls">
         <div className="stress-panel__header">
@@ -930,8 +1091,8 @@ function App() {
                     circle.amplitude ?? Math.max(4, circle.radius * 0.06)
                   )}
                   fill={MATERIAL_TONES[circle.tone].fill}
-                  stroke={selectedItem.type === 'circle' && selectedItem.id === circle.id ? MATERIAL_TONES[circle.tone].border : 'none'}
-                  strokeWidth={selectedItem.type === 'circle' && selectedItem.id === circle.id ? 3.5 : 0}
+                  stroke={selectedItem?.type === 'circle' && selectedItem?.id === circle.id ? MATERIAL_TONES[circle.tone].border : 'none'}
+                  strokeWidth={selectedItem?.type === 'circle' && selectedItem?.id === circle.id ? 3.5 : 0}
                   filter="drop-shadow(0px 8px 16px rgba(0,0,0,0.06))"
                 />
               </svg>
@@ -972,7 +1133,7 @@ function App() {
           {sortedCircles.map((circle) => (
             <section
               key={circle.id}
-              className={`circle circle--${circle.tone} ${selectedItem.type === 'circle' && selectedItem.id === circle.id ? 'is-selected' : ''}`}
+              className={`circle circle--${circle.tone} ${selectedItem?.type === 'circle' && selectedItem?.id === circle.id ? 'is-selected' : ''}`}
               style={{
                 width: circle.radius * 2,
                 height: circle.radius * 2,
@@ -997,7 +1158,7 @@ function App() {
               >
                 <button
                   type="button"
-                  className={`circle-center ${selectedItem.type === 'circle' && selectedItem.id === circle.id ? 'is-selected' : ''}`}
+                  className={`circle-center ${selectedItem?.type === 'circle' && selectedItem?.id === circle.id ? 'is-selected' : ''}`}
                   style={{
                     position: 'absolute',
                     inset: 0,
@@ -1008,7 +1169,7 @@ function App() {
                     borderRadius: '50%',
                     display: 'grid',
                     placeItems: 'center',
-                    cursor: 'crosshair',
+                    cursor: centerBehavior === 'connect' ? 'crosshair' : 'grab',
                     padding: 0,
                     outline: 'none',
                     pointerEvents: 'auto',
@@ -1043,7 +1204,7 @@ function App() {
                   )}
                 </button>
 
-                {selectedItem.type === 'circle' && selectedItem.id === circle.id && (
+                {selectedItem?.type === 'circle' && selectedItem?.id === circle.id && (
                   <>
                     {/* Top dot */}
                     <div
@@ -1129,7 +1290,7 @@ function App() {
 
           {/* PASS 4: People Icons and Labels */}
           {graph.people.map((person) => {
-            const isSelected = selectedItem.type === 'person' && selectedItem.id === person.id;
+            const isSelected = selectedItem?.type === 'person' && selectedItem?.id === person.id;
             return (
               <div
                 key={person.id}
@@ -1340,162 +1501,179 @@ function App() {
       ) : null}
 
       <aside className="inspector" aria-label="Selection details" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 120px)' }}>
-        <span className="inspector__eyebrow">{selectedItem.type === 'circle' ? 'Circle center' : 'Person'}</span>
-        <input
-          value={selectedCircle?.name ?? selectedPerson?.name ?? ''}
-          onChange={(event) => renameSelected(event.target.value)}
-          aria-label="Selected item name"
-        />
-        {selectedCircle ? (
+        {selectedItem ? (
           <>
-            <dl>
-              <div>
-                <dt>People</dt>
-                <dd>{graph.people.filter((person) => person.circleId === selectedCircle.id).length}</dd>
-              </div>
-              <div>
-                <dt>Nested circles</dt>
-                <dd>{graph.circles.filter((circle) => circle.parentId === selectedCircle.id).length}</dd>
-              </div>
-              <div>
-                <dt>Tone</dt>
-                <dd>{TONE_LABELS[selectedCircle.tone]}</dd>
-              </div>
-              <div>
-                <dt>Radius</dt>
-                <dd>{Math.round(selectedCircle.radius)} px</dd>
-              </div>
-            </dl>
-
-            <div className="inspector-field">
-              <label>Shape Type</label>
-              <select
-                value={selectedCircle.shapeType ?? 'wavy'}
-                onChange={(e) => updateCircleStyle(selectedCircle.id, { shapeType: e.target.value as ShapeType })}
-              >
-                <option value="wavy">Wavy (Flower)</option>
-                <option value="polygon">Soft Polygon</option>
-                <option value="circle">Circle</option>
-              </select>
-            </div>
-            
-            {(selectedCircle.shapeType ?? 'wavy') !== 'circle' && (
+            <span className="inspector__eyebrow">{selectedItem.type === 'circle' ? 'Circle center' : 'Person'}</span>
+            <input
+              value={selectedCircle?.name ?? selectedPerson?.name ?? ''}
+              onChange={(event) => renameSelected(event.target.value)}
+              aria-label="Selected item name"
+            />
+            {selectedCircle && (
               <>
+                <dl>
+                  <div>
+                    <dt>People</dt>
+                    <dd>{graph.people.filter((person) => person.circleId === selectedCircle.id).length}</dd>
+                  </div>
+                  <div>
+                    <dt>Nested circles</dt>
+                    <dd>{graph.circles.filter((circle) => circle.parentId === selectedCircle.id).length}</dd>
+                  </div>
+                  <div>
+                    <dt>Tone</dt>
+                    <dd>{TONE_LABELS[selectedCircle.tone]}</dd>
+                  </div>
+                  <div>
+                    <dt>Radius</dt>
+                    <dd>{Math.round(selectedCircle.radius)} px</dd>
+                  </div>
+                </dl>
+
                 <div className="inspector-field">
-                  <label>Sides / Petals ({selectedCircle.sides ?? 8})</label>
+                  <label>Shape Type</label>
+                  <select
+                    value={selectedCircle.shapeType ?? 'wavy'}
+                    onChange={(e) => updateCircleStyle(selectedCircle.id, { shapeType: e.target.value as ShapeType })}
+                  >
+                    <option value="wavy">Wavy (Flower)</option>
+                    <option value="polygon">Soft Polygon</option>
+                    <option value="circle">Circle</option>
+                  </select>
+                </div>
+                
+                {(selectedCircle.shapeType ?? 'wavy') !== 'circle' && (
+                  <>
+                    <div className="inspector-field">
+                      <label>Sides / Petals ({selectedCircle.sides ?? 8})</label>
+                      <input
+                        type="range"
+                        min="3"
+                        max="60"
+                        value={selectedCircle.sides ?? 8}
+                        onChange={(e) => updateCircleStyle(selectedCircle.id, { sides: parseInt(e.target.value) })}
+                      />
+                    </div>
+                    <div className="inspector-field">
+                      <label>Amplitude / Rounding ({selectedCircle.amplitude ?? 5})</label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="50"
+                        value={selectedCircle.amplitude ?? 5}
+                        onChange={(e) => updateCircleStyle(selectedCircle.id, { amplitude: parseFloat(e.target.value) })}
+                      />
+                    </div>
+                  </>
+                )}
+
+                <div className="inspector-field">
+                  <label>Center Image URL</label>
                   <input
-                    type="range"
-                    min="3"
-                    max="60"
-                    value={selectedCircle.sides ?? 8}
-                    onChange={(e) => updateCircleStyle(selectedCircle.id, { sides: parseInt(e.target.value) })}
+                    type="text"
+                    placeholder="https://example.com/image.jpg"
+                    value={selectedCircle.imageUrl ?? ''}
+                    onChange={(e) => updateCircleStyle(selectedCircle.id, { imageUrl: e.target.value })}
                   />
                 </div>
                 <div className="inspector-field">
-                  <label>Amplitude / Rounding ({selectedCircle.amplitude ?? 5})</label>
+                  <label>Upload Photo</label>
                   <input
-                    type="range"
-                    min="0"
-                    max="50"
-                    value={selectedCircle.amplitude ?? 5}
-                    onChange={(e) => updateCircleStyle(selectedCircle.id, { amplitude: parseFloat(e.target.value) })}
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleImageUpload(e, (base64) => updateCircleStyle(selectedCircle.id, { imageUrl: base64 }))}
                   />
                 </div>
+
+                <button type="button" className="primary-action" onClick={addDemoCluster} style={{ marginTop: '8px' }}>
+                  Add 3 demo people
+                </button>
               </>
             )}
-
-            <div className="inspector-field">
-              <label>Center Image URL</label>
-              <input
-                type="text"
-                placeholder="https://example.com/image.jpg"
-                value={selectedCircle.imageUrl ?? ''}
-                onChange={(e) => updateCircleStyle(selectedCircle.id, { imageUrl: e.target.value })}
-              />
-            </div>
-            <div className="inspector-field">
-              <label>Upload Photo</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => handleImageUpload(e, (base64) => updateCircleStyle(selectedCircle.id, { imageUrl: base64 }))}
-              />
-            </div>
-
-            <button type="button" className="primary-action" onClick={addDemoCluster} style={{ marginTop: '8px' }}>
-              Add 3 demo people
-            </button>
-          </>
-        ) : null}
-        {selectedPerson ? (
-          <>
-            <dl>
-              <div>
-                <dt>Role</dt>
-                <dd>{selectedPerson.role}</dd>
-              </div>
-              <div>
-                <dt>Circle</dt>
-                <dd>{circlesById.get(selectedPerson.circleId)?.name}</dd>
-              </div>
-            </dl>
-
-            <div className="inspector-field">
-              <label>Shape Type</label>
-              <select
-                value={selectedPerson.shapeType ?? 'polygon'}
-                onChange={(e) => updatePersonStyle(selectedPerson.id, { shapeType: e.target.value as ShapeType })}
-              >
-                <option value="polygon">Soft Polygon</option>
-                <option value="wavy">Wavy (Flower)</option>
-                <option value="circle">Circle</option>
-              </select>
-            </div>
-            
-            {(selectedPerson.shapeType ?? 'polygon') !== 'circle' && (
+            {selectedPerson && (
               <>
+                <dl>
+                  <div>
+                    <dt>Role</dt>
+                    <dd>{selectedPerson.role}</dd>
+                  </div>
+                  <div>
+                    <dt>Circle</dt>
+                    <dd>{circlesById.get(selectedPerson.circleId)?.name}</dd>
+                  </div>
+                </dl>
+
                 <div className="inspector-field">
-                  <label>Sides / Petals ({selectedPerson.sides ?? 8})</label>
+                  <label>Shape Type</label>
+                  <select
+                    value={selectedPerson.shapeType ?? 'polygon'}
+                    onChange={(e) => updatePersonStyle(selectedPerson.id, { shapeType: e.target.value as ShapeType })}
+                  >
+                    <option value="polygon">Soft Polygon</option>
+                    <option value="wavy">Wavy (Flower)</option>
+                    <option value="circle">Circle</option>
+                  </select>
+                </div>
+                
+                {(selectedPerson.shapeType ?? 'polygon') !== 'circle' && (
+                  <>
+                    <div className="inspector-field">
+                      <label>Sides / Petals ({selectedPerson.sides ?? 8})</label>
+                      <input
+                        type="range"
+                        min="3"
+                        max="20"
+                        value={selectedPerson.sides ?? 8}
+                        onChange={(e) => updatePersonStyle(selectedPerson.id, { sides: parseInt(e.target.value) })}
+                      />
+                    </div>
+                    <div className="inspector-field">
+                      <label>Amplitude / Rounding ({selectedPerson.amplitude ?? 2})</label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="20"
+                        value={selectedPerson.amplitude ?? 2}
+                        onChange={(e) => updatePersonStyle(selectedPerson.id, { amplitude: parseFloat(e.target.value) })}
+                      />
+                    </div>
+                  </>
+                )}
+
+                <div className="inspector-field">
+                  <label>Photo Image URL</label>
                   <input
-                    type="range"
-                    min="3"
-                    max="20"
-                    value={selectedPerson.sides ?? 8}
-                    onChange={(e) => updatePersonStyle(selectedPerson.id, { sides: parseInt(e.target.value) })}
+                    type="text"
+                    placeholder="https://example.com/image.jpg"
+                    value={selectedPerson.imageUrl ?? ''}
+                    onChange={(e) => updatePersonStyle(selectedPerson.id, { imageUrl: e.target.value })}
                   />
                 </div>
                 <div className="inspector-field">
-                  <label>Amplitude / Rounding ({selectedPerson.amplitude ?? 2})</label>
+                  <label>Upload Photo</label>
                   <input
-                    type="range"
-                    min="0"
-                    max="20"
-                    value={selectedPerson.amplitude ?? 2}
-                    onChange={(e) => updatePersonStyle(selectedPerson.id, { amplitude: parseFloat(e.target.value) })}
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleImageUpload(e, (base64) => updatePersonStyle(selectedPerson.id, { imageUrl: base64 }))}
                   />
                 </div>
+
+                <button
+                  type="button"
+                  className="primary-action"
+                  style={{ marginTop: '16px', background: '#dc2626' }}
+                  onClick={() => deletePerson(selectedPerson.id)}
+                >
+                  Delete Person
+                </button>
               </>
             )}
-
-            <div className="inspector-field">
-              <label>Photo Image URL</label>
-              <input
-                type="text"
-                placeholder="https://example.com/image.jpg"
-                value={selectedPerson.imageUrl ?? ''}
-                onChange={(e) => updatePersonStyle(selectedPerson.id, { imageUrl: e.target.value })}
-              />
-            </div>
-            <div className="inspector-field">
-              <label>Upload Photo</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => handleImageUpload(e, (base64) => updatePersonStyle(selectedPerson.id, { imageUrl: base64 }))}
-              />
-            </div>
           </>
-        ) : null}
+        ) : (
+          <div style={{ display: 'grid', placeItems: 'center', height: '100px', color: 'rgba(28, 37, 40, 0.52)' }}>
+            <span style={{ fontSize: '13px', fontWeight: 650 }}>Select an item to view details</span>
+          </div>
+        )}
         <p style={{ marginTop: '14px' }}>Drag objects directly. Right-click a circle for creation actions. Parent circles auto-fit as contained objects move.</p>
       </aside>
     </main>
@@ -1900,6 +2078,15 @@ function CircleIcon() {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="12" cy="12" r="8" />
       <path d="M4 12h16" />
+    </svg>
+  )
+}
+
+function SettingsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z" />
+      <circle cx="12" cy="12" r="3" />
     </svg>
   )
 }
