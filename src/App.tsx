@@ -1469,24 +1469,21 @@ function App() {
     }
 
     const timestamp = new Date().toISOString()
-    let updatedPerson: PersonNode | null = null
-    setLocalPeople((currentPeople) =>
-      currentPeople.map((person) => {
-        if (person.id !== input.id) return person
+    const existingPerson = localPeople.find((person) => person.id === input.id)
+    if (!existingPerson) throw new Error('Person was not found.')
 
-        updatedPerson = {
-          ...person,
-          ...(input.name !== undefined ? { name: input.name } : {}),
-          ...(input.tag_id !== undefined ? { tag_id: input.tag_id } : {}),
-          updated_at: timestamp,
-        }
-        return updatedPerson
-      }),
+    const updatedPerson = {
+      ...existingPerson,
+      ...(input.name !== undefined ? { name: input.name } : {}),
+      ...(input.tag_id !== undefined ? { tag_id: input.tag_id } : {}),
+      updated_at: timestamp,
+    }
+    setLocalPeople((currentPeople) =>
+      currentPeople.map((person) => (person.id === input.id ? updatedPerson : person)),
     )
 
-    if (!updatedPerson) throw new Error('Person was not found.')
     return updatedPerson
-  }, [isRemoteGraphReady, updateRemotePerson])
+  }, [isRemoteGraphReady, localPeople, updateRemotePerson])
 
   const movePerson = useCallback(async (id: string, x: number, y: number) => {
     if (isRemoteGraphReady) {
@@ -1494,24 +1491,21 @@ function App() {
     }
 
     const timestamp = new Date().toISOString()
-    let updatedPerson: PersonNode | null = null
-    setLocalPeople((currentPeople) =>
-      currentPeople.map((person) => {
-        if (person.id !== id || person.is_root) return person
+    const existingPerson = localPeople.find((person) => person.id === id && !person.is_root)
+    if (!existingPerson) throw new Error('Person was not found.')
 
-        updatedPerson = {
-          ...person,
-          x,
-          y,
-          updated_at: timestamp,
-        }
-        return updatedPerson
-      }),
+    const updatedPerson = {
+      ...existingPerson,
+      x,
+      y,
+      updated_at: timestamp,
+    }
+    setLocalPeople((currentPeople) =>
+      currentPeople.map((person) => (person.id === id && !person.is_root ? updatedPerson : person)),
     )
 
-    if (!updatedPerson) throw new Error('Person was not found.')
     return updatedPerson
-  }, [isRemoteGraphReady, moveRemotePerson])
+  }, [isRemoteGraphReady, localPeople, moveRemotePerson])
 
   const deletePerson = useCallback(async (id: string) => {
     if (isRemoteGraphReady) {

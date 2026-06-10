@@ -30,7 +30,7 @@ Users should be able to open the page and immediately:
 
 ## Visual Goal
 
-The dark theme should feel deep, green-black, and slightly futuristic, similar to the provided reference.
+The dark theme should feel deep, blue-black, and slightly futuristic, similar to the provided reference.
 
 The light theme should keep the same product identity while becoming brighter, cleaner, and easier to use in daylight conditions.
 

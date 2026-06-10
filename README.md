@@ -39,7 +39,7 @@ A persisted social graph board built with React, Vite, and TypeScript.
 - Opening the inspector pans the board enough to keep it visible and opens it at a consistent size before later zoom changes affect it
 - Click the widened connection-line target to delete it from the inline menu or with Backspace
 - Drag a person to move them with their connected lines
-- Dark green-black theme inspired by the provided reference
+- Dark blue-black theme inspired by the provided reference
 - Light theme designed to match the same visual language
 - High-contrast point grid across the board
 

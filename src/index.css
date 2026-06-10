@@ -144,56 +144,56 @@ input[type='search']::-webkit-search-results-decoration {
 }
 
 .theme-dark {
-  --app-bg: #020806;
-  --text-strong: #e7faf1;
-  --toggle-bg: rgba(7, 28, 20, 0.82);
-  --toggle-border: rgba(64, 191, 148, 0.38);
-  --toggle-thumb: linear-gradient(135deg, #8affd6 0%, #39c795 100%);
-  --toggle-label: #dff9ef;
-  --panel-bg: rgba(7, 28, 20, 0.82);
-  --panel-border: rgba(64, 191, 148, 0.34);
-  --panel-text: #e7faf1;
-  --panel-muted: rgba(223, 249, 239, 0.72);
+  --app-bg: #02060b;
+  --text-strong: #e7f2ff;
+  --toggle-bg: rgba(7, 18, 34, 0.82);
+  --toggle-border: rgba(64, 142, 218, 0.38);
+  --toggle-thumb: linear-gradient(135deg, #8ac7ff 0%, #397fc7 100%);
+  --toggle-label: #dfefff;
+  --panel-bg: rgba(7, 18, 34, 0.82);
+  --panel-border: rgba(64, 142, 218, 0.34);
+  --panel-text: #e7f2ff;
+  --panel-muted: rgba(223, 239, 255, 0.72);
   --panel-error: #ffb6a8;
-  --button-bg: rgba(138, 255, 214, 0.16);
-  --button-border: rgba(138, 255, 214, 0.34);
-  --grid-dot: rgba(94, 226, 180, 0.14);
-  --grid-dot-major: rgba(115, 255, 201, 0.3);
-  --grid-dot-hover: rgba(119, 255, 209, 0.92);
-  --grid-dot-major-hover: rgba(226, 255, 244, 0.98);
-  --grid-glow-a: rgba(12, 67, 46, 0.22);
-  --grid-glow-b: rgba(10, 24, 18, 0);
+  --button-bg: rgba(138, 199, 255, 0.16);
+  --button-border: rgba(138, 199, 255, 0.34);
+  --grid-dot: rgba(94, 157, 226, 0.14);
+  --grid-dot-major: rgba(115, 186, 255, 0.3);
+  --grid-dot-hover: rgba(119, 190, 255, 0.92);
+  --grid-dot-major-hover: rgba(226, 242, 255, 0.98);
+  --grid-glow-a: rgba(12, 40, 75, 0.22);
+  --grid-glow-b: rgba(10, 17, 28, 0);
   background:
-    radial-gradient(circle at top left, rgba(28, 85, 63, 0.22), transparent 34%),
-    radial-gradient(circle at right center, rgba(120, 104, 27, 0.08), transparent 26%),
+    radial-gradient(circle at top left, rgba(28, 55, 95, 0.22), transparent 34%),
+    radial-gradient(circle at right center, rgba(38, 75, 140, 0.08), transparent 26%),
     var(--app-bg);
   color: var(--text-strong);
 }
 
 .theme-light {
-  --app-bg: #f7f6ef;
-  --text-strong: #163427;
+  --app-bg: #f3f7fc;
+  --text-strong: #162a42;
   --toggle-bg: rgba(255, 251, 244, 0.92);
-  --toggle-border: rgba(48, 109, 84, 0.18);
-  --toggle-thumb: linear-gradient(135deg, #a8e2bf 0%, #62bf91 100%);
-  --toggle-label: #1f5a43;
+  --toggle-border: rgba(48, 83, 126, 0.18);
+  --toggle-thumb: linear-gradient(135deg, #a8d2ff 0%, #629bbf 100%);
+  --toggle-label: #1f4568;
   --panel-bg: rgba(255, 252, 247, 0.9);
-  --panel-border: rgba(48, 109, 84, 0.16);
-  --panel-text: #163427;
-  --panel-muted: rgba(31, 90, 67, 0.68);
+  --panel-border: rgba(48, 83, 126, 0.16);
+  --panel-text: #162a42;
+  --panel-muted: rgba(31, 69, 104, 0.68);
   --panel-error: #9d2f22;
-  --button-bg: rgba(137, 212, 170, 0.14);
-  --button-border: rgba(48, 109, 84, 0.18);
-  --grid-dot: rgba(36, 92, 68, 0.1);
-  --grid-dot-major: rgba(43, 112, 84, 0.2);
-  --grid-dot-hover: rgba(29, 145, 102, 0.66);
-  --grid-dot-major-hover: rgba(20, 102, 71, 0.82);
-  --grid-glow-a: rgba(133, 211, 172, 0.16);
-  --grid-glow-b: rgba(255, 247, 235, 0);
+  --button-bg: rgba(137, 180, 212, 0.14);
+  --button-border: rgba(48, 83, 126, 0.18);
+  --grid-dot: rgba(36, 68, 104, 0.1);
+  --grid-dot-major: rgba(43, 83, 128, 0.2);
+  --grid-dot-hover: rgba(29, 94, 160, 0.66);
+  --grid-dot-major-hover: rgba(20, 77, 132, 0.82);
+  --grid-glow-a: rgba(133, 178, 223, 0.16);
+  --grid-glow-b: rgba(242, 248, 255, 0);
   background:
-    radial-gradient(circle at top left, rgba(158, 223, 186, 0.34), transparent 34%),
-    radial-gradient(circle at right center, rgba(255, 225, 188, 0.26), transparent 28%),
-    radial-gradient(circle at 50% 100%, rgba(255, 244, 213, 0.3), transparent 30%),
+    radial-gradient(circle at top left, rgba(158, 201, 244, 0.34), transparent 34%),
+    radial-gradient(circle at right center, rgba(188, 217, 255, 0.26), transparent 28%),
+    radial-gradient(circle at 50% 100%, rgba(213, 233, 255, 0.3), transparent 30%),
     var(--app-bg);
   color: var(--text-strong);
 }
