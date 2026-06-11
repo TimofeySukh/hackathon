@@ -236,9 +236,9 @@ const DEFAULT_STATE: GraphState = {
       y: -54,
       circleId: 'you',
       avatar: 'MI',
-      shapeType: 'polygon',
+      shapeType: 'wavy',
       sides: 8,
-      amplitude: 2,
+      amplitude: 1,
       notes: [
         { id: 'note-1', title: 'Gift ideas', body: 'Likes sci-fi books and matcha latte' },
         { id: 'note-2', title: 'Meeting notes', body: 'Sync up next Tuesday about project timeline' }
@@ -252,27 +252,27 @@ const DEFAULT_STATE: GraphState = {
       y: -6,
       circleId: 'you',
       avatar: 'NO',
-      shapeType: 'polygon',
+      shapeType: 'wavy',
       sides: 10,
-      amplitude: 2,
+      amplitude: 1,
       notes: [
         { id: 'note-3', title: 'Joint project', body: 'Wants to co-host a demo next month' }
       ]
     },
-    { id: 'p3', name: 'Ava', role: 'Design', x: 34, y: 67, circleId: 'you', avatar: 'AV', shapeType: 'polygon', sides: 11, amplitude: 2 },
-    { id: 'p4', name: 'Sofia', role: 'Portugal', x: 168, y: -472, circleId: 'eu-network', avatar: 'SO', shapeType: 'polygon', sides: 9, amplitude: 2 },
-    { id: 'p5', name: 'Lucas', role: 'Germany', x: 28, y: -610, circleId: 'eu-network', avatar: 'LU', shapeType: 'polygon', sides: 12, amplitude: 2 },
-    { id: 'p6', name: 'Emma', role: 'Finland', x: -112, y: -416, circleId: 'eu-network', avatar: 'EM', shapeType: 'polygon', sides: 8, amplitude: 2 },
-    { id: 'p7', name: 'Oscar', role: 'Denmark', x: 106, y: -302, circleId: 'eu-network', avatar: 'OC', shapeType: 'polygon', sides: 10, amplitude: 2 },
-    { id: 'p8', name: 'Olivia', role: 'Brand', x: -166, y: 335, circleId: 'pandora', avatar: 'OL', shapeType: 'polygon', sides: 11, amplitude: 2 },
-    { id: 'p9', name: 'Victor', role: 'Retail', x: 154, y: 360, circleId: 'pandora', avatar: 'VI', shapeType: 'polygon', sides: 9, amplitude: 2 },
-    { id: 'p10', name: 'Freja', role: 'Operations', x: -190, y: 575, circleId: 'pandora', avatar: 'FR', shapeType: 'polygon', sides: 12, amplitude: 2 },
-    { id: 'p11', name: 'Anton', role: 'PM', x: -92, y: 575, circleId: 'product-team', avatar: 'AN', shapeType: 'polygon', sides: 8, amplitude: 2 },
-    { id: 'p12', name: 'Nora', role: 'UX', x: -20, y: 591, circleId: 'product-team', avatar: 'NR', shapeType: 'polygon', sides: 10, amplitude: 2 },
-    { id: 'p13', name: 'Eli', role: 'Engineering', x: 50, y: 575, circleId: 'product-team', avatar: 'EL', shapeType: 'polygon', sides: 11, amplitude: 2 },
-    { id: 'p14', name: 'Karim', role: 'Investor', x: 645, y: -15, circleId: 'market', avatar: 'KA', shapeType: 'polygon', sides: 9, amplitude: 2 },
-    { id: 'p15', name: 'Lina', role: 'Media', x: 423, y: 4, circleId: 'market', avatar: 'LI', shapeType: 'polygon', sides: 12, amplitude: 2 },
-    { id: 'p16', name: 'Yara', role: 'Analyst', x: 580, y: 198, circleId: 'market', avatar: 'YA', shapeType: 'polygon', sides: 8, amplitude: 2 },
+    { id: 'p3', name: 'Ava', role: 'Design', x: 34, y: 67, circleId: 'you', avatar: 'AV', shapeType: 'wavy', sides: 11, amplitude: 1 },
+    { id: 'p4', name: 'Sofia', role: 'Portugal', x: 168, y: -472, circleId: 'eu-network', avatar: 'SO', shapeType: 'wavy', sides: 9, amplitude: 1 },
+    { id: 'p5', name: 'Lucas', role: 'Germany', x: 28, y: -610, circleId: 'eu-network', avatar: 'LU', shapeType: 'wavy', sides: 12, amplitude: 1 },
+    { id: 'p6', name: 'Emma', role: 'Finland', x: -112, y: -416, circleId: 'eu-network', avatar: 'EM', shapeType: 'wavy', sides: 8, amplitude: 1 },
+    { id: 'p7', name: 'Oscar', role: 'Denmark', x: 106, y: -302, circleId: 'eu-network', avatar: 'OC', shapeType: 'wavy', sides: 10, amplitude: 1 },
+    { id: 'p8', name: 'Olivia', role: 'Brand', x: -166, y: 335, circleId: 'pandora', avatar: 'OL', shapeType: 'wavy', sides: 11, amplitude: 1 },
+    { id: 'p9', name: 'Victor', role: 'Retail', x: 154, y: 360, circleId: 'pandora', avatar: 'VI', shapeType: 'wavy', sides: 9, amplitude: 1 },
+    { id: 'p10', name: 'Freja', role: 'Operations', x: -190, y: 575, circleId: 'pandora', avatar: 'FR', shapeType: 'wavy', sides: 12, amplitude: 1 },
+    { id: 'p11', name: 'Anton', role: 'PM', x: -92, y: 575, circleId: 'product-team', avatar: 'AN', shapeType: 'wavy', sides: 8, amplitude: 1 },
+    { id: 'p12', name: 'Nora', role: 'UX', x: -20, y: 591, circleId: 'product-team', avatar: 'NR', shapeType: 'wavy', sides: 10, amplitude: 1 },
+    { id: 'p13', name: 'Eli', role: 'Engineering', x: 50, y: 575, circleId: 'product-team', avatar: 'EL', shapeType: 'wavy', sides: 11, amplitude: 1 },
+    { id: 'p14', name: 'Karim', role: 'Investor', x: 645, y: -15, circleId: 'market', avatar: 'KA', shapeType: 'wavy', sides: 9, amplitude: 1 },
+    { id: 'p15', name: 'Lina', role: 'Media', x: 423, y: 4, circleId: 'market', avatar: 'LI', shapeType: 'wavy', sides: 12, amplitude: 1 },
+    { id: 'p16', name: 'Yara', role: 'Analyst', x: 580, y: 198, circleId: 'market', avatar: 'YA', shapeType: 'wavy', sides: 8, amplitude: 1 },
   ],
   connections: [],
 }
@@ -293,11 +293,28 @@ function getNodePath(
   sides: number,
   amplitude: number
 ) {
-  if (shapeType === 'circle' || amplitude === 0) {
+  if (shapeType === 'circle' || (shapeType === 'wavy' && amplitude === 0)) {
     let path = ''
     const points = Math.max(120, Math.round(r * 2))
     for (let i = 0; i <= points; i++) {
       const angle = (i * 2 * Math.PI) / points
+      const x = cx + r * Math.cos(angle)
+      const y = cy + r * Math.sin(angle)
+      if (i === 0) {
+        path += `M ${x.toFixed(2)} ${y.toFixed(2)}`
+      } else {
+        path += ` L ${x.toFixed(2)} ${y.toFixed(2)}`
+      }
+    }
+    path += ' Z'
+    return path
+  }
+
+  if (shapeType === 'polygon' && amplitude === 0) {
+    let path = ''
+    const angleStep = (2 * Math.PI) / sides
+    for (let i = 0; i < sides; i++) {
+      const angle = i * angleStep - Math.PI / 2
       const x = cx + r * Math.cos(angle)
       const y = cy + r * Math.sin(angle)
       if (i === 0) {
@@ -1121,9 +1138,9 @@ function App() {
             y: createMenu.y,
             circleId: source.id,
             avatar: makeAvatar(current.people.length + 1),
-            shapeType: 'polygon',
+            shapeType: 'wavy',
             sides,
-            amplitude: 2,
+            amplitude: 1,
           },
         ],
       })
@@ -1210,9 +1227,9 @@ function App() {
         y: source.y + source.radius * 0.42 + index * 18,
         circleId: source.id,
         avatar: makeAvatar(nextIndex + index),
-        shapeType: 'polygon' as ShapeType,
+        shapeType: 'wavy' as ShapeType,
         sides,
-        amplitude: 2,
+        amplitude: 1,
       }
     })
     setGraph((current) => ensureContainment({ ...current, people: [...current.people, ...points] }))
@@ -1308,18 +1325,6 @@ function App() {
         <div
           ref={settingsPanelRef}
           className="settings-panel"
-          style={{
-            position: 'absolute',
-            zIndex: 10,
-            top: '72px',
-            right: '16px',
-            width: '280px',
-            padding: '16px',
-            borderRadius: 'var(--md-r-md)',
-            border: 'none',
-            background: 'var(--md-surface-container)',
-            boxShadow: 'var(--md-elev-2)',
-          }}
         >
           <strong style={{ fontSize: '16px', fontWeight: 500, color: 'var(--md-on-surface)' }}>
             Settings
@@ -1819,21 +1824,21 @@ function App() {
                   <svg viewBox="0 0 40 40" style={{ width: 40, height: 40, overflow: 'visible' }}>
                     <defs>
                       <clipPath id={`clip-${person.id}`}>
-                        <path d={getNodePath(20, 20, 18, person.shapeType ?? 'polygon', person.sides ?? 8, person.amplitude ?? 2)} />
+                        <path d={getNodePath(20, 20, 18, person.shapeType ?? 'wavy', person.sides ?? 8, person.amplitude ?? 1)} />
                       </clipPath>
                     </defs>
                     {person.imageUrl ? (
                       <g>
                         {/* Outer stroke path (drawn first) at double width */}
                         <path
-                          d={getNodePath(20, 20, 18, person.shapeType ?? 'polygon', person.sides ?? 8, person.amplitude ?? 2)}
+                          d={getNodePath(20, 20, 18, person.shapeType ?? 'wavy', person.sides ?? 8, person.amplitude ?? 1)}
                           fill="none"
                           stroke={strokeColor}
                           strokeWidth={strokeWidth * 2}
                         />
                         {/* Background cover */}
                         <path
-                          d={getNodePath(20, 20, 18, person.shapeType ?? 'polygon', person.sides ?? 8, person.amplitude ?? 2)}
+                          d={getNodePath(20, 20, 18, person.shapeType ?? 'wavy', person.sides ?? 8, person.amplitude ?? 1)}
                           fill={personColor}
                         />
                         <image
@@ -1850,14 +1855,14 @@ function App() {
                       <g>
                         {/* Outer stroke path (drawn first) at double width */}
                         <path
-                          d={getNodePath(20, 20, 18, person.shapeType ?? 'polygon', person.sides ?? 8, person.amplitude ?? 2)}
+                          d={getNodePath(20, 20, 18, person.shapeType ?? 'wavy', person.sides ?? 8, person.amplitude ?? 1)}
                           fill="none"
                           stroke={strokeColor}
                           strokeWidth={strokeWidth * 2}
                         />
                         {/* Background cover */}
                         <path
-                          d={getNodePath(20, 20, 18, person.shapeType ?? 'polygon', person.sides ?? 8, person.amplitude ?? 2)}
+                          d={getNodePath(20, 20, 18, person.shapeType ?? 'wavy', person.sides ?? 8, person.amplitude ?? 1)}
                           fill={personColor}
                         />
                         <text
@@ -2133,15 +2138,42 @@ function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px' }}>
                   <div className="inspector-field">
                     <label>Shape Type</label>
-                    <div className="m3-select-wrapper">
-                      <select
-                        value={selectedCircle.shapeType ?? 'wavy'}
-                        onChange={(e) => updateCircleStyle(selectedCircle.id, { shapeType: e.target.value as ShapeType })}
+                    <div className="m3-segmented-button">
+                      <button
+                        type="button"
+                        className={`m3-segmented-button-item ${(!selectedCircle.shapeType || selectedCircle.shapeType === 'wavy') ? 'is-selected' : ''}`}
+                        onClick={() => {
+                          const updates: Partial<CircleNode> = { shapeType: 'wavy' }
+                          if ((selectedCircle.amplitude ?? 5) > 50) {
+                            updates.amplitude = 15
+                          }
+                          updateCircleStyle(selectedCircle.id, updates)
+                        }}
                       >
-                        <option value="wavy">Wavy (Flower)</option>
-                        <option value="polygon">Soft Polygon</option>
-                        <option value="circle">Circle</option>
-                      </select>
+                        Wavy
+                      </button>
+                      <button
+                        type="button"
+                        className={`m3-segmented-button-item ${selectedCircle.shapeType === 'polygon' ? 'is-selected' : ''}`}
+                        onClick={() => {
+                          const updates: Partial<CircleNode> = { shapeType: 'polygon' }
+                          if ((selectedCircle.amplitude ?? 5) > 20) {
+                            updates.amplitude = 8
+                          }
+                          updateCircleStyle(selectedCircle.id, updates)
+                        }}
+                      >
+                        Polygon
+                      </button>
+                      <button
+                        type="button"
+                        className={`m3-segmented-button-item ${selectedCircle.shapeType === 'circle' ? 'is-selected' : ''}`}
+                        onClick={() => {
+                          updateCircleStyle(selectedCircle.id, { shapeType: 'circle' })
+                        }}
+                      >
+                        Circle
+                      </button>
                     </div>
                   </div>
                   
@@ -2158,11 +2190,11 @@ function App() {
                         />
                       </div>
                       <div className="inspector-field">
-                        <label>Amplitude / Rounding ({selectedCircle.amplitude ?? 5})</label>
+                        <label>{selectedCircle.shapeType === 'polygon' ? 'Rounding' : 'Amplitude'} ({selectedCircle.amplitude ?? 5})</label>
                         <input
                           type="range"
                           min="0"
-                          max="50"
+                          max={selectedCircle.shapeType === 'polygon' ? 20 : 50}
                           value={selectedCircle.amplitude ?? 5}
                           onChange={(e) => updateCircleStyle(selectedCircle.id, { amplitude: parseFloat(e.target.value) })}
                         />
@@ -2399,19 +2431,38 @@ function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px', borderTop: '1px solid var(--md-outline-variant)', paddingTop: '12px' }}>
                   <div className="inspector-field">
                     <label>Shape Type</label>
-                    <div className="m3-select-wrapper">
-                      <select
-                        value={selectedPerson.shapeType ?? 'polygon'}
-                        onChange={(e) => updatePersonStyle(selectedPerson.id, { shapeType: e.target.value as ShapeType })}
+                    <div className="m3-segmented-button">
+                      <button
+                        type="button"
+                        className={`m3-segmented-button-item ${(!selectedPerson.shapeType || selectedPerson.shapeType === 'wavy') ? 'is-selected' : ''}`}
+                        onClick={() => {
+                          updatePersonStyle(selectedPerson.id, { shapeType: 'wavy', amplitude: 1 })
+                        }}
                       >
-                        <option value="polygon">Soft Polygon</option>
-                        <option value="wavy">Wavy (Flower)</option>
-                        <option value="circle">Circle</option>
-                      </select>
+                        Wavy
+                      </button>
+                      <button
+                        type="button"
+                        className={`m3-segmented-button-item ${selectedPerson.shapeType === 'polygon' ? 'is-selected' : ''}`}
+                        onClick={() => {
+                          updatePersonStyle(selectedPerson.id, { shapeType: 'polygon', amplitude: 8 })
+                        }}
+                      >
+                        Polygon
+                      </button>
+                      <button
+                        type="button"
+                        className={`m3-segmented-button-item ${selectedPerson.shapeType === 'circle' ? 'is-selected' : ''}`}
+                        onClick={() => {
+                          updatePersonStyle(selectedPerson.id, { shapeType: 'circle', amplitude: 0 })
+                        }}
+                      >
+                        Circle
+                      </button>
                     </div>
                   </div>
                   
-                  {(selectedPerson.shapeType ?? 'polygon') !== 'circle' && (
+                  {(selectedPerson.shapeType ?? 'wavy') !== 'circle' && (
                     <>
                       <div className="inspector-field">
                         <label>Sides / Petals ({selectedPerson.sides ?? 8})</label>
@@ -2421,16 +2472,6 @@ function App() {
                           max="20"
                           value={selectedPerson.sides ?? 8}
                           onChange={(e) => updatePersonStyle(selectedPerson.id, { sides: parseInt(e.target.value) })}
-                        />
-                      </div>
-                      <div className="inspector-field">
-                        <label>Amplitude / Rounding ({selectedPerson.amplitude ?? 2})</label>
-                        <input
-                          type="range"
-                          min="0"
-                          max="20"
-                          value={selectedPerson.amplitude ?? 2}
-                          onChange={(e) => updatePersonStyle(selectedPerson.id, { amplitude: parseFloat(e.target.value) })}
                         />
                       </div>
                     </>
