@@ -16,7 +16,8 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   other apart.
 - **Resize**: drag a circle's edge; parent circles auto-fit (expand and shrink back to a
   minimum) as their contents move. Shrinking a circle pulls its contained people and subset
-  circles toward the center instead of simply stopping at the old content boundary.
+  circles toward the center, and nested subset circles shrink with the parent when position
+  packing alone cannot fit them.
 - **Create**: right-click a circle, or Shift-drag from a circle center, to open the
   create menu (add person / nested subset circle / connected external circle). People are
   endpoints; only circle centers spawn new branches.
@@ -26,9 +27,10 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   rename / styling / notes / delete.
 - **Favorite**: a person can be starred; favorited people get a thicker neon-yellow
   outline on the canvas.
-- **Collision rules**: people only repel people in their owning circle. Nested subset
-  circles repel people that belong directly to the parent circle, so a parent-level person
-  cannot visually sit inside a subset they do not belong to.
+- **Collision rules**: people repel other people in their owning circle and the center
+  handle of that circle. Nested subset circles repel people that belong directly to the
+  parent circle, so a parent-level person cannot visually sit inside a subset they do not
+  belong to.
 - State is browser-session-only in this prototype screen (no backend writes from here).
 
 ## Design

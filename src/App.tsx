@@ -156,6 +156,7 @@ const PERSON_CONTAINMENT_RADIUS = 62
 const CIRCLE_CONTAINMENT_PADDING = 28
 const PERSON_COLLISION_RADIUS = 26
 const PERSON_COLLISION_GAP = 10
+const CIRCLE_CENTER_COLLISION_RADIUS = 32
 const PERSON_CIRCLE_COLLISION_GAP = 14
 const CIRCLE_COLLISION_GAP = 20
 const COLLISION_PASSES = 10
@@ -2962,7 +2963,14 @@ function pullCircleContentsTowardCenter(
   return {
     ...state,
     circles: state.circles.map((candidate) =>
-      descendantCircleIds.has(candidate.id) ? { ...candidate, ...pullPoint(candidate) } : candidate,
+      descendantCircleIds.has(candidate.id)
+        ? {
+            ...candidate,
+            ...pullPoint(candidate),
+            radius: Math.max(MIN_CIRCLE_RADIUS, candidate.radius * scale),
+            minRadius: Math.max(MIN_CIRCLE_RADIUS, candidate.minRadius * scale),
+          }
+        : candidate,
     ),
     people: state.people.map((person) =>
       containedCircleIds.has(person.circleId) ? { ...person, ...pullPoint(person) } : person,
@@ -3052,6 +3060,27 @@ function resolveCollisions(state: GraphState, context: LayoutContext): GraphStat
       const parentIndex = circleIndexById.get(person.circleId)
       const personIndex = personIndexById.get(person.id)
       if (parentIndex == null || personIndex == null) continue
+
+      const parentCircle = circles[parentIndex]
+      const separation = getSeparation(
+        parentCircle,
+        people[personIndex],
+        CIRCLE_CENTER_COLLISION_RADIUS + PERSON_COLLISION_RADIUS + PERSON_COLLISION_GAP,
+      )
+      if (!separation) continue
+
+      people[personIndex] = {
+        ...people[personIndex],
+        x: people[personIndex].x + separation.x,
+        y: people[personIndex].y + separation.y,
+      }
+      changed = true
+    }
+
+    for (const person of people) {
+      const parentIndex = circleIndexById.get(person.circleId)
+      const personIndex = personIndexById.get(person.id)
+      if (parentIndex == null || personIndex == null) continue
       people[personIndex] = clampPersonInsideCircle(people[personIndex], circles[parentIndex])
     }
 
@@ -3105,7 +3134,7 @@ function translateCircleSubtree(
 }
 
 function clampPersonInsideCircle(person: PersonNode, circle: CircleNode) {
-  const maxDistance = Math.max(0, circle.radius - PERSON_CONTAINMENT_RADIUS)
+  const maxDistance = Math.max(0, circle.radius - PERSON_COLLISION_RADIUS)
   const dx = person.x - circle.x
   const dy = person.y - circle.y
   const distance = Math.hypot(dx, dy)

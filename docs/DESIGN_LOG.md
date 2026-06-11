@@ -22,14 +22,15 @@ rediscover, write it here.
 - Decision: board layout now runs a lightweight collision pass as part of
   `ensureContainment`. Same-level circles repel each other as whole subtrees, people repel
   other people in the same owning circle, and nested subset circles repel parent-level
-  people so visual membership matches `circleId`.
+  people so visual membership matches `circleId`. Each circle center also has a small
+  collision radius, so people cannot stack on top of the center handle.
 - Drag behavior: while dragging a person or circle, the dragged item is treated as active
   and the object it hits receives the main push. This keeps the pointer target feeling
   attached to the hand while still preventing overlap.
 - Resize behavior: shrinking a circle scales the positions of contained people and
-  descendant circle centers toward the resized circle center before containment re-fits.
-  The intent is a packed contraction instead of the old behavior where the radius appeared
-  to stop as soon as existing content blocked it.
+  descendant circles toward the resized circle center before containment re-fits. Descendant
+  circle `radius` and `minRadius` shrink with the parent down to the global minimum, so a
+  subset can compress when moving it inward is not enough.
 
 ### 2026-06-12 — Hover-to-DOM, coalesced drags, multi-res sprites
 
