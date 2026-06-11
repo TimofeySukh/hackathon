@@ -10,10 +10,13 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
 
 - **Pan / zoom**: drag empty space to pan; mouse wheel or toolbar buttons to zoom
   (`MIN_SCALE`/`MAX_SCALE` clamp).
-- **Move**: drag a person to reposition inside its owning circle; drag a circle center to
-  move the whole circle and everything it contains.
+- **Move**: drag a person to reposition inside its owning circle; nearby people in the
+  same circle are pushed aside instead of overlapping. Drag a circle center or body to move
+  the whole circle and everything it contains; circles at the same nesting level push each
+  other apart.
 - **Resize**: drag a circle's edge; parent circles auto-fit (expand and shrink back to a
-  minimum) as their contents move.
+  minimum) as their contents move. Shrinking a circle pulls its contained people and subset
+  circles toward the center instead of simply stopping at the old content boundary.
 - **Create**: right-click a circle, or Shift-drag from a circle center, to open the
   create menu (add person / nested subset circle / connected external circle). People are
   endpoints; only circle centers spawn new branches.
@@ -23,6 +26,9 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   rename / styling / notes / delete.
 - **Favorite**: a person can be starred; favorited people get a thicker neon-yellow
   outline on the canvas.
+- **Collision rules**: people only repel people in their owning circle. Nested subset
+  circles repel people that belong directly to the parent circle, so a parent-level person
+  cannot visually sit inside a subset they do not belong to.
 - State is browser-session-only in this prototype screen (no backend writes from here).
 
 ## Design

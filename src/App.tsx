@@ -140,14 +140,25 @@ const MAX_SCALE = 1.8
 // Render only nodes inside the viewport, padded by this fraction on each side so
 // small pans reveal already-rendered nodes before the gesture settles.
 const CULL_OVERSCAN = 0.45
-// Below this zoom, individual people are sub-10px and illegible — skip drawing
-// them (and their edges) so surveying the whole board stays cheap (LOD).
-const PEOPLE_LOD_SCALE = 0.5
+// People are always drawn on the Canvas 2D layer (cheap, cached sprites). At/above
+// this zoom they ALSO get a real interactive DOM node overlaid on top (so you can
+// drag/select them); below it they're canvas-only — still fully visible, just not
+// individually interactive until you zoom in.
+const PEOPLE_INTERACT_SCALE = 0.5
+// ...but a DOM person node is ~100× heavier than a canvas sprite, so we never
+// promote more than this many at once. If more than this are on screen (a dense
+// circle), everyone stays on the canvas until you zoom in enough to thin them out.
+const PEOPLE_DOM_CAP = 120
 const CONNECT_THRESHOLD = 40
 const MIN_CIRCLE_RADIUS = 72
 const EDGE_RESIZE_HIT_SIZE = 18
 const PERSON_CONTAINMENT_RADIUS = 62
 const CIRCLE_CONTAINMENT_PADDING = 28
+const PERSON_COLLISION_RADIUS = 26
+const PERSON_COLLISION_GAP = 10
+const PERSON_CIRCLE_COLLISION_GAP = 14
+const CIRCLE_COLLISION_GAP = 20
+const COLLISION_PASSES = 10
 
 const DEFAULT_STATE: GraphState = {
   circles: [
@@ -393,10 +404,17 @@ function getNodePath(
 
 function App() {
   const surfaceRef = useRef<HTMLDivElement | null>(null)
+  // Canvas 2D layer that draws all people (+ their edges) as cached sprites.
+  const peopleCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const panRef = useRef<PanState | null>(null)
   const moveCircleRef = useRef<MoveCircleState | null>(null)
   const movePersonRef = useRef<MovePersonState | null>(null)
   const resizeCircleRef = useRef<ResizeCircleState | null>(null)
+  // Drag updates are coalesced to one React commit per animation frame (like the
+  // pan/zoom gesture) so a move event flood doesn't trigger a re-render storm.
+  const dragRafRef = useRef<number | null>(null)
+  const pendingGraphRef = useRef<((current: GraphState) => GraphState) | null>(null)
+  const pendingConnectorRef = useRef<DragConnector | null>(null)
   const [graph, setGraph] = useState(createInitialGraph)
   const [camera, setCamera] = useState<Camera>({ x: window.innerWidth / 2, y: window.innerHeight / 2, scale: 0.82 })
   // cameraRef holds the *live* camera during a pan/zoom gesture. `camera` state
@@ -414,6 +432,9 @@ function App() {
   const [connector, setConnector] = useState<DragConnector | null>(null)
   const [createMenu, setCreateMenu] = useState<CreateMenu | null>(null)
   const [selectedItem, setSelectedItem] = useState<SelectedItem>({ type: 'circle', id: 'you' })
+  // Person currently under the cursor — promoted to an interactive DOM node so it
+  // can be clicked/dragged even inside a dense circle that's otherwise canvas-only.
+  const [hoveredPersonId, setHoveredPersonId] = useState<string | null>(null)
   // STRESS TEST — synthetic-load config (circles / people / cross-links).
   const [stress, setStress] = useState<StressConfig>(STRESS_DEFAULT_CONFIG)
   // Viewport size in CSS px, used to cull off-screen nodes. Updated on resize.
@@ -676,44 +697,60 @@ function App() {
     return { left: left - mx, right: right + mx, top: top - my, bottom: bottom + my }
   }, [camera, viewport])
 
-  const visibleCircles = useMemo(
-    () =>
-      sortedCircles.filter(
-        (c) =>
-          c.x + c.radius >= visibleWorld.left &&
-          c.x - c.radius <= visibleWorld.right &&
-          c.y + c.radius >= visibleWorld.top &&
-          c.y - c.radius <= visibleWorld.bottom,
-      ),
-    [sortedCircles, visibleWorld],
-  )
+  // Circles are few and cheap (the people canvas carries the heavy load), so we
+  // render them all rather than culling. Culling them caused circles to pop in
+  // late during a long pan (the DOM layer only re-culls once the gesture settles,
+  // while the canvas repaints people live every frame).
+  const visibleCircles = sortedCircles
 
-  // LOD — when zoomed far out, individual people would be unreadable specks, so
-  // we drop them (and their edges) entirely. At working zoom they're culled.
-  const showPeople = camera.scale >= PEOPLE_LOD_SCALE
   const pointVisible = (n: { x: number; y: number }) =>
     n.x >= visibleWorld.left && n.x <= visibleWorld.right && n.y >= visibleWorld.top && n.y <= visibleWorld.bottom
+  // People are always drawn (on the canvas layer below), so we only need the
+  // culled set to decide which ones also get an interactive DOM overlay.
   const visiblePeople = useMemo(
-    () => (showPeople ? displayPeople.filter(pointVisible) : []),
+    () => displayPeople.filter(pointVisible),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [displayPeople, visibleWorld, showPeople],
+    [displayPeople, visibleWorld],
   )
-  const visibleConnections = useMemo(() => {
-    if (!showPeople) return []
-    return displayConnections.filter((conn) => {
-      const a = peopleById.get(conn.fromId) || circlesById.get(conn.fromId)
-      const b = peopleById.get(conn.toId) || circlesById.get(conn.toId)
-      if (!a || !b) return false
-      return pointVisible(a) || pointVisible(b)
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [displayConnections, peopleById, circlesById, visibleWorld, showPeople])
-
-  const drawnNodeCount = visibleCircles.length + visiblePeople.length
 
   const selectedCircle = selectedItem?.type === 'circle' ? circlesById.get(selectedItem.id) ?? null : null
   const selectedPerson = selectedItem?.type === 'person' ? graph.people.find((person) => person.id === selectedItem.id) ?? null : null
   const selectedConnection = selectedItem?.type === 'connection' ? (graph.connections || []).find((conn) => conn.id === selectedItem.id) ?? null : null
+
+  // INTERACTIVE OVERLAY — when few enough people are on screen, every visible one
+  // gets a real DOM node (drag/select/notes). When there are too many (a dense
+  // circle, or zoomed out), only the selected + hovered person become DOM and the
+  // canvas carries the rest, so the DOM set stays tiny no matter the total.
+  const promoteAllPeople = camera.scale >= PEOPLE_INTERACT_SCALE && visiblePeople.length <= PEOPLE_DOM_CAP
+  const domPeople = useMemo(() => {
+    if (promoteAllPeople) return visiblePeople
+    return visiblePeople.filter((p) => p.id === selectedPerson?.id || p.id === hoveredPersonId)
+  }, [promoteAllPeople, visiblePeople, selectedPerson, hoveredPersonId])
+  // Ids the canvas must NOT draw (their crisp DOM node sits on top). Deliberately
+  // hover-independent so sweeping the cursor doesn't force a canvas repaint — a
+  // hovered person just double-draws (its opaque DOM node covers the sprite).
+  const canvasExcludeIds = useMemo(
+    () => (promoteAllPeople ? new Set(visiblePeople.map((p) => p.id)) : new Set(selectedPerson ? [selectedPerson.id] : [])),
+    [promoteAllPeople, visiblePeople, selectedPerson],
+  )
+  // Real (user-made) connections stay interactive SVG; synthetic stress cross-links
+  // are drawn on the canvas layer instead.
+  const domConnections = useMemo(
+    () =>
+      displayConnections.filter((conn) => {
+        if (conn.id.startsWith('stress-link-')) return false
+        const a = peopleById.get(conn.fromId) || circlesById.get(conn.fromId)
+        const b = peopleById.get(conn.toId) || circlesById.get(conn.toId)
+        return a && b && (pointVisible(a) || pointVisible(b))
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [displayConnections, peopleById, circlesById, visibleWorld],
+  )
+  const canvasConnections = useMemo(
+    () => displayConnections.filter((conn) => conn.id.startsWith('stress-link-')),
+    [displayConnections],
+  )
+  const drawnNodeCount = visibleCircles.length + visiblePeople.length
 
   // Push the live camera onto the DOM (world transform + dotted grid) without
   // going through React. Cheap: one style write, the browser composites it.
@@ -729,9 +766,16 @@ function App() {
     }
   }
 
-  // One imperative frame of a gesture: move the DOM at the live camera.
+  // One imperative frame of a gesture: move the DOM and repaint the (culled)
+  // people canvas at the live camera, so newly revealed people fill in mid-pan.
   function applyLiveCamera() {
-    applyDomCamera(cameraRef.current)
+    const cam = cameraRef.current
+    applyDomCamera(cam)
+    const canvas = peopleCanvasRef.current
+    const surface = surfaceRef.current
+    if (canvas && surface) {
+      drawPeopleLayer(canvas, surface, cam, displayPeople, circlesById, canvasConnections, canvasExcludeIds)
+    }
   }
 
   // Called on every pan/zoom event. Updates the live camera, schedules one
@@ -786,6 +830,7 @@ function App() {
   useEffect(() => () => {
     if (gestureRafRef.current != null) window.cancelAnimationFrame(gestureRafRef.current)
     if (settleTimerRef.current != null) window.clearTimeout(settleTimerRef.current)
+    if (dragRafRef.current != null) window.cancelAnimationFrame(dragRafRef.current)
   }, [])
 
   // Track viewport size so culling has the current visible rectangle.
@@ -796,6 +841,15 @@ function App() {
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
+
+  // Repaint the people canvas whenever the settled camera, people, viewport or
+  // interactive set changes. (Gesture frames are handled imperatively above.)
+  useEffect(() => {
+    const canvas = peopleCanvasRef.current
+    const surface = surfaceRef.current
+    if (!canvas || !surface) return
+    drawPeopleLayer(canvas, surface, camera, displayPeople, circlesById, canvasConnections, canvasExcludeIds)
+  }, [camera, viewport, displayPeople, circlesById, canvasConnections, canvasExcludeIds])
 
   useEffect(() => {
     const surface = surfaceRef.current
@@ -845,6 +899,34 @@ function App() {
     }
   }
 
+  // Coalesce drag-driven state updates to one commit per frame. Each move stores
+  // the latest absolute target (updaters/connector are not cumulative), and a
+  // single rAF flushes it — so a 120 Hz move stream becomes <=60 re-renders/s.
+  function scheduleDrag() {
+    if (dragRafRef.current != null) return
+    dragRafRef.current = window.requestAnimationFrame(() => {
+      dragRafRef.current = null
+      const update = pendingGraphRef.current
+      pendingGraphRef.current = null
+      if (update) setGraph(update)
+      const conn = pendingConnectorRef.current
+      pendingConnectorRef.current = null
+      if (conn) setConnector(conn)
+    })
+  }
+
+  // Cancel the pending frame and return the last pending graph updater (if any),
+  // so pointer-up can apply the final position immediately (plus containment).
+  function takePendingGraphUpdate() {
+    if (dragRafRef.current != null) {
+      window.cancelAnimationFrame(dragRafRef.current)
+      dragRafRef.current = null
+    }
+    const update = pendingGraphRef.current
+    pendingGraphRef.current = null
+    return update
+  }
+
   function handleSurfacePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     if (event.button !== 0 || event.target !== event.currentTarget) return
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -870,36 +952,63 @@ function App() {
       })
     }
 
+    // During a drag, coalesce graph layout to one animation-frame commit. The
+    // active item stays under the pointer while collision layout pushes blockers.
     const moving = moveCircleRef.current
     if (moving?.pointerId === event.pointerId) {
       const deltaX = (event.clientX - moving.startX) / camera.scale
       const deltaY = (event.clientY - moving.startY) / camera.scale
-      setGraph((current) => ensureContainment(moveCircleSubtree(current, moving.circleId, moving.originX + deltaX, moving.originY + deltaY)))
+      pendingGraphRef.current = (current) =>
+        ensureContainment(
+          moveCircleSubtree(current, moving.circleId, moving.originX + deltaX, moving.originY + deltaY),
+          { activeCircleId: moving.circleId },
+        )
+      scheduleDrag()
     }
 
     const movingPerson = movePersonRef.current
     if (movingPerson?.pointerId === event.pointerId) {
       const deltaX = (event.clientX - movingPerson.startX) / camera.scale
       const deltaY = (event.clientY - movingPerson.startY) / camera.scale
-      setGraph((current) =>
-        ensureContainment({
-          ...current,
-          people: current.people.map((person) =>
-            person.id === movingPerson.personId ? { ...person, x: movingPerson.originX + deltaX, y: movingPerson.originY + deltaY } : person,
-          ),
-        }),
-      )
+      pendingGraphRef.current = (current) =>
+        ensureContainment(
+          {
+            ...current,
+            people: current.people.map((person) =>
+              person.id === movingPerson.personId
+                ? { ...person, x: movingPerson.originX + deltaX, y: movingPerson.originY + deltaY }
+                : person,
+            ),
+          },
+          { activePersonId: movingPerson.personId },
+        )
+      scheduleDrag()
     }
 
     const resizing = resizeCircleRef.current
     if (resizing?.pointerId === event.pointerId) {
       const world = screenToWorld({ x: event.clientX, y: event.clientY })
-      setGraph((current) => resizeCircleFromPoint(current, resizing.circleId, world))
+      pendingGraphRef.current = (current) => resizeCircleFromPoint(current, resizing.circleId, world)
+      scheduleDrag()
     }
 
     if (connector) {
       const world = screenToWorld({ x: event.clientX, y: event.clientY })
-      setConnector({ ...connector, endX: world.x, endY: world.y })
+      pendingConnectorRef.current = { ...connector, endX: world.x, endY: world.y }
+      scheduleDrag()
+      return
+    }
+
+    // Idle hover: promote the nearest person under the cursor to a DOM node so
+    // it's interactive even in a dense, canvas-only circle. Skipped when everyone
+    // is already DOM (promoteAllPeople) — no need, and it would re-render per move.
+    if (!promoteAllPeople && !pan && !moving && !movingPerson && !resizing) {
+      const world = screenToWorld({ x: event.clientX, y: event.clientY })
+      const hit = findPersonAt(visiblePeople, world.x, world.y, 22)
+      const id = hit ? hit.id : null
+      if (id !== hoveredPersonId) setHoveredPersonId(id)
+    } else if (promoteAllPeople && hoveredPersonId) {
+      setHoveredPersonId(null)
     }
   }
 
@@ -909,50 +1018,57 @@ function App() {
       settleGesture()
     }
 
-    if (moveCircleRef.current?.pointerId === event.pointerId) {
-      moveCircleRef.current = null
+    const endingMove =
+      moveCircleRef.current?.pointerId === event.pointerId ||
+      movePersonRef.current?.pointerId === event.pointerId ||
+      resizeCircleRef.current?.pointerId === event.pointerId
+
+    if (moveCircleRef.current?.pointerId === event.pointerId) moveCircleRef.current = null
+    if (movePersonRef.current?.pointerId === event.pointerId) movePersonRef.current = null
+    if (resizeCircleRef.current?.pointerId === event.pointerId) resizeCircleRef.current = null
+
+    if (endingMove) {
+      // Apply the final dragged position immediately, including any queued layout pass.
+      const pending = takePendingGraphUpdate()
+      setGraph((prev) => ensureContainment(pending ? pending(prev) : prev))
     }
 
-    if (movePersonRef.current?.pointerId === event.pointerId) {
-      movePersonRef.current = null
+    // Resolve the connector against its latest endpoint (which may still be queued
+    // in the drag rAF), then clear any pending frame.
+    const conn = pendingConnectorRef.current ?? connector
+    pendingConnectorRef.current = null
+    if (dragRafRef.current != null) {
+      window.cancelAnimationFrame(dragRafRef.current)
+      dragRafRef.current = null
     }
+    if (!conn) return
 
-    if (resizeCircleRef.current?.pointerId === event.pointerId) {
-      resizeCircleRef.current = null
-    }
-
-    if (!connector) return
-
-    const distance = Math.hypot(connector.endX - connector.startX, connector.endY - connector.startY)
+    const distance = Math.hypot(conn.endX - conn.startX, conn.endY - conn.startY)
     if (distance > CONNECT_THRESHOLD) {
-      const targetPerson = graph.people.find(
-        (p) => Math.hypot(p.x - connector.endX, p.y - connector.endY) < 30
-      )
-      const targetCircle = graph.circles.find(
-        (c) => Math.hypot(c.x - connector.endX, c.y - connector.endY) < 30
-      )
+      const targetPerson = graph.people.find((p) => Math.hypot(p.x - conn.endX, p.y - conn.endY) < 30)
+      const targetCircle = graph.circles.find((c) => Math.hypot(c.x - conn.endX, c.y - conn.endY) < 30)
 
-      if (targetPerson && targetPerson.id !== connector.sourceId) {
+      if (targetPerson && targetPerson.id !== conn.sourceId) {
         setGraph((current) => ({
           ...current,
           connections: [
             ...(current.connections || []),
             {
               id: `conn-${Date.now()}`,
-              fromId: connector.sourceId,
+              fromId: conn.sourceId,
               toId: targetPerson.id,
             },
           ],
         }))
-      } else if (targetCircle && targetCircle.id !== connector.sourceId) {
-        if (connector.sourceType === 'circle') {
+      } else if (targetCircle && targetCircle.id !== conn.sourceId) {
+        if (conn.sourceType === 'circle') {
           setGraph((current) => {
-            const srcCircle = current.circles.find((c) => c.id === connector.sourceId)
+            const srcCircle = current.circles.find((c) => c.id === conn.sourceId)
             if (srcCircle && !srcCircle.connectedTo) {
               return {
                 ...current,
                 circles: current.circles.map((c) =>
-                  c.id === connector.sourceId ? { ...c, connectedTo: targetCircle.id } : c
+                  c.id === conn.sourceId ? { ...c, connectedTo: targetCircle.id } : c
                 ),
               }
             } else {
@@ -962,7 +1078,7 @@ function App() {
                   ...(current.connections || []),
                   {
                     id: `conn-${Date.now()}`,
-                    fromId: connector.sourceId,
+                    fromId: conn.sourceId,
                     toId: targetCircle.id,
                   },
                 ],
@@ -976,33 +1092,33 @@ function App() {
               ...(current.connections || []),
               {
                 id: `conn-${Date.now()}`,
-                fromId: connector.sourceId,
+                fromId: conn.sourceId,
                 toId: targetCircle.id,
               },
             ],
           }))
         }
       } else {
-        if (connector.sourceType === 'circle') {
+        if (conn.sourceType === 'circle') {
           setCreateMenu({
-            sourceCircleId: connector.sourceId,
-            x: connector.endX,
-            y: connector.endY,
+            sourceCircleId: conn.sourceId,
+            x: conn.endX,
+            y: conn.endY,
             screenX: event.clientX,
             screenY: event.clientY,
-            dragSourceId: connector.sourceId,
+            dragSourceId: conn.sourceId,
             dragSourceType: 'circle',
           })
-        } else if (connector.sourceType === 'person') {
-          const person = graph.people.find((p) => p.id === connector.sourceId)
+        } else if (conn.sourceType === 'person') {
+          const person = graph.people.find((p) => p.id === conn.sourceId)
           const sourceCircleId = person ? person.circleId : 'you'
           setCreateMenu({
             sourceCircleId,
-            x: connector.endX,
-            y: connector.endY,
+            x: conn.endX,
+            y: conn.endY,
             screenX: event.clientX,
             screenY: event.clientY,
-            dragSourceId: connector.sourceId,
+            dragSourceId: conn.sourceId,
             dragSourceType: 'person',
           })
         }
@@ -1449,7 +1565,7 @@ function App() {
               <dd>{renderedEdgeCount.toLocaleString('en-US')}</dd>
             </div>
             <div>
-              <dt>Drawn{!showPeople ? ' (LOD)' : ''}</dt>
+              <dt>On screen</dt>
               <dd>{drawnNodeCount.toLocaleString('en-US')}</dd>
             </div>
           </dl>
@@ -1476,6 +1592,7 @@ function App() {
         onPointerMove={handleSurfacePointerMove}
         onPointerUp={handleSurfacePointerUp}
         onPointerCancel={handleSurfacePointerUp}
+        onPointerLeave={() => hoveredPersonId && setHoveredPersonId(null)}
       >
         <div ref={worldLayerRef} className="world-layer" style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale})` }}>
           
@@ -1522,12 +1639,14 @@ function App() {
               if (!source) return null
               return <path key={circle.id} className="edge edge--circle" d={makeCurve(source, circle)} />
             })}
-            {visiblePeople.map((person) => {
+            {/* Canvas-only people get their edge from the canvas; interactive DOM
+                people get an SVG edge here so it sits behind their avatar. */}
+            {domPeople.map((person) => {
               const circle = circlesById.get(person.circleId)
               if (!circle) return null
               return <path key={person.id} className="edge edge--person" d={makeCurve(circle, person)} />
             })}
-            {visibleConnections.map((conn) => {
+            {domConnections.map((conn) => {
               const sourceNode = peopleById.get(conn.fromId) || circlesById.get(conn.fromId)
               const targetNode = peopleById.get(conn.toId) || circlesById.get(conn.toId)
               if (!sourceNode || !targetNode) return null
@@ -1774,8 +1893,8 @@ function App() {
             </section>
           ))}
 
-          {/* PASS 4: People Icons and Labels */}
-          {visiblePeople.map((person) => {
+          {/* PASS 4: Interactive people overlay (canvas below draws all of them) */}
+          {domPeople.map((person) => {
             const isSelected = selectedItem?.type === 'person' && selectedItem?.id === person.id
             const parentCircle = circlesById.get(person.circleId)
             const personColor = parentCircle ? MATERIAL_TONES[parentCircle.tone].centerBg : '#3F51B5'
@@ -2036,6 +2155,9 @@ function App() {
           })}
 
         </div>
+        {/* People canvas — draws ALL people (+ their edges) as cached sprites,
+            on top of circle fills, below the interactive DOM overlay. */}
+        <canvas ref={peopleCanvasRef} className="people-canvas-layer" aria-hidden="true" />
       </div>
 
       {createMenu ? (
@@ -2581,6 +2703,152 @@ function FpsMeter() {
   return <span>{fps} FPS</span>
 }
 
+// ---- People canvas layer ----------------------------------------------------
+// All people are painted on a single Canvas 2D layer with cached avatar sprites
+// and viewport culling, so the board stays smooth with thousands of them at any
+// zoom. Interactive (DOM) people are passed in `excludeIds` and skipped here to
+// avoid double-drawing; the canvas still draws everyone else, including people
+// revealed mid-pan before the gesture settles.
+
+// Pre-rendered avatar sprites keyed by `${tone}|${avatar}|${resolution}`. We keep
+// a few resolution tiers (see SPRITE_TIERS) so a zoomed-in avatar is rendered from
+// a crisp high-res bitmap instead of an upscaled 64px one. At most 5 tones × a
+// handful of initials × 3 tiers, so the cache stays small.
+const personSpriteCache = new Map<string, HTMLCanvasElement>()
+const SPRITE_TIERS = [64, 128, 256]
+
+// Pick the smallest tier whose pixels meet/exceed the on-screen device-pixel size.
+function pickSpriteTier(screenPx: number): number {
+  for (const tier of SPRITE_TIERS) {
+    if (tier >= screenPx) return tier
+  }
+  return SPRITE_TIERS[SPRITE_TIERS.length - 1]
+}
+
+function getPersonSprite(tone: CircleTone, avatar: string, size: number): HTMLCanvasElement {
+  const key = `${tone}|${avatar}|${size}`
+  const cached = personSpriteCache.get(key)
+  if (cached) return cached
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')
+  if (ctx) {
+    const path = new Path2D(getNodePath(size / 2, size / 2, size * 0.40625, 'polygon', 9, 2))
+    ctx.fillStyle = MATERIAL_TONES[tone].centerBg
+    ctx.fill(path)
+    ctx.lineWidth = size * 0.0625
+    ctx.strokeStyle = '#ffffff'
+    ctx.stroke(path)
+    ctx.fillStyle = '#ffffff'
+    ctx.font = `600 ${(size * 0.34375).toFixed(1)}px Inter, system-ui, sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(avatar, size / 2, size / 2 + size * 0.016)
+  }
+  personSpriteCache.set(key, canvas)
+  return canvas
+}
+
+// Nearest person to a world-space point within `radius` (for hover hit-testing).
+function findPersonAt(people: PersonNode[], x: number, y: number, radius: number): PersonNode | null {
+  let best: PersonNode | null = null
+  let bestDist = radius * radius
+  for (const p of people) {
+    const dx = p.x - x
+    const dy = p.y - y
+    const d = dx * dx + dy * dy
+    if (d < bestDist) {
+      bestDist = d
+      best = p
+    }
+  }
+  return best
+}
+
+function drawPeopleLayer(
+  canvas: HTMLCanvasElement,
+  surface: HTMLElement,
+  camera: Camera,
+  people: PersonNode[],
+  circlesById: Map<string, CircleNode>,
+  connections: Connection[],
+  excludeIds: Set<string>,
+) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 1.75)
+  const width = Math.max(1, surface.clientWidth)
+  const height = Math.max(1, surface.clientHeight)
+  if (canvas.width !== Math.round(width * dpr) || canvas.height !== Math.round(height * dpr)) {
+    canvas.width = Math.round(width * dpr)
+    canvas.height = Math.round(height * dpr)
+    canvas.style.width = `${width}px`
+    canvas.style.height = `${height}px`
+  }
+
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  ctx.clearRect(0, 0, width, height)
+  if (people.length === 0) return
+
+  const pad = 80 / camera.scale
+  const left = -camera.x / camera.scale - pad
+  const right = (width - camera.x) / camera.scale + pad
+  const top = -camera.y / camera.scale - pad
+  const bottom = (height - camera.y) / camera.scale + pad
+  const inView = (n: { x: number; y: number }) => n.x >= left && n.x <= right && n.y >= top && n.y <= bottom
+  const visible = people.filter(inView)
+
+  ctx.save()
+  ctx.translate(camera.x, camera.y)
+  ctx.scale(camera.scale, camera.scale)
+
+  // Person → parent-circle edges (only for canvas-drawn people; DOM people get
+  // their edge from the SVG layer so it sits behind their avatar).
+  ctx.beginPath()
+  ctx.strokeStyle = 'rgba(120, 130, 138, 0.22)'
+  ctx.lineWidth = Math.max(0.8 / camera.scale, 0.5)
+  for (const p of visible) {
+    if (excludeIds.has(p.id)) continue
+    const c = circlesById.get(p.circleId)
+    if (!c) continue
+    ctx.moveTo(c.x, c.y)
+    ctx.lineTo(p.x, p.y)
+  }
+  ctx.stroke()
+
+  // Cross-links (synthetic person↔person stress connections).
+  if (connections.length) {
+    const byId = new Map(people.map((p) => [p.id, p]))
+    ctx.beginPath()
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.30)'
+    ctx.lineWidth = Math.max(0.7 / camera.scale, 0.45)
+    for (const conn of connections) {
+      const a = byId.get(conn.fromId)
+      const b = byId.get(conn.toId)
+      if (!a || !b) continue
+      if (!inView(a) && !inView(b)) continue
+      ctx.moveTo(a.x, a.y)
+      ctx.lineTo(b.x, b.y)
+    }
+    ctx.stroke()
+  }
+
+  // Avatar sprites. Choose a sprite resolution that matches the on-screen size
+  // (avatar is 40 world units) so zoomed-in avatars stay crisp instead of blurry.
+  const half = 20
+  const spriteRes = pickSpriteTier(half * 2 * camera.scale * dpr)
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+  for (const p of visible) {
+    if (excludeIds.has(p.id)) continue
+    const tone = circlesById.get(p.circleId)?.tone ?? 'blue'
+    ctx.drawImage(getPersonSprite(tone, p.avatar, spriteRes), p.x - half, p.y - half, half * 2, half * 2)
+  }
+
+  ctx.restore()
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value))
 }
@@ -2631,15 +2899,27 @@ function resizeCircleFromPoint(state: GraphState, circleId: string, point: { x: 
   if (!circle) return state
 
   const requestedRadius = Math.max(MIN_CIRCLE_RADIUS, Math.hypot(point.x - circle.x, point.y - circle.y))
+  const radiusRatio = requestedRadius < circle.radius ? requestedRadius / circle.radius : 1
+  const resizedState = radiusRatio < 1 ? pullCircleContentsTowardCenter(state, circleId, circle, radiusRatio) : state
+
   return ensureContainment({
-    ...state,
-    circles: state.circles.map((candidate) =>
+    ...resizedState,
+    circles: resizedState.circles.map((candidate) =>
       candidate.id === circleId ? { ...candidate, minRadius: requestedRadius, radius: requestedRadius } : candidate,
     ),
-  })
+  }, { activeCircleId: circleId })
 }
 
-function ensureContainment(state: GraphState): GraphState {
+type LayoutContext = {
+  activeCircleId?: string
+  activePersonId?: string
+}
+
+function ensureContainment(state: GraphState, context: LayoutContext = {}): GraphState {
+  return fitContainment(resolveCollisions(fitContainment(resolveCollisions(state, context)), context))
+}
+
+function fitContainment(state: GraphState): GraphState {
   let circles = state.circles
 
   for (let pass = 0; pass < circles.length + 2; pass += 1) {
@@ -2659,6 +2939,183 @@ function ensureContainment(state: GraphState): GraphState {
   }
 
   return { ...state, circles }
+}
+
+function pullCircleContentsTowardCenter(
+  state: GraphState,
+  circleId: string,
+  circle: CircleNode,
+  radiusRatio: number,
+): GraphState {
+  const descendantCircleIds = getDescendantCircleIds(state.circles, circleId)
+  const containedCircleIds = new Set(descendantCircleIds)
+  containedCircleIds.add(circleId)
+  const scale = clamp(radiusRatio, 0.12, 1)
+
+  function pullPoint(point: { x: number; y: number }) {
+    return {
+      x: circle.x + (point.x - circle.x) * scale,
+      y: circle.y + (point.y - circle.y) * scale,
+    }
+  }
+
+  return {
+    ...state,
+    circles: state.circles.map((candidate) =>
+      descendantCircleIds.has(candidate.id) ? { ...candidate, ...pullPoint(candidate) } : candidate,
+    ),
+    people: state.people.map((person) =>
+      containedCircleIds.has(person.circleId) ? { ...person, ...pullPoint(person) } : person,
+    ),
+  }
+}
+
+function resolveCollisions(state: GraphState, context: LayoutContext): GraphState {
+  let circles = state.circles.map((circle) => ({ ...circle }))
+  let people = state.people.map((person) => ({ ...person }))
+
+  for (let pass = 0; pass < COLLISION_PASSES; pass += 1) {
+    let changed = false
+    const circleIndexById = new Map(circles.map((circle, index) => [circle.id, index]))
+    const personIndexById = new Map(people.map((person, index) => [person.id, index]))
+
+    for (let i = 0; i < circles.length; i += 1) {
+      for (let j = i + 1; j < circles.length; j += 1) {
+        const a = circles[i]
+        const b = circles[j]
+        if (a.parentId !== b.parentId) continue
+
+        const separation = getSeparation(a, b, a.radius + b.radius + CIRCLE_COLLISION_GAP)
+        if (!separation) continue
+
+        const activeSide = context.activeCircleId === a.id ? 'a' : context.activeCircleId === b.id ? 'b' : null
+        const moveA = activeSide === 'a' ? 0 : activeSide === 'b' ? 1 : 0.5
+        const moveB = activeSide === 'b' ? 0 : activeSide === 'a' ? 1 : 0.5
+
+        if (moveA > 0) {
+          const translated = translateCircleSubtree(circles, people, a.id, -separation.x * moveA, -separation.y * moveA)
+          circles = translated.circles
+          people = translated.people
+        }
+        if (moveB > 0) {
+          const translated = translateCircleSubtree(circles, people, b.id, separation.x * moveB, separation.y * moveB)
+          circles = translated.circles
+          people = translated.people
+        }
+        changed = true
+      }
+    }
+
+    for (let i = 0; i < people.length; i += 1) {
+      for (let j = i + 1; j < people.length; j += 1) {
+        const a = people[i]
+        const b = people[j]
+        if (a.circleId !== b.circleId) continue
+
+        const separation = getSeparation(a, b, PERSON_COLLISION_RADIUS * 2 + PERSON_COLLISION_GAP)
+        if (!separation) continue
+
+        const activeSide = context.activePersonId === a.id ? 'a' : context.activePersonId === b.id ? 'b' : null
+        const moveA = activeSide === 'a' ? 0 : activeSide === 'b' ? 1 : 0.5
+        const moveB = activeSide === 'b' ? 0 : activeSide === 'a' ? 1 : 0.5
+
+        people[i] = { ...a, x: a.x - separation.x * moveA, y: a.y - separation.y * moveA }
+        people[j] = { ...b, x: b.x + separation.x * moveB, y: b.y + separation.y * moveB }
+        changed = true
+      }
+    }
+
+    for (const childCircle of circles) {
+      if (!childCircle.parentId) continue
+      for (const person of people) {
+        if (person.circleId !== childCircle.parentId) continue
+
+        const separation = getSeparation(
+          childCircle,
+          person,
+          childCircle.radius + PERSON_COLLISION_RADIUS + PERSON_CIRCLE_COLLISION_GAP,
+        )
+        if (!separation) continue
+
+        const personIndex = personIndexById.get(person.id)
+        if (personIndex == null) continue
+        people[personIndex] = {
+          ...people[personIndex],
+          x: people[personIndex].x + separation.x,
+          y: people[personIndex].y + separation.y,
+        }
+        changed = true
+      }
+    }
+
+    for (const person of people) {
+      const parentIndex = circleIndexById.get(person.circleId)
+      const personIndex = personIndexById.get(person.id)
+      if (parentIndex == null || personIndex == null) continue
+      people[personIndex] = clampPersonInsideCircle(people[personIndex], circles[parentIndex])
+    }
+
+    if (!changed) break
+  }
+
+  return { ...state, circles, people }
+}
+
+function getSeparation(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  minDistance: number,
+) {
+  let dx = b.x - a.x
+  let dy = b.y - a.y
+  let distance = Math.hypot(dx, dy)
+
+  if (distance >= minDistance) return null
+  if (distance < 0.0001) {
+    dx = 1
+    dy = 0
+    distance = 1
+  }
+
+  const overlap = minDistance - distance
+  return {
+    x: (dx / distance) * overlap,
+    y: (dy / distance) * overlap,
+  }
+}
+
+function translateCircleSubtree(
+  circles: CircleNode[],
+  people: PersonNode[],
+  circleId: string,
+  deltaX: number,
+  deltaY: number,
+) {
+  const subtreeIds = getDescendantCircleIds(circles, circleId)
+  subtreeIds.add(circleId)
+
+  return {
+    circles: circles.map((circle) =>
+      subtreeIds.has(circle.id) ? { ...circle, x: circle.x + deltaX, y: circle.y + deltaY } : circle,
+    ),
+    people: people.map((person) =>
+      subtreeIds.has(person.circleId) ? { ...person, x: person.x + deltaX, y: person.y + deltaY } : person,
+    ),
+  }
+}
+
+function clampPersonInsideCircle(person: PersonNode, circle: CircleNode) {
+  const maxDistance = Math.max(0, circle.radius - PERSON_CONTAINMENT_RADIUS)
+  const dx = person.x - circle.x
+  const dy = person.y - circle.y
+  const distance = Math.hypot(dx, dy)
+  if (distance <= maxDistance || distance < 0.0001) return person
+
+  return {
+    ...person,
+    x: circle.x + (dx / distance) * maxDistance,
+    y: circle.y + (dy / distance) * maxDistance,
+  }
 }
 
 function getRequiredCircleRadius(

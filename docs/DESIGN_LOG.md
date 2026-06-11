@@ -17,6 +17,64 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-12 — Board collision layout
+
+- Decision: board layout now runs a lightweight collision pass as part of
+  `ensureContainment`. Same-level circles repel each other as whole subtrees, people repel
+  other people in the same owning circle, and nested subset circles repel parent-level
+  people so visual membership matches `circleId`.
+- Drag behavior: while dragging a person or circle, the dragged item is treated as active
+  and the object it hits receives the main push. This keeps the pointer target feeling
+  attached to the hand while still preventing overlap.
+- Resize behavior: shrinking a circle scales the positions of contained people and
+  descendant circle centers toward the resized circle center before containment re-fits.
+  The intent is a packed contraction instead of the old behavior where the radius appeared
+  to stop as soon as existing content blocked it.
+
+### 2026-06-12 — Hover-to-DOM, coalesced drags, multi-res sprites
+
+- Hover promotion: when people are canvas-only (dense circle / zoomed out), the person
+  under the cursor is hit-tested and promoted to a real DOM node (`hoveredPersonId`), so it
+  can be clicked/dragged even when the whole circle is on the canvas. Skipped when everyone
+  is already DOM. The canvas exclude-set is deliberately hover-independent (a hovered person
+  just double-draws under its opaque DOM node) so sweeping the cursor doesn't repaint the
+  canvas.
+- Drag cost: dragging a circle/person/resize used to `setGraph` on every pointer move (a
+  full re-render each, plus layout work). Now move events are coalesced to one commit per
+  animation frame (`scheduleDrag`, mirroring the pan/zoom gesture), so collision and
+  containment layout can run during drag without reacting to every raw pointer event.
+  Connector drags are coalesced the same way.
+- Sprite resolution: canvas avatar sprites are cached at multiple resolution tiers
+  (`SPRITE_TIERS` 64/128/256) and the draw picks the tier matching the on-screen device-pixel
+  size, so zoomed-in canvas avatars are crisp instead of an upscaled 64px blur. Cost is a bit
+  more sprite-cache memory (still tiny: tones × initials × tiers).
+
+### 2026-06-11 — People render on a Canvas 2D layer; DOM only for interaction
+
+- Decision: all people are painted on a single Canvas 2D layer with cached avatar
+  sprites and viewport culling, so they stay visible at every zoom (no LOD hiding).
+  A real interactive DOM person node is overlaid only for people in view at working
+  zoom (`scale >= PEOPLE_INTERACT_SCALE`), plus the selected person; those are excluded
+  from the canvas draw to avoid double-painting. Person→circle edges and synthetic
+  cross-links also move to the canvas (DOM people keep an SVG edge behind their avatar).
+- Why: this supersedes the earlier "drop people when zoomed out" LOD — the user wants
+  every person always visible. The canvas sprite path (the one that genuinely held up at
+  10k nodes earlier) is now applied to the *real* people, so the bulk is cheap while the
+  small interactive overlay keeps drag/select/notes working. DOM person count stays near
+  zero when zoomed out and bounded to one viewport when zoomed in.
+- Mechanics: the canvas is a screen-space sibling of the world layer, repainted
+  imperatively each gesture frame (live culling fills in people revealed mid-pan) and via
+  an effect on settle. Sprites are keyed by `${tone}|${avatar}` and cached forever.
+  Layering: circle fills < canvas (people + edges) < interactive DOM overlay.
+- Rejected: cheaper DOM-only people (still O(n) reconciliation/paint) and hiding people on
+  zoom-out (the user explicitly wants them always shown).
+- Follow-up: promoting people to DOM by zoom *scale* alone still died when a dense circle
+  put 1,000+ people on screen at once (each DOM person is ~100× a canvas sprite). Capped
+  the interactive overlay at `PEOPLE_DOM_CAP` (120) — above that everyone stays on the
+  canvas until you zoom in enough to thin them out. Also stopped culling circles (they're
+  few and cheap): circle culling made circles pop in late during a long pan because the DOM
+  layer only re-culls on settle while the people canvas repaints live every frame.
+
 ### 2026-06-11 — Compact Shape Type Selection and Stacked Overlay Fixes
 
 - Decision: Replaced the bulky, native dropdown select elements for Shape Type selections (for both Circles and People) with a custom-styled Material 3 Segmented Button component (`.m3-segmented-button`). Shifted the Settings panel styling out of inline styles, defining it as `.settings-panel` in `src/index.css` with a high `z-index: 100` stacking order.
