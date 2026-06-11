@@ -137,6 +137,12 @@ type ResizeCircleState = {
 
 const MIN_SCALE = 0.35
 const MAX_SCALE = 1.8
+// Render only nodes inside the viewport, padded by this fraction on each side so
+// small pans reveal already-rendered nodes before the gesture settles.
+const CULL_OVERSCAN = 0.45
+// Below this zoom, individual people are sub-10px and illegible — skip drawing
+// them (and their edges) so surveying the whole board stays cheap (LOD).
+const PEOPLE_LOD_SCALE = 0.5
 const CONNECT_THRESHOLD = 40
 const MIN_CIRCLE_RADIUS = 72
 const EDGE_RESIZE_HIT_SIZE = 18
@@ -271,14 +277,6 @@ const DEFAULT_STATE: GraphState = {
   connections: [],
 }
 
-const TONE_LABELS: Record<CircleTone, string> = {
-  amber: 'Warm',
-  blue: 'Blue',
-  green: 'Green',
-  red: 'Red',
-  violet: 'Violet',
-}
-
 const MATERIAL_TONES: Record<CircleTone, { fill: string; border: string; text: string; centerBg: string }> = {
   blue: { fill: '#D2E4FF', border: '#004A77', text: '#001D35', centerBg: '#00629D' },
   red: { fill: '#FFDAD6', border: '#BA1A1A', text: '#410002', centerBg: '#C00015' },
@@ -401,7 +399,8 @@ function App() {
   const [selectedItem, setSelectedItem] = useState<SelectedItem>({ type: 'circle', id: 'you' })
   // STRESS TEST — synthetic-load config (circles / people / cross-links).
   const [stress, setStress] = useState<StressConfig>(STRESS_DEFAULT_CONFIG)
-  const fps = useFrameRate()
+  // Viewport size in CSS px, used to cull off-screen nodes. Updated on resize.
+  const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight })
 
   const [showSettings, setShowSettings] = useState(false)
   const [centerBehavior, setCenterBehavior] = useState<'connect' | 'move'>('connect')
@@ -643,6 +642,58 @@ function App() {
     }
     return [...displayCircles].sort((a, b) => getDepth(a.parentId) - getDepth(b.parentId))
   }, [displayCircles, circlesById])
+
+  // VIEWPORT CULLING — derive the visible world rectangle from the settled
+  // camera, padded by CULL_OVERSCAN. During a gesture `camera` is frozen (only
+  // cameraRef moves), so these sets stay stable and the GPU-composited world
+  // layer just translates them; on settle they refresh. Keeping the rendered
+  // set small makes both React reconciliation and layer rasterization cheap.
+  const visibleWorld = useMemo(() => {
+    const s = camera.scale
+    const left = -camera.x / s
+    const top = -camera.y / s
+    const right = (viewport.w - camera.x) / s
+    const bottom = (viewport.h - camera.y) / s
+    const mx = (right - left) * CULL_OVERSCAN
+    const my = (bottom - top) * CULL_OVERSCAN
+    return { left: left - mx, right: right + mx, top: top - my, bottom: bottom + my }
+  }, [camera, viewport])
+
+  const visibleCircles = useMemo(
+    () =>
+      sortedCircles.filter(
+        (c) =>
+          c.x + c.radius >= visibleWorld.left &&
+          c.x - c.radius <= visibleWorld.right &&
+          c.y + c.radius >= visibleWorld.top &&
+          c.y - c.radius <= visibleWorld.bottom,
+      ),
+    [sortedCircles, visibleWorld],
+  )
+
+  // LOD — when zoomed far out, individual people would be unreadable specks, so
+  // we drop them (and their edges) entirely. At working zoom they're culled.
+  const showPeople = camera.scale >= PEOPLE_LOD_SCALE
+  const pointVisible = (n: { x: number; y: number }) =>
+    n.x >= visibleWorld.left && n.x <= visibleWorld.right && n.y >= visibleWorld.top && n.y <= visibleWorld.bottom
+  const visiblePeople = useMemo(
+    () => (showPeople ? displayPeople.filter(pointVisible) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [displayPeople, visibleWorld, showPeople],
+  )
+  const visibleConnections = useMemo(() => {
+    if (!showPeople) return []
+    return displayConnections.filter((conn) => {
+      const a = peopleById.get(conn.fromId) || circlesById.get(conn.fromId)
+      const b = peopleById.get(conn.toId) || circlesById.get(conn.toId)
+      if (!a || !b) return false
+      return pointVisible(a) || pointVisible(b)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayConnections, peopleById, circlesById, visibleWorld, showPeople])
+
+  const drawnNodeCount = visibleCircles.length + visiblePeople.length
+
   const selectedCircle = selectedItem?.type === 'circle' ? circlesById.get(selectedItem.id) ?? null : null
   const selectedPerson = selectedItem?.type === 'person' ? graph.people.find((person) => person.id === selectedItem.id) ?? null : null
   const selectedConnection = selectedItem?.type === 'connection' ? (graph.connections || []).find((conn) => conn.id === selectedItem.id) ?? null : null
@@ -718,6 +769,15 @@ function App() {
   useEffect(() => () => {
     if (gestureRafRef.current != null) window.cancelAnimationFrame(gestureRafRef.current)
     if (settleTimerRef.current != null) window.clearTimeout(settleTimerRef.current)
+  }, [])
+
+  // Track viewport size so culling has the current visible rectangle.
+  useEffect(() => {
+    function handleResize() {
+      setViewport({ w: window.innerWidth, h: window.innerHeight })
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
   }, [])
 
   useEffect(() => {
@@ -1326,7 +1386,7 @@ function App() {
         <section className="stress-panel" aria-label="Performance stress test controls">
           <div className="stress-panel__header">
             <strong>Real-node stress</strong>
-            <span>{fps} FPS</span>
+            <FpsMeter />
           </div>
           <label className="stress-slider">
             <span>{stress.circleCount.toLocaleString('en-US')} circles</span>
@@ -1383,6 +1443,10 @@ function App() {
               <dt>Edges</dt>
               <dd>{renderedEdgeCount.toLocaleString('en-US')}</dd>
             </div>
+            <div>
+              <dt>Drawn{!showPeople ? ' (LOD)' : ''}</dt>
+              <dd>{drawnNodeCount.toLocaleString('en-US')}</dd>
+            </div>
           </dl>
         </section>
       )}
@@ -1411,7 +1475,7 @@ function App() {
         <div ref={worldLayerRef} className="world-layer" style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale})` }}>
           
           {/* PASS 1: Circle Fills and Borders */}
-          {sortedCircles.map((circle) => (
+          {visibleCircles.map((circle) => (
             <div
               key={`body-${circle.id}`}
               style={{
@@ -1448,17 +1512,17 @@ function App() {
 
           {/* PASS 2: Connection Edges */}
           <svg className="edge-layer" aria-hidden="true" style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}>
-            {displayCircles.map((circle) => {
+            {visibleCircles.map((circle) => {
               const source = circle.connectedTo ? circlesById.get(circle.connectedTo) : null
               if (!source) return null
               return <path key={circle.id} className="edge edge--circle" d={makeCurve(source, circle)} />
             })}
-            {displayPeople.map((person) => {
+            {visiblePeople.map((person) => {
               const circle = circlesById.get(person.circleId)
               if (!circle) return null
               return <path key={person.id} className="edge edge--person" d={makeCurve(circle, person)} />
             })}
-            {displayConnections.map((conn) => {
+            {visibleConnections.map((conn) => {
               const sourceNode = peopleById.get(conn.fromId) || circlesById.get(conn.fromId)
               const targetNode = peopleById.get(conn.toId) || circlesById.get(conn.toId)
               if (!sourceNode || !targetNode) return null
@@ -1496,7 +1560,7 @@ function App() {
           </svg>
 
           {/* PASS 3: Circle Interactive Elements (Centers & Labels) */}
-          {sortedCircles.map((circle) => (
+          {visibleCircles.map((circle) => (
             <section
               key={circle.id}
               className={`circle circle--${circle.tone} ${selectedItem?.type === 'circle' && selectedItem?.id === circle.id ? 'is-selected' : ''}`}
@@ -1706,7 +1770,7 @@ function App() {
           ))}
 
           {/* PASS 4: People Icons and Labels */}
-          {displayPeople.map((person) => {
+          {visiblePeople.map((person) => {
             const isSelected = selectedItem?.type === 'person' && selectedItem?.id === person.id
             const parentCircle = circlesById.get(person.circleId)
             const personColor = parentCircle ? MATERIAL_TONES[parentCircle.tone].centerBg : '#3F51B5'
@@ -2005,7 +2069,7 @@ function App() {
         {selectedItem ? (
           <>
             <span className="inspector__eyebrow">
-              {selectedItem.type === 'circle' ? 'Circle center' : selectedItem.type === 'person' ? 'Person' : 'Connection'}
+              {selectedItem.type === 'circle' ? 'Circle' : selectedItem.type === 'person' ? 'Person' : 'Connection'}
             </span>
             {selectedItem.type !== 'connection' ? (
               <input
@@ -2019,126 +2083,128 @@ function App() {
                 Relationship Link
               </div>
             )}
+            
             {selectedCircle && (
               <>
-                <dl className="metadata-grid">
-                  <div>
-                    <dt>People</dt>
-                    <dd>{graph.people.filter((person) => person.circleId === selectedCircle.id).length}</dd>
-                  </div>
-                  <div>
-                    <dt>Nested circles</dt>
-                    <dd>{graph.circles.filter((circle) => circle.parentId === selectedCircle.id).length}</dd>
-                  </div>
-                  <div>
-                    <dt>Tone</dt>
-                    <dd>{TONE_LABELS[selectedCircle.tone]}</dd>
-                  </div>
-                  <div>
-                    <dt>Radius</dt>
-                    <dd>{Math.round(selectedCircle.radius)} px</dd>
-                  </div>
-                </dl>
-
-                {/* Collapsible Appearance Settings */}
-                <details style={{ marginTop: '14px', cursor: 'pointer' }}>
-                  <summary>
-                    <span>Style & appearance</span>
-                    <ChevronDownIcon />
-                  </summary>
-                  <div style={{ padding: '8px 0', display: 'flex', flexDirection: 'column', gap: '10px', cursor: 'default' }}>
-                    <div className="inspector-field">
-                      <label>Shape Type</label>
-                      <div className="m3-select-wrapper">
-                        <select
-                          value={selectedCircle.shapeType ?? 'wavy'}
-                          onChange={(e) => updateCircleStyle(selectedCircle.id, { shapeType: e.target.value as ShapeType })}
-                        >
-                          <option value="wavy">Wavy (Flower)</option>
-                          <option value="polygon">Soft Polygon</option>
-                          <option value="circle">Circle</option>
-                        </select>
-                      </div>
-                    </div>
-                    
-                    {(selectedCircle.shapeType ?? 'wavy') !== 'circle' && (
-                      <>
-                        <div className="inspector-field">
-                          <label>Sides / Petals ({selectedCircle.sides ?? 8})</label>
-                          <input
-                            type="range"
-                            min="3"
-                            max="60"
-                            value={selectedCircle.sides ?? 8}
-                            onChange={(e) => updateCircleStyle(selectedCircle.id, { sides: parseInt(e.target.value) })}
-                          />
-                        </div>
-                        <div className="inspector-field">
-                          <label>Amplitude / Rounding ({selectedCircle.amplitude ?? 5})</label>
-                          <input
-                            type="range"
-                            min="0"
-                            max="50"
-                            value={selectedCircle.amplitude ?? 5}
-                            onChange={(e) => updateCircleStyle(selectedCircle.id, { amplitude: parseFloat(e.target.value) })}
-                          />
-                        </div>
-                      </>
-                    )}
-
-                    <div className="inspector-field">
-                      <label>Center Image URL</label>
-                      <input
-                        type="text"
-                        placeholder="https://example.com/image.jpg"
-                        value={selectedCircle.imageUrl ?? ''}
-                        onChange={(e) => updateCircleStyle(selectedCircle.id, { imageUrl: e.target.value })}
-                      />
-                    </div>
-                    <div className="inspector-field">
-                      <label>Upload Photo</label>
-                      <label className="m3-upload-btn">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="m3-file-input-hidden"
-                          onChange={(e) => handleImageUpload(e, (base64) => updateCircleStyle(selectedCircle.id, { imageUrl: base64 }))}
+                {/* Visual Settings Row: Color swatches + Avatar Photo Upload */}
+                <div className="inspector-visual-row">
+                  <div className="m3-color-swatches-container">
+                    <label>Color Tone</label>
+                    <div className="m3-color-swatches">
+                      {(['blue', 'red', 'green', 'amber', 'violet'] as CircleTone[]).map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          className={`m3-color-swatch m3-color-swatch--${t} ${selectedCircle.tone === t ? 'is-selected' : ''}`}
+                          onClick={() => updateCircleStyle(selectedCircle.id, { tone: t })}
+                          title={`Set tone to ${t}`}
+                          aria-label={`Set tone to ${t}`}
                         />
-                        <UploadIcon />
-                        <span>Upload photo</span>
-                      </label>
+                      ))}
                     </div>
                   </div>
-                </details>
 
-                {/* Collapsible Actions */}
-                <details style={{ marginTop: '8px', cursor: 'pointer' }}>
-                  <summary>
-                    <span>Actions</span>
-                    <ChevronDownIcon />
-                  </summary>
-                  <div style={{ padding: '8px 0', display: 'flex', flexDirection: 'column', gap: '8px', cursor: 'default' }}>
-                    <button type="button" className="primary-action" onClick={addDemoCluster}>
-                      Add 3 demo people
-                    </button>
-
-                    {selectedCircle.id !== 'you' && (
-                      <button
-                        type="button"
-                        className="primary-action"
-                        style={{
-                          background: 'var(--md-error-container)',
-                          color: 'var(--md-on-error-container)',
-                        }}
-                        onClick={() => deleteCircle(selectedCircle.id)}
-                      >
-                        Delete circle
-                      </button>
-                    )}
+                  <div className="m3-avatar-picker-container">
+                    <label>Photo</label>
+                    <label className="m3-avatar-picker" title="Upload circle photo">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="m3-file-input-hidden"
+                        onChange={(e) => handleImageUpload(e, (base64) => updateCircleStyle(selectedCircle.id, { imageUrl: base64 }))}
+                      />
+                      {selectedCircle.imageUrl ? (
+                        <img src={selectedCircle.imageUrl} alt="Circle avatar" />
+                      ) : (
+                        <svg className="m3-avatar-picker-default-icon" viewBox="0 0 24 24">
+                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                          <circle cx="8.5" cy="8.5" r="1.5" />
+                          <polyline points="21 15 16 10 5 21" />
+                        </svg>
+                      )}
+                      <div className="m3-avatar-picker-overlay">
+                        <UploadIcon />
+                      </div>
+                    </label>
                   </div>
-                </details>
+                </div>
+
+                {/* Shape Type Selection */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px' }}>
+                  <div className="inspector-field">
+                    <label>Shape Type</label>
+                    <div className="m3-select-wrapper">
+                      <select
+                        value={selectedCircle.shapeType ?? 'wavy'}
+                        onChange={(e) => updateCircleStyle(selectedCircle.id, { shapeType: e.target.value as ShapeType })}
+                      >
+                        <option value="wavy">Wavy (Flower)</option>
+                        <option value="polygon">Soft Polygon</option>
+                        <option value="circle">Circle</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  {(selectedCircle.shapeType ?? 'wavy') !== 'circle' && (
+                    <>
+                      <div className="inspector-field">
+                        <label>Sides / Petals ({selectedCircle.sides ?? 8})</label>
+                        <input
+                          type="range"
+                          min="3"
+                          max="60"
+                          value={selectedCircle.sides ?? 8}
+                          onChange={(e) => updateCircleStyle(selectedCircle.id, { sides: parseInt(e.target.value) })}
+                        />
+                      </div>
+                      <div className="inspector-field">
+                        <label>Amplitude / Rounding ({selectedCircle.amplitude ?? 5})</label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="50"
+                          value={selectedCircle.amplitude ?? 5}
+                          onChange={(e) => updateCircleStyle(selectedCircle.id, { amplitude: parseFloat(e.target.value) })}
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  <div className="inspector-field">
+                    <label>Center Image URL</label>
+                    <input
+                      type="text"
+                      placeholder="https://example.com/image.jpg"
+                      value={selectedCircle.imageUrl ?? ''}
+                      onChange={(e) => updateCircleStyle(selectedCircle.id, { imageUrl: e.target.value })}
+                      className="m3-input-field"
+                    />
+                  </div>
+                </div>
+
+                {/* Sticky Actions at Bottom */}
+                <div className="inspector-actions-section">
+                  <button type="button" className="primary-action" onClick={addDemoCluster}>
+                    Add 3 demo people
+                  </button>
+
+                  {selectedCircle.id !== 'you' && (
+                    <button
+                      type="button"
+                      className="primary-action"
+                      style={{
+                        background: 'var(--md-error-container)',
+                        color: 'var(--md-on-error-container)',
+                      }}
+                      onClick={() => deleteCircle(selectedCircle.id)}
+                    >
+                      Delete circle
+                    </button>
+                  )}
+                </div>
               </>
             )}
+
             {selectedPerson && (
               <>
                 {/* Favorite Star Button at top-right of inspector */}
@@ -2171,22 +2237,81 @@ function App() {
                   </svg>
                 </button>
 
-                <dl className="metadata-grid" style={{ paddingRight: '28px' }}>
-                  <div>
-                    <dt>Role</dt>
-                    <dd>{selectedPerson.role}</dd>
+                {/* Visual Settings Row: Select Circle + Avatar Photo Upload */}
+                <div className="inspector-visual-row">
+                  <div className="inspector-field" style={{ flex: 1, marginTop: 0 }}>
+                    <label>Circle</label>
+                    <div className="m3-select-wrapper">
+                      <select
+                        value={selectedPerson.circleId}
+                        onChange={(e) => {
+                          const newCircleId = e.target.value
+                          setGraph((current) => ({
+                            ...current,
+                            people: current.people.map((p) =>
+                              p.id === selectedPerson.id ? { ...p, circleId: newCircleId } : p
+                            ),
+                          }))
+                        }}
+                      >
+                        {graph.circles.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
-                  <div>
-                    <dt>Circle</dt>
-                    <dd>{circlesById.get(selectedPerson.circleId)?.name}</dd>
-                  </div>
-                </dl>
 
-                <div className="inspector-notes-section" style={{ marginTop: '16px', borderTop: '1px solid var(--md-outline-variant)', paddingTop: '16px' }}>
-                  <h4 style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: 500, color: 'var(--md-on-surface)' }}>Notes</h4>
+                  <div className="m3-avatar-picker-container">
+                    <label>Photo</label>
+                    <label className="m3-avatar-picker" title="Upload person photo">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="m3-file-input-hidden"
+                        onChange={(e) => handleImageUpload(e, (base64) => updatePersonStyle(selectedPerson.id, { imageUrl: base64 }))}
+                      />
+                      {selectedPerson.imageUrl ? (
+                        <img src={selectedPerson.imageUrl} alt="Person avatar" />
+                      ) : (
+                        <svg className="m3-avatar-picker-default-icon" viewBox="0 0 24 24">
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                          <circle cx="12" cy="7" r="4" />
+                        </svg>
+                      )}
+                      <div className="m3-avatar-picker-overlay">
+                        <UploadIcon />
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="inspector-field" style={{ marginTop: '4px' }}>
+                  <label>Role</label>
+                  <input
+                    type="text"
+                    value={selectedPerson.role}
+                    onChange={(e) => {
+                      const newRole = e.target.value
+                      setGraph((current) => ({
+                        ...current,
+                        people: current.people.map((p) =>
+                          p.id === selectedPerson.id ? { ...p, role: newRole } : p
+                        ),
+                      }))
+                    }}
+                    placeholder="E.g., Software Developer"
+                    className="m3-input-field"
+                  />
+                </div>
+
+                {/* Notes Section */}
+                <div className="inspector-notes-section" style={{ marginTop: '12px', borderTop: '1px solid var(--md-outline-variant)', paddingTop: '12px' }}>
+                  <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 500, color: 'var(--md-on-surface)' }}>Notes</h4>
 
                   {/* Scrollable list */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px' }}>
                     {(!selectedPerson.notes || selectedPerson.notes.length === 0) ? (
                       <span style={{ fontSize: '11px', color: 'var(--md-on-surface-variant)', fontStyle: 'italic' }}>No notes yet.</span>
                     ) : (
@@ -2270,100 +2395,76 @@ function App() {
                   </div>
                 </div>
 
-                {/* Collapsible Appearance Settings */}
-                <details style={{ marginTop: '14px', cursor: 'pointer' }}>
-                  <summary>
-                    <span>Style & appearance</span>
-                    <ChevronDownIcon />
-                  </summary>
-                  <div style={{ padding: '8px 0', display: 'flex', flexDirection: 'column', gap: '10px', cursor: 'default' }}>
-                    <div className="inspector-field">
-                      <label>Shape Type</label>
-                      <div className="m3-select-wrapper">
-                        <select
-                          value={selectedPerson.shapeType ?? 'polygon'}
-                          onChange={(e) => updatePersonStyle(selectedPerson.id, { shapeType: e.target.value as ShapeType })}
-                        >
-                          <option value="polygon">Soft Polygon</option>
-                          <option value="wavy">Wavy (Flower)</option>
-                          <option value="circle">Circle</option>
-                        </select>
-                      </div>
+                {/* Appearance Options */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px', borderTop: '1px solid var(--md-outline-variant)', paddingTop: '12px' }}>
+                  <div className="inspector-field">
+                    <label>Shape Type</label>
+                    <div className="m3-select-wrapper">
+                      <select
+                        value={selectedPerson.shapeType ?? 'polygon'}
+                        onChange={(e) => updatePersonStyle(selectedPerson.id, { shapeType: e.target.value as ShapeType })}
+                      >
+                        <option value="polygon">Soft Polygon</option>
+                        <option value="wavy">Wavy (Flower)</option>
+                        <option value="circle">Circle</option>
+                      </select>
                     </div>
-                    
-                    {(selectedPerson.shapeType ?? 'polygon') !== 'circle' && (
-                      <>
-                        <div className="inspector-field">
-                          <label>Sides / Petals ({selectedPerson.sides ?? 8})</label>
-                          <input
-                            type="range"
-                            min="3"
-                            max="20"
-                            value={selectedPerson.sides ?? 8}
-                            onChange={(e) => updatePersonStyle(selectedPerson.id, { sides: parseInt(e.target.value) })}
-                          />
-                        </div>
-                        <div className="inspector-field">
-                          <label>Amplitude / Rounding ({selectedPerson.amplitude ?? 2})</label>
-                          <input
-                            type="range"
-                            min="0"
-                            max="20"
-                            value={selectedPerson.amplitude ?? 2}
-                            onChange={(e) => updatePersonStyle(selectedPerson.id, { amplitude: parseFloat(e.target.value) })}
-                          />
-                        </div>
-                      </>
-                    )}
-
-                    <div className="inspector-field">
-                      <label>Photo Image URL</label>
-                      <input
-                        type="text"
-                        placeholder="https://example.com/image.jpg"
-                        value={selectedPerson.imageUrl ?? ''}
-                        onChange={(e) => updatePersonStyle(selectedPerson.id, { imageUrl: e.target.value })}
-                      />
-                    </div>
-                    <div className="inspector-field">
-                      <label>Upload Photo</label>
-                      <label className="m3-upload-btn">
+                  </div>
+                  
+                  {(selectedPerson.shapeType ?? 'polygon') !== 'circle' && (
+                    <>
+                      <div className="inspector-field">
+                        <label>Sides / Petals ({selectedPerson.sides ?? 8})</label>
                         <input
-                          type="file"
-                          accept="image/*"
-                          className="m3-file-input-hidden"
-                          onChange={(e) => handleImageUpload(e, (base64) => updatePersonStyle(selectedPerson.id, { imageUrl: base64 }))}
+                          type="range"
+                          min="3"
+                          max="20"
+                          value={selectedPerson.sides ?? 8}
+                          onChange={(e) => updatePersonStyle(selectedPerson.id, { sides: parseInt(e.target.value) })}
                         />
-                        <UploadIcon />
-                        <span>Upload photo</span>
-                      </label>
-                    </div>
-                  </div>
-                </details>
+                      </div>
+                      <div className="inspector-field">
+                        <label>Amplitude / Rounding ({selectedPerson.amplitude ?? 2})</label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="20"
+                          value={selectedPerson.amplitude ?? 2}
+                          onChange={(e) => updatePersonStyle(selectedPerson.id, { amplitude: parseFloat(e.target.value) })}
+                        />
+                      </div>
+                    </>
+                  )}
 
-                {/* Collapsible Actions */}
-                <details style={{ marginTop: '8px', cursor: 'pointer' }}>
-                  <summary>
-                    <span>Actions</span>
-                    <ChevronDownIcon />
-                  </summary>
-                  <div style={{ padding: '8px 0', cursor: 'default' }}>
-                    <button
-                      type="button"
-                      className="primary-action"
-                      style={{
-                        background: 'var(--md-error-container)',
-                        color: 'var(--md-on-error-container)',
-                        width: '100%',
-                      }}
-                      onClick={() => deletePerson(selectedPerson.id)}
-                    >
-                      Delete person
-                    </button>
+                  <div className="inspector-field">
+                    <label>Photo Image URL</label>
+                    <input
+                      type="text"
+                      placeholder="https://example.com/image.jpg"
+                      value={selectedPerson.imageUrl ?? ''}
+                      onChange={(e) => updatePersonStyle(selectedPerson.id, { imageUrl: e.target.value })}
+                      className="m3-input-field"
+                    />
                   </div>
-                </details>
+                </div>
+
+                {/* Sticky Actions at Bottom */}
+                <div className="inspector-actions-section">
+                  <button
+                    type="button"
+                    className="primary-action"
+                    style={{
+                      background: 'var(--md-error-container)',
+                      color: 'var(--md-on-error-container)',
+                    }}
+                    onClick={() => deletePerson(selectedPerson.id)}
+                  >
+                    Delete person
+                  </button>
+                </div>
               </>
             )}
+
             {selectedConnection && (() => {
               const fromNode = peopleById.get(selectedConnection.fromId) || circlesById.get(selectedConnection.fromId)
               const toNode = peopleById.get(selectedConnection.toId) || circlesById.get(selectedConnection.toId)
@@ -2401,7 +2502,6 @@ function App() {
             <span style={{ fontSize: '13px', fontWeight: 500 }}>Select an item to view details</span>
           </div>
         )}
-        <p style={{ marginTop: '14px' }}>Drag objects directly. Right-click a circle for creation actions. Parent circles auto-fit as contained objects move.</p>
       </aside>
     </main>
   )
@@ -2431,6 +2531,13 @@ function useFrameRate() {
   }, [])
 
   return fps
+}
+
+// Isolated so its 2 Hz state tick only re-renders this badge, not the whole
+// board tree (which would otherwise reconcile every visible node twice a second).
+function FpsMeter() {
+  const fps = useFrameRate()
+  return <span>{fps} FPS</span>
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -2656,27 +2763,6 @@ function CheckIcon() {
       }}
     >
       <path d="M20 6L9 17l-5-5" />
-    </svg>
-  )
-}
-
-function ChevronDownIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      className="chevron-icon"
-      style={{
-        width: '16px',
-        height: '16px',
-        fill: 'none',
-        stroke: 'currentColor',
-        strokeWidth: 2,
-        strokeLinecap: 'round',
-        strokeLinejoin: 'round',
-      }}
-    >
-      <polyline points="6 9 12 15 18 9" />
     </svg>
   )
 }

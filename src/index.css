@@ -1082,3 +1082,158 @@ input[type="range"]::-webkit-slider-thumb:active {
   background-color: var(--md-surface-container-low);
 }
 
+/* Color swatch picker styles */
+.m3-color-swatches-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.m3-color-swatches-container label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--md-on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.m3-color-swatches {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.m3-color-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  position: relative;
+  transition: transform 0.15s cubic-bezier(0.2, 0, 0, 1), outline 0.15s ease;
+  padding: 0;
+  background-clip: content-box;
+}
+
+.m3-color-swatch:hover {
+  transform: scale(1.15);
+}
+
+.m3-color-swatch.is-selected {
+  outline: 2px solid var(--md-primary);
+  outline-offset: 2px;
+  transform: scale(1.1);
+}
+
+.m3-color-swatch--blue { background-color: #00629D; }
+.m3-color-swatch--red { background-color: #C00015; }
+.m3-color-swatch--green { background-color: #1E824A; }
+.m3-color-swatch--amber { background-color: #D87A00; }
+.m3-color-swatch--violet { background-color: #7F67BE; }
+
+/* Visual row containing swatches and avatar */
+.inspector-visual-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 12px 0;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--md-outline-variant);
+}
+
+/* Avatar circular picker */
+.m3-avatar-picker-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.m3-avatar-picker-container label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--md-on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.m3-avatar-picker {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: var(--md-surface-container-highest);
+  border: 1px solid var(--md-outline-variant);
+  overflow: hidden;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.2s, background-color 0.2s, transform 0.1s;
+}
+
+.m3-avatar-picker:hover {
+  border-color: var(--md-primary);
+  transform: scale(1.05);
+}
+
+.m3-avatar-picker:active {
+  transform: scale(0.98);
+}
+
+.m3-avatar-picker img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.m3-avatar-picker-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  opacity: 0;
+  transition: opacity 0.2s;
+  border-radius: 50%;
+}
+
+.m3-avatar-picker:hover .m3-avatar-picker-overlay {
+  opacity: 1;
+}
+
+.m3-avatar-picker-overlay svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  fill: none;
+}
+
+.m3-avatar-picker-default-icon {
+  width: 22px;
+  height: 22px;
+  color: var(--md-on-surface-variant);
+  stroke: currentColor;
+  stroke-width: 2;
+  fill: none;
+}
+
+/* Secondary full-width buttons and actions */
+.inspector-actions-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: auto; /* Push to the bottom */
+  padding-top: 16px;
+  border-top: 1px solid var(--md-outline-variant);
+}
+
+.inspector-actions-section button {
+  width: 100%;
+}
+
