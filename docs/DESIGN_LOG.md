@@ -17,6 +17,12 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-11 — Compact Shape Type Selection and Stacked Overlay Fixes
+
+- Decision: Replaced the bulky, native dropdown select elements for Shape Type selections (for both Circles and People) with a custom-styled Material 3 Segmented Button component (`.m3-segmented-button`). Shifted the Settings panel styling out of inline styles, defining it as `.settings-panel` in `src/index.css` with a high `z-index: 100` stacking order.
+- Why: Dropdowns felt cheap and added vertical noise. Segmented buttons are compact, fit exactly 3 options horizontally, and provide a premium tactile feel using Material 3 secondary container tokens. The Settings panel previously rendered behind the inspector panel due to conflicting stacking context layers. Specifying a dedicated `z-index: 100` class ensures overlay panels draw on top of content panels.
+- Polygon rounding: Refactored the `getNodePath` drawing code for regular polygons so that setting `amplitude: 0` (or `Rounding: 0` on the Circle slider) correctly renders a sharp, clean regular polygon instead of falling back to a circle.
+
 ### 2026-06-11 — Scale the board with viewport culling + LOD, not by rendering everything
 
 - Decision: the board only renders nodes inside the visible world rectangle (padded by
