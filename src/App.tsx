@@ -1,11 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react'
+// STRESS TEST — dev-only performance harness. See src/lib/stressTest.ts.
+import {
+  STRESS_TEST_ENABLED,
+  STRESS_DEFAULT_CONFIG,
+  STRESS_LIMITS,
+  generateStressGraph,
+  type StressConfig,
+} from './lib/stressTest'
 
-type CircleTone = 'blue' | 'red' | 'green' | 'amber' | 'violet'
+export type CircleTone = 'blue' | 'red' | 'green' | 'amber' | 'violet'
 
-type ShapeType = 'circle' | 'wavy' | 'polygon'
+export type ShapeType = 'circle' | 'wavy' | 'polygon'
 
-type CircleNode = {
+export type CircleNode = {
   id: string
   name: string
   icon: string
@@ -28,7 +36,7 @@ type PersonNote = {
   body: string
 }
 
-type PersonNode = {
+export type PersonNode = {
   id: string
   name: string
   role: string
@@ -44,7 +52,7 @@ type PersonNode = {
   notes?: PersonNote[]
 }
 
-type Connection = {
+export type Connection = {
   id: string
   fromId: string
   toId: string
@@ -54,12 +62,6 @@ type GraphState = {
   circles: CircleNode[]
   people: PersonNode[]
   connections: Connection[]
-}
-
-type StressSettings = {
-  count: number
-  showLabels: boolean
-  showEdges: boolean
 }
 
 type Camera = {
@@ -140,7 +142,6 @@ const MIN_CIRCLE_RADIUS = 72
 const EDGE_RESIZE_HIT_SIZE = 18
 const PERSON_CONTAINMENT_RADIUS = 62
 const CIRCLE_CONTAINMENT_PADDING = 28
-const MAX_STRESS_ICONS = 10000
 
 const DEFAULT_STATE: GraphState = {
   circles: [
@@ -377,27 +378,37 @@ function getNodePath(
 
 function App() {
   const surfaceRef = useRef<HTMLDivElement | null>(null)
-  const stressCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const panRef = useRef<PanState | null>(null)
   const moveCircleRef = useRef<MoveCircleState | null>(null)
   const movePersonRef = useRef<MovePersonState | null>(null)
   const resizeCircleRef = useRef<ResizeCircleState | null>(null)
   const [graph, setGraph] = useState(createInitialGraph)
   const [camera, setCamera] = useState<Camera>({ x: window.innerWidth / 2, y: window.innerHeight / 2, scale: 0.82 })
+  // cameraRef holds the *live* camera during a pan/zoom gesture. `camera` state
+  // is only the last *settled* value (committed when the gesture stops moving).
   const cameraRef = useRef(camera)
+  const worldLayerRef = useRef<HTMLDivElement | null>(null)
+  // Gesture machinery: during a pan/zoom we drive the DOM transform + canvas
+  // imperatively (no React re-render), then commit to state once it settles.
+  const gestureActiveRef = useRef(false)
+  const gestureRafRef = useRef<number | null>(null)
+  const settleTimerRef = useRef<number | null>(null)
+  const driveCameraRef = useRef<(next: Camera) => void>(() => {})
+  const settleGestureRef = useRef<() => void>(() => {})
 
   const [connector, setConnector] = useState<DragConnector | null>(null)
   const [createMenu, setCreateMenu] = useState<CreateMenu | null>(null)
   const [selectedItem, setSelectedItem] = useState<SelectedItem>({ type: 'circle', id: 'you' })
-  const [stress, setStress] = useState<StressSettings>({ count: 0, showLabels: false, showEdges: true })
+  // STRESS TEST — synthetic-load config (circles / people / cross-links).
+  const [stress, setStress] = useState<StressConfig>(STRESS_DEFAULT_CONFIG)
   const fps = useFrameRate()
 
   const [showSettings, setShowSettings] = useState(false)
   const [centerBehavior, setCenterBehavior] = useState<'connect' | 'move'>('connect')
   const [hoveredConnId, setHoveredConnId] = useState<string | null>(null)
   const [openNotesPersonId, setOpenNotesPersonId] = useState<string | null>(null)
-  const [newNoteTitle, setNewNoteTitle] = useState('')
   const [newNoteBody, setNewNoteBody] = useState('')
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
 
   const settingsButtonRef = useRef<HTMLButtonElement>(null)
   const settingsPanelRef = useRef<HTMLDivElement>(null)
@@ -594,12 +605,32 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedItem])
 
-  const circlesById = useMemo(() => new Map(graph.circles.map((circle) => [circle.id, circle])), [graph.circles])
-  const stressPeople = useMemo(() => generateStressPeople(stress.count), [stress.count])
-  const stressSprites = useMemo(() => createStressSprites(), [])
-  const renderedPeopleCount = graph.people.length + stressPeople.length
+  // STRESS TEST — generate real synthetic entities (circles, people, links)
+  // and merge them into the arrays that feed the render passes, so they go
+  // through the exact same React DOM + SVG path as production data.
+  const stressGraph = useMemo(() => generateStressGraph(stress), [stress])
+  const displayCircles = useMemo(
+    () => (stressGraph.circles.length ? [...graph.circles, ...stressGraph.circles] : graph.circles),
+    [graph.circles, stressGraph.circles],
+  )
+  const displayPeople = useMemo(
+    () => (stressGraph.people.length ? [...graph.people, ...stressGraph.people] : graph.people),
+    [graph.people, stressGraph.people],
+  )
+  const displayConnections = useMemo(
+    () =>
+      stressGraph.connections.length
+        ? [...(graph.connections || []), ...stressGraph.connections]
+        : graph.connections || [],
+    [graph.connections, stressGraph.connections],
+  )
+
+  const circlesById = useMemo(() => new Map(displayCircles.map((circle) => [circle.id, circle])), [displayCircles])
+  const peopleById = useMemo(() => new Map(displayPeople.map((person) => [person.id, person])), [displayPeople])
+  const renderedPeopleCount = displayPeople.length
+  const renderedCircleCount = displayCircles.length
   const renderedEdgeCount =
-    graph.circles.filter((circle) => circle.connectedTo).length + graph.people.length + (stress.showEdges ? stressPeople.length : 0)
+    displayCircles.filter((circle) => circle.connectedTo).length + displayPeople.length + displayConnections.length
   const sortedCircles = useMemo(() => {
     function getDepth(circleId: string | null): number {
       let depth = 0
@@ -610,31 +641,84 @@ function App() {
       }
       return depth
     }
-    return [...graph.circles].sort((a, b) => getDepth(a.parentId) - getDepth(b.parentId))
-  }, [graph.circles, circlesById])
+    return [...displayCircles].sort((a, b) => getDepth(a.parentId) - getDepth(b.parentId))
+  }, [displayCircles, circlesById])
   const selectedCircle = selectedItem?.type === 'circle' ? circlesById.get(selectedItem.id) ?? null : null
   const selectedPerson = selectedItem?.type === 'person' ? graph.people.find((person) => person.id === selectedItem.id) ?? null : null
   const selectedConnection = selectedItem?.type === 'connection' ? (graph.connections || []).find((conn) => conn.id === selectedItem.id) ?? null : null
 
-  useEffect(() => {
-    const canvas = stressCanvasRef.current
+  // Push the live camera onto the DOM (world transform + dotted grid) without
+  // going through React. Cheap: one style write, the browser composites it.
+  function applyDomCamera(cam: Camera) {
+    const world = worldLayerRef.current
+    if (world) world.style.transform = `translate(${cam.x}px, ${cam.y}px) scale(${cam.scale})`
     const surface = surfaceRef.current
-    if (!canvas || !surface) return
-
-    drawStressCanvas(canvas, surface, camera, stress, stressPeople, circlesById, stressSprites)
-  }, [camera, circlesById, stress, stressPeople, stressSprites])
-
-  useEffect(() => {
-    function handleResize() {
-      const canvas = stressCanvasRef.current
-      const surface = surfaceRef.current
-      if (!canvas || !surface) return
-      drawStressCanvas(canvas, surface, camera, stress, stressPeople, circlesById, stressSprites)
+    if (surface) {
+      const minor = 32 * cam.scale
+      const major = 160 * cam.scale
+      surface.style.backgroundSize = `${major}px ${major}px, ${minor}px ${minor}px`
+      surface.style.backgroundPosition = `${cam.x}px ${cam.y}px`
     }
+  }
 
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [camera, circlesById, stress, stressPeople, stressSprites])
+  // One imperative frame of a gesture: move the DOM at the live camera.
+  function applyLiveCamera() {
+    applyDomCamera(cameraRef.current)
+  }
+
+  // Called on every pan/zoom event. Updates the live camera, schedules one
+  // imperative repaint per frame, promotes the world to its own GPU layer
+  // (so zoom scales the cached bitmap instead of repainting every vector),
+  // and (re)arms the settle timer that commits a sharp render once you pause.
+  function driveCamera(next: Camera) {
+    cameraRef.current = next
+    if (!gestureActiveRef.current) {
+      gestureActiveRef.current = true
+      worldLayerRef.current?.classList.add('is-gesturing')
+    }
+    if (gestureRafRef.current == null) {
+      gestureRafRef.current = window.requestAnimationFrame(() => {
+        gestureRafRef.current = null
+        applyLiveCamera()
+      })
+    }
+    if (settleTimerRef.current != null) window.clearTimeout(settleTimerRef.current)
+    settleTimerRef.current = window.setTimeout(() => settleGestureRef.current(), 130)
+  }
+
+  // Gesture stopped (pointer up, or no wheel events for a beat): drop the GPU
+  // layer and commit the live camera to React state, which repaints everything
+  // sharp at the final position.
+  function settleGesture() {
+    if (!gestureActiveRef.current) return
+    if (settleTimerRef.current != null) {
+      window.clearTimeout(settleTimerRef.current)
+      settleTimerRef.current = null
+    }
+    if (gestureRafRef.current != null) {
+      window.cancelAnimationFrame(gestureRafRef.current)
+      gestureRafRef.current = null
+    }
+    gestureActiveRef.current = false
+    worldLayerRef.current?.classList.remove('is-gesturing')
+    setCamera(cameraRef.current)
+  }
+
+  // Keep stable refs pointing at the latest gesture closures (so the wheel
+  // listener, registered once, always calls the current ones), and — if
+  // anything re-renders App mid-gesture (e.g. the FPS meter ticks) — re-assert
+  // the live transform before the browser paints so it can't snap back to the
+  // stale settled camera.
+  useLayoutEffect(() => {
+    driveCameraRef.current = driveCamera
+    settleGestureRef.current = settleGesture
+    if (gestureActiveRef.current) applyDomCamera(cameraRef.current)
+  })
+
+  useEffect(() => () => {
+    if (gestureRafRef.current != null) window.cancelAnimationFrame(gestureRafRef.current)
+    if (settleTimerRef.current != null) window.clearTimeout(settleTimerRef.current)
+  }, [])
 
   useEffect(() => {
     const surface = surfaceRef.current
@@ -657,17 +741,17 @@ function App() {
       if (event.ctrlKey) {
         const zoomIntensity = 0.015
         const nextScale = clamp(currentCamera.scale * Math.exp(-event.deltaY * zoomIntensity), MIN_SCALE, MAX_SCALE)
-        setCamera({
+        driveCameraRef.current({
           scale: nextScale,
           x: pointer.x - before.x * nextScale,
           y: pointer.y - before.y * nextScale,
         })
       } else {
-        setCamera((current) => ({
-          ...current,
-          x: current.x - event.deltaX,
-          y: current.y - event.deltaY,
-        }))
+        driveCameraRef.current({
+          ...currentCamera,
+          x: currentCamera.x - event.deltaX,
+          y: currentCamera.y - event.deltaY,
+        })
       }
     }
 
@@ -702,11 +786,11 @@ function App() {
   function handleSurfacePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
     const pan = panRef.current
     if (pan?.pointerId === event.pointerId) {
-      setCamera((current) => ({
-        ...current,
+      driveCamera({
+        ...cameraRef.current,
         x: pan.originX + event.clientX - pan.startX,
         y: pan.originY + event.clientY - pan.startY,
-      }))
+      })
     }
 
     const moving = moveCircleRef.current
@@ -745,6 +829,7 @@ function App() {
   function handleSurfacePointerUp(event: ReactPointerEvent<HTMLDivElement>) {
     if (panRef.current?.pointerId === event.pointerId) {
       panRef.current = null
+      settleGesture()
     }
 
     if (moveCircleRef.current?.pointerId === event.pointerId) {
@@ -1150,7 +1235,8 @@ function App() {
             onClick={() => setShowSettings(!showSettings)}
             aria-label="Settings"
             style={{
-              background: showSettings ? 'rgba(28, 37, 40, 0.07)' : 'transparent',
+              background: showSettings ? 'var(--md-secondary-container)' : 'transparent',
+              color: showSettings ? 'var(--md-on-secondary-container)' : 'var(--md-on-surface-variant)',
             }}
           >
             <SettingsIcon />
@@ -1169,104 +1255,137 @@ function App() {
             right: '16px',
             width: '280px',
             padding: '16px',
-            borderRadius: '12px',
-            border: '1.5px solid #c4c7c8',
-            background: '#ffffff',
-            boxShadow: 'var(--panel-shadow)',
+            borderRadius: 'var(--md-r-md)',
+            border: 'none',
+            background: 'var(--md-surface-container)',
+            boxShadow: 'var(--md-elev-2)',
           }}
         >
-          <strong style={{ fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <strong style={{ fontSize: '16px', fontWeight: 500, color: 'var(--md-on-surface)' }}>
             Settings
           </strong>
           <div style={{ marginTop: '12px', display: 'grid', gap: '8px' }}>
-            <label style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(28, 37, 40, 0.64)' }}>
+            <label style={{ fontSize: '12px', fontWeight: 500, color: 'rgba(28, 37, 40, 0.64)' }}>
               Circle Center Drag Behavior
             </label>
-            <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+            <div
+              style={{
+                display: 'flex',
+                border: '1px solid var(--md-outline-variant)',
+                borderRadius: 'var(--md-r-full)',
+                overflow: 'hidden',
+                marginTop: '4px',
+              }}
+            >
               <button
                 type="button"
                 onClick={() => setCenterBehavior('connect')}
                 style={{
                   flex: 1,
-                  padding: '8px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '8px 12px',
                   fontSize: '12px',
-                  fontWeight: 800,
-                  borderRadius: '6px',
-                  border: '1px solid #c4c7c8',
-                  background: centerBehavior === 'connect' ? '#1c2528' : '#ffffff',
-                  color: centerBehavior === 'connect' ? '#ffffff' : '#1c2528',
+                  fontWeight: 500,
+                  background: centerBehavior === 'connect' ? 'var(--md-secondary-container)' : 'transparent',
+                  color: centerBehavior === 'connect' ? 'var(--md-on-secondary-container)' : 'var(--md-on-surface-variant)',
                   cursor: 'pointer',
                 }}
               >
-                Draw Connection
+                {centerBehavior === 'connect' && <CheckIcon />}
+                <span>Draw connection</span>
               </button>
               <button
                 type="button"
                 onClick={() => setCenterBehavior('move')}
                 style={{
                   flex: 1,
-                  padding: '8px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '8px 12px',
                   fontSize: '12px',
-                  fontWeight: 800,
-                  borderRadius: '6px',
-                  border: '1px solid #c4c7c8',
-                  background: centerBehavior === 'move' ? '#1c2528' : '#ffffff',
-                  color: centerBehavior === 'move' ? '#ffffff' : '#1c2528',
+                  fontWeight: 500,
+                  background: centerBehavior === 'move' ? 'var(--md-secondary-container)' : 'transparent',
+                  color: centerBehavior === 'move' ? 'var(--md-on-secondary-container)' : 'var(--md-on-surface-variant)',
                   cursor: 'pointer',
+                  borderLeft: '1px solid var(--md-outline-variant)',
                 }}
               >
-                Move Circle
+                {centerBehavior === 'move' && <CheckIcon />}
+                <span>Move circle</span>
               </button>
             </div>
           </div>
         </div>
       )}
 
-      <section className="stress-panel" aria-label="Icon stress test controls">
-        <div className="stress-panel__header">
-          <strong>Icon stress</strong>
-          <span>{fps} FPS</span>
-        </div>
-        <label className="stress-slider">
-          <span>{stress.count.toLocaleString('en-US')} synthetic icons</span>
-          <input
-            type="range"
-            min="0"
-            max={MAX_STRESS_ICONS}
-            step="250"
-            value={stress.count}
-            onChange={(event) => setStress((current) => ({ ...current, count: Number(event.target.value) }))}
-          />
-        </label>
-        <div className="stress-toggles">
-          <label>
-            <input
-              type="checkbox"
-              checked={stress.showEdges}
-              onChange={(event) => setStress((current) => ({ ...current, showEdges: event.target.checked }))}
-            />
-            <span>Edges</span>
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={stress.showLabels}
-              onChange={(event) => setStress((current) => ({ ...current, showLabels: event.target.checked }))}
-            />
-            <span>Labels</span>
-          </label>
-        </div>
-        <dl>
-          <div>
-            <dt>Rendered icons</dt>
-            <dd>{renderedPeopleCount.toLocaleString('en-US')}</dd>
+      {/* STRESS TEST — dev-only panel. Hidden when STRESS_TEST_ENABLED is false. */}
+      {STRESS_TEST_ENABLED && (
+        <section className="stress-panel" aria-label="Performance stress test controls">
+          <div className="stress-panel__header">
+            <strong>Real-node stress</strong>
+            <span>{fps} FPS</span>
           </div>
-          <div>
-            <dt>Rendered edges</dt>
-            <dd>{renderedEdgeCount.toLocaleString('en-US')}</dd>
+          <label className="stress-slider">
+            <span>{stress.circleCount.toLocaleString('en-US')} circles</span>
+            <input
+              type="range"
+              min="0"
+              max={STRESS_LIMITS.circleCount}
+              step="5"
+              value={stress.circleCount}
+              onChange={(event) => setStress((current) => ({ ...current, circleCount: Number(event.target.value) }))}
+            />
+          </label>
+          <label className="stress-slider">
+            <span>{stress.peoplePerCircle.toLocaleString('en-US')} people / circle</span>
+            <input
+              type="range"
+              min="0"
+              max={STRESS_LIMITS.peoplePerCircle}
+              step="1"
+              value={stress.peoplePerCircle}
+              onChange={(event) => setStress((current) => ({ ...current, peoplePerCircle: Number(event.target.value) }))}
+            />
+          </label>
+          <label className="stress-slider">
+            <span>{stress.crossLinks.toLocaleString('en-US')} cross-links</span>
+            <input
+              type="range"
+              min="0"
+              max={STRESS_LIMITS.crossLinks}
+              step="25"
+              value={stress.crossLinks}
+              onChange={(event) => setStress((current) => ({ ...current, crossLinks: Number(event.target.value) }))}
+            />
+          </label>
+          <div className="stress-toggles" style={{ gap: '16px' }}>
+            <button
+              type="button"
+              className="m3-text-button"
+              onClick={() => setStress(STRESS_DEFAULT_CONFIG)}
+            >
+              Clear
+            </button>
           </div>
-        </dl>
-      </section>
+          <dl>
+            <div>
+              <dt>Circles</dt>
+              <dd>{renderedCircleCount.toLocaleString('en-US')}</dd>
+            </div>
+            <div>
+              <dt>People</dt>
+              <dd>{renderedPeopleCount.toLocaleString('en-US')}</dd>
+            </div>
+            <div>
+              <dt>Edges</dt>
+              <dd>{renderedEdgeCount.toLocaleString('en-US')}</dd>
+            </div>
+          </dl>
+        </section>
+      )}
 
       <section className="help-panel" aria-label="How to use the prototype">
         <strong>How it works</strong>
@@ -1280,14 +1399,16 @@ function App() {
       <div
         ref={surfaceRef}
         className="graph-surface"
+        style={{
+          backgroundSize: `${160 * camera.scale}px ${160 * camera.scale}px, ${32 * camera.scale}px ${32 * camera.scale}px`,
+          backgroundPosition: `${camera.x}px ${camera.y}px`,
+        }}
         onPointerDown={handleSurfacePointerDown}
         onPointerMove={handleSurfacePointerMove}
         onPointerUp={handleSurfacePointerUp}
         onPointerCancel={handleSurfacePointerUp}
       >
-        <canvas ref={stressCanvasRef} className="stress-canvas-layer" aria-hidden="true" />
-
-        <div className="world-layer" style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale})` }}>
+        <div ref={worldLayerRef} className="world-layer" style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale})` }}>
           
           {/* PASS 1: Circle Fills and Borders */}
           {sortedCircles.map((circle) => (
@@ -1327,19 +1448,19 @@ function App() {
 
           {/* PASS 2: Connection Edges */}
           <svg className="edge-layer" aria-hidden="true" style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}>
-            {graph.circles.map((circle) => {
+            {displayCircles.map((circle) => {
               const source = circle.connectedTo ? circlesById.get(circle.connectedTo) : null
               if (!source) return null
               return <path key={circle.id} className="edge edge--circle" d={makeCurve(source, circle)} />
             })}
-            {graph.people.map((person) => {
+            {displayPeople.map((person) => {
               const circle = circlesById.get(person.circleId)
               if (!circle) return null
               return <path key={person.id} className="edge edge--person" d={makeCurve(circle, person)} />
             })}
-            {(graph.connections || []).map((conn) => {
-              const sourceNode = graph.people.find((p) => p.id === conn.fromId) || circlesById.get(conn.fromId)
-              const targetNode = graph.people.find((p) => p.id === conn.toId) || circlesById.get(conn.toId)
+            {displayConnections.map((conn) => {
+              const sourceNode = peopleById.get(conn.fromId) || circlesById.get(conn.fromId)
+              const targetNode = peopleById.get(conn.toId) || circlesById.get(conn.toId)
               if (!sourceNode || !targetNode) return null
               const isSelected = selectedItem?.type === 'connection' && selectedItem?.id === conn.id
               const isHovered = hoveredConnId === conn.id
@@ -1363,7 +1484,7 @@ function App() {
                   <path
                     className={`edge edge--custom ${isSelected ? 'is-selected' : ''}`}
                     d={makeCurve(sourceNode, targetNode)}
-                    stroke={isSelected ? '#2563eb' : isHovered ? '#64748b' : '#94a3b8'}
+                    stroke={isSelected ? '#00629d' : isHovered ? '#64748b' : '#94a3b8'}
                     strokeWidth={isSelected ? 4 : isHovered ? 3 : 2}
                     fill="none"
                     style={{ pointerEvents: 'none' }}
@@ -1444,7 +1565,7 @@ function App() {
                       <circle cx="20" cy="20" r="18.5" fill="none" stroke="#ffffff" strokeWidth="3" />
                     </svg>
                   ) : (
-                    <span style={{ color: '#ffffff', fontSize: 10, fontWeight: 900 }}>{circle.icon}</span>
+                    <span style={{ color: '#ffffff', fontSize: 10, fontWeight: 500 }}>{circle.icon}</span>
                   )}
                 </button>
 
@@ -1585,14 +1706,14 @@ function App() {
           ))}
 
           {/* PASS 4: People Icons and Labels */}
-          {graph.people.map((person) => {
+          {displayPeople.map((person) => {
             const isSelected = selectedItem?.type === 'person' && selectedItem?.id === person.id
             const parentCircle = circlesById.get(person.circleId)
             const personColor = parentCircle ? MATERIAL_TONES[parentCircle.tone].centerBg : '#3F51B5'
             const strokeColor = person.isFavorite
               ? '#ffff00' // Highly vibrant neon yellow
               : isSelected
-              ? '#2563eb' // Blue
+              ? '#00629d' // Blue
               : personColor // Group tone
             const strokeWidth = person.isFavorite
               ? (isSelected ? 5.5 : 4.5)
@@ -1680,7 +1801,7 @@ function App() {
                           y="21"
                           fill="#ffffff"
                           fontSize="11"
-                          fontWeight="900"
+                          fontWeight="500"
                           textAnchor="middle"
                           dominantBaseline="middle"
                         >
@@ -1721,7 +1842,7 @@ function App() {
                             width: 10,
                             height: 10,
                             borderRadius: '50%',
-                            background: '#2563eb',
+                            background: 'var(--md-primary)',
                             border: '2px solid #ffffff',
                             boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
                             pointerEvents: 'none',
@@ -1757,7 +1878,7 @@ function App() {
                             width: 10,
                             height: 10,
                             borderRadius: '50%',
-                            background: '#2563eb',
+                            background: 'var(--md-primary)',
                             border: '2px solid #ffffff',
                             boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
                             pointerEvents: 'none',
@@ -1793,7 +1914,7 @@ function App() {
                             width: 10,
                             height: 10,
                             borderRadius: '50%',
-                            background: '#2563eb',
+                            background: 'var(--md-primary)',
                             border: '2px solid #ffffff',
                             boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
                             pointerEvents: 'none',
@@ -1829,7 +1950,7 @@ function App() {
                             width: 10,
                             height: 10,
                             borderRadius: '50%',
-                            background: '#2563eb',
+                            background: 'var(--md-primary)',
                             border: '2px solid #ffffff',
                             boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
                             pointerEvents: 'none',
@@ -1888,18 +2009,19 @@ function App() {
             </span>
             {selectedItem.type !== 'connection' ? (
               <input
+                className="inspector__name-input"
                 value={selectedCircle?.name ?? selectedPerson?.name ?? ''}
                 onChange={(event) => renameSelected(event.target.value)}
                 aria-label="Selected item name"
               />
             ) : (
-              <div style={{ fontSize: '15px', fontWeight: 600, padding: '4px 0 12px 0', borderBottom: '1px solid rgba(28, 37, 40, 0.08)' }}>
+              <div style={{ fontSize: '15px', fontWeight: 500, padding: '4px 0 12px 0', borderBottom: '1px solid rgba(28, 37, 40, 0.08)', marginBottom: '8px' }}>
                 Relationship Link
               </div>
             )}
             {selectedCircle && (
               <>
-                <dl>
+                <dl className="metadata-grid">
                   <div>
                     <dt>People</dt>
                     <dd>{graph.people.filter((person) => person.circleId === selectedCircle.id).length}</dd>
@@ -1920,20 +2042,23 @@ function App() {
 
                 {/* Collapsible Appearance Settings */}
                 <details style={{ marginTop: '14px', cursor: 'pointer' }}>
-                  <summary style={{ fontWeight: 650, fontSize: '12.5px', color: '#4b5563', padding: '6px 0', borderTop: '1px solid #e5e7eb', outline: 'none' }}>
-                    Style & Appearance
+                  <summary>
+                    <span>Style & appearance</span>
+                    <ChevronDownIcon />
                   </summary>
                   <div style={{ padding: '8px 0', display: 'flex', flexDirection: 'column', gap: '10px', cursor: 'default' }}>
                     <div className="inspector-field">
                       <label>Shape Type</label>
-                      <select
-                        value={selectedCircle.shapeType ?? 'wavy'}
-                        onChange={(e) => updateCircleStyle(selectedCircle.id, { shapeType: e.target.value as ShapeType })}
-                      >
-                        <option value="wavy">Wavy (Flower)</option>
-                        <option value="polygon">Soft Polygon</option>
-                        <option value="circle">Circle</option>
-                      </select>
+                      <div className="m3-select-wrapper">
+                        <select
+                          value={selectedCircle.shapeType ?? 'wavy'}
+                          onChange={(e) => updateCircleStyle(selectedCircle.id, { shapeType: e.target.value as ShapeType })}
+                        >
+                          <option value="wavy">Wavy (Flower)</option>
+                          <option value="polygon">Soft Polygon</option>
+                          <option value="circle">Circle</option>
+                        </select>
+                      </div>
                     </div>
                     
                     {(selectedCircle.shapeType ?? 'wavy') !== 'circle' && (
@@ -1972,19 +2097,25 @@ function App() {
                     </div>
                     <div className="inspector-field">
                       <label>Upload Photo</label>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => handleImageUpload(e, (base64) => updateCircleStyle(selectedCircle.id, { imageUrl: base64 }))}
-                      />
+                      <label className="m3-upload-btn">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="m3-file-input-hidden"
+                          onChange={(e) => handleImageUpload(e, (base64) => updateCircleStyle(selectedCircle.id, { imageUrl: base64 }))}
+                        />
+                        <UploadIcon />
+                        <span>Upload photo</span>
+                      </label>
                     </div>
                   </div>
                 </details>
 
                 {/* Collapsible Actions */}
                 <details style={{ marginTop: '8px', cursor: 'pointer' }}>
-                  <summary style={{ fontWeight: 650, fontSize: '12.5px', color: '#4b5563', padding: '6px 0', borderTop: '1px solid #e5e7eb', outline: 'none' }}>
-                    Actions
+                  <summary>
+                    <span>Actions</span>
+                    <ChevronDownIcon />
                   </summary>
                   <div style={{ padding: '8px 0', display: 'flex', flexDirection: 'column', gap: '8px', cursor: 'default' }}>
                     <button type="button" className="primary-action" onClick={addDemoCluster}>
@@ -1995,10 +2126,13 @@ function App() {
                       <button
                         type="button"
                         className="primary-action"
-                        style={{ background: '#dc2626' }}
+                        style={{
+                          background: 'var(--md-error-container)',
+                          color: 'var(--md-on-error-container)',
+                        }}
                         onClick={() => deleteCircle(selectedCircle.id)}
                       >
-                        Delete Circle
+                        Delete circle
                       </button>
                     )}
                   </div>
@@ -2037,7 +2171,7 @@ function App() {
                   </svg>
                 </button>
 
-                <dl style={{ paddingRight: '28px' }}>
+                <dl className="metadata-grid" style={{ paddingRight: '28px' }}>
                   <div>
                     <dt>Role</dt>
                     <dd>{selectedPerson.role}</dd>
@@ -2048,161 +2182,113 @@ function App() {
                   </div>
                 </dl>
 
-                <div className="inspector-notes-section" style={{ marginTop: '16px', borderTop: '1px solid #e5e7eb', paddingTop: '16px' }}>
-                  <h4 style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: 'bold', color: '#1f2937' }}>Notes</h4>
+                <div className="inspector-notes-section" style={{ marginTop: '16px', borderTop: '1px solid var(--md-outline-variant)', paddingTop: '16px' }}>
+                  <h4 style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: 500, color: 'var(--md-on-surface)' }}>Notes</h4>
 
                   {/* Scrollable list */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
                     {(!selectedPerson.notes || selectedPerson.notes.length === 0) ? (
-                      <span style={{ fontSize: '11px', color: '#9ca3af', fontStyle: 'italic' }}>No notes yet.</span>
+                      <span style={{ fontSize: '11px', color: 'var(--md-on-surface-variant)', fontStyle: 'italic' }}>No notes yet.</span>
                     ) : (
                       selectedPerson.notes.map((note) => (
-                        <div
-                          key={note.id}
-                          style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '4px',
-                            backgroundColor: '#f9fafb',
-                            border: '1px solid #e5e7eb',
-                            borderRadius: '8px',
-                            padding: '8px',
-                            position: 'relative',
-                          }}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => deletePersonNote(selectedPerson.id, note.id)}
-                            style={{
-                              position: 'absolute',
-                              top: '6px',
-                              right: '6px',
-                              background: 'none',
-                              border: 'none',
-                              cursor: 'pointer',
-                              color: '#ef4444',
-                              padding: '2px',
-                            }}
-                            title="Delete note"
-                          >
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ width: '12px', height: '12px' }}>
-                              <polyline points="3 6 5 6 21 6" />
-                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                            </svg>
-                          </button>
-
-                          <input
-                            type="text"
-                            value={note.title}
-                            onChange={(e) => updatePersonNote(selectedPerson.id, note.id, e.target.value, note.body)}
-                            placeholder="Note title"
-                            style={{
-                              fontSize: '11px',
-                              fontWeight: 600,
-                              border: 'none',
-                              background: 'transparent',
-                              padding: 0,
-                              color: '#374151',
-                              width: 'calc(100% - 16px)',
-                              outline: 'none',
-                            }}
-                          />
-
-                          <textarea
-                            value={note.body}
-                            onChange={(e) => updatePersonNote(selectedPerson.id, note.id, note.title, e.target.value)}
-                            placeholder="Note content..."
-                            rows={2}
-                            style={{
-                              fontSize: '11px',
-                              border: 'none',
-                              background: 'transparent',
-                              padding: 0,
-                              color: '#4b5563',
-                              resize: 'none',
-                              outline: 'none',
-                              width: '100%',
-                            }}
-                          />
+                        <div key={note.id}>
+                          {editingNoteId === note.id ? (
+                            <div className="note-card__editor">
+                              <textarea
+                                className="m3-input-field"
+                                autoFocus
+                                value={note.body}
+                                onChange={(e) => updatePersonNote(selectedPerson.id, note.id, e.target.value.split('\n')[0].substr(0, 30) || 'Untitled note', e.target.value)}
+                                onBlur={() => setEditingNoteId(null)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault()
+                                    setEditingNoteId(null)
+                                  }
+                                }}
+                                style={{
+                                  fontSize: '11.5px',
+                                  resize: 'vertical',
+                                  minHeight: '60px',
+                                  lineHeight: '1.4',
+                                }}
+                              />
+                            </div>
+                          ) : (
+                            <div
+                              className="note-card"
+                              onClick={() => setEditingNoteId(note.id)}
+                            >
+                              <div className="note-card__body">{note.body}</div>
+                              <button
+                                type="button"
+                                className="note-card__delete-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  deletePersonNote(selectedPerson.id, note.id)
+                                }}
+                                title="Delete note"
+                              >
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                                  <polyline points="3 6 5 6 21 6" />
+                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                </svg>
+                              </button>
+                            </div>
+                          )}
                         </div>
                       ))
                     )}
                   </div>
 
                   {/* Add note fields */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <input
-                      type="text"
-                      placeholder="New note title..."
-                      value={newNoteTitle}
-                      onChange={(e) => setNewNoteTitle(e.target.value)}
-                      style={{
-                        fontSize: '11px',
-                        padding: '6px 8px',
-                        borderRadius: '6px',
-                        border: '1px solid #d1d5db',
-                        outline: 'none',
-                        width: '100%',
-                        boxSizing: 'border-box',
-                      }}
-                    />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <textarea
                       placeholder="Write a note..."
                       value={newNoteBody}
                       onChange={(e) => setNewNoteBody(e.target.value)}
                       rows={2}
-                      style={{
-                        fontSize: '11px',
-                        padding: '6px 8px',
-                        borderRadius: '6px',
-                        border: '1px solid #d1d5db',
-                        resize: 'none',
-                        outline: 'none',
-                        width: '100%',
-                        boxSizing: 'border-box',
-                      }}
+                      className="m3-input-field"
+                      style={{ resize: 'none' }}
                     />
                     <button
                       type="button"
                       onClick={() => {
-                        if (!newNoteTitle.trim() && !newNoteBody.trim()) return
-                        addPersonNote(selectedPerson.id, newNoteTitle.trim() || 'Untitled Note', newNoteBody.trim())
-                        setNewNoteTitle('')
+                        if (!newNoteBody.trim()) return
+                        addPersonNote(
+                          selectedPerson.id,
+                          newNoteBody.trim().split('\n')[0].substr(0, 30) || 'Untitled note',
+                          newNoteBody.trim()
+                        )
                         setNewNoteBody('')
                       }}
-                      style={{
-                        backgroundColor: '#2563eb',
-                        color: '#ffffff',
-                        border: 'none',
-                        borderRadius: '6px',
-                        padding: '6px 12px',
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        width: '100%',
-                      }}
+                      className="primary-action"
+                      style={{ width: '100%' }}
                     >
-                      Add Note
+                      Add note
                     </button>
                   </div>
                 </div>
 
                 {/* Collapsible Appearance Settings */}
                 <details style={{ marginTop: '14px', cursor: 'pointer' }}>
-                  <summary style={{ fontWeight: 650, fontSize: '12.5px', color: '#4b5563', padding: '6px 0', borderTop: '1px solid #e5e7eb', outline: 'none' }}>
-                    Style & Appearance
+                  <summary>
+                    <span>Style & appearance</span>
+                    <ChevronDownIcon />
                   </summary>
                   <div style={{ padding: '8px 0', display: 'flex', flexDirection: 'column', gap: '10px', cursor: 'default' }}>
                     <div className="inspector-field">
                       <label>Shape Type</label>
-                      <select
-                        value={selectedPerson.shapeType ?? 'polygon'}
-                        onChange={(e) => updatePersonStyle(selectedPerson.id, { shapeType: e.target.value as ShapeType })}
-                      >
-                        <option value="polygon">Soft Polygon</option>
-                        <option value="wavy">Wavy (Flower)</option>
-                        <option value="circle">Circle</option>
-                      </select>
+                      <div className="m3-select-wrapper">
+                        <select
+                          value={selectedPerson.shapeType ?? 'polygon'}
+                          onChange={(e) => updatePersonStyle(selectedPerson.id, { shapeType: e.target.value as ShapeType })}
+                        >
+                          <option value="polygon">Soft Polygon</option>
+                          <option value="wavy">Wavy (Flower)</option>
+                          <option value="circle">Circle</option>
+                        </select>
+                      </div>
                     </div>
                     
                     {(selectedPerson.shapeType ?? 'polygon') !== 'circle' && (
@@ -2241,36 +2327,46 @@ function App() {
                     </div>
                     <div className="inspector-field">
                       <label>Upload Photo</label>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => handleImageUpload(e, (base64) => updatePersonStyle(selectedPerson.id, { imageUrl: base64 }))}
-                      />
+                      <label className="m3-upload-btn">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="m3-file-input-hidden"
+                          onChange={(e) => handleImageUpload(e, (base64) => updatePersonStyle(selectedPerson.id, { imageUrl: base64 }))}
+                        />
+                        <UploadIcon />
+                        <span>Upload photo</span>
+                      </label>
                     </div>
                   </div>
                 </details>
 
                 {/* Collapsible Actions */}
                 <details style={{ marginTop: '8px', cursor: 'pointer' }}>
-                  <summary style={{ fontWeight: 650, fontSize: '12.5px', color: '#4b5563', padding: '6px 0', borderTop: '1px solid #e5e7eb', outline: 'none' }}>
-                    Actions
+                  <summary>
+                    <span>Actions</span>
+                    <ChevronDownIcon />
                   </summary>
                   <div style={{ padding: '8px 0', cursor: 'default' }}>
                     <button
                       type="button"
                       className="primary-action"
-                      style={{ background: '#dc2626', width: '100%' }}
+                      style={{
+                        background: 'var(--md-error-container)',
+                        color: 'var(--md-on-error-container)',
+                        width: '100%',
+                      }}
                       onClick={() => deletePerson(selectedPerson.id)}
                     >
-                      Delete Person
+                      Delete person
                     </button>
                   </div>
                 </details>
               </>
             )}
             {selectedConnection && (() => {
-              const fromNode = graph.people.find((p) => p.id === selectedConnection.fromId) || circlesById.get(selectedConnection.fromId)
-              const toNode = graph.people.find((p) => p.id === selectedConnection.toId) || circlesById.get(selectedConnection.toId)
+              const fromNode = peopleById.get(selectedConnection.fromId) || circlesById.get(selectedConnection.fromId)
+              const toNode = peopleById.get(selectedConnection.toId) || circlesById.get(selectedConnection.toId)
               return (
                 <>
                   <dl>
@@ -2287,10 +2383,14 @@ function App() {
                   <button
                     type="button"
                     className="primary-action"
-                    style={{ marginTop: '16px', background: '#dc2626' }}
+                    style={{
+                      marginTop: '16px',
+                      background: 'var(--md-error-container)',
+                      color: 'var(--md-on-error-container)',
+                    }}
                     onClick={() => deleteConnection(selectedConnection.id)}
                   >
-                    Delete Connection
+                    Delete connection
                   </button>
                 </>
               )
@@ -2298,158 +2398,13 @@ function App() {
           </>
         ) : (
           <div style={{ display: 'grid', placeItems: 'center', height: '100px', color: 'rgba(28, 37, 40, 0.52)' }}>
-            <span style={{ fontSize: '13px', fontWeight: 650 }}>Select an item to view details</span>
+            <span style={{ fontSize: '13px', fontWeight: 500 }}>Select an item to view details</span>
           </div>
         )}
         <p style={{ marginTop: '14px' }}>Drag objects directly. Right-click a circle for creation actions. Parent circles auto-fit as contained objects move.</p>
       </aside>
     </main>
   )
-}
-
-function drawStressCanvas(
-  canvas: HTMLCanvasElement,
-  surface: HTMLElement,
-  camera: Camera,
-  stress: StressSettings,
-  people: PersonNode[],
-  circlesById: Map<string, CircleNode>,
-  sprites: HTMLCanvasElement[],
-) {
-  const dpr = Math.min(window.devicePixelRatio || 1, 1.75)
-  const width = Math.max(1, surface.clientWidth)
-  const height = Math.max(1, surface.clientHeight)
-
-  if (canvas.width !== Math.round(width * dpr) || canvas.height !== Math.round(height * dpr)) {
-    canvas.width = Math.round(width * dpr)
-    canvas.height = Math.round(height * dpr)
-    canvas.style.width = `${width}px`
-    canvas.style.height = `${height}px`
-  }
-
-  const context = canvas.getContext('2d')
-  if (!context) return
-
-  context.setTransform(dpr, 0, 0, dpr, 0, 0)
-  context.clearRect(0, 0, width, height)
-  if (people.length === 0) return
-
-  const viewport = {
-    left: (0 - camera.x) / camera.scale,
-    right: (width - camera.x) / camera.scale,
-    top: (0 - camera.y) / camera.scale,
-    bottom: (height - camera.y) / camera.scale,
-  }
-  const padding = stress.showLabels ? 120 / camera.scale : 48 / camera.scale
-  const visiblePeople = people.filter(
-    (person) =>
-      person.x >= viewport.left - padding &&
-      person.x <= viewport.right + padding &&
-      person.y >= viewport.top - padding &&
-      person.y <= viewport.bottom + padding,
-  )
-
-  context.save()
-  context.translate(camera.x, camera.y)
-  context.scale(camera.scale, camera.scale)
-
-  if (stress.showEdges) {
-    context.beginPath()
-    context.strokeStyle = 'rgba(116, 126, 132, 0.12)'
-    context.lineWidth = Math.max(0.7 / camera.scale, 0.45)
-
-    for (const person of visiblePeople) {
-      const circle = circlesById.get(person.circleId)
-      if (!circle) continue
-      context.moveTo(circle.x, circle.y)
-      context.lineTo(person.x, person.y)
-    }
-
-    context.stroke()
-  }
-
-  const iconSize = stress.showLabels ? 30 : 28
-  const halfIcon = iconSize / 2
-  context.textAlign = 'center'
-  context.textBaseline = 'middle'
-
-  for (const person of visiblePeople) {
-    const sprite = sprites[getAvatarIndex(person.avatar) % sprites.length]
-    context.drawImage(sprite, person.x - halfIcon, person.y - halfIcon, iconSize, iconSize)
-  }
-
-  if (stress.showLabels) {
-    context.font = `${Math.max(10 / camera.scale, 8)}px Inter, system-ui, sans-serif`
-    context.textBaseline = 'top'
-
-    for (const person of visiblePeople) {
-      const labelWidth = context.measureText(person.name).width + 12 / camera.scale
-      const x = person.x - labelWidth / 2
-      const y = person.y + 19
-      context.fillStyle = 'rgba(255, 255, 255, 0.86)'
-      roundRect(context, x, y, labelWidth, 18 / camera.scale, 5 / camera.scale)
-      context.fill()
-      context.fillStyle = '#1c2528'
-      context.fillText(person.name, person.x, y + 4 / camera.scale)
-    }
-  }
-
-  context.restore()
-}
-
-function createStressSprites() {
-  const colors = ['#00629D', '#C00015', '#1E824A', '#D87A00', '#7F67BE', '#0F766E', '#4F46E5', '#BE185D', '#BE185D']
-  return colors.map((color, index) => {
-    const canvas = document.createElement('canvas')
-    const size = 64
-    const context = canvas.getContext('2d')
-    canvas.width = size
-    canvas.height = size
-    if (!context) return canvas
-
-    context.fillStyle = color
-    drawFlowerPath(context, size / 2, size / 2, 25, 6, 5)
-    context.fill()
-
-    context.strokeStyle = '#ffffff'
-    context.lineWidth = 4
-    context.stroke()
-
-    context.fillStyle = '#ffffff'
-    context.font = '900 18px Inter, system-ui, sans-serif'
-    context.textAlign = 'center'
-    context.textBaseline = 'middle'
-    context.fillText(makeAvatar(index), size / 2, size / 2 + 1)
-
-    return canvas
-  })
-}
-
-function drawFlowerPath(context: CanvasRenderingContext2D, cx: number, cy: number, r: number, petals: number, amplitude: number) {
-  const points = 72
-  context.beginPath()
-  for (let i = 0; i <= points; i += 1) {
-    const angle = (i * 2 * Math.PI) / points
-    const currentR = r + amplitude * Math.cos(petals * angle)
-    const x = cx + currentR * Math.cos(angle)
-    const y = cy + currentR * Math.sin(angle)
-    if (i === 0) {
-      context.moveTo(x, y)
-    } else {
-      context.lineTo(x, y)
-    }
-  }
-  context.closePath()
-}
-
-function roundRect(context: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
-  context.beginPath()
-  context.moveTo(x + radius, y)
-  context.arcTo(x + width, y, x + width, y + height, radius)
-  context.arcTo(x + width, y + height, x, y + height, radius)
-  context.arcTo(x, y + height, x, y, radius)
-  context.arcTo(x, y, x + width, y, radius)
-  context.closePath()
 }
 
 function useFrameRate() {
@@ -2476,30 +2431,6 @@ function useFrameRate() {
   }, [])
 
   return fps
-}
-
-function generateStressPeople(count: number): PersonNode[] {
-  const colors = ['#00629D', '#C00015', '#1E824A', '#D87A00', '#7F67BE', '#0F766E', '#4F46E5', '#BE185D']
-  const people: PersonNode[] = []
-
-  for (let index = 0; index < count; index += 1) {
-    const angle = index * 2.399963229728653
-    const ring = Math.floor(Math.sqrt(index))
-    const radius = 185 + ring * 15
-    const jitter = (seededRandom(index + 11) - 0.5) * 18
-
-    people.push({
-      id: `stress-${index}`,
-      name: `Stress ${index + 1}`,
-      role: colors[index % colors.length],
-      x: Math.cos(angle) * (radius + jitter),
-      y: Math.sin(angle) * (radius + jitter),
-      circleId: 'you',
-      avatar: makeAvatar(index),
-    })
-  }
-
-  return people
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -2642,16 +2573,6 @@ function makeAvatar(index: number) {
   return names[index % names.length]
 }
 
-function getAvatarIndex(avatar: string) {
-  const names = ['AL', 'BD', 'CE', 'DK', 'EV', 'FX', 'GN', 'HM', 'IR']
-  return Math.max(0, names.indexOf(avatar))
-}
-
-function seededRandom(seed: number) {
-  const value = Math.sin(seed * 12.9898) * 43758.5453
-  return value - Math.floor(value)
-}
-
 function nextTone(index: number): CircleTone {
   return (['blue', 'red', 'green', 'amber', 'violet'] as CircleTone[])[index % 5]
 }
@@ -2714,6 +2635,70 @@ function SettingsIcon() {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z" />
       <circle cx="12" cy="12" r="3" />
+    </svg>
+  )
+}
+
+function CheckIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      style={{
+        width: '14px',
+        height: '14px',
+        fill: 'none',
+        stroke: 'currentColor',
+        strokeWidth: 3,
+        strokeLinecap: 'round',
+        strokeLinejoin: 'round',
+        marginRight: '6px',
+      }}
+    >
+      <path d="M20 6L9 17l-5-5" />
+    </svg>
+  )
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="chevron-icon"
+      style={{
+        width: '16px',
+        height: '16px',
+        fill: 'none',
+        stroke: 'currentColor',
+        strokeWidth: 2,
+        strokeLinecap: 'round',
+        strokeLinejoin: 'round',
+      }}
+    >
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  )
+}
+
+function UploadIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      style={{
+        width: '16px',
+        height: '16px',
+        fill: 'none',
+        stroke: 'currentColor',
+        strokeWidth: 2,
+        strokeLinecap: 'round',
+        strokeLinejoin: 'round',
+      }}
+    >
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="17 8 12 3 7 8" />
+      <line x1="12" y1="3" x2="12" y2="15" />
     </svg>
   )
 }
