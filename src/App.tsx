@@ -322,6 +322,7 @@ function App() {
   const [connector, setConnector] = useState<DragConnector | null>(null)
   const [createMenu, setCreateMenu] = useState<CreateMenu | null>(null)
   const [selectedItem, setSelectedItem] = useState<SelectedItem>({ type: 'circle', id: 'you' })
+  const [selectedPeopleIds, setSelectedPeopleIds] = useState<string[]>([])
   // Person currently under the cursor — promoted to an interactive DOM node so it
   // can be clicked/dragged even inside a dense circle that's otherwise canvas-only.
   const [hoveredPersonId, setHoveredPersonId] = useState<string | null>(null)
@@ -474,7 +475,17 @@ function App() {
   }
 
   function deleteSelectedItem() {
-    if (selectedItem?.type === 'person') {
+    if (selectedPeopleIds.length > 0) {
+      setGraph((current) => ({
+        ...current,
+        people: current.people.filter((p) => !selectedPeopleIds.includes(p.id)),
+        connections: (current.connections || []).filter(
+          (conn) => !selectedPeopleIds.includes(conn.fromId) && !selectedPeopleIds.includes(conn.toId)
+        ),
+      }))
+      setSelectedPeopleIds([])
+      setSelectedItem(null)
+    } else if (selectedItem?.type === 'person') {
       deletePerson(selectedItem.id)
     } else if (selectedItem?.type === 'circle') {
       deleteCircle(selectedItem.id)
@@ -650,6 +661,7 @@ function App() {
         showPersonLabels,
         circleShapeMode,
         circleFillMode,
+        selectedPeopleIds,
       )
     }
   }
@@ -735,6 +747,7 @@ function App() {
       showPersonLabels,
       circleShapeMode,
       circleFillMode,
+      selectedPeopleIds,
     )
   }, [
     camera,
@@ -748,6 +761,7 @@ function App() {
     showPersonLabels,
     circleShapeMode,
     circleFillMode,
+    selectedPeopleIds,
   ])
 
   useEffect(() => {
@@ -887,12 +901,30 @@ function App() {
     }
 
     if (hit?.type === 'person') {
-      setSelectedItem({ type: 'person', id: hit.person.id })
-      startPersonMove(event, hit.person)
+      if (event.shiftKey) {
+        setSelectedPeopleIds((prev) => {
+          let next = [...prev]
+          if (selectedItem?.type === 'person' && !next.includes(selectedItem.id)) {
+            next.push(selectedItem.id)
+          }
+          if (next.includes(hit.person.id)) {
+            next = next.filter((id) => id !== hit.person.id)
+          } else {
+            next.push(hit.person.id)
+          }
+          return next
+        })
+        setSelectedItem(null)
+      } else {
+        setSelectedPeopleIds([])
+        setSelectedItem({ type: 'person', id: hit.person.id })
+        startPersonMove(event, hit.person)
+      }
       return
     }
 
     if (hit?.type === 'circle-center') {
+      setSelectedPeopleIds([])
       if (centerBehavior === 'connect') {
         startConnector(event, hit.circle.id, 'circle', hit.circle.x, hit.circle.y)
       } else {
@@ -903,21 +935,25 @@ function App() {
     }
 
     if (hit?.type === 'circle-edge') {
+      setSelectedPeopleIds([])
       startCircleResize(event, hit.circle)
       return
     }
 
     if (hit?.type === 'circle-body') {
+      setSelectedPeopleIds([])
       setSelectedItem({ type: 'circle', id: hit.circle.id })
       startCircleMove(event, hit.circle)
       return
     }
 
     if (hit?.type === 'connection') {
+      setSelectedPeopleIds([])
       setSelectedItem({ type: 'connection', id: hit.connection.id })
       return
     }
 
+    setSelectedPeopleIds([])
     setSelectedItem(null)
     setOpenNotesPersonId(null)
     panRef.current = {
@@ -1262,6 +1298,100 @@ function App() {
       pointerId: event.pointerId,
       circleId: circle.id,
     }
+  }
+
+  function handleSurfaceDoubleClick(event: React.MouseEvent<HTMLDivElement>) {
+    if (event.button !== 0) return
+    const hit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
+      x: event.clientX,
+      y: event.clientY,
+    })
+
+    if (hit && (hit.type === 'circle-body' || hit.type === 'circle-center' || hit.type === 'circle-edge')) {
+      const circleId = hit.circle.id
+      const world = screenToWorld({ x: event.clientX, y: event.clientY })
+      const source = circlesById.get(circleId)
+      if (!source) return
+
+      const id = `person-${Date.now()}`
+      const sides = Math.floor(Math.random() * 5) + 8
+      setGraph((current) => {
+        return ensureContainment({
+          ...current,
+          people: [
+            ...current.people,
+            {
+              id,
+              name: `New person ${current.people.length + 1}`,
+              role: `Inside ${source.name}`,
+              x: world.x,
+              y: world.y,
+              circleId: source.id,
+              avatar: makeAvatar(current.people.length + 1),
+              shapeType: 'wavy',
+              sides,
+              amplitude: 1,
+            },
+          ],
+        })
+      })
+      setSelectedPeopleIds([])
+      setSelectedItem({ type: 'person', id: id })
+    }
+  }
+
+  function handleMergeSelected() {
+    if (selectedPeopleIds.length < 2) return
+
+    const selectedPeople = graph.people.filter((p) => selectedPeopleIds.includes(p.id))
+    if (selectedPeople.length === 0) return
+
+    const avgX = selectedPeople.reduce((sum, p) => sum + p.x, 0) / selectedPeople.length
+    const avgY = selectedPeople.reduce((sum, p) => sum + p.y, 0) / selectedPeople.length
+
+    const firstPerson = selectedPeople[0]
+    const parentCircleId = firstPerson.circleId || 'you'
+    const parentCircle = circlesById.get(parentCircleId)
+    const parentName = parentCircle ? parentCircle.name : 'subset'
+
+    const newCircleId = `circle-${Date.now()}`
+
+    setGraph((current) => {
+      const newCircle = {
+        id: newCircleId,
+        name: `${parentName} subset`,
+        icon: 'SUB',
+        x: avgX,
+        y: avgY,
+        radius: 82,
+        minRadius: 82,
+        parentId: parentCircleId,
+        connectedTo: parentCircleId,
+        tone: 'violet' as const,
+        shapeType: 'polygon' as const,
+        sides: 6,
+        amplitude: 4,
+      }
+
+      const nextPeople = current.people.map((person) => {
+        if (selectedPeopleIds.includes(person.id)) {
+          return {
+            ...person,
+            circleId: newCircleId,
+          }
+        }
+        return person
+      })
+
+      return ensureContainment({
+        ...current,
+        circles: [...current.circles, newCircle],
+        people: nextPeople,
+      })
+    })
+
+    setSelectedItem({ type: 'circle', id: newCircleId })
+    setSelectedPeopleIds([])
   }
 
   function createPerson() {
@@ -1713,6 +1843,7 @@ function App() {
         onPointerMove={handleSurfacePointerMove}
         onPointerUp={handleSurfacePointerUp}
         onPointerCancel={handleSurfacePointerUp}
+        onDoubleClick={handleSurfaceDoubleClick}
         onKeyDown={(event) => {
           if (event.key !== 'Delete' && event.key !== 'Backspace') return
           event.preventDefault()
@@ -1762,6 +1893,30 @@ function App() {
           )}
         </div>
       ) : null}
+
+      {selectedPeopleIds.length >= 2 && (
+        <div className="merge-prompt-panel">
+          <span className="merge-prompt-text">
+            Selected <strong>{selectedPeopleIds.length}</strong> people
+          </span>
+          <div className="merge-prompt-buttons">
+            <button
+              type="button"
+              className="primary-action"
+              onClick={handleMergeSelected}
+            >
+              Merge into subset
+            </button>
+            <button
+              type="button"
+              className="m3-text-button"
+              onClick={() => setSelectedPeopleIds([])}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {!demoMode && (
       <aside className="inspector" aria-label="Selection details" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 120px)' }}>
@@ -2484,6 +2639,7 @@ function drawBoardLayer(
   showPersonLabels: boolean,
   circleShapeMode: CircleShapeMode,
   circleFillMode: CircleFillMode,
+  selectedPeopleIds: string[] = [],
 ) {
   const { dpr, width, height } = resizeCanvas(canvas, surface)
   const ctx = canvas.getContext('2d')
@@ -2507,7 +2663,7 @@ function drawBoardLayer(
   drawPersonEdges(ctx, visiblePeople, index, camera.scale)
   drawCustomConnections(ctx, visiblePeopleIds, visibleCircleIds, index, selectedItem, hoveredConnId, camera.scale)
   drawCircleDetails(ctx, visibleCircles, camera.scale, circleFillMode, showCircleLabels)
-  drawPeople(ctx, visiblePeople, index, selectedItem, hoveredPersonId, camera.scale, dpr, showPersonLabels)
+  drawPeople(ctx, visiblePeople, index, selectedItem, hoveredPersonId, camera.scale, dpr, showPersonLabels, selectedPeopleIds)
   if (connector) drawConnector(ctx, connector, camera.scale)
   drawSelectionHandles(ctx, selectedItem, index, camera.scale)
 
@@ -2695,6 +2851,7 @@ function drawPeople(
   scale: number,
   dpr: number,
   showPersonLabels: boolean,
+  selectedPeopleIds: string[] = [],
 ) {
   const spriteRes = pickSpriteTier(PERSON_VISUAL_RADIUS * 2 * scale * dpr)
   ctx.imageSmoothingEnabled = true
@@ -2702,7 +2859,7 @@ function drawPeople(
   for (const person of people) {
     const circle = index.circlesById.get(person.circleId)
     const tone = circle?.tone ?? 'blue'
-    const isSelected = selectedItem?.type === 'person' && selectedItem.id === person.id
+    const isSelected = (selectedItem?.type === 'person' && selectedItem.id === person.id) || selectedPeopleIds.includes(person.id)
     const isHovered = hoveredPersonId === person.id
     const stroke = person.isFavorite ? '#ffd600' : isSelected ? '#00629d' : isHovered ? '#64748b' : MATERIAL_TONES[tone].centerBg
     const strokeWidth = person.isFavorite ? (isSelected ? 5.5 : 4.5) : isSelected || isHovered ? 2.5 : 1.5

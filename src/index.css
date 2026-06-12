@@ -1177,3 +1177,47 @@ input[type="range"]::-webkit-slider-thumb:active {
   background: var(--md-surface-container);
   box-shadow: var(--md-elev-2);
 }
+
+.merge-prompt-panel {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  background: var(--md-surface-container-high);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-r-lg);
+  padding: 12px 20px;
+  box-shadow: var(--md-elev-3);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  animation: slideUp 0.2s ease-out;
+  pointer-events: auto;
+}
+
+.merge-prompt-text {
+  font-size: 14px;
+  color: var(--md-on-surface);
+}
+
+.merge-prompt-text strong {
+  font-weight: 600;
+  color: var(--md-primary);
+}
+
+.merge-prompt-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translate(-50%, 20px);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
