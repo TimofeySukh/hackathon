@@ -1,5 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react'
+import * as zip from '@zip.js/zip.js'
+
+zip.configure({ useWebWorkers: false })
 // STRESS TEST — dev-only performance harness. See src/lib/stressTest.ts.
 import {
   STRESS_TEST_ENABLED,
@@ -345,6 +348,213 @@ function App() {
 
   const settingsButtonRef = useRef<HTMLButtonElement>(null)
   const settingsPanelRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  async function handleLinkedInImport(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    try {
+      const zipReader = new zip.ZipReader(new zip.BlobReader(file))
+      const entries = await zipReader.getEntries()
+
+      const connectionsEntry = entries.find(
+        (e) => e.filename === 'Connections.csv' || e.filename.endsWith('/Connections.csv')
+      )
+
+      if (!connectionsEntry || typeof (connectionsEntry as any).getData !== 'function') {
+        alert('Could not find Connections.csv inside the ZIP file.')
+        await zipReader.close()
+        return
+      }
+
+      const csvText = await (connectionsEntry as any).getData(new zip.TextWriter())
+      await zipReader.close()
+
+      const rows = parseCSV(csvText)
+      if (rows.length === 0) {
+        alert('Connections.csv is empty or invalid.')
+        return
+      }
+
+      let headerIdx = -1
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i]
+        const lowerRow = row.map(cell => cell.toLowerCase().replace(/\s+/g, ''))
+        if (lowerRow.includes('firstname') && lowerRow.includes('lastname') && lowerRow.includes('company')) {
+          headerIdx = i
+          break
+        }
+      }
+
+      if (headerIdx === -1) {
+        alert('Could not find standard headers in Connections.csv.')
+        return
+      }
+
+      const headers = rows[headerIdx].map(cell => cell.toLowerCase().replace(/\s+/g, ''))
+      const firstNameIdx = headers.indexOf('firstname')
+      const lastNameIdx = headers.indexOf('lastname')
+      const companyIdx = headers.indexOf('company')
+      const positionIdx = headers.indexOf('position')
+      const urlIdx = headers.indexOf('url')
+      const emailIdx = headers.indexOf('emailaddress')
+      const connectedOnIdx = headers.indexOf('connectedon')
+
+      const dataRows = rows.slice(headerIdx + 1)
+
+      const companyGroups: Record<string, typeof dataRows> = {}
+      for (const row of dataRows) {
+        if (row.length <= Math.max(firstNameIdx, lastNameIdx, companyIdx)) continue
+        const company = row[companyIdx]?.trim() || ''
+        if (!companyGroups[company]) {
+          companyGroups[company] = []
+        }
+        companyGroups[company].push(row)
+      }
+
+      setGraph((current) => {
+        const nextCircles = [...current.circles]
+        const nextPeople = [...current.people]
+
+        let linkedinCircle = nextCircles.find(c => c.id === 'linkedin-import')
+        if (!linkedinCircle) {
+          linkedinCircle = {
+            id: 'linkedin-import',
+            name: 'LinkedIn',
+            icon: '🔗',
+            x: -950,
+            y: 800,
+            radius: 350,
+            minRadius: 350,
+            parentId: null,
+            connectedTo: 'you',
+            tone: 'blue',
+            shapeType: 'wavy',
+            sides: 18,
+            amplitude: 20
+          }
+          nextCircles.push(linkedinCircle)
+        }
+
+        let companyIndex = 0
+        const totalCompanies = Object.keys(companyGroups).length
+
+        for (const [companyName, members] of Object.entries(companyGroups)) {
+          const cleanCompName = companyName ? companyName : 'No Company'
+          const companyId = `linkedin-company-${cleanCompName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`
+
+          let companyCircle = nextCircles.find(c => c.id === companyId)
+          if (!companyCircle) {
+            const angle = (companyIndex / totalCompanies) * 2 * Math.PI
+            const placementRadius = 180
+            const x = linkedinCircle.x + Math.cos(angle) * placementRadius
+            const y = linkedinCircle.y + Math.sin(angle) * placementRadius
+            const icon = cleanCompName.slice(0, 2).toUpperCase()
+
+            companyCircle = {
+              id: companyId,
+              name: cleanCompName,
+              icon,
+              x,
+              y,
+              radius: 90,
+              minRadius: 90,
+              parentId: 'linkedin-import',
+              connectedTo: 'linkedin-import',
+              tone: nextTone(nextCircles.length),
+              shapeType: 'polygon',
+              sides: 8,
+              amplitude: 4
+            }
+            nextCircles.push(companyCircle)
+            companyIndex++
+          }
+
+          let personIndex = 0
+          for (const memberRow of members) {
+            const firstName = memberRow[firstNameIdx] || ''
+            const lastName = memberRow[lastNameIdx] || ''
+            const name = `${firstName} ${lastName}`.trim()
+            if (!name) continue
+
+            const personId = `linkedin-person-${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`
+
+            if (nextPeople.some(p => p.id === personId)) {
+              continue
+            }
+
+            const position = positionIdx !== -1 ? memberRow[positionIdx] || '' : ''
+            const url = urlIdx !== -1 ? memberRow[urlIdx] || '' : ''
+            const email = emailIdx !== -1 ? memberRow[emailIdx] || '' : ''
+            const connectedOn = connectedOnIdx !== -1 ? memberRow[connectedOnIdx] || '' : ''
+
+            const avatar = (firstName.slice(0, 1) + lastName.slice(0, 1)).toUpperCase() || 'IN'
+
+            const pAngle = (personIndex / members.length) * 2 * Math.PI
+            const px = companyCircle.x + Math.cos(pAngle) * 35
+            const py = companyCircle.y + Math.sin(pAngle) * 35
+
+            const notesList: PersonNote[] = []
+            if (position) {
+              notesList.push({
+                id: `note-pos-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                title: 'Position',
+                body: position
+              })
+            }
+            if (connectedOn) {
+              notesList.push({
+                id: `note-conn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                title: 'Connected On',
+                body: connectedOn
+              })
+            }
+            if (email) {
+              notesList.push({
+                id: `note-email-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                title: 'Email',
+                body: email
+              })
+            }
+            if (url) {
+              notesList.push({
+                id: `note-url-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                title: 'LinkedIn Profile',
+                body: url
+              })
+            }
+
+            nextPeople.push({
+              id: personId,
+              name,
+              role: position || 'Connection',
+              x: px,
+              y: py,
+              circleId: companyCircle.id,
+              avatar,
+              shapeType: 'circle',
+              sides: 10,
+              amplitude: 0,
+              notes: notesList
+            })
+            personIndex++
+          }
+        }
+
+        return ensureContainment({
+          ...current,
+          circles: nextCircles,
+          people: nextPeople
+        })
+      })
+
+      alert('LinkedIn data imported successfully!')
+    } catch (err: any) {
+      console.error(err)
+      alert(`Failed to import LinkedIn ZIP: ${err.message || err}`)
+    }
+  }
 
   function deletePerson(personId: string) {
     setGraph((current) => ({
@@ -1746,6 +1956,26 @@ function App() {
                 <span>Move circle</span>
               </button>
             </div>
+            <div style={{ marginTop: '12px', borderTop: '1px solid var(--md-outline-variant)', paddingTop: '12px' }}>
+              <label style={{ fontSize: '12px', fontWeight: 500, color: 'rgba(28, 37, 40, 0.64)', display: 'block', marginBottom: '8px' }}>
+                LinkedIn Data Import
+              </label>
+              <button
+                type="button"
+                className="m3-primary-button"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <UploadIcon />
+                <span>Import LinkedIn ZIP</span>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".zip"
+                style={{ display: 'none' }}
+                onChange={handleLinkedInImport}
+              />
+            </div>
           </div>
         </div>
       )}
@@ -3139,6 +3369,49 @@ function createDemoGraphState(): GraphState {
   const connections: Connection[] = []
 
   return { circles, people, connections }
+}
+
+function parseCSV(text: string): string[][] {
+  const lines: string[][] = []
+  let row: string[] = []
+  let inQuotes = false
+  let currentValue = ''
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i]
+    const nextChar = text[i + 1]
+
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        currentValue += '"'
+        i++ // skip next quote
+      } else {
+        inQuotes = !inQuotes
+      }
+    } else if (char === ',' && !inQuotes) {
+      row.push(currentValue.trim())
+      currentValue = ''
+    } else if ((char === '\n' || char === '\r') && !inQuotes) {
+      if (char === '\r' && nextChar === '\n') {
+        i++
+      }
+      row.push(currentValue.trim())
+      if (row.length > 0 && row.some(val => val !== '')) {
+        lines.push(row)
+      }
+      row = []
+      currentValue = ''
+    } else {
+      currentValue += char
+    }
+  }
+  if (currentValue || row.length > 0) {
+    row.push(currentValue.trim())
+    if (row.some(val => val !== '')) {
+      lines.push(row)
+    }
+  }
+  return lines
 }
 
 function makeCircle(
