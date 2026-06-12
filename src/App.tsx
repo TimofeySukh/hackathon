@@ -417,25 +417,9 @@ function App() {
         const nextCircles = [...current.circles]
         const nextPeople = [...current.people]
 
-        let linkedinCircle = nextCircles.find(c => c.id === 'linkedin-import')
-        if (!linkedinCircle) {
-          linkedinCircle = {
-            id: 'linkedin-import',
-            name: 'LinkedIn',
-            icon: '🔗',
-            x: -950,
-            y: 800,
-            radius: 350,
-            minRadius: 350,
-            parentId: null,
-            connectedTo: 'you',
-            tone: 'blue',
-            shapeType: 'wavy',
-            sides: 18,
-            amplitude: 20
-          }
-          nextCircles.push(linkedinCircle)
-        }
+        const youCircle = nextCircles.find((c) => c.id === 'you')
+        const youX = youCircle ? youCircle.x : 0
+        const youY = youCircle ? youCircle.y : 0
 
         let companyIndex = 0
         const totalCompanies = Object.keys(companyGroups).length
@@ -444,12 +428,12 @@ function App() {
           const cleanCompName = companyName ? companyName : 'No Company'
           const companyId = `linkedin-company-${cleanCompName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`
 
-          let companyCircle = nextCircles.find(c => c.id === companyId)
+          let companyCircle = nextCircles.find((c) => c.id === companyId)
           if (!companyCircle) {
             const angle = (companyIndex / totalCompanies) * 2 * Math.PI
-            const placementRadius = 180
-            const x = linkedinCircle.x + Math.cos(angle) * placementRadius
-            const y = linkedinCircle.y + Math.sin(angle) * placementRadius
+            const placementRadius = 680
+            const x = youX + Math.cos(angle) * placementRadius
+            const y = youY + Math.sin(angle) * placementRadius
             const icon = cleanCompName.slice(0, 2).toUpperCase()
 
             companyCircle = {
@@ -460,12 +444,12 @@ function App() {
               y,
               radius: 90,
               minRadius: 90,
-              parentId: 'linkedin-import',
-              connectedTo: 'linkedin-import',
+              parentId: null,
+              connectedTo: 'you',
               tone: nextTone(nextCircles.length),
-              shapeType: 'polygon',
-              sides: 8,
-              amplitude: 4
+              shapeType: 'wavy',
+              sides: 12,
+              amplitude: 8
             }
             nextCircles.push(companyCircle)
             companyIndex++
