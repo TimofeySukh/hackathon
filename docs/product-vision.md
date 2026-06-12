@@ -36,7 +36,7 @@ The light theme should keep the same product identity while becoming brighter, c
 
 The board background should include visible point markers at regular intervals, similar to spatial references on tools like Miro.
 
-The graph layer should feel compact and readable, with node creation happening directly on the board and nearby people forming soft visual groups instead of large circular containers.
+The graph layer should feel compact and readable, with node creation happening directly on the board and nearby people forming circular pie zones that make merged group composition visible.
 
 ## Why This Direction
 

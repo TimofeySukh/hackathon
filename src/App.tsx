@@ -66,7 +66,14 @@ type NodeGroupBubble = {
   fill: string
   stroke: string
   center: Offset
+  radius: number
   ringRadii: number[]
+  segments: Array<{
+    color: string
+    fill: string
+    stroke: string
+    path: string
+  }>
 }
 
 type LocalGraphState = {
@@ -233,20 +240,15 @@ const DOUBLE_TAP_MS = 330
 const DOUBLE_TAP_DISTANCE = 22
 const GROUP_DROP_DISTANCE = 86
 const GROUP_MEMBER_SPACING = 72
-// Tag-sector + pyramid packing for a group. The circle is split into equal
-// angular sectors — one per tag, plus one for untagged people. Inside a sector
-// people form a pyramid pointing at the centre: the innermost ring holds 1, the
-// next 3, then 5, 7… (odd numbers). A K-ring pyramid holds K². Partial pyramids
-// fill from the outermost ring inward, so the apex (centre) fills last. Equal
-// radial gaps between rings and angular gaps between sectors keep them distinct,
-// and the empty core stays grabbable for dragging the whole cluster.
-const GROUP_ZONE_WIDTH = 130 // radial gap between consecutive rings (the "прослойка")
-const GROUP_CORE_RADIUS = 70 // empty centre kept as the cluster drag handle
-const GROUP_ROW_SPACING = 132 // arc distance between neighbours on a full ring
-const GROUP_ORBIT_BAND_WIDTH = 70 // thickness of each filled orbit shell (< zone, leaves a gap)
-const GROUP_BLOB_NODE_RADIUS = 12
+// Pie-zone layout. A group is always one filled circle split into colour slices
+// by member count. Concentric orbit lines are drawn over the filled circle, so
+// there are no transparent gaps between rings. Members are packed inside their
+// colour slice using the same ring spacing.
+const GROUP_ZONE_WIDTH = 118
+const GROUP_CORE_RADIUS = 64
+const GROUP_ROW_SPACING = 132
+const GROUP_ORBIT_STROKE_WIDTH = 2.5
 const GROUP_BLOB_PADDING = 28
-const GROUP_BLOB_SAMPLE_POINTS = 18
 // Nested-ring layout. One row of people sits at the centre of each equal-width
 // zone, so the radial gap between rings and the arc gap between neighbours are
 // both constant. Capacity of a ring is just its circumference / spacing, so it
@@ -747,11 +749,19 @@ function sanitizeNodeGroups(groups: NodeGroup[], boardId: string, nodes: PersonN
     if (memberIds.length < 2) continue
 
     for (const nodeId of memberIds) assignedNodeIds.add(nodeId)
+    const memberColors = group.memberColors
+      ? Object.fromEntries(
+          memberIds
+            .map((memberId) => [memberId, normalizeTagColor(group.memberColors?.[memberId] ?? group.color)] as const)
+            .filter(([, color]) => Boolean(color)),
+        )
+      : undefined
     nextGroups.push({
       ...group,
       boardId,
       memberIds,
       color: normalizeTagColor(group.color),
+      memberColors,
     })
   }
 
@@ -771,7 +781,88 @@ function rgbaFromHex(color: string, alpha: number) {
   return `rgb(${hexToRgb(color)} / ${alpha})`
 }
 
-function getNodeGroupBubbles(groups: NodeGroup[], nodes: PersonNode[]): NodeGroupBubble[] {
+function getNodeColorInGroup(node: PersonNode, group: NodeGroup, tagColorById: Record<string, string>) {
+  return normalizeTagColor(group.memberColors?.[node.id] ?? (node.tag_id ? tagColorById[node.tag_id] : null) ?? group.color)
+}
+
+function getCirclePath(center: Offset, radius: number) {
+  return [
+    `M ${center.x - radius} ${center.y}`,
+    `A ${radius} ${radius} 0 1 0 ${center.x + radius} ${center.y}`,
+    `A ${radius} ${radius} 0 1 0 ${center.x - radius} ${center.y}`,
+    'Z',
+  ].join(' ')
+}
+
+function getPieSegmentPath(center: Offset, radius: number, startAngle: number, endAngle: number) {
+  const fullCircle = Math.PI * 2
+  const span = endAngle - startAngle
+  if (span >= fullCircle - 0.001) return getCirclePath(center, radius)
+
+  const start = {
+    x: center.x + Math.cos(startAngle) * radius,
+    y: center.y + Math.sin(startAngle) * radius,
+  }
+  const end = {
+    x: center.x + Math.cos(endAngle) * radius,
+    y: center.y + Math.sin(endAngle) * radius,
+  }
+  const largeArcFlag = span > Math.PI ? 1 : 0
+
+  return [
+    `M ${center.x} ${center.y}`,
+    `L ${start.x} ${start.y}`,
+    `A ${radius} ${radius} 0 ${largeArcFlag} 1 ${end.x} ${end.y}`,
+    'Z',
+  ].join(' ')
+}
+
+function getCircleHull(center: Offset, radius: number) {
+  const points: Offset[] = []
+  for (let index = 0; index < 48; index += 1) {
+    const angle = (index * Math.PI * 2) / 48
+    points.push({
+      x: center.x + Math.cos(angle) * radius,
+      y: center.y + Math.sin(angle) * radius,
+    })
+  }
+  return points
+}
+
+function getGroupOuterRadius(memberCount: number) {
+  if (memberCount <= 2) return GROUP_CORE_RADIUS
+
+  let placed = 0
+  let ringIndex = 0
+  while (placed < memberCount) {
+    const radius = getGroupRingRadius(ringIndex)
+    placed += Math.max(1, Math.round((Math.PI * 2 * radius) / GROUP_ROW_SPACING))
+    ringIndex += 1
+  }
+
+  return getGroupRingRadius(Math.max(0, ringIndex - 1)) + GROUP_ZONE_WIDTH * 0.5
+}
+
+function getGroupColorBuckets(members: PersonNode[], group: NodeGroup, tagColorById: Record<string, string>) {
+  const buckets = new Map<string, PersonNode[]>()
+  for (const member of members) {
+    const color = getNodeColorInGroup(member, group, tagColorById)
+    const bucket = buckets.get(color) ?? []
+    bucket.push(member)
+    buckets.set(color, bucket)
+  }
+
+  return Array.from(buckets.entries()).map(([color, bucketMembers]) => ({
+    color,
+    members: bucketMembers,
+  }))
+}
+
+function getNodeGroupBubbles(
+  groups: NodeGroup[],
+  nodes: PersonNode[],
+  tagColorById: Record<string, string> = {},
+): NodeGroupBubble[] {
   const nodesById = new Map(nodes.map((node) => [node.id, node]))
 
   return groups
@@ -779,103 +870,56 @@ function getNodeGroupBubbles(groups: NodeGroup[], nodes: PersonNode[]): NodeGrou
       const members = group.memberIds.map((nodeId) => nodesById.get(nodeId)).filter(Boolean) as PersonNode[]
       if (members.length < 2) return null
 
-      const color = normalizeTagColor(group.color)
-      const hull = getGroupBubbleHull(members)
-      const path = hull ? getSmoothClosedPath(hull) : null
-      if (!path) return null
-
-      // Centre + the radius of each occupied ring, so we can draw concentric
-      // "electron cloud" orbits around the cluster.
       const center = {
         x: members.reduce((sum, node) => sum + node.x, 0) / members.length,
         y: members.reduce((sum, node) => sum + node.y, 0) / members.length,
       }
-      const maxDistance = members.reduce(
-        (max, node) => Math.max(max, Math.hypot(node.x - center.x, node.y - center.y)),
-        0,
+      const radius = Math.max(
+        getGroupOuterRadius(members.length),
+        members.reduce((max, node) => Math.max(max, Math.hypot(node.x - center.x, node.y - center.y)), 0) +
+          GROUP_BLOB_PADDING,
       )
+      const hull = getCircleHull(center, radius)
+      const path = getCirclePath(center, radius)
       const ringRadii: number[] = []
-      for (let ring = 0; getGroupRingRadius(ring) <= maxDistance + GROUP_BLOB_NODE_RADIUS; ring += 1) {
+      for (let ring = 0; getGroupRingRadius(ring) < radius; ring += 1) {
         ringRadii.push(getGroupRingRadius(ring))
       }
-      if (ringRadii.length === 0) ringRadii.push(getGroupRingRadius(0))
+
+      const buckets = getGroupColorBuckets(members, group, tagColorById)
+      const totalMembers = members.length
+      let currentAngle = -Math.PI / 2
+      const segments = buckets.map((bucket, index) => {
+        const isLast = index === buckets.length - 1
+        const nextAngle = isLast ? Math.PI * 1.5 : currentAngle + (bucket.members.length / totalMembers) * Math.PI * 2
+        const segment = {
+          color: bucket.color,
+          fill: rgbaFromHex(bucket.color, 0.16),
+          stroke: rgbaFromHex(bucket.color, 0.42),
+          path: getPieSegmentPath(center, radius, currentAngle, nextAngle),
+        }
+        currentAngle = nextAngle
+        return segment
+      })
+      const primarySegment = [...segments].sort((left, right) => {
+        const leftCount = buckets.find((bucket) => bucket.color === left.color)?.members.length ?? 0
+        const rightCount = buckets.find((bucket) => bucket.color === right.color)?.members.length ?? 0
+        return rightCount - leftCount
+      })[0]
 
       return {
         id: group.id,
         path,
         hull,
-        fill: rgbaFromHex(color, 0.18),
-        stroke: rgbaFromHex(color, 0.5),
+        fill: primarySegment?.fill ?? rgbaFromHex(normalizeTagColor(group.color), 0.16),
+        stroke: primarySegment?.stroke ?? rgbaFromHex(normalizeTagColor(group.color), 0.42),
         center,
+        radius,
         ringRadii,
+        segments,
       }
     })
     .filter(Boolean) as NodeGroupBubble[]
-}
-
-function getGroupBubbleHull(nodes: PersonNode[]) {
-  const points: Offset[] = []
-  const radius = GROUP_BLOB_NODE_RADIUS + GROUP_BLOB_PADDING
-
-  for (const node of nodes) {
-    for (let index = 0; index < GROUP_BLOB_SAMPLE_POINTS; index += 1) {
-      const angle = (index * Math.PI * 2) / GROUP_BLOB_SAMPLE_POINTS
-      const wobble = index % 2 === 0 ? 2 : -1
-      points.push({
-        x: node.x + Math.cos(angle) * (radius + wobble),
-        y: node.y + Math.sin(angle) * (radius - wobble),
-      })
-    }
-  }
-
-  const hull = getConvexHull(points)
-  if (hull.length < 3) return null
-
-  return hull
-}
-
-function getConvexHull(points: Offset[]) {
-  const sortedPoints = [...points].sort((left, right) => left.x - right.x || left.y - right.y)
-  if (sortedPoints.length <= 1) return sortedPoints
-
-  const cross = (origin: Offset, left: Offset, right: Offset) =>
-    (left.x - origin.x) * (right.y - origin.y) - (left.y - origin.y) * (right.x - origin.x)
-  const lower: Offset[] = []
-  for (const point of sortedPoints) {
-    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], point) <= 0) {
-      lower.pop()
-    }
-    lower.push(point)
-  }
-
-  const upper: Offset[] = []
-  for (let index = sortedPoints.length - 1; index >= 0; index -= 1) {
-    const point = sortedPoints[index]
-    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], point) <= 0) {
-      upper.pop()
-    }
-    upper.push(point)
-  }
-
-  lower.pop()
-  upper.pop()
-  return [...lower, ...upper]
-}
-
-function getSmoothClosedPath(points: Offset[]) {
-  const first = points[0]
-  const commands = [`M ${first.x} ${first.y}`]
-
-  for (let index = 0; index < points.length; index += 1) {
-    const current = points[index]
-    const next = points[(index + 1) % points.length]
-    const midX = (current.x + next.x) / 2
-    const midY = (current.y + next.y) / 2
-    commands.push(`Q ${current.x} ${current.y} ${midX} ${midY}`)
-  }
-
-  commands.push('Z')
-  return commands.join(' ')
 }
 
 function isPointInPolygon(point: Offset, polygon: Offset[]) {
@@ -921,56 +965,32 @@ function isPointTouchingPolygon(point: Offset, polygon: Offset[], radius: number
 }
 
 function getGroupRingRadius(ringIndex: number) {
-  return GROUP_CORE_RADIUS + (ringIndex + 0.5) * GROUP_ZONE_WIDTH
+  return GROUP_CORE_RADIUS + ringIndex * GROUP_ZONE_WIDTH
 }
 
-// How many people sit on each ring of a pyramid that holds `count` people.
-// Rings are indexed from the centre out (ring 0 = apex). A full pyramid is
-// 1, 3, 5, … (ring k holds 2k+1, total of K rings = K²). When the count is not
-// a perfect square the outermost rings fill first and the apex fills last.
-// Lays out a group as ONE filled circle. The primary-category people fill the
-// concentric rings normally. "Outsiders" (people whose tag differs from the
-// group's main category) are clustered into a small pyramid wedge on one side:
-// 1 of them on the innermost ring, 3 on the next, 5 on the next… (a triangle
-// pointing at the centre), with the primary people filling the rest of each ring.
-function placeCircleWithPyramid(
-  mainMembers: PersonNode[],
-  outsiderMembers: PersonNode[],
+function arrangeMembersInSector(
+  members: PersonNode[],
   centerX: number,
   centerY: number,
+  startAngle: number,
+  endAngle: number,
   positions: Map<string, Offset>,
 ) {
-  const total = mainMembers.length + outsiderMembers.length
-  const pyramidDirection = Math.PI / 2 // outsiders cluster toward the bottom
-  let mainIndex = 0
-  let outsiderIndex = 0
+  if (members.length === 0) return
+
+  const span = Math.max(0.001, endAngle - startAngle)
+  let placed = 0
   let ringIndex = 0
 
-  while (mainIndex + outsiderIndex < total) {
+  while (placed < members.length) {
     const radius = getGroupRingRadius(ringIndex)
-    const capacity = Math.max(1, Math.round((Math.PI * 2 * radius) / GROUP_ROW_SPACING))
-    const remainingTotal = total - mainIndex - outsiderIndex
-    const countOnRing = Math.min(capacity, remainingTotal)
+    const fullRingCapacity = Math.max(1, Math.round((Math.PI * 2 * radius) / GROUP_ROW_SPACING))
+    const sectorCapacity = Math.max(1, Math.round(fullRingCapacity * (span / (Math.PI * 2))))
+    const countOnRing = Math.min(sectorCapacity, members.length - placed)
 
-    const remainingMain = mainMembers.length - mainIndex
-    const remainingOutsiders = outsiderMembers.length - outsiderIndex
-    // Pyramid: 1 outsider on ring 0, 3 on ring 1, 5 on ring 2…
-    let outsidersOnRing = Math.min(2 * ringIndex + 1, remainingOutsiders, countOnRing)
-    let mainOnRing = countOnRing - outsidersOnRing
-    if (mainOnRing > remainingMain) {
-      outsidersOnRing += mainOnRing - remainingMain
-      mainOnRing = remainingMain
-    }
-
-    const step = (Math.PI * 2) / countOnRing
-    // Centre the outsider block on the pyramid direction; primary people take the
-    // remaining slots around the rest of the ring.
-    const startSlot = -Math.floor((outsidersOnRing - 1) / 2)
-
-    for (let slot = 0; slot < countOnRing; slot += 1) {
-      const angle = pyramidDirection + (startSlot + slot) * step
-      const isOutsider = slot < outsidersOnRing
-      const node = isOutsider ? outsiderMembers[outsiderIndex++] : mainMembers[mainIndex++]
+    for (let index = 0; index < countOnRing; index += 1) {
+      const angle = startAngle + ((index + 0.5) / countOnRing) * span
+      const node = members[placed++]
       positions.set(node.id, {
         x: centerX + Math.cos(angle) * radius,
         y: centerY + Math.sin(angle) * radius,
@@ -981,12 +1001,20 @@ function placeCircleWithPyramid(
   }
 }
 
-function arrangeGroupMembers(nodes: PersonNode[], memberIds: string[]) {
+function arrangeGroupMembers(
+  nodes: PersonNode[],
+  memberIds: string[],
+  centerOverride?: Offset,
+  group?: NodeGroup,
+  tagColorById: Record<string, string> = {},
+) {
   const members = memberIds.map((nodeId) => nodes.find((node) => node.id === nodeId)).filter(Boolean) as PersonNode[]
   if (members.length < 2) return new Map<string, Offset>()
 
-  const centerX = members.reduce((sum, node) => sum + node.x, 0) / members.length
-  const centerY = members.reduce((sum, node) => sum + node.y, 0) / members.length
+  // Anchor the layout to an explicit centre when given, so removing a member
+  // doesn't drift the whole cluster.
+  const centerX = centerOverride ? centerOverride.x : members.reduce((sum, node) => sum + node.x, 0) / members.length
+  const centerY = centerOverride ? centerOverride.y : members.reduce((sum, node) => sum + node.y, 0) / members.length
   const positions = new Map<string, Offset>()
 
   if (members.length === 2) {
@@ -1004,33 +1032,22 @@ function arrangeGroupMembers(nodes: PersonNode[], memberIds: string[]) {
     return positions
   }
 
-  // The group's primary category is its most common tag. Everyone else is an
-  // "outsider" and gets clustered into the pyramid wedge.
-  const tagCounts = new Map<string, number>()
-  for (const node of members) {
-    const key = node.tag_id ?? ''
-    tagCounts.set(key, (tagCounts.get(key) ?? 0) + 1)
+  const fallbackGroup: NodeGroup = group ?? {
+    id: 'layout-preview',
+    boardId: '',
+    memberIds,
+    color: DEFAULT_TAG_COLOR,
+    createdAt: '',
   }
-  let primaryKey = ''
-  let primaryCount = -1
-  for (const [key, count] of tagCounts) {
-    if (count > primaryCount) {
-      primaryKey = key
-      primaryCount = count
-    }
+  const buckets = getGroupColorBuckets(members, fallbackGroup, tagColorById)
+  let currentAngle = -Math.PI / 2
+  for (let index = 0; index < buckets.length; index += 1) {
+    const bucket = buckets[index]
+    const isLast = index === buckets.length - 1
+    const nextAngle = isLast ? Math.PI * 1.5 : currentAngle + (bucket.members.length / members.length) * Math.PI * 2
+    arrangeMembersInSector(bucket.members, centerX, centerY, currentAngle, nextAngle, positions)
+    currentAngle = nextAngle
   }
-
-  const mainMembers = members.filter((node) => (node.tag_id ?? '') === primaryKey)
-  // Group outsiders by their own tag so same-tag outsiders stay adjacent.
-  const outsiderMembers = members
-    .filter((node) => (node.tag_id ?? '') !== primaryKey)
-    .sort((left, right) => {
-      const leftKey = left.tag_id ?? ''
-      const rightKey = right.tag_id ?? ''
-      return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0
-    })
-
-  placeCircleWithPyramid(mainMembers, outsiderMembers, centerX, centerY, positions)
   return positions
 }
 
@@ -1090,19 +1107,23 @@ const GraphEdgePath = memo(function GraphEdgePath({
 type GraphNodeProps = {
   node: PersonNode
   isSelected: boolean
+  isUnattached: boolean
   tagColor: string | null
   showLabel: boolean
   onPointerDown: (node: PersonNode, event: ReactPointerEvent<HTMLButtonElement>) => void
   onClick: (node: PersonNode) => void
+  onDoubleClick: (node: PersonNode) => void
 }
 
 const GraphNodeCard = memo(function GraphNodeCard({
   node,
   isSelected,
+  isUnattached,
   tagColor,
   showLabel,
   onPointerDown,
   onClick,
+  onDoubleClick,
 }: GraphNodeProps) {
   const nodeStyle = {
     transform: `translate(${node.x}px, ${node.y}px)`,
@@ -1111,7 +1132,7 @@ const GraphNodeCard = memo(function GraphNodeCard({
 
   return (
     <div
-      className={`graph-node${node.is_root ? ' graph-node--root' : ''}${isSelected ? ' is-selected' : ''}`}
+      className={`graph-node${node.is_root ? ' graph-node--root' : ''}${isSelected ? ' is-selected' : ''}${isUnattached ? ' is-unattached' : ''}`}
       style={nodeStyle}
     >
       <button
@@ -1122,6 +1143,11 @@ const GraphNodeCard = memo(function GraphNodeCard({
         onClick={(event) => {
           event.stopPropagation()
           onClick(node)
+        }}
+        onDoubleClick={(event) => {
+          event.stopPropagation()
+          event.preventDefault()
+          onDoubleClick(node)
         }}
       >
         <span className="graph-node__dot" />
@@ -1366,9 +1392,17 @@ function App() {
     [boardConnections, visibleNodesById],
   )
   const visibleNodeGroupBubbles = useMemo(
-    () => getNodeGroupBubbles(nodeGroups, visibleBoardNodes),
-    [nodeGroups, visibleBoardNodes],
+    () => getNodeGroupBubbles(nodeGroups, visibleBoardNodes, tagColorById),
+    [nodeGroups, visibleBoardNodes, tagColorById],
   )
+  // Every person that belongs to a group; anyone else (non-root) is "unattached".
+  const groupedNodeIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const group of nodeGroups) {
+      for (const memberId of group.memberIds) ids.add(memberId)
+    }
+    return ids
+  }, [nodeGroups])
   const pinnedRenderNodeIds = useMemo(() => {
     const nodeIds = new Set<string>()
 
@@ -1969,7 +2003,7 @@ function App() {
 
     const moves: Array<{ id: string; x: number; y: number }> = []
     for (const group of nodeGroups) {
-      const positions = arrangeGroupMembers(boardNodes, group.memberIds)
+      const positions = arrangeGroupMembers(boardNodes, group.memberIds, undefined, group, tagColorById)
       for (const [nodeId, position] of positions) {
         const node = boardNodes.find((candidate) => candidate.id === nodeId)
         if (!node || node.is_root) continue
@@ -1990,7 +2024,7 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [isGraphReady, nodeGroups, boardNodes, movePerson])
+  }, [isGraphReady, nodeGroups, boardNodes, movePerson, tagColorById])
 
   useEffect(() => {
     areaSelectionRef.current = areaSelection
@@ -2465,14 +2499,29 @@ function App() {
       const nextMemberIds = Array.from(new Set([...currentMemberIds, ...memberIds]))
       if (nextMemberIds.length < 2) return false
 
+      const sourceColorByMemberId = new Map<string, string>()
+      for (const group of currentGroups) {
+        for (const memberId of group.memberIds) {
+          sourceColorByMemberId.set(memberId, normalizeTagColor(group.memberColors?.[memberId] ?? group.color))
+        }
+      }
+      const memberColors = Object.fromEntries(
+        nextMemberIds.map((memberId) => {
+          const node = currentNodes.find((candidateNode) => candidateNode.id === memberId)
+          const color = sourceColorByMemberId.get(memberId) ?? (node ? getNodeDisplayColor(node, tagColorById) : DEFAULT_TAG_COLOR)
+          return [memberId, normalizeTagColor(color)]
+        }),
+      )
+
       const nextGroup: NodeGroup = {
         id: targetGroup?.id ?? createLocalId('node-group'),
         boardId: activeBoardId,
         memberIds: nextMemberIds,
         color: targetGroup?.color ?? getNodeDisplayColor(targetNode, tagColorById),
+        memberColors,
         createdAt: targetGroup?.createdAt ?? new Date().toISOString(),
       }
-      const nextPositions = arrangeGroupMembers(currentNodes, nextMemberIds)
+      const nextPositions = arrangeGroupMembers(currentNodes, nextMemberIds, undefined, nextGroup, tagColorById)
       if (nextPositions.size === 0) return false
 
       applyNodeGroup(nextGroup)
@@ -4054,6 +4103,67 @@ function App() {
     openInspectorForNode(node)
   }, [inspectorNodeId, openInspectorForNode])
 
+  const detachNodesFromGroups = useCallback(
+    async (nodeIds: string[]) => {
+      const removeSet = new Set(nodeIds)
+      const currentGroups = nodeGroupsRef.current
+      if (!currentGroups.some((group) => group.memberIds.some((id) => removeSet.has(id)))) {
+        return false
+      }
+
+      const nextGroups = sanitizeNodeGroups(
+        currentGroups.map((group) => ({
+          ...group,
+          memberIds: group.memberIds.filter((id) => !removeSet.has(id)),
+        })),
+        activeBoardId,
+        boardNodesRef.current,
+      )
+      nodeGroupsRef.current = nextGroups
+      setNodeGroups(nextGroups)
+      if (isRemoteGraphReady) {
+        await saveRemoteNodeGroups(nextGroups)
+      } else {
+        setLocalNodeGroups(nextGroups)
+      }
+      return true
+    },
+    [activeBoardId, isRemoteGraphReady, saveRemoteNodeGroups],
+  )
+
+  // Double-tap a person to detach it from its group. It stays where it is and
+  // picks up the unattached (grey-outline) styling. The remaining members are
+  // re-packed around the group's existing centre so the zone doesn't jump.
+  const handleNodeDetach = useCallback(
+    async (node: PersonNode) => {
+      if (node.is_root) return
+      const group = getNodeGroupForNode(nodeGroupsRef.current, node.id)
+      if (!group) return
+
+      const members = group.memberIds
+        .map((id) => boardNodesRef.current.find((candidate) => candidate.id === id))
+        .filter(Boolean) as PersonNode[]
+      const anchor = {
+        x: members.reduce((sum, member) => sum + member.x, 0) / members.length,
+        y: members.reduce((sum, member) => sum + member.y, 0) / members.length,
+      }
+
+      const detached = await detachNodesFromGroups([node.id])
+      if (!detached) return
+
+      const remainingGroup = nodeGroupsRef.current.find((candidate) => candidate.id === group.id)
+      if (!remainingGroup) return
+
+      const positions = arrangeGroupMembers(boardNodesRef.current, remainingGroup.memberIds, anchor, remainingGroup, tagColorById)
+      for (const [nodeId, position] of positions) {
+        const memberNode = boardNodesRef.current.find((candidate) => candidate.id === nodeId)
+        if (!memberNode || memberNode.is_root) continue
+        void movePerson(nodeId, position.x, position.y)
+      }
+    },
+    [detachNodesFromGroups, movePerson, tagColorById],
+  )
+
   const previewPath = connectionDrag
     ? getLinkPath(nodesById[connectionDrag.fromId], {
         x: connectionDrag.worldX,
@@ -5052,14 +5162,22 @@ function App() {
           >
             {visibleNodeGroupBubbles.map((groupBubble) => (
               <g key={groupBubble.id}>
-                {/* Invisible blob = the drag target for moving the whole cluster. */}
+                {groupBubble.segments.map((segment, index) => (
+                  <path
+                    key={`${segment.color}-${index}`}
+                    className="node-group-segment"
+                    d={segment.path}
+                    style={{ fill: segment.fill, stroke: segment.stroke }}
+                  />
+                ))}
+                {/* Invisible circle = the drag target for moving the whole cluster. */}
                 <path
                   className="node-group-bubble"
                   d={groupBubble.path}
                   style={{ fill: 'transparent', stroke: 'transparent' }}
                   onPointerDown={(event) => startNodeGroupInteraction(groupBubble.id, event)}
                 />
-                {/* Concentric filled "electron cloud" shells with transparent gaps. */}
+                {/* Concentric orbit guides over a filled circle; no transparent ring gaps. */}
                 {groupBubble.ringRadii.map((radius, index) => (
                   <circle
                     key={index}
@@ -5067,7 +5185,7 @@ function App() {
                     cx={groupBubble.center.x}
                     cy={groupBubble.center.y}
                     r={radius}
-                    style={{ stroke: groupBubble.fill, strokeWidth: GROUP_ORBIT_BAND_WIDTH }}
+                    style={{ stroke: groupBubble.stroke, strokeWidth: GROUP_ORBIT_STROKE_WIDTH }}
                     onPointerDown={(event) => startNodeGroupInteraction(groupBubble.id, event)}
                   />
                 ))}
@@ -5103,10 +5221,12 @@ function App() {
               key={node.id}
               node={node}
               isSelected={node.id === selectedNode?.id || multiSelectedNodeIdSet.has(node.id)}
+              isUnattached={!node.is_root && !groupedNodeIds.has(node.id)}
               tagColor={node.tag_id ? tagColorById[node.tag_id] : null}
               showLabel={shouldShowGraphLabels || node.is_root || node.id === selectedNode?.id}
               onPointerDown={startNodeInteraction}
               onClick={handleNodeClick}
+              onDoubleClick={handleNodeDetach}
             />
           ))}
         </div>

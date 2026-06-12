@@ -382,12 +382,19 @@ export function useBoardGraph(user: User | null) {
       try {
         const { boardId, userId } = ensureUserAndBoard()
         const savedGroups = await saveRemoteNodeGroups(boardId, userId, groups)
+        const savedGroupsWithMemberColors = savedGroups.map((savedGroup) => {
+          const originalGroup = groups.find((group) => group.id === savedGroup.id)
+          return {
+            ...savedGroup,
+            memberColors: originalGroup?.memberColors,
+          }
+        })
         setGraphState((currentState) => ({
           ...currentState,
-          nodeGroups: savedGroups,
+          nodeGroups: savedGroupsWithMemberColors,
           error: null,
         }))
-        return savedGroups
+        return savedGroupsWithMemberColors
       } catch (error) {
         setError(error)
         throw error

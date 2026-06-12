@@ -1700,6 +1700,12 @@ input[type='search']::-webkit-search-results-decoration {
   cursor: grabbing;
 }
 
+.node-group-segment {
+  pointer-events: none;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
 .node-group-orbit {
   fill: none;
   cursor: grab;
@@ -1929,10 +1935,21 @@ input[type='search']::-webkit-search-results-decoration {
   color: #f4fff9;
 }
 
+.graph-node.is-unattached .graph-node__button::before {
+  border-color: rgba(148, 158, 173, 0.85);
+  border-style: dashed;
+}
+
+.theme-light .graph-node.is-unattached .graph-node__button::before {
+  border-color: rgba(92, 102, 118, 0.6);
+  border-style: dashed;
+}
+
 .graph-node.is-selected .graph-node__button::before {
   border-color: rgba(138, 255, 214, 0.94);
   background: rgba(138, 255, 214, 0.12);
   box-shadow: 0 0 0 1px rgba(138, 255, 214, 0.18);
+  border-style: solid;
 }
 
 .theme-light .graph-node.is-selected .graph-node__label {

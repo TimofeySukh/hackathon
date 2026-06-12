@@ -64,6 +64,7 @@ Current scope:
 - multiple notes per person
 - at most one manually refreshed AI summary record per person with a top-level text summary plus structured JSON fields
 - blob-group membership
+- circular pie-zone group rendering with proportional color slices and non-gapped orbit guides
 - a people search overlay over names, tags, notes, and AI-generated search explanations
 - batch LinkedIn import that inserts people and notes in chunks instead of one request per row
 - dense graph rendering with canvas overview drawing, viewport culling, label LOD, and capped SVG/DOM overlays
