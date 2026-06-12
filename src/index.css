@@ -123,23 +123,23 @@ svg {
 }
 
 .theme-dark {
-  --app-bg: #00140e;
-  --text-strong: #e8fff4;
-  --panel-bg: rgba(0, 22, 15, 0.88);
-  --panel-border: rgba(112, 235, 181, 0.38);
-  --panel-text: #e8fff4;
-  --panel-muted: rgba(215, 239, 226, 0.72);
+  --app-bg: #02060b;
+  --text-strong: #e7f2ff;
+  --panel-bg: rgba(7, 18, 34, 0.82);
+  --panel-border: rgba(64, 142, 218, 0.34);
+  --panel-text: #e7f2ff;
+  --panel-muted: rgba(223, 239, 255, 0.72);
   --panel-error: #ffb6a8;
   --panel-danger: #ffb6a8;
-  --button-bg: rgba(112, 235, 181, 0.14);
-  --button-border: rgba(112, 235, 181, 0.34);
-  --grid-dot: rgba(76, 207, 147, 0.13);
-  --grid-dot-major: rgba(112, 235, 181, 0.32);
-  --grid-glow-a: rgba(10, 72, 49, 0.22);
-  --grid-glow-b: rgba(0, 20, 14, 0);
+  --button-bg: rgba(138, 199, 255, 0.16);
+  --button-border: rgba(138, 199, 255, 0.34);
+  --grid-dot: rgba(94, 157, 226, 0.14);
+  --grid-dot-major: rgba(115, 186, 255, 0.30);
+  --grid-glow-a: rgba(12, 40, 75, 0.22);
+  --grid-glow-b: rgba(10, 17, 28, 0);
   background:
-    radial-gradient(circle at top left, rgba(30, 112, 75, 0.22), transparent 34%),
-    radial-gradient(circle at right center, rgba(34, 105, 76, 0.08), transparent 26%),
+    radial-gradient(circle at top left, rgba(28, 55, 95, 0.22), transparent 34%),
+    radial-gradient(circle at right center, rgba(38, 75, 140, 0.08), transparent 26%),
     var(--app-bg);
   color: var(--text-strong);
 }
@@ -393,7 +393,10 @@ svg {
 .linkedin-menu__panel {
   left: 0;
   display: grid;
-  width: min(420px, calc(100vw - 32px));
+  width: min(620px, calc(100vw - 32px));
+  max-height: calc(100dvh - 112px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   gap: 14px;
   padding: 14px;
 }
