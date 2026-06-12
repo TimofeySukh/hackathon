@@ -246,7 +246,7 @@ async function callOpenRouterJson<T>(input: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
       'HTTP-Referer': 'https://lxnrpdeahoglgiocowsh.supabase.co',
-      'X-Title': 'Hackathon Board',
+      'X-Title': 'Social Datanode',
     },
     body: JSON.stringify({
       model: OPENROUTER_MODEL,
