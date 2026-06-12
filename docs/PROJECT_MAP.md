@@ -10,7 +10,7 @@ The current visible prototype is intentionally narrow:
 - a central `You` circle
 - seeded connected circles and nested subset circles
 - people placed inside parent circles or subsets
-- curved SVG links from circle centers to people and circles
+- curved Canvas 2D links from circle centers to people and circles
 - branch creation from a circle context menu or Shift-drag from a circle center
 - a create menu for choosing person, nested subset circle, or external connected circle
 - direct dragging for people and circle centers
@@ -20,6 +20,7 @@ The current visible prototype is intentionally narrow:
 - in-page help text for the prototype controls
 - selection and renaming through a right-side inspector
 - local pan and zoom
+- Canvas 2D board rendering with canvas hit testing; React owns chrome, menus, and inspector UI
 - browser-session-only state
 - no visible Supabase, auth, LinkedIn import, persistence, notes, AI search, or collaboration in this prototype screen
 

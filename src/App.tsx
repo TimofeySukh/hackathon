@@ -104,6 +104,15 @@ type SelectedItem =
     }
   | null
 
+type BoardHit =
+  | { type: 'circle-center'; circle: CircleNode }
+  | { type: 'circle-edge'; circle: CircleNode }
+  | { type: 'circle-body'; circle: CircleNode }
+  | { type: 'person'; person: PersonNode }
+  | { type: 'connection'; connection: Connection }
+  | { type: 'connector-handle'; sourceId: string; sourceType: 'circle' | 'person'; x: number; y: number }
+  | null
+
 type PanState = {
   pointerId: number
   startX: number
@@ -140,18 +149,13 @@ const MAX_SCALE = 1.8
 // Render only nodes inside the viewport, padded by this fraction on each side so
 // small pans reveal already-rendered nodes before the gesture settles.
 const CULL_OVERSCAN = 0.45
-// People are always drawn on the Canvas 2D layer (cheap, cached sprites). At/above
-// this zoom they ALSO get a real interactive DOM node overlaid on top (so you can
-// drag/select them); below it they're canvas-only — still fully visible, just not
-// individually interactive until you zoom in.
-const PEOPLE_INTERACT_SCALE = 0.5
-// ...but a DOM person node is ~100× heavier than a canvas sprite, so we never
-// promote more than this many at once. If more than this are on screen (a dense
-// circle), everyone stays on the canvas until you zoom in enough to thin them out.
-const PEOPLE_DOM_CAP = 120
 const CONNECT_THRESHOLD = 40
 const MIN_CIRCLE_RADIUS = 72
 const EDGE_RESIZE_HIT_SIZE = 18
+const PERSON_VISUAL_RADIUS = 20
+const CIRCLE_CENTER_RADIUS = 20
+const CONNECTOR_HANDLE_RADIUS = 6
+const HANDLE_HIT_RADIUS = 16
 const PERSON_CONTAINMENT_RADIUS = 62
 const CIRCLE_CONTAINMENT_PADDING = 28
 const PERSON_COLLISION_RADIUS = 26
@@ -405,7 +409,7 @@ function getNodePath(
 
 function App() {
   const surfaceRef = useRef<HTMLDivElement | null>(null)
-  // Canvas 2D layer that draws all people (+ their edges) as cached sprites.
+  // Canvas 2D board renderer: circles, edges, people, labels, and interaction chrome.
   const peopleCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const panRef = useRef<PanState | null>(null)
   const moveCircleRef = useRef<MoveCircleState | null>(null)
@@ -421,7 +425,6 @@ function App() {
   // cameraRef holds the *live* camera during a pan/zoom gesture. `camera` state
   // is only the last *settled* value (committed when the gesture stops moving).
   const cameraRef = useRef(camera)
-  const worldLayerRef = useRef<HTMLDivElement | null>(null)
   // Gesture machinery: during a pan/zoom we drive the DOM transform + canvas
   // imperatively (no React re-render), then commit to state once it settles.
   const gestureActiveRef = useRef(false)
@@ -681,6 +684,10 @@ function App() {
     }
     return [...displayCircles].sort((a, b) => getDepth(a.parentId) - getDepth(b.parentId))
   }, [displayCircles, circlesById])
+  const boardIndex = useMemo(
+    () => createBoardIndex(sortedCircles, displayPeople, displayConnections),
+    [sortedCircles, displayPeople, displayConnections],
+  )
 
   // VIEWPORT CULLING — derive the visible world rectangle from the settled
   // camera, padded by CULL_OVERSCAN. During a gesture `camera` is frozen (only
@@ -698,66 +705,20 @@ function App() {
     return { left: left - mx, right: right + mx, top: top - my, bottom: bottom + my }
   }, [camera, viewport])
 
-  // Circles are few and cheap (the people canvas carries the heavy load), so we
-  // render them all rather than culling. Culling them caused circles to pop in
-  // late during a long pan (the DOM layer only re-culls once the gesture settles,
-  // while the canvas repaints people live every frame).
-  const visibleCircles = sortedCircles
+  const visibleCircles = useMemo(() => queryCircles(boardIndex, visibleWorld), [boardIndex, visibleWorld])
 
-  const pointVisible = (n: { x: number; y: number }) =>
-    n.x >= visibleWorld.left && n.x <= visibleWorld.right && n.y >= visibleWorld.top && n.y <= visibleWorld.bottom
   // People are always drawn (on the canvas layer below), so we only need the
   // culled set to decide which ones also get an interactive DOM overlay.
-  const visiblePeople = useMemo(
-    () => displayPeople.filter(pointVisible),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [displayPeople, visibleWorld],
-  )
+  const visiblePeople = useMemo(() => queryPeople(boardIndex, visibleWorld), [boardIndex, visibleWorld])
 
   const selectedCircle = selectedItem?.type === 'circle' ? circlesById.get(selectedItem.id) ?? null : null
   const selectedPerson = selectedItem?.type === 'person' ? graph.people.find((person) => person.id === selectedItem.id) ?? null : null
   const selectedConnection = selectedItem?.type === 'connection' ? (graph.connections || []).find((conn) => conn.id === selectedItem.id) ?? null : null
 
-  // INTERACTIVE OVERLAY — when few enough people are on screen, every visible one
-  // gets a real DOM node (drag/select/notes). When there are too many (a dense
-  // circle, or zoomed out), only the selected + hovered person become DOM and the
-  // canvas carries the rest, so the DOM set stays tiny no matter the total.
-  const promoteAllPeople = camera.scale >= PEOPLE_INTERACT_SCALE && visiblePeople.length <= PEOPLE_DOM_CAP
-  const domPeople = useMemo(() => {
-    if (promoteAllPeople) return visiblePeople
-    return visiblePeople.filter((p) => p.id === selectedPerson?.id || p.id === hoveredPersonId)
-  }, [promoteAllPeople, visiblePeople, selectedPerson, hoveredPersonId])
-  // Ids the canvas must NOT draw (their crisp DOM node sits on top). Deliberately
-  // hover-independent so sweeping the cursor doesn't force a canvas repaint — a
-  // hovered person just double-draws (its opaque DOM node covers the sprite).
-  const canvasExcludeIds = useMemo(
-    () => (promoteAllPeople ? new Set(visiblePeople.map((p) => p.id)) : new Set(selectedPerson ? [selectedPerson.id] : [])),
-    [promoteAllPeople, visiblePeople, selectedPerson],
-  )
-  // Real (user-made) connections stay interactive SVG; synthetic stress cross-links
-  // are drawn on the canvas layer instead.
-  const domConnections = useMemo(
-    () =>
-      displayConnections.filter((conn) => {
-        if (conn.id.startsWith('stress-link-')) return false
-        const a = peopleById.get(conn.fromId) || circlesById.get(conn.fromId)
-        const b = peopleById.get(conn.toId) || circlesById.get(conn.toId)
-        return a && b && (pointVisible(a) || pointVisible(b))
-      }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [displayConnections, peopleById, circlesById, visibleWorld],
-  )
-  const canvasConnections = useMemo(
-    () => displayConnections.filter((conn) => conn.id.startsWith('stress-link-')),
-    [displayConnections],
-  )
   const drawnNodeCount = visibleCircles.length + visiblePeople.length
 
-  // Push the live camera onto the DOM (world transform + dotted grid) without
-  // going through React. Cheap: one style write, the browser composites it.
+  // Push the live camera onto the dotted grid without going through React.
   function applyDomCamera(cam: Camera) {
-    const world = worldLayerRef.current
-    if (world) world.style.transform = `translate(${cam.x}px, ${cam.y}px) scale(${cam.scale})`
     const surface = surfaceRef.current
     if (surface) {
       const minor = 32 * cam.scale
@@ -775,7 +736,7 @@ function App() {
     const canvas = peopleCanvasRef.current
     const surface = surfaceRef.current
     if (canvas && surface) {
-      drawPeopleLayer(canvas, surface, cam, displayPeople, circlesById, canvasConnections, canvasExcludeIds)
+      drawBoardLayer(canvas, surface, cam, boardIndex, selectedItem, hoveredPersonId, hoveredConnId, connector)
     }
   }
 
@@ -787,7 +748,6 @@ function App() {
     cameraRef.current = next
     if (!gestureActiveRef.current) {
       gestureActiveRef.current = true
-      worldLayerRef.current?.classList.add('is-gesturing')
     }
     if (gestureRafRef.current == null) {
       gestureRafRef.current = window.requestAnimationFrame(() => {
@@ -813,7 +773,6 @@ function App() {
       gestureRafRef.current = null
     }
     gestureActiveRef.current = false
-    worldLayerRef.current?.classList.remove('is-gesturing')
     setCamera(cameraRef.current)
   }
 
@@ -849,8 +808,8 @@ function App() {
     const canvas = peopleCanvasRef.current
     const surface = surfaceRef.current
     if (!canvas || !surface) return
-    drawPeopleLayer(canvas, surface, camera, displayPeople, circlesById, canvasConnections, canvasExcludeIds)
-  }, [camera, viewport, displayPeople, circlesById, canvasConnections, canvasExcludeIds])
+    drawBoardLayer(canvas, surface, camera, boardIndex, selectedItem, hoveredPersonId, hoveredConnId, connector)
+  }, [camera, viewport, boardIndex, selectedItem, hoveredPersonId, hoveredConnId, connector])
 
   useEffect(() => {
     const surface = surfaceRef.current
@@ -894,9 +853,10 @@ function App() {
   }, [])
 
   function screenToWorld(point: { x: number; y: number }) {
+    const liveCamera = cameraRef.current
     return {
-      x: (point.x - camera.x) / camera.scale,
-      y: (point.y - camera.y) / camera.scale,
+      x: (point.x - liveCamera.x) / liveCamera.scale,
+      y: (point.y - liveCamera.y) / liveCamera.scale,
     }
   }
 
@@ -929,9 +889,51 @@ function App() {
   }
 
   function handleSurfacePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
-    if (event.button !== 0 || event.target !== event.currentTarget) return
+    if (event.button !== 0) return
     event.currentTarget.setPointerCapture(event.pointerId)
     setCreateMenu(null)
+    setOpenNotesPersonId(null)
+
+    const hit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
+      x: event.clientX,
+      y: event.clientY,
+    })
+
+    if (hit?.type === 'connector-handle') {
+      startConnector(event, hit.sourceId, hit.sourceType, hit.x, hit.y)
+      return
+    }
+
+    if (hit?.type === 'person') {
+      startPersonMove(event, hit.person)
+      return
+    }
+
+    if (hit?.type === 'circle-center') {
+      if (centerBehavior === 'connect') {
+        startConnector(event, hit.circle.id, 'circle', hit.circle.x, hit.circle.y)
+      } else {
+        startCircleMove(event, hit.circle)
+      }
+      return
+    }
+
+    if (hit?.type === 'circle-edge') {
+      startCircleResize(event, hit.circle)
+      return
+    }
+
+    if (hit?.type === 'circle-body') {
+      setSelectedItem({ type: 'circle', id: hit.circle.id })
+      startCircleMove(event, hit.circle)
+      return
+    }
+
+    if (hit?.type === 'connection') {
+      setSelectedItem({ type: 'connection', id: hit.connection.id })
+      return
+    }
+
     setSelectedItem(null)
     setOpenNotesPersonId(null)
     panRef.current = {
@@ -1000,16 +1002,19 @@ function App() {
       return
     }
 
-    // Idle hover: promote the nearest person under the cursor to a DOM node so
-    // it's interactive even in a dense, canvas-only circle. Skipped when everyone
-    // is already DOM (promoteAllPeople) — no need, and it would re-render per move.
-    if (!promoteAllPeople && !pan && !moving && !movingPerson && !resizing) {
-      const world = screenToWorld({ x: event.clientX, y: event.clientY })
-      const hit = findPersonAt(visiblePeople, world.x, world.y, 22)
-      const id = hit ? hit.id : null
+    // Idle hover is canvas hit-testing now; React only stores the hovered ids.
+    if (!pan && !moving && !movingPerson && !resizing) {
+      const hit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
+        x: event.clientX,
+        y: event.clientY,
+      })
+      const id = hit?.type === 'person' ? hit.person.id : null
       if (id !== hoveredPersonId) setHoveredPersonId(id)
-    } else if (promoteAllPeople && hoveredPersonId) {
-      setHoveredPersonId(null)
+      const connId = hit?.type === 'connection' ? hit.connection.id : null
+      if (connId !== hoveredConnId) setHoveredConnId(connId)
+    } else {
+      if (hoveredPersonId) setHoveredPersonId(null)
+      if (hoveredConnId) setHoveredConnId(null)
     }
   }
 
@@ -1128,6 +1133,25 @@ function App() {
     setConnector(null)
   }
 
+  function handleSurfaceContextMenu(event: ReactMouseEvent<HTMLDivElement>) {
+    event.preventDefault()
+    const hit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
+      x: event.clientX,
+      y: event.clientY,
+    })
+    if (hit?.type !== 'circle-body' && hit?.type !== 'circle-edge' && hit?.type !== 'circle-center') return
+
+    const world = screenToWorld({ x: event.clientX, y: event.clientY })
+    setSelectedItem({ type: 'circle', id: hit.circle.id })
+    setCreateMenu({
+      sourceCircleId: hit.circle.id,
+      x: world.x,
+      y: world.y,
+      screenX: event.clientX,
+      screenY: event.clientY,
+    })
+  }
+
   function startConnector(
     event: ReactPointerEvent<HTMLElement>,
     sourceId: string,
@@ -1162,48 +1186,6 @@ function App() {
       originX: circle.x,
       originY: circle.y,
     }
-  }
-
-  function startCircleCenterDrag(event: ReactPointerEvent<HTMLButtonElement>, circle: CircleNode) {
-    if (centerBehavior === 'connect') {
-      startConnector(event, circle.id, 'circle', circle.x, circle.y)
-    } else {
-      startCircleMove(event, circle)
-    }
-  }
-
-  function startPersonConnection(event: ReactPointerEvent<HTMLElement>, person: PersonNode) {
-    startConnector(event, person.id, 'person', person.x, person.y)
-  }
-
-  function startCircleSurfaceDrag(event: ReactPointerEvent<Element>, circle: CircleNode) {
-    if (event.button !== 0) return
-
-    const world = screenToWorld({ x: event.clientX, y: event.clientY })
-    const distanceFromCenter = Math.hypot(world.x - circle.x, world.y - circle.y)
-    const edgeHitSize = EDGE_RESIZE_HIT_SIZE / camera.scale
-
-    if (Math.abs(distanceFromCenter - circle.radius) <= edgeHitSize) {
-      startCircleResize(event, circle)
-      return
-    }
-
-    setSelectedItem({ type: 'circle', id: circle.id })
-    startCircleMove(event, circle)
-  }
-
-  function openCircleCreateMenu(event: ReactMouseEvent<Element>, circle: CircleNode) {
-    event.preventDefault()
-    event.stopPropagation()
-    const world = screenToWorld({ x: event.clientX, y: event.clientY })
-    setSelectedItem({ type: 'circle', id: circle.id })
-    setCreateMenu({
-      sourceCircleId: circle.id,
-      x: world.x,
-      y: world.y,
-      screenX: event.clientX,
-      screenY: event.clientY,
-    })
   }
 
   function startPersonMove(event: ReactPointerEvent<HTMLElement>, person: PersonNode) {
@@ -1593,572 +1575,13 @@ function App() {
         onPointerMove={handleSurfacePointerMove}
         onPointerUp={handleSurfacePointerUp}
         onPointerCancel={handleSurfacePointerUp}
-        onPointerLeave={() => hoveredPersonId && setHoveredPersonId(null)}
+        onContextMenu={handleSurfaceContextMenu}
+        onPointerLeave={() => {
+          if (hoveredPersonId) setHoveredPersonId(null)
+          if (hoveredConnId) setHoveredConnId(null)
+        }}
       >
-        <div ref={worldLayerRef} className="world-layer" style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale})` }}>
-          
-          {/* PASS 1: Circle Fills and Borders */}
-          {visibleCircles.map((circle) => (
-            <div
-              key={`body-${circle.id}`}
-              style={{
-                position: 'absolute',
-                left: 0,
-                top: 0,
-                width: circle.radius * 2,
-                height: circle.radius * 2,
-                transform: `translate(${circle.x - circle.radius}px, ${circle.y - circle.radius}px)`,
-                pointerEvents: 'none',
-              }}
-            >
-              <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible', pointerEvents: 'none' }}>
-                <path
-                  d={getNodePath(
-                    circle.radius,
-                    circle.radius,
-                    circle.radius,
-                    circle.shapeType ?? 'wavy',
-                    circle.sides ?? Math.max(8, Math.round(circle.radius / 10)),
-                    circle.amplitude ?? Math.max(4, circle.radius * 0.06)
-                  )}
-                  fill={MATERIAL_TONES[circle.tone].fill}
-                  stroke={selectedItem?.type === 'circle' && selectedItem?.id === circle.id ? MATERIAL_TONES[circle.tone].border : 'none'}
-                  strokeWidth={selectedItem?.type === 'circle' && selectedItem?.id === circle.id ? 3.5 : 0}
-                  filter="drop-shadow(0px 8px 16px rgba(0,0,0,0.06))"
-                  style={{ pointerEvents: 'auto', cursor: 'grab' }}
-                  onContextMenu={(event) => openCircleCreateMenu(event, circle)}
-                  onPointerDown={(event) => startCircleSurfaceDrag(event, circle)}
-                />
-              </svg>
-            </div>
-          ))}
-
-          {/* PASS 2: Connection Edges */}
-          <svg className="edge-layer" aria-hidden="true" style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}>
-            {visibleCircles.map((circle) => {
-              const source = circle.connectedTo ? circlesById.get(circle.connectedTo) : null
-              if (!source) return null
-              return <path key={circle.id} className="edge edge--circle" d={makeCurve(source, circle)} />
-            })}
-            {/* Canvas-only people get their edge from the canvas; interactive DOM
-                people get an SVG edge here so it sits behind their avatar. */}
-            {domPeople.map((person) => {
-              const circle = circlesById.get(person.circleId)
-              if (!circle) return null
-              return <path key={person.id} className="edge edge--person" d={makeCurve(circle, person)} />
-            })}
-            {domConnections.map((conn) => {
-              const sourceNode = peopleById.get(conn.fromId) || circlesById.get(conn.fromId)
-              const targetNode = peopleById.get(conn.toId) || circlesById.get(conn.toId)
-              if (!sourceNode || !targetNode) return null
-              const isSelected = selectedItem?.type === 'connection' && selectedItem?.id === conn.id
-              const isHovered = hoveredConnId === conn.id
-              return (
-                <g key={conn.id}>
-                  {/* Invisible overlay for easier hovering and clicking */}
-                  <path
-                    d={makeCurve(sourceNode, targetNode)}
-                    stroke="transparent"
-                    strokeWidth={16}
-                    fill="none"
-                    style={{ cursor: 'pointer', pointerEvents: 'stroke' }}
-                    onPointerDown={(e) => {
-                      e.stopPropagation()
-                      setSelectedItem({ type: 'connection', id: conn.id })
-                    }}
-                    onMouseEnter={() => setHoveredConnId(conn.id)}
-                    onMouseLeave={() => setHoveredConnId(null)}
-                  />
-                  {/* Visible path */}
-                  <path
-                    className={`edge edge--custom ${isSelected ? 'is-selected' : ''}`}
-                    d={makeCurve(sourceNode, targetNode)}
-                    stroke={isSelected ? '#00629d' : isHovered ? '#64748b' : '#94a3b8'}
-                    strokeWidth={isSelected ? 4 : isHovered ? 3 : 2}
-                    fill="none"
-                    style={{ pointerEvents: 'none' }}
-                  />
-                </g>
-              )
-            })}
-            {connector ? <path className="edge edge--draft" d={makeCurve({ x: connector.startX, y: connector.startY }, { x: connector.endX, y: connector.endY })} /> : null}
-          </svg>
-
-          {/* PASS 3: Circle Interactive Elements (Centers & Labels) */}
-          {visibleCircles.map((circle) => (
-            <section
-              key={circle.id}
-              className={`circle circle--${circle.tone} ${selectedItem?.type === 'circle' && selectedItem?.id === circle.id ? 'is-selected' : ''}`}
-              style={{
-                width: circle.radius * 2,
-                height: circle.radius * 2,
-                transform: `translate(${circle.x - circle.radius}px, ${circle.y - circle.radius}px)`,
-                background: 'transparent',
-                border: 'none',
-                pointerEvents: 'none',
-              }}
-            >
-              <span className="circle__label">{circle.name}</span>
-              <div
-                style={{
-                  position: 'absolute',
-                  left: circle.radius,
-                  top: circle.radius,
-                  width: 40,
-                  height: 40,
-                  transform: 'translate(-50%, -50%)',
-                  pointerEvents: 'none',
-                }}
-              >
-                <button
-                  type="button"
-                  className={`circle-center ${selectedItem?.type === 'circle' && selectedItem?.id === circle.id ? 'is-selected' : ''}`}
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    width: '100%',
-                    height: '100%',
-                    background: circle.imageUrl ? 'transparent' : MATERIAL_TONES[circle.tone].centerBg,
-                    border: 'none',
-                    borderRadius: '50%',
-                    display: 'grid',
-                    placeItems: 'center',
-                    cursor: centerBehavior === 'connect' ? 'crosshair' : 'grab',
-                    padding: 0,
-                    outline: 'none',
-                    pointerEvents: 'auto',
-                    transform: 'none',
-                  }}
-                  onPointerDown={(event) => startCircleCenterDrag(event, circle)}
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    setSelectedItem({ type: 'circle', id: circle.id })
-                  }}
-                  title="Drag to connect. Drag empty space inside circle to move."
-                >
-                  {circle.imageUrl ? (
-                    <svg viewBox="0 0 40 40" style={{ width: 40, height: 40, borderRadius: '50%' }}>
-                      <clipPath id={`clip-center-${circle.id}`}>
-                        <circle cx="20" cy="20" r="17" />
-                      </clipPath>
-                      <circle cx="20" cy="20" r="17" fill={MATERIAL_TONES[circle.tone].centerBg} />
-                      <image
-                        href={circle.imageUrl}
-                        x="3"
-                        y="3"
-                        width="34"
-                        height="34"
-                        preserveAspectRatio="xMidYMid slice"
-                        clipPath={`url(#clip-center-${circle.id})`}
-                      />
-                      <circle cx="20" cy="20" r="18.5" fill="none" stroke="#ffffff" strokeWidth="3" />
-                    </svg>
-                  ) : (
-                    <span style={{ color: '#ffffff', fontSize: 10, fontWeight: 500 }}>{circle.icon}</span>
-                  )}
-                </button>
-
-                {selectedItem?.type === 'circle' && selectedItem?.id === circle.id && (
-                  <>
-                    {/* Top dot */}
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: -20,
-                        left: 5,
-                        width: 30,
-                        height: 20,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'flex-end',
-                        cursor: 'crosshair',
-                        zIndex: 10,
-                        pointerEvents: 'auto',
-                        background: 'transparent',
-                      }}
-                      onPointerDown={(e) => startConnector(e, circle.id, 'circle', circle.x, circle.y)}
-                    >
-                      <div
-                        style={{
-                          width: 10,
-                          height: 10,
-                          borderRadius: '50%',
-                          background: MATERIAL_TONES[circle.tone].centerBg,
-                          border: '2px solid #ffffff',
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-                          pointerEvents: 'none',
-                          marginBottom: '-5px',
-                        }}
-                      />
-                    </div>
-                    {/* Bottom dot */}
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: 40,
-                        left: 5,
-                        width: 30,
-                        height: 20,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'flex-start',
-                        cursor: 'crosshair',
-                        zIndex: 10,
-                        pointerEvents: 'auto',
-                        background: 'transparent',
-                      }}
-                      onPointerDown={(e) => startConnector(e, circle.id, 'circle', circle.x, circle.y)}
-                    >
-                      <div
-                        style={{
-                          width: 10,
-                          height: 10,
-                          borderRadius: '50%',
-                          background: MATERIAL_TONES[circle.tone].centerBg,
-                          border: '2px solid #ffffff',
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-                          pointerEvents: 'none',
-                          marginTop: '-5px',
-                        }}
-                      />
-                    </div>
-                    {/* Left dot */}
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: 5,
-                        left: -20,
-                        width: 20,
-                        height: 30,
-                        display: 'flex',
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'flex-end',
-                        cursor: 'crosshair',
-                        zIndex: 10,
-                        pointerEvents: 'auto',
-                        background: 'transparent',
-                      }}
-                      onPointerDown={(e) => startConnector(e, circle.id, 'circle', circle.x, circle.y)}
-                    >
-                      <div
-                        style={{
-                          width: 10,
-                          height: 10,
-                          borderRadius: '50%',
-                          background: MATERIAL_TONES[circle.tone].centerBg,
-                          border: '2px solid #ffffff',
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-                          pointerEvents: 'none',
-                          marginRight: '-5px',
-                        }}
-                      />
-                    </div>
-                    {/* Right dot */}
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: 5,
-                        left: 40,
-                        width: 20,
-                        height: 30,
-                        display: 'flex',
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'flex-start',
-                        cursor: 'crosshair',
-                        zIndex: 10,
-                        pointerEvents: 'auto',
-                        background: 'transparent',
-                      }}
-                      onPointerDown={(e) => startConnector(e, circle.id, 'circle', circle.x, circle.y)}
-                    >
-                      <div
-                        style={{
-                          width: 10,
-                          height: 10,
-                          borderRadius: '50%',
-                          background: MATERIAL_TONES[circle.tone].centerBg,
-                          border: '2px solid #ffffff',
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-                          pointerEvents: 'none',
-                          marginLeft: '-5px',
-                        }}
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-            </section>
-          ))}
-
-          {/* PASS 4: Interactive people overlay (canvas below draws all of them) */}
-          {domPeople.map((person) => {
-            const isSelected = selectedItem?.type === 'person' && selectedItem?.id === person.id
-            const parentCircle = circlesById.get(person.circleId)
-            const personColor = parentCircle ? MATERIAL_TONES[parentCircle.tone].centerBg : '#3F51B5'
-            const strokeColor = person.isFavorite
-              ? '#ffff00' // Highly vibrant neon yellow
-              : isSelected
-              ? '#00629d' // Blue
-              : personColor // Group tone
-            const strokeWidth = person.isFavorite
-              ? (isSelected ? 5.5 : 4.5)
-              : (isSelected ? 2.5 : 1.5)
-
-            return (
-              <div
-                key={person.id}
-                className={`person-icon-only ${isSelected ? 'is-selected' : ''}`}
-                style={{
-                  position: 'absolute',
-                  left: 0,
-                  top: 0,
-                  width: 100,
-                  height: 80,
-                  transform: `translate(${person.x - 50}px, ${person.y - 20}px)`,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'grab',
-                  outline: 'none',
-                }}
-                onPointerDown={(event) => startPersonMove(event, person)}
-                onClick={() => setSelectedItem({ type: 'person', id: person.id })}
-                title="Drag to move this person"
-              >
-                <div
-                  className={`person-avatar-shape ${isSelected ? 'is-selected' : ''}`}
-                  style={{
-                    position: 'relative',
-                    width: 40,
-                    height: 40,
-                    display: 'grid',
-                    placeItems: 'center',
-                  }}
-                >
-                  <svg viewBox="0 0 40 40" style={{ width: 40, height: 40, overflow: 'visible' }}>
-                    <defs>
-                      <clipPath id={`clip-${person.id}`}>
-                        <path d={getNodePath(20, 20, 18, person.shapeType ?? 'wavy', person.sides ?? 8, person.amplitude ?? 1)} />
-                      </clipPath>
-                    </defs>
-                    {person.imageUrl ? (
-                      <g>
-                        {/* Outer stroke path (drawn first) at double width */}
-                        <path
-                          d={getNodePath(20, 20, 18, person.shapeType ?? 'wavy', person.sides ?? 8, person.amplitude ?? 1)}
-                          fill="none"
-                          stroke={strokeColor}
-                          strokeWidth={strokeWidth * 2}
-                        />
-                        {/* Background cover */}
-                        <path
-                          d={getNodePath(20, 20, 18, person.shapeType ?? 'wavy', person.sides ?? 8, person.amplitude ?? 1)}
-                          fill={personColor}
-                        />
-                        <image
-                          href={person.imageUrl}
-                          x="0"
-                          y="0"
-                          width="40"
-                          height="40"
-                          preserveAspectRatio="xMidYMid slice"
-                          clipPath={`url(#clip-${person.id})`}
-                        />
-                      </g>
-                    ) : (
-                      <g>
-                        {/* Outer stroke path (drawn first) at double width */}
-                        <path
-                          d={getNodePath(20, 20, 18, person.shapeType ?? 'wavy', person.sides ?? 8, person.amplitude ?? 1)}
-                          fill="none"
-                          stroke={strokeColor}
-                          strokeWidth={strokeWidth * 2}
-                        />
-                        {/* Background cover */}
-                        <path
-                          d={getNodePath(20, 20, 18, person.shapeType ?? 'wavy', person.sides ?? 8, person.amplitude ?? 1)}
-                          fill={personColor}
-                        />
-                        <text
-                          x="20"
-                          y="21"
-                          fill="#ffffff"
-                          fontSize="11"
-                          fontWeight="500"
-                          textAnchor="middle"
-                          dominantBaseline="middle"
-                        >
-                          {person.avatar}
-                        </text>
-                      </g>
-                    )}
-                  </svg>
-
-                  {/* 4 connection dots around selected person's avatar */}
-                  {isSelected && (
-                    <>
-                      {/* Top dot */}
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: -20,
-                          left: 5,
-                          width: 30,
-                          height: 20,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'flex-end',
-                          cursor: 'crosshair',
-                          zIndex: 10,
-                          pointerEvents: 'auto',
-                          background: 'transparent',
-                        }}
-                        onPointerDown={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          startPersonConnection(e, person)
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 10,
-                            height: 10,
-                            borderRadius: '50%',
-                            background: 'var(--md-primary)',
-                            border: '2px solid #ffffff',
-                            boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-                            pointerEvents: 'none',
-                            marginBottom: '-5px',
-                          }}
-                        />
-                      </div>
-                      {/* Bottom dot */}
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: 40,
-                          left: 5,
-                          width: 30,
-                          height: 20,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'flex-start',
-                          cursor: 'crosshair',
-                          zIndex: 10,
-                          pointerEvents: 'auto',
-                          background: 'transparent',
-                        }}
-                        onPointerDown={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          startPersonConnection(e, person)
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 10,
-                            height: 10,
-                            borderRadius: '50%',
-                            background: 'var(--md-primary)',
-                            border: '2px solid #ffffff',
-                            boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-                            pointerEvents: 'none',
-                            marginTop: '-5px',
-                          }}
-                        />
-                      </div>
-                      {/* Left dot */}
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: 5,
-                          left: -20,
-                          width: 20,
-                          height: 30,
-                          display: 'flex',
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'flex-end',
-                          cursor: 'crosshair',
-                          zIndex: 10,
-                          pointerEvents: 'auto',
-                          background: 'transparent',
-                        }}
-                        onPointerDown={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          startPersonConnection(e, person)
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 10,
-                            height: 10,
-                            borderRadius: '50%',
-                            background: 'var(--md-primary)',
-                            border: '2px solid #ffffff',
-                            boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-                            pointerEvents: 'none',
-                            marginRight: '-5px',
-                          }}
-                        />
-                      </div>
-                      {/* Right dot */}
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: 5,
-                          left: 40,
-                          width: 20,
-                          height: 30,
-                          display: 'flex',
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'flex-start',
-                          cursor: 'crosshair',
-                          zIndex: 10,
-                          pointerEvents: 'auto',
-                          background: 'transparent',
-                        }}
-                        onPointerDown={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          startPersonConnection(e, person)
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 10,
-                            height: 10,
-                            borderRadius: '50%',
-                            background: 'var(--md-primary)',
-                            border: '2px solid #ffffff',
-                            boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-                            pointerEvents: 'none',
-                            marginLeft: '-5px',
-                          }}
-                        />
-                      </div>
-                    </>
-                  )}
-                </div>
-                <strong className="person-label">{person.name}</strong>
-              </div>
-            )
-          })}
-
-        </div>
-        {/* People canvas — draws ALL people (+ their edges) as cached sprites,
-            on top of circle fills, below the interactive DOM overlay. */}
-        <canvas ref={peopleCanvasRef} className="people-canvas-layer" aria-hidden="true" />
+        <canvas ref={peopleCanvasRef} className="board-canvas-layer" aria-label="Relationship board" />
       </div>
 
       {createMenu ? (
@@ -2385,8 +1808,8 @@ function App() {
                   <svg viewBox="0 0 24 24" style={{ width: 20, height: 20 }}>
                     <path
                       d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
-                      fill={selectedPerson.isFavorite ? '#ffd600' : 'none'}
-                      stroke={selectedPerson.isFavorite ? '#d97706' : '#94a3b8'}
+                      fill={selectedPerson.isFavorite ? 'var(--md-favorite-fill)' : 'none'}
+                      stroke={selectedPerson.isFavorite ? 'var(--md-favorite-stroke)' : 'var(--md-outline-variant)'}
                       strokeWidth={2}
                     />
                   </svg>
@@ -2704,21 +2127,28 @@ function FpsMeter() {
   return <span>{fps} FPS</span>
 }
 
-// ---- People canvas layer ----------------------------------------------------
-// All people are painted on a single Canvas 2D layer with cached avatar sprites
-// and viewport culling, so the board stays smooth with thousands of them at any
-// zoom. Interactive (DOM) people are passed in `excludeIds` and skipped here to
-// avoid double-drawing; the canvas still draws everyone else, including people
-// revealed mid-pan before the gesture settles.
+// ---- Canvas board renderer ---------------------------------------------------
+// The relationship board is canvas-first: React owns chrome/inspector/menu UI,
+// while this renderer owns every hot-path board pixel and hit target.
 
-// Pre-rendered avatar sprites keyed by `${tone}|${avatar}|${resolution}`. We keep
-// a few resolution tiers (see SPRITE_TIERS) so a zoomed-in avatar is rendered from
-// a crisp high-res bitmap instead of an upscaled 64px one. At most 5 tones × a
-// handful of initials × 3 tiers, so the cache stays small.
+type WorldRect = { left: number; right: number; top: number; bottom: number }
+
+type BoardIndex = {
+  circles: CircleNode[]
+  people: PersonNode[]
+  connections: Connection[]
+  circlesById: Map<string, CircleNode>
+  peopleById: Map<string, PersonNode>
+  peopleByCell: Map<string, PersonNode[]>
+  circlesByCell: Map<string, CircleNode[]>
+  connectionsByEndpoint: Map<string, Connection[]>
+}
+
+const BOARD_GRID_SIZE = 360
 const personSpriteCache = new Map<string, HTMLCanvasElement>()
+const imageCache = new Map<string, HTMLImageElement>()
 const SPRITE_TIERS = [64, 128, 256]
 
-// Pick the smallest tier whose pixels meet/exceed the on-screen device-pixel size.
 function pickSpriteTier(screenPx: number): number {
   for (const tier of SPRITE_TIERS) {
     if (tier >= screenPx) return tier
@@ -2726,128 +2156,557 @@ function pickSpriteTier(screenPx: number): number {
   return SPRITE_TIERS[SPRITE_TIERS.length - 1]
 }
 
-function getPersonSprite(tone: CircleTone, avatar: string, size: number): HTMLCanvasElement {
-  const key = `${tone}|${avatar}|${size}`
+function cellRange(min: number, max: number) {
+  return {
+    from: Math.floor(min / BOARD_GRID_SIZE),
+    to: Math.floor(max / BOARD_GRID_SIZE),
+  }
+}
+
+function cellKey(x: number, y: number) {
+  return `${x},${y}`
+}
+
+function pushCell<T>(map: Map<string, T[]>, x: number, y: number, item: T) {
+  const key = cellKey(x, y)
+  const existing = map.get(key)
+  if (existing) existing.push(item)
+  else map.set(key, [item])
+}
+
+function createBoardIndex(circles: CircleNode[], people: PersonNode[], connections: Connection[]): BoardIndex {
+  const peopleByCell = new Map<string, PersonNode[]>()
+  const circlesByCell = new Map<string, CircleNode[]>()
+  const connectionsByEndpoint = new Map<string, Connection[]>()
+
+  for (const person of people) {
+    const x = Math.floor(person.x / BOARD_GRID_SIZE)
+    const y = Math.floor(person.y / BOARD_GRID_SIZE)
+    pushCell(peopleByCell, x, y, person)
+  }
+
+  for (const circle of circles) {
+    const xs = cellRange(circle.x - circle.radius, circle.x + circle.radius)
+    const ys = cellRange(circle.y - circle.radius, circle.y + circle.radius)
+    for (let x = xs.from; x <= xs.to; x += 1) {
+      for (let y = ys.from; y <= ys.to; y += 1) {
+        pushCell(circlesByCell, x, y, circle)
+      }
+    }
+  }
+
+  for (const connection of connections) {
+    const a = connectionsByEndpoint.get(connection.fromId)
+    if (a) a.push(connection)
+    else connectionsByEndpoint.set(connection.fromId, [connection])
+    const b = connectionsByEndpoint.get(connection.toId)
+    if (b) b.push(connection)
+    else connectionsByEndpoint.set(connection.toId, [connection])
+  }
+
+  return {
+    circles,
+    people,
+    connections,
+    circlesById: new Map(circles.map((circle) => [circle.id, circle])),
+    peopleById: new Map(people.map((person) => [person.id, person])),
+    peopleByCell,
+    circlesByCell,
+    connectionsByEndpoint,
+  }
+}
+
+function queryGrid<T extends { id: string }>(map: Map<string, T[]>, rect: WorldRect) {
+  const found = new Map<string, T>()
+  const xs = cellRange(rect.left, rect.right)
+  const ys = cellRange(rect.top, rect.bottom)
+  for (let x = xs.from; x <= xs.to; x += 1) {
+    for (let y = ys.from; y <= ys.to; y += 1) {
+      const bucket = map.get(cellKey(x, y))
+      if (!bucket) continue
+      for (const item of bucket) found.set(item.id, item)
+    }
+  }
+  return [...found.values()]
+}
+
+function queryPeople(index: BoardIndex, rect: WorldRect) {
+  return queryGrid(index.peopleByCell, rect).filter(
+    (person) => person.x >= rect.left && person.x <= rect.right && person.y >= rect.top && person.y <= rect.bottom,
+  )
+}
+
+function queryCircles(index: BoardIndex, rect: WorldRect) {
+  return queryGrid(index.circlesByCell, rect).filter(
+    (circle) =>
+      circle.x + circle.radius >= rect.left &&
+      circle.x - circle.radius <= rect.right &&
+      circle.y + circle.radius >= rect.top &&
+      circle.y - circle.radius <= rect.bottom,
+  )
+}
+
+function cameraWorldRect(surface: HTMLElement, camera: Camera, padPx = 120): WorldRect {
+  const width = Math.max(1, surface.clientWidth)
+  const height = Math.max(1, surface.clientHeight)
+  const pad = padPx / camera.scale
+  return {
+    left: -camera.x / camera.scale - pad,
+    right: (width - camera.x) / camera.scale + pad,
+    top: -camera.y / camera.scale - pad,
+    bottom: (height - camera.y) / camera.scale + pad,
+  }
+}
+
+function getCanvasImage(src: string): HTMLImageElement | null {
+  const cached = imageCache.get(src)
+  if (cached) return cached.complete ? cached : null
+  const image = new Image()
+  image.src = src
+  imageCache.set(src, image)
+  return image.complete ? image : null
+}
+
+function getPersonSprite(person: PersonNode, tone: CircleTone, size: number, stroke: string, strokeWidth: number): HTMLCanvasElement {
+  const imageKey = person.imageUrl ? `img:${person.imageUrl.length}` : person.avatar
+  const key = `${tone}|${imageKey}|${person.shapeType ?? 'wavy'}|${person.sides ?? 8}|${person.amplitude ?? 1}|${stroke}|${strokeWidth}|${size}`
   const cached = personSpriteCache.get(key)
   if (cached) return cached
+
   const canvas = document.createElement('canvas')
   canvas.width = size
   canvas.height = size
   const ctx = canvas.getContext('2d')
-  if (ctx) {
-    const path = new Path2D(getNodePath(size / 2, size / 2, size * 0.40625, 'polygon', 9, 2))
-    ctx.fillStyle = MATERIAL_TONES[tone].centerBg
-    ctx.fill(path)
-    ctx.lineWidth = size * 0.0625
-    ctx.strokeStyle = '#ffffff'
-    ctx.stroke(path)
+  if (!ctx) return canvas
+
+  const scale = size / 40
+  const path = new Path2D(getNodePath(20 * scale, 20 * scale, 18 * scale, person.shapeType ?? 'wavy', person.sides ?? 8, (person.amplitude ?? 1) * scale))
+  ctx.save()
+  ctx.fillStyle = MATERIAL_TONES[tone].centerBg
+  ctx.strokeStyle = stroke
+  ctx.lineWidth = strokeWidth * scale
+  ctx.stroke(path)
+  ctx.fill(path)
+
+  if (person.imageUrl) {
+    const image = getCanvasImage(person.imageUrl)
+    if (image) {
+      ctx.clip(path)
+      ctx.drawImage(image, 0, 0, size, size)
+    }
+  } else {
     ctx.fillStyle = '#ffffff'
-    ctx.font = `600 ${(size * 0.34375).toFixed(1)}px Inter, system-ui, sans-serif`
+    ctx.font = `500 ${(11 * scale).toFixed(1)}px Inter, system-ui, sans-serif`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(avatar, size / 2, size / 2 + size * 0.016)
+    ctx.fillText(person.avatar, size / 2, size / 2 + scale)
   }
+  ctx.restore()
+
   personSpriteCache.set(key, canvas)
   return canvas
 }
 
-// Nearest person to a world-space point within `radius` (for hover hit-testing).
-function findPersonAt(people: PersonNode[], x: number, y: number, radius: number): PersonNode | null {
-  let best: PersonNode | null = null
-  let bestDist = radius * radius
-  for (const p of people) {
-    const dx = p.x - x
-    const dy = p.y - y
-    const d = dx * dx + dy * dy
-    if (d < bestDist) {
-      bestDist = d
-      best = p
-    }
-  }
-  return best
-}
-
-function drawPeopleLayer(
-  canvas: HTMLCanvasElement,
-  surface: HTMLElement,
-  camera: Camera,
-  people: PersonNode[],
-  circlesById: Map<string, CircleNode>,
-  connections: Connection[],
-  excludeIds: Set<string>,
-) {
+function resizeCanvas(canvas: HTMLCanvasElement, surface: HTMLElement) {
   const dpr = Math.min(window.devicePixelRatio || 1, 1.75)
   const width = Math.max(1, surface.clientWidth)
   const height = Math.max(1, surface.clientHeight)
-  if (canvas.width !== Math.round(width * dpr) || canvas.height !== Math.round(height * dpr)) {
-    canvas.width = Math.round(width * dpr)
-    canvas.height = Math.round(height * dpr)
+  const nextWidth = Math.round(width * dpr)
+  const nextHeight = Math.round(height * dpr)
+  if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
+    canvas.width = nextWidth
+    canvas.height = nextHeight
     canvas.style.width = `${width}px`
     canvas.style.height = `${height}px`
   }
+  return { dpr, width, height }
+}
 
+function drawBoardLayer(
+  canvas: HTMLCanvasElement,
+  surface: HTMLElement,
+  camera: Camera,
+  index: BoardIndex,
+  selectedItem: SelectedItem,
+  hoveredPersonId: string | null,
+  hoveredConnId: string | null,
+  connector: DragConnector | null,
+) {
+  const { dpr, width, height } = resizeCanvas(canvas, surface)
   const ctx = canvas.getContext('2d')
   if (!ctx) return
+
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.clearRect(0, 0, width, height)
-  if (people.length === 0) return
 
-  const pad = 80 / camera.scale
-  const left = -camera.x / camera.scale - pad
-  const right = (width - camera.x) / camera.scale + pad
-  const top = -camera.y / camera.scale - pad
-  const bottom = (height - camera.y) / camera.scale + pad
-  const inView = (n: { x: number; y: number }) => n.x >= left && n.x <= right && n.y >= top && n.y <= bottom
-  const visible = people.filter(inView)
+  const worldRect = cameraWorldRect(surface, camera)
+  const visibleCircles = queryCircles(index, worldRect)
+  const visiblePeople = queryPeople(index, worldRect)
+  const visibleCircleIds = new Set(visibleCircles.map((circle) => circle.id))
+  const visiblePeopleIds = new Set(visiblePeople.map((person) => person.id))
 
   ctx.save()
   ctx.translate(camera.x, camera.y)
   ctx.scale(camera.scale, camera.scale)
 
-  // Person → parent-circle edges (only for canvas-drawn people; DOM people get
-  // their edge from the SVG layer so it sits behind their avatar).
-  ctx.beginPath()
-  ctx.strokeStyle = 'rgba(120, 130, 138, 0.22)'
-  ctx.lineWidth = Math.max(0.8 / camera.scale, 0.5)
-  for (const p of visible) {
-    if (excludeIds.has(p.id)) continue
-    const c = circlesById.get(p.circleId)
-    if (!c) continue
-    ctx.moveTo(c.x, c.y)
-    ctx.lineTo(p.x, p.y)
-  }
-  ctx.stroke()
-
-  // Cross-links (synthetic person↔person stress connections).
-  if (connections.length) {
-    const byId = new Map(people.map((p) => [p.id, p]))
-    ctx.beginPath()
-    ctx.strokeStyle = 'rgba(148, 163, 184, 0.30)'
-    ctx.lineWidth = Math.max(0.7 / camera.scale, 0.45)
-    for (const conn of connections) {
-      const a = byId.get(conn.fromId)
-      const b = byId.get(conn.toId)
-      if (!a || !b) continue
-      if (!inView(a) && !inView(b)) continue
-      ctx.moveTo(a.x, a.y)
-      ctx.lineTo(b.x, b.y)
-    }
-    ctx.stroke()
-  }
-
-  // Avatar sprites. Choose a sprite resolution that matches the on-screen size
-  // (avatar is 40 world units) so zoomed-in avatars stay crisp instead of blurry.
-  const half = 20
-  const spriteRes = pickSpriteTier(half * 2 * camera.scale * dpr)
-  ctx.imageSmoothingEnabled = true
-  ctx.imageSmoothingQuality = 'high'
-  for (const p of visible) {
-    if (excludeIds.has(p.id)) continue
-    const tone = circlesById.get(p.circleId)?.tone ?? 'blue'
-    ctx.drawImage(getPersonSprite(tone, p.avatar, spriteRes), p.x - half, p.y - half, half * 2, half * 2)
-  }
+  drawCircleEdges(ctx, visibleCircles, index)
+  drawPersonEdges(ctx, visiblePeople, index, camera.scale)
+  drawCustomConnections(ctx, visiblePeopleIds, visibleCircleIds, index, selectedItem, hoveredConnId, camera.scale)
+  drawCircles(ctx, visibleCircles, selectedItem, camera.scale)
+  drawPeople(ctx, visiblePeople, index, selectedItem, hoveredPersonId, camera.scale, dpr)
+  if (connector) drawConnector(ctx, connector, camera.scale)
+  drawSelectionHandles(ctx, selectedItem, index, camera.scale)
 
   ctx.restore()
+}
+
+function drawCircleEdges(ctx: CanvasRenderingContext2D, circles: CircleNode[], index: BoardIndex) {
+  ctx.beginPath()
+  ctx.strokeStyle = '#b5b8b9'
+  ctx.lineWidth = 2
+  for (const circle of circles) {
+    const source = circle.connectedTo ? index.circlesById.get(circle.connectedTo) : null
+    if (!source) continue
+    drawCurvePath(ctx, source, circle)
+  }
+  ctx.stroke()
+}
+
+function drawPersonEdges(ctx: CanvasRenderingContext2D, people: PersonNode[], index: BoardIndex, scale: number) {
+  ctx.beginPath()
+  ctx.strokeStyle = 'rgba(120, 130, 138, 0.22)'
+  ctx.lineWidth = Math.max(0.8 / scale, 0.5)
+  for (const person of people) {
+    const circle = index.circlesById.get(person.circleId)
+    if (!circle) continue
+    ctx.moveTo(circle.x, circle.y)
+    ctx.lineTo(person.x, person.y)
+  }
+  ctx.stroke()
+}
+
+function drawCustomConnections(
+  ctx: CanvasRenderingContext2D,
+  visiblePeopleIds: Set<string>,
+  visibleCircleIds: Set<string>,
+  index: BoardIndex,
+  selectedItem: SelectedItem,
+  hoveredConnId: string | null,
+  scale: number,
+) {
+  const candidates = new Map<string, Connection>()
+  for (const id of visiblePeopleIds) {
+    const bucket = index.connectionsByEndpoint.get(id)
+    if (bucket) for (const conn of bucket) candidates.set(conn.id, conn)
+  }
+  for (const id of visibleCircleIds) {
+    const bucket = index.connectionsByEndpoint.get(id)
+    if (bucket) for (const conn of bucket) candidates.set(conn.id, conn)
+  }
+
+  for (const conn of candidates.values()) {
+    const source = index.peopleById.get(conn.fromId) || index.circlesById.get(conn.fromId)
+    const target = index.peopleById.get(conn.toId) || index.circlesById.get(conn.toId)
+    if (!source || !target) continue
+    const isSelected = selectedItem?.type === 'connection' && selectedItem.id === conn.id
+    const isHovered = hoveredConnId === conn.id
+    ctx.beginPath()
+    ctx.strokeStyle = isSelected ? '#00629d' : isHovered ? '#64748b' : conn.id.startsWith('stress-link-') ? 'rgba(148, 163, 184, 0.30)' : '#94a3b8'
+    ctx.lineWidth = isSelected ? Math.max(4 / scale, 2) : isHovered ? Math.max(3 / scale, 1.5) : Math.max(1.6 / scale, 0.55)
+    drawCurvePath(ctx, source, target)
+    ctx.stroke()
+  }
+}
+
+function drawCircles(ctx: CanvasRenderingContext2D, circles: CircleNode[], selectedItem: SelectedItem, scale: number) {
+  for (const circle of circles) {
+    const tone = MATERIAL_TONES[circle.tone]
+    const path = new Path2D(getNodePath(circle.x, circle.y, circle.radius, circle.shapeType ?? 'wavy', circle.sides ?? Math.max(8, Math.round(circle.radius / 10)), circle.amplitude ?? Math.max(4, circle.radius * 0.06)))
+    ctx.save()
+    ctx.shadowColor = 'rgba(0,0,0,0.06)'
+    ctx.shadowBlur = 16 / scale
+    ctx.shadowOffsetY = 8 / scale
+    ctx.fillStyle = tone.fill
+    ctx.fill(path)
+    ctx.restore()
+
+    if (selectedItem?.type === 'circle' && selectedItem.id === circle.id) {
+      ctx.save()
+      ctx.strokeStyle = tone.border
+      ctx.lineWidth = Math.max(3.5 / scale, 2)
+      ctx.stroke(path)
+      ctx.restore()
+    }
+
+    drawCircleLabel(ctx, circle, scale)
+    drawCircleCenter(ctx, circle, scale)
+  }
+}
+
+function drawCircleCenter(ctx: CanvasRenderingContext2D, circle: CircleNode, scale: number) {
+  const tone = MATERIAL_TONES[circle.tone]
+  const radius = CIRCLE_CENTER_RADIUS
+  ctx.save()
+  ctx.beginPath()
+  ctx.arc(circle.x, circle.y, radius, 0, Math.PI * 2)
+  ctx.fillStyle = tone.centerBg
+  ctx.fill()
+  ctx.lineWidth = Math.max(3 / scale, 2)
+  ctx.strokeStyle = '#ffffff'
+  ctx.stroke()
+
+  const image = circle.imageUrl ? getCanvasImage(circle.imageUrl) : null
+  if (image) {
+    ctx.clip()
+    ctx.drawImage(image, circle.x - radius + 3, circle.y - radius + 3, radius * 2 - 6, radius * 2 - 6)
+  } else {
+    ctx.fillStyle = '#ffffff'
+    ctx.font = `500 ${10 / scale}px Inter, system-ui, sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(circle.icon, circle.x, circle.y + 0.5 / scale)
+  }
+  ctx.restore()
+}
+
+function drawCircleLabel(ctx: CanvasRenderingContext2D, circle: CircleNode, scale: number) {
+  if (scale < 0.42) return
+  const fontSize = 13 / scale
+  ctx.save()
+  ctx.font = `500 ${fontSize}px Inter, system-ui, sans-serif`
+  const maxWidth = 170 / scale
+  const text = ellipsize(ctx, circle.name, maxWidth)
+  const metrics = ctx.measureText(text)
+  const width = Math.min(maxWidth, metrics.width) + 18 / scale
+  const height = 24 / scale
+  const x = circle.x - width / 2
+  const y = circle.y + circle.radius - 41 / scale
+  roundedRect(ctx, x, y, width, height, 7 / scale)
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.86)'
+  ctx.fill()
+  ctx.strokeStyle = '#d7dcde'
+  ctx.lineWidth = 1 / scale
+  ctx.stroke()
+  ctx.fillStyle = '#1c2528'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(text, circle.x, y + height / 2 + 0.5 / scale)
+  ctx.restore()
+}
+
+function drawPeople(
+  ctx: CanvasRenderingContext2D,
+  people: PersonNode[],
+  index: BoardIndex,
+  selectedItem: SelectedItem,
+  hoveredPersonId: string | null,
+  scale: number,
+  dpr: number,
+) {
+  const spriteRes = pickSpriteTier(PERSON_VISUAL_RADIUS * 2 * scale * dpr)
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+  for (const person of people) {
+    const circle = index.circlesById.get(person.circleId)
+    const tone = circle?.tone ?? 'blue'
+    const isSelected = selectedItem?.type === 'person' && selectedItem.id === person.id
+    const isHovered = hoveredPersonId === person.id
+    const stroke = person.isFavorite ? '#ffd600' : isSelected ? '#00629d' : isHovered ? '#64748b' : MATERIAL_TONES[tone].centerBg
+    const strokeWidth = person.isFavorite ? (isSelected ? 5.5 : 4.5) : isSelected || isHovered ? 2.5 : 1.5
+    ctx.drawImage(
+      getPersonSprite(person, tone, spriteRes, stroke, strokeWidth),
+      person.x - PERSON_VISUAL_RADIUS,
+      person.y - PERSON_VISUAL_RADIUS,
+      PERSON_VISUAL_RADIUS * 2,
+      PERSON_VISUAL_RADIUS * 2,
+    )
+    if (scale >= 0.62 || isSelected || isHovered) drawPersonLabel(ctx, person, scale)
+  }
+}
+
+function drawPersonLabel(ctx: CanvasRenderingContext2D, person: PersonNode, scale: number) {
+  const fontSize = 11 / scale
+  ctx.save()
+  ctx.font = `500 ${fontSize}px Inter, system-ui, sans-serif`
+  const maxWidth = 90 / scale
+  const text = ellipsize(ctx, person.name, maxWidth)
+  const metrics = ctx.measureText(text)
+  const width = Math.min(maxWidth, metrics.width) + 14 / scale
+  const height = 20 / scale
+  const x = person.x - width / 2
+  const y = person.y + 26 / scale
+  roundedRect(ctx, x, y, width, height, 6 / scale)
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.88)'
+  ctx.fill()
+  ctx.strokeStyle = '#d7dcde'
+  ctx.lineWidth = 1 / scale
+  ctx.stroke()
+  ctx.fillStyle = '#1c2528'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(text, person.x, y + height / 2 + 0.5 / scale)
+  ctx.restore()
+}
+
+function drawSelectionHandles(ctx: CanvasRenderingContext2D, selectedItem: SelectedItem, index: BoardIndex, scale: number) {
+  const selected = selectedItem?.type === 'person'
+    ? index.peopleById.get(selectedItem.id)
+    : selectedItem?.type === 'circle'
+      ? index.circlesById.get(selectedItem.id)
+      : null
+  if (!selected) return
+  for (const handle of connectorHandlesFor(selected)) {
+    ctx.beginPath()
+    ctx.arc(handle.x, handle.y, CONNECTOR_HANDLE_RADIUS / scale, 0, Math.PI * 2)
+    ctx.fillStyle = selectedItem?.type === 'circle' ? MATERIAL_TONES[(selected as CircleNode).tone].centerBg : '#00629d'
+    ctx.fill()
+    ctx.lineWidth = 2 / scale
+    ctx.strokeStyle = '#ffffff'
+    ctx.stroke()
+  }
+}
+
+function drawConnector(ctx: CanvasRenderingContext2D, connector: DragConnector, scale: number) {
+  ctx.save()
+  ctx.beginPath()
+  ctx.strokeStyle = '#00629d'
+  ctx.lineWidth = Math.max(2 / scale, 1)
+  ctx.setLineDash([7 / scale, 7 / scale])
+  drawCurvePath(ctx, { x: connector.startX, y: connector.startY }, { x: connector.endX, y: connector.endY })
+  ctx.stroke()
+  ctx.restore()
+}
+
+function connectorHandlesFor(node: CircleNode | PersonNode) {
+  const isCircle = 'radius' in node
+  const radius = isCircle ? CIRCLE_CENTER_RADIUS : PERSON_VISUAL_RADIUS
+  return [
+    { x: node.x, y: node.y - radius - 14 },
+    { x: node.x, y: node.y + radius + 14 },
+    { x: node.x - radius - 14, y: node.y },
+    { x: node.x + radius + 14, y: node.y },
+  ]
+}
+
+function hitTestBoard(index: BoardIndex, camera: Camera, selectedItem: SelectedItem, screen: { x: number; y: number }): BoardHit {
+  const point = {
+    x: (screen.x - camera.x) / camera.scale,
+    y: (screen.y - camera.y) / camera.scale,
+  }
+  const scale = camera.scale
+  const handleHit = HANDLE_HIT_RADIUS / scale
+
+  if (selectedItem?.type === 'person') {
+    const person = index.peopleById.get(selectedItem.id)
+    if (person) {
+      for (const handle of connectorHandlesFor(person)) {
+        if (Math.hypot(point.x - handle.x, point.y - handle.y) <= handleHit) {
+          return { type: 'connector-handle', sourceId: person.id, sourceType: 'person', x: person.x, y: person.y }
+        }
+      }
+    }
+  } else if (selectedItem?.type === 'circle') {
+    const circle = index.circlesById.get(selectedItem.id)
+    if (circle) {
+      for (const handle of connectorHandlesFor(circle)) {
+        if (Math.hypot(point.x - handle.x, point.y - handle.y) <= handleHit) {
+          return { type: 'connector-handle', sourceId: circle.id, sourceType: 'circle', x: circle.x, y: circle.y }
+        }
+      }
+    }
+  }
+
+  const hitRect = {
+    left: point.x - 28 / scale,
+    right: point.x + 28 / scale,
+    top: point.y - 28 / scale,
+    bottom: point.y + 28 / scale,
+  }
+  const people = queryPeople(index, hitRect)
+  let bestPerson: PersonNode | null = null
+  let bestDist = (PERSON_VISUAL_RADIUS + 8 / scale) ** 2
+  for (const person of people) {
+    const d = (person.x - point.x) ** 2 + (person.y - point.y) ** 2
+    if (d < bestDist) {
+      bestDist = d
+      bestPerson = person
+    }
+  }
+  if (bestPerson) return { type: 'person', person: bestPerson }
+
+  const connection = findConnectionNearPoint(index, point, 10 / scale)
+  if (connection) return { type: 'connection', connection }
+
+  const circles = queryCircles(index, hitRect).reverse()
+  for (const circle of circles) {
+    const d = Math.hypot(point.x - circle.x, point.y - circle.y)
+    if (d <= CIRCLE_CENTER_RADIUS + 6 / scale) return { type: 'circle-center', circle }
+    if (Math.abs(d - circle.radius) <= EDGE_RESIZE_HIT_SIZE / scale) return { type: 'circle-edge', circle }
+    if (d <= circle.radius) return { type: 'circle-body', circle }
+  }
+
+  return null
+}
+
+function findConnectionNearPoint(index: BoardIndex, point: { x: number; y: number }, tolerance: number) {
+  let best: Connection | null = null
+  let bestDist = tolerance
+  for (const conn of index.connections) {
+    if (conn.id.startsWith('stress-link-')) continue
+    const source = index.peopleById.get(conn.fromId) || index.circlesById.get(conn.fromId)
+    const target = index.peopleById.get(conn.toId) || index.circlesById.get(conn.toId)
+    if (!source || !target) continue
+    const dist = distanceToSegment(point, source, target)
+    if (dist < bestDist) {
+      bestDist = dist
+      best = conn
+    }
+  }
+  return best
+}
+
+function distanceToSegment(point: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }) {
+  const vx = b.x - a.x
+  const vy = b.y - a.y
+  const wx = point.x - a.x
+  const wy = point.y - a.y
+  const len = vx * vx + vy * vy
+  const t = len === 0 ? 0 : clamp((wx * vx + wy * vy) / len, 0, 1)
+  const x = a.x + vx * t
+  const y = a.y + vy * t
+  return Math.hypot(point.x - x, point.y - y)
+}
+
+function drawCurvePath(ctx: CanvasRenderingContext2D, from: { x: number; y: number }, to: { x: number; y: number }) {
+  const mx = (from.x + to.x) / 2
+  const my = (from.y + to.y) / 2 - 40
+  ctx.moveTo(from.x, from.y)
+  ctx.quadraticCurveTo(mx, my, to.x, to.y)
+}
+
+function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
+  ctx.beginPath()
+  ctx.moveTo(x + radius, y)
+  ctx.lineTo(x + width - radius, y)
+  ctx.quadraticCurveTo(x + width, y, x + width, y + radius)
+  ctx.lineTo(x + width, y + height - radius)
+  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height)
+  ctx.lineTo(x + radius, y + height)
+  ctx.quadraticCurveTo(x, y + height, x, y + height - radius)
+  ctx.lineTo(x, y + radius)
+  ctx.quadraticCurveTo(x, y, x + radius, y)
+}
+
+function ellipsize(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) {
+  if (ctx.measureText(text).width <= maxWidth) return text
+  let lo = 0
+  let hi = text.length
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2)
+    if (ctx.measureText(`${text.slice(0, mid)}...`).width <= maxWidth) lo = mid
+    else hi = mid - 1
+  }
+  return `${text.slice(0, lo)}...`
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -3187,12 +3046,6 @@ function getDescendantCircleIds(circles: CircleNode[], circleId: string) {
   }
 
   return descendants
-}
-
-function makeCurve(from: { x: number; y: number }, to: { x: number; y: number }) {
-  const midX = (from.x + to.x) / 2
-  const lift = Math.min(100, Math.abs(to.y - from.y) * 0.22 + 38)
-  return `M ${from.x} ${from.y} C ${midX} ${from.y - lift}, ${midX} ${to.y + lift}, ${to.x} ${to.y}`
 }
 
 function menuPosition(menu: CreateMenu) {

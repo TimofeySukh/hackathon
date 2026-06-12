@@ -85,7 +85,7 @@ Contains the board experience:
 - circle resizing by dragging the circle edge
 - automatic containment fit, including shrink-back, when people or child circles cross a parent boundary
 - pan and zoom camera state
-- curved SVG links between circle centers, circles, and people
+- curved Canvas 2D links between circle centers, circles, and people
 
 ### `src/lib/`
 
@@ -165,7 +165,7 @@ It currently supports:
 - toolbar zoom buttons and reset
 - local state only for the current browser session
 
-The visual board uses CSS grid backgrounds, React DOM nodes for graph objects, and SVG paths for links.
+The visual board uses CSS grid backgrounds plus a Canvas 2D board layer for graph objects, links, labels, hover, selection, resize handles, and draft connectors. React DOM is reserved for chrome, menus, panels, and inspector UI.
 
 ## Extension Strategy
 

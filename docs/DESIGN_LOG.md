@@ -17,6 +17,30 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-12 — Chrome Migration to Material 3
+
+- Decision: Migrated all surrounding chrome surfaces (toolbar, settings panel, stress panel, help panel, create menu, inspector, note cards, buttons, and inputs) to match the Material 3 design spec.
+- Key Actions:
+  - Added Design Tokens: Configured the full Material 3 token set (`--md-*` color roles, `--md-r-*` shape radius, and `--md-elev-*` shadows) on the `.app-shell` selector.
+  - Global Typographic Cleanup: Mapped all font weights strictly to 400 (regular) and 500 (medium).
+  - Floating and Context Surfaces: Removed hard borders and mapped backgrounds and elevations (`--md-surface-container` / `--md-elev-2` for floating panels, `--md-surface-container-low` / `--md-elev-1` for side sheets).
+  - Component Upgrades: Restructured the Settings panel control into an M3 Segmented Button, converted checkboxes to M3 Switches, styled range inputs, and updated action buttons to M3 Filled shape/pill styles.
+  - Hex Cleanup: Removed all remaining raw hex values (e.g., `#c4c7c8` borders and Tailwind grays) from the chrome styling, replacing them with semantic tokens.
+
+### 2026-06-12 — Board visuals move to a Canvas 2D renderer
+
+- Decision: the board's hot visual path is now Canvas 2D-first. Circles, people,
+  labels, edges, selected handles, hover states, and the draft connector draw on one
+  canvas; React keeps only chrome, panels, context menus, inspector UI, and state.
+- Why: the previous hybrid renderer had accumulated DOM/SVG render passes plus a
+  canvas people layer. That kept pan acceptable, but zoom still paid for mixed DOM,
+  SVG, canvas redraw, and synthetic-link scans. The new renderer makes board frame
+  cost primarily viewport-driven through a lightweight spatial grid and removes the
+  interactive DOM person overlay.
+- LOD rule: people keep the same silhouette and outline model at every zoom. The
+  renderer may hide tiny labels or choose a cached sprite resolution, but it does not
+  turn people into points or swap their shape identity at zoom-out.
+
 ### 2026-06-12 — Board collision layout
 
 - Decision: board layout now runs a lightweight collision pass as part of

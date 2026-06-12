@@ -44,27 +44,29 @@ This is the most Material-3-aligned part of the app today; keep it that way.
 - **Shapes**: nodes render as `wavy` (flower), soft `polygon`, or `circle` via
   `getNodePath`; circles default to `wavy`, people to `polygon`. Sides and amplitude are
   per-node and adjustable in the inspector.
-- **Surfaces**: node labels and the help/stress panels float above the grid background.
-  Selection is shown by a stronger border/state, not a color swap.
+- **Surfaces**: node labels draw inside the Canvas 2D board layer, while the help/stress
+  panels float above the grid background. Selection is shown by a stronger border/state,
+  not a color swap.
 - **Components used**: create menu (M3 menu), inspector (side sheet), toolbar (icon
   buttons). These follow the recipes in the design system.
 - **Known gaps vs. Material 3 target**:
-  - Node labels (`.circle__label`, `.person-label`) use font-weight 800 → should be 500.
-  - The draft edge color `#2563eb` is a second blue; align it to `--md-primary`
-    (`#00629d`) so there is one blue in the system.
-  - Shadows on labels are heavier than `--md-elev-1`.
+  - Canvas-rendered label and shadow tokens should stay aligned with
+    [`../DESIGN_SYSTEM.md`](../DESIGN_SYSTEM.md) as the renderer is extracted.
 
 ## Code
 
-- Main file: `src/App.tsx` (single-file prototype; ~2.7k lines).
+- Main file: `src/App.tsx` (single-file prototype; ~3.1k lines).
 - Styles: `src/index.css` (canvas + chrome).
 - Key pieces:
   - `MATERIAL_TONES`, `TONE_LABELS` — the accent palette.
   - `getNodePath` — wavy/polygon/circle shape generation.
-  - `makeCurve` — curved edge paths.
-  - Pointer handlers: `handleSurfacePointerDown/Move/Up`, `startCircleCenterDrag`,
-    `startCircleSurfaceDrag`.
-  - `openCircleCreateMenu` / create-menu rendering; inspector `<aside className="inspector">`.
+  - `createBoardIndex`, `queryPeople`, `queryCircles` — the spatial grid used for
+    viewport rendering and hit testing.
+  - `drawBoardLayer` — Canvas 2D renderer for circles, people, labels, edges, selected
+    handles, and the draft connector.
+  - `hitTestBoard` plus `handleSurfacePointerDown/Move/Up` — canvas interaction model
+    for selecting, dragging, resizing, connecting, and context menus.
+  - create-menu rendering; inspector `<aside className="inspector">`.
 
 ## Open questions / TODO
 

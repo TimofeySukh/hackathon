@@ -33,9 +33,9 @@ The visible circle graph demo does not call Supabase or any backend. The existin
 - `supabase/functions/_shared/ai.ts` calls Gemini first and falls back to OpenRouter for structured AI responses.
 - `supabase/functions/sync-person-ai-note/index.ts` authenticates the caller, loads person context, calls the shared AI provider layer, and upserts `person_ai_notes`.
 - `supabase/functions/search-people-ai/index.ts` authenticates the caller, builds candidate context, calls the shared AI provider layer, and returns ranked people.
-- `src/index.css` contains the visible circle graph prototype styling, including the grid board, dashed circle boundaries, node controls, creation menu, toolbar, and inspector.
+- `src/index.css` contains the visible circle graph prototype styling, including the grid board, creation menu, toolbar, and inspector.
 
-The board is rendered with React DOM elements for nodes and dashed circle boundaries, plus SVG paths for curved links. The local camera transforms a world layer for pan and zoom.
+The board's hot visual path is rendered on a single Canvas 2D layer: circle fills and labels, center controls, people avatars and labels, curved links, selected handles, hover states, and the draft connector. React still owns the surrounding chrome, menus, inspector, and persisted graph state. Pointer events land on the board surface and use canvas hit testing against a lightweight spatial grid instead of DOM/SVG nodes.
 
 ## Current Product Boundaries
 

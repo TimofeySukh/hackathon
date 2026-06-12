@@ -6,8 +6,6 @@
     'Segoe UI',
     system-ui,
     sans-serif;
-  color: #1c2528;
-  background: #f6f7f4;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -88,6 +86,17 @@ svg {
   --md-elev-2: 0 1px 2px rgba(0,0,0,.30), 0 2px 6px 2px rgba(0,0,0,.15);
   --md-elev-3: 0 4px 8px 3px rgba(0,0,0,.15), 0 1px 3px rgba(0,0,0,.30);
 
+  /* Swatch colors */
+  --md-tone-blue: #00629d;
+  --md-tone-red: #c00015;
+  --md-tone-green: #1e824a;
+  --md-tone-amber: #d87a00;
+  --md-tone-violet: #7f67be;
+
+  /* Favorite star colors */
+  --md-favorite-fill: #ffd600;
+  --md-favorite-stroke: #d97706;
+
   /* Legacy references */
   --panel-bg: var(--md-surface-container);
   --panel-border: var(--md-outline-variant);
@@ -98,6 +107,7 @@ svg {
   height: 100%;
   overflow: hidden;
   background: var(--md-surface);
+  color: var(--md-on-surface);
 }
 
 .toolbar {
@@ -190,7 +200,7 @@ svg {
   gap: 6px;
   border-radius: 14px;
   padding: 14px 16px;
-  color: #1c2528;
+  color: var(--md-on-surface);
   pointer-events: none;
 }
 
@@ -227,7 +237,7 @@ svg {
   touch-action: none;
   /* Dotted world grid. background-size / background-position are set inline
      from the camera so the dots pan and zoom together with the canvas. */
-  background-color: #f6f7f4;
+  background-color: var(--md-surface);
   background-image:
     radial-gradient(circle, rgba(61, 71, 78, 0.18) 1.3px, transparent 1.7px),
     radial-gradient(circle, rgba(61, 71, 78, 0.09) 1px, transparent 1.4px);
@@ -238,143 +248,13 @@ svg {
   cursor: grabbing;
 }
 
-.people-canvas-layer {
+.board-canvas-layer {
   position: absolute;
   inset: 0;
   display: block;
   width: 100%;
   height: 100%;
   pointer-events: none;
-}
-
-.edge-layer {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  pointer-events: none;
-}
-
-.edge {
-  fill: none;
-  stroke-linecap: round;
-}
-
-.edge--circle {
-  stroke: #b5b8b9;
-  stroke-width: 2;
-}
-
-.edge--person {
-  stroke: #d3d6d7;
-  stroke-width: 1.45;
-}
-
-.edge--draft {
-  stroke: var(--md-primary);
-  stroke-width: 2;
-  stroke-dasharray: 7 7;
-}
-
-.world-layer {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 1px;
-  height: 1px;
-  transform-origin: 0 0;
-}
-
-/* While panning/zooming, promote the whole world to its own compositor layer.
-   The browser then rasterizes it once and GPU-transforms that cached bitmap —
-   pan becomes a free translate, and zoom scales the bitmap (slightly soft)
-   instead of repainting every SVG path + drop-shadow each frame. When the
-   gesture settles we drop this class and React repaints everything sharp. */
-.world-layer.is-gesturing {
-  will-change: transform;
-}
-
-.circle {
-  --circle-color: var(--md-primary);
-  position: absolute;
-  left: 0;
-  top: 0;
-  border: 2px dashed color-mix(in srgb, var(--circle-color) 72%, transparent);
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--circle-color) 4%, transparent);
-  transform-origin: 0 0;
-  cursor: grab;
-  pointer-events: auto;
-}
-
-.circle:active {
-  cursor: grabbing;
-}
-
-.circle--red {
-  --circle-color: #dc2626;
-}
-
-.circle--green {
-  --circle-color: #0f8f69;
-}
-
-.circle--amber {
-  --circle-color: #c27b18;
-}
-
-.circle--violet {
-  --circle-color: #7c3aed;
-}
-
-.circle.is-selected {
-  border-width: 3px;
-  background: color-mix(in srgb, var(--circle-color) 8%, transparent);
-}
-
-.circle__label {
-  position: absolute;
-  left: 50%;
-  bottom: 17px;
-  max-width: 170px;
-  transform: translateX(-50%);
-  overflow: hidden;
-  padding: 5px 9px;
-  border: 1px solid var(--md-outline-variant);
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.86);
-  color: var(--md-on-surface);
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.15;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  box-shadow: var(--md-elev-1);
-  pointer-events: none;
-}
-
-.circle-center {
-  position: absolute;
-  width: 40px;
-  height: 40px;
-  transform: translate(-50%, -50%);
-  border: 3px solid #fff;
-  border-radius: 50%;
-  background: var(--circle-color);
-  color: #fff;
-  box-shadow:
-    0 12px 26px rgba(28, 37, 40, 0.2),
-    0 0 0 1px rgba(28, 37, 40, 0.08);
-  cursor: grab;
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0;
-  pointer-events: auto;
-}
-
-.circle-center:active {
-  cursor: grabbing;
 }
 
 .person {
@@ -526,7 +406,7 @@ svg {
 
 .stress-panel dd {
   margin: 0;
-  color: #1c2528;
+  color: var(--md-on-surface);
   font-size: 15px;
   font-weight: 400;
 }
@@ -950,43 +830,6 @@ svg {
   stroke: currentColor;
 }
 
-.person-icon-only {
-  transition: transform 0.1s ease-out;
-  cursor: grab;
-}
-
-.person-icon-only:active {
-  cursor: grabbing;
-}
-
-.person-avatar-shape {
-  filter: drop-shadow(0px 4px 10px rgba(54, 61, 68, 0.12));
-  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.person-avatar-shape:hover,
-.person-icon-only.is-selected .person-avatar-shape {
-  transform: scale(1.1);
-  filter: drop-shadow(0px 6px 14px rgba(37, 99, 235, 0.22));
-}
-
-.person-label {
-  margin-top: 6px;
-  max-width: 90px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--md-on-surface);
-  background: rgba(255, 255, 255, 0.88);
-  padding: 3px 7px;
-  border-radius: 6px;
-  border: 1px solid var(--md-outline-variant);
-  box-shadow: var(--md-elev-1);
-  pointer-events: none;
-}
-
 /* Material 3 Switch */
 .m3-switch {
   appearance: none;
@@ -1135,11 +978,11 @@ input[type="range"]::-webkit-slider-thumb:active {
   transform: scale(1.1);
 }
 
-.m3-color-swatch--blue { background-color: #00629D; }
-.m3-color-swatch--red { background-color: #C00015; }
-.m3-color-swatch--green { background-color: #1E824A; }
-.m3-color-swatch--amber { background-color: #D87A00; }
-.m3-color-swatch--violet { background-color: #7F67BE; }
+.m3-color-swatch--blue { background-color: var(--md-tone-blue); }
+.m3-color-swatch--red { background-color: var(--md-tone-red); }
+.m3-color-swatch--green { background-color: var(--md-tone-green); }
+.m3-color-swatch--amber { background-color: var(--md-tone-amber); }
+.m3-color-swatch--violet { background-color: var(--md-tone-violet); }
 
 /* Visual row containing swatches and avatar */
 .inspector-visual-row {
@@ -1205,7 +1048,7 @@ input[type="range"]::-webkit-slider-thumb:active {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ffffff;
+  color: var(--md-on-primary);
   opacity: 0;
   transition: opacity 0.2s;
   border-radius: 50%;
@@ -1302,4 +1145,3 @@ input[type="range"]::-webkit-slider-thumb:active {
   background: var(--md-surface-container);
   box-shadow: var(--md-elev-2);
 }
-
