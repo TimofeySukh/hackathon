@@ -124,6 +124,13 @@ type PanState = {
   originY: number
 }
 
+type PinchState = {
+  initialDist: number
+  initialMid: { x: number; y: number }
+  initialCamera: Camera
+  midWorld: { x: number; y: number }
+}
+
 type MoveCircleState = {
   pointerId: number
   circleId: string
@@ -292,6 +299,8 @@ function App() {
   const moveCircleRef = useRef<MoveCircleState | null>(null)
   const movePersonRef = useRef<MovePersonState | null>(null)
   const resizeCircleRef = useRef<ResizeCircleState | null>(null)
+  const activePointersRef = useRef<PointerEvent[]>([])
+  const pinchRef = useRef<PinchState | null>(null)
   // Drag updates are coalesced to one React commit per animation frame (like the
   // pan/zoom gesture) so a move event flood doesn't trigger a re-render storm.
   const dragRafRef = useRef<number | null>(null)
@@ -819,9 +828,51 @@ function App() {
   }
 
   function handleSurfacePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
-    if (event.button !== 0) return
+    if (event.pointerType !== 'touch' && event.button !== 0) return
     event.currentTarget.focus({ preventScroll: true })
     event.currentTarget.setPointerCapture(event.pointerId)
+
+    activePointersRef.current = [
+      ...activePointersRef.current.filter((p) => p.pointerId !== event.pointerId),
+      event.nativeEvent,
+    ]
+
+    if (activePointersRef.current.length >= 2) {
+      panRef.current = null
+      moveCircleRef.current = null
+      movePersonRef.current = null
+      resizeCircleRef.current = null
+      setConnector(null)
+      pendingConnectorRef.current = null
+      pendingGraphRef.current = null
+      if (dragRafRef.current != null) {
+        window.cancelAnimationFrame(dragRafRef.current)
+        dragRafRef.current = null
+      }
+
+      const p1 = activePointersRef.current[0]
+      const p2 = activePointersRef.current[1]
+      const rect = event.currentTarget.getBoundingClientRect()
+      const lp1 = { x: p1.clientX - rect.left, y: p1.clientY - rect.top }
+      const lp2 = { x: p2.clientX - rect.left, y: p2.clientY - rect.top }
+      const initialDist = Math.hypot(lp1.x - lp2.x, lp1.y - lp2.y)
+      const initialMid = {
+        x: (lp1.x + lp2.x) / 2,
+        y: (lp1.y + lp2.y) / 2,
+      }
+      const initialCamera = { ...cameraRef.current }
+      pinchRef.current = {
+        initialDist,
+        initialMid,
+        initialCamera,
+        midWorld: {
+          x: (initialMid.x - initialCamera.x) / initialCamera.scale,
+          y: (initialMid.y - initialCamera.y) / initialCamera.scale,
+        },
+      }
+      return
+    }
+
     if (!demoMode) setCreateMenu(null)
     setOpenNotesPersonId(null)
 
@@ -879,6 +930,60 @@ function App() {
   }
 
   function handleSurfacePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    activePointersRef.current = activePointersRef.current.map((p) =>
+      p.pointerId === event.pointerId ? event.nativeEvent : p
+    )
+
+    if (activePointersRef.current.length >= 2 && !pinchRef.current) {
+      const p1 = activePointersRef.current[0]
+      const p2 = activePointersRef.current[1]
+      const rect = event.currentTarget.getBoundingClientRect()
+      const lp1 = { x: p1.clientX - rect.left, y: p1.clientY - rect.top }
+      const lp2 = { x: p2.clientX - rect.left, y: p2.clientY - rect.top }
+      const initialDist = Math.hypot(lp1.x - lp2.x, lp1.y - lp2.y)
+      const initialMid = {
+        x: (lp1.x + lp2.x) / 2,
+        y: (lp1.y + lp2.y) / 2,
+      }
+      const initialCamera = { ...cameraRef.current }
+      pinchRef.current = {
+        initialDist,
+        initialMid,
+        initialCamera,
+        midWorld: {
+          x: (initialMid.x - initialCamera.x) / initialCamera.scale,
+          y: (initialMid.y - initialCamera.y) / initialCamera.scale,
+        },
+      }
+    }
+
+    const pinch = pinchRef.current
+    if (pinch && activePointersRef.current.length >= 2) {
+      const p1 = activePointersRef.current[0]
+      const p2 = activePointersRef.current[1]
+      const rect = event.currentTarget.getBoundingClientRect()
+      const lp1 = { x: p1.clientX - rect.left, y: p1.clientY - rect.top }
+      const lp2 = { x: p2.clientX - rect.left, y: p2.clientY - rect.top }
+      const newDist = Math.hypot(lp1.x - lp2.x, lp1.y - lp2.y)
+      const newMid = {
+        x: (lp1.x + lp2.x) / 2,
+        y: (lp1.y + lp2.y) / 2,
+      }
+
+      const scaleFactor = pinch.initialDist > 5 ? newDist / pinch.initialDist : 1
+      const nextScale = clamp(pinch.initialCamera.scale * scaleFactor, MIN_SCALE, MAX_SCALE)
+
+      const nextX = newMid.x - pinch.midWorld.x * nextScale
+      const nextY = newMid.y - pinch.midWorld.y * nextScale
+
+      driveCamera({
+        scale: nextScale,
+        x: nextX,
+        y: nextY,
+      })
+      return
+    }
+
     const pan = panRef.current
     if (pan?.pointerId === event.pointerId) {
       driveCamera({
@@ -952,6 +1057,15 @@ function App() {
   }
 
   function handleSurfacePointerUp(event: ReactPointerEvent<HTMLDivElement>) {
+    activePointersRef.current = activePointersRef.current.filter((p) => p.pointerId !== event.pointerId)
+    if (activePointersRef.current.length < 2) {
+      pinchRef.current = null
+    }
+
+    if (activePointersRef.current.length === 0) {
+      settleGesture()
+    }
+
     if (panRef.current?.pointerId === event.pointerId) {
       panRef.current = null
       settleGesture()
