@@ -1,8 +1,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react'
+import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react'
+import type { User } from '@supabase/supabase-js'
 import * as zip from '@zip.js/zip.js'
 
 zip.configure({ useWebWorkers: false })
+import { useAuth } from './lib/useAuth'
+import { loadGraph, saveGraph } from './lib/graphPersistence'
 // STRESS TEST — dev-only performance harness. See src/lib/stressTest.ts.
 import {
   STRESS_TEST_ENABLED,
@@ -61,7 +64,7 @@ export type Connection = {
   toId: string
 }
 
-type GraphState = {
+export type GraphState = {
   circles: CircleNode[]
   people: PersonNode[]
   connections: Connection[]
@@ -294,6 +297,28 @@ function getNodePath(
   return path
 }
 
+const authOverlayStyle: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  zIndex: 1000,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: 'var(--md-surface-container-low, #eef1f3)',
+}
+
+const authCardStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: '16px',
+  padding: '32px',
+  borderRadius: '24px',
+  background: 'var(--md-surface, #fff)',
+  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+  maxWidth: '320px',
+}
+
 function App() {
   const surfaceRef = useRef<HTMLDivElement | null>(null)
   // Canvas 2D board renderer: circles, edges, people, labels, and interaction chrome.
@@ -310,6 +335,55 @@ function App() {
   const pendingGraphRef = useRef<((current: GraphState) => GraphState) | null>(null)
   const pendingConnectorRef = useRef<DragConnector | null>(null)
   const [graph, setGraph] = useState(createInitialGraph)
+  const auth = useAuth()
+  const userId = auth.session?.user?.id ?? null
+  // True once we've pulled this user's saved graph (or confirmed they have none).
+  // The board stays hidden until then so the demo seed never flashes or gets saved.
+  const [graphLoaded, setGraphLoaded] = useState(false)
+  // Bumped when an avatar image finishes decoding, to force a board repaint.
+  const [imageEpoch, setImageEpoch] = useState(0)
+
+  useEffect(() => {
+    requestBoardRepaint = () => setImageEpoch((epoch) => epoch + 1)
+    return () => {
+      requestBoardRepaint = null
+    }
+  }, [])
+
+  // Load the signed-in user's graph; a brand-new account starts from a blank
+  // canvas with only their "you" circle — the local demo data is never persisted.
+  useEffect(() => {
+    if (auth.status !== 'authenticated' || !userId || !auth.session) return
+    let cancelled = false
+    setGraphLoaded(false)
+    loadGraph(userId)
+      .then((saved) => {
+        if (cancelled) return
+        const base = saved ?? createFreshGraph()
+        setGraph(stampYouIdentity(base, auth.session!.user))
+        setGraphLoaded(true)
+      })
+      .catch((error) => {
+        console.error('Failed to load graph', error)
+        if (!cancelled) {
+          setGraph(stampYouIdentity(createFreshGraph(), auth.session!.user))
+          setGraphLoaded(true)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [auth.status, userId])
+
+  // Debounced autosave: a flood of drags or a bulk import collapses into one write.
+  useEffect(() => {
+    if (!graphLoaded || auth.status !== 'authenticated' || !userId) return
+    const timer = window.setTimeout(() => {
+      void saveGraph(userId, graph).catch((error) => console.error('Failed to save graph', error))
+    }, 800)
+    return () => window.clearTimeout(timer)
+  }, [graph, graphLoaded, auth.status, userId])
+
   const [camera, setCamera] = useState<Camera>({ x: window.innerWidth / 2, y: window.innerHeight / 2, scale: 0.82 })
   // cameraRef holds the *live* camera during a pan/zoom gesture. `camera` state
   // is only the last *settled* value (committed when the gesture stops moving).
@@ -956,6 +1030,7 @@ function App() {
     circleShapeMode,
     circleFillMode,
     selectedPeopleIds,
+    imageEpoch,
   ])
 
   useEffect(() => {
@@ -1775,6 +1850,15 @@ function App() {
     reader.readAsDataURL(file)
   }
 
+  // Auth gate rendered as an OVERLAY (not an early return) so the board JSX always
+  // mounts — its mount-time effects (e.g. the native wheel listener for trackpad
+  // pinch-zoom / two-finger pan) need surfaceRef to exist on first commit. When
+  // Supabase isn't configured we just never show the overlay (local dev mode).
+  const isAuthLoading =
+    auth.status !== 'unconfigured' &&
+    (auth.status === 'loading' || (auth.status === 'authenticated' && !graphLoaded))
+  const showAuthOverlay = isAuthLoading || auth.status === 'anonymous'
+
   return (
     <main className={`app-shell ${demoMode ? 'is-demo-mode' : ''}`}>
       <div className="toolbar" aria-label="Graph controls">
@@ -1960,6 +2044,43 @@ function App() {
                 onChange={handleLinkedInImport}
               />
             </div>
+            {auth.status === 'authenticated' && (
+              <div style={{ marginTop: '12px', borderTop: '1px solid var(--md-outline-variant)', paddingTop: '12px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 500, color: 'rgba(28, 37, 40, 0.64)', display: 'block', marginBottom: '8px' }}>
+                  Account
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  {typeof auth.session?.user?.user_metadata?.avatar_url === 'string' && (
+                    <img
+                      src={auth.session.user.user_metadata.avatar_url as string}
+                      alt=""
+                      style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }}
+                    />
+                  )}
+                  <span style={{ fontSize: '13px', color: 'var(--md-on-surface)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {auth.session?.user?.email}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="m3-primary-button"
+                  onClick={async () => {
+                    // Flush the latest graph before the debounced autosave would have
+                    // fired, so edits made right before logout aren't lost.
+                    if (userId) {
+                      try {
+                        await saveGraph(userId, graph)
+                      } catch (error) {
+                        console.error('Failed to save before sign-out', error)
+                      }
+                    }
+                    await auth.signOut()
+                  }}
+                >
+                  Sign out
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -2608,6 +2729,32 @@ function App() {
         )}
       </aside>
       )}
+
+      {showAuthOverlay && (
+        <div style={authOverlayStyle}>
+          <div style={authCardStyle}>
+            <span className="brand__mark">DN</span>
+            {auth.status === 'anonymous' ? (
+              <>
+                <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 500, color: 'var(--md-on-surface)' }}>
+                  Circle graph
+                </h1>
+                <p style={{ margin: 0, color: 'var(--md-on-surface-variant)', textAlign: 'center' }}>
+                  Sign in to save your connections across sessions.
+                </p>
+                <button type="button" className="m3-primary-button" onClick={() => void auth.signInWithGoogle()}>
+                  Continue with Google
+                </button>
+                {auth.error && (
+                  <p style={{ margin: 0, color: 'var(--md-error, #b3261e)', fontSize: '13px' }}>{auth.error}</p>
+                )}
+              </>
+            ) : (
+              <p style={{ margin: 0, color: 'var(--md-on-surface-variant)' }}>Loading your board…</p>
+            )}
+          </div>
+        </div>
+      )}
     </main>
   )
 }
@@ -2776,13 +2923,43 @@ function cameraWorldRect(surface: HTMLElement, camera: Camera, padPx = 120): Wor
   }
 }
 
+// Set by the board so freshly-decoded images can trigger a repaint (otherwise an
+// avatar only appears after the next interaction-driven redraw).
+let requestBoardRepaint: (() => void) | null = null
+
 function getCanvasImage(src: string): HTMLImageElement | null {
   const cached = imageCache.get(src)
-  if (cached) return cached.complete ? cached : null
+  if (cached) return cached.complete && cached.naturalWidth > 0 ? cached : null
   const image = new Image()
+  image.onload = () => {
+    // Cached person sprites were baked without the image; drop them so they redraw.
+    personSpriteCache.clear()
+    requestBoardRepaint?.()
+  }
   image.src = src
   imageCache.set(src, image)
-  return image.complete ? image : null
+  return image.complete && image.naturalWidth > 0 ? image : null
+}
+
+// Draw `image` filling the dest box while preserving aspect ratio (CSS object-fit:
+// cover) — centred crop. Avoids the squashed look of stretching to a square.
+function drawImageCover(
+  ctx: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  dx: number,
+  dy: number,
+  dWidth: number,
+  dHeight: number,
+) {
+  const iw = image.naturalWidth || image.width
+  const ih = image.naturalHeight || image.height
+  if (!iw || !ih) return
+  const scale = Math.max(dWidth / iw, dHeight / ih)
+  const sw = dWidth / scale
+  const sh = dHeight / scale
+  const sx = (iw - sw) / 2
+  const sy = (ih - sh) / 2
+  ctx.drawImage(image, sx, sy, sw, sh, dx, dy, dWidth, dHeight)
 }
 
 function getPersonSprite(person: PersonNode, tone: CircleTone, size: number, stroke: string, strokeWidth: number): HTMLCanvasElement {
@@ -2810,7 +2987,7 @@ function getPersonSprite(person: PersonNode, tone: CircleTone, size: number, str
     const image = getCanvasImage(person.imageUrl)
     if (image) {
       ctx.clip(path)
-      ctx.drawImage(image, 0, 0, size, size)
+      drawImageCover(ctx, image, 0, 0, size, size)
     }
   } else {
     ctx.fillStyle = '#ffffff'
@@ -3016,8 +3193,9 @@ function drawCircleCenter(ctx: CanvasRenderingContext2D, circle: CircleNode, sca
 
   const image = circle.imageUrl ? getCanvasImage(circle.imageUrl) : null
   if (image) {
+    ctx.globalAlpha = 1
     ctx.clip()
-    ctx.drawImage(image, circle.x - radius + 3, circle.y - radius + 3, radius * 2 - 6, radius * 2 - 6)
+    drawImageCover(ctx, image, circle.x - radius, circle.y - radius, radius * 2, radius * 2)
   } else {
     ctx.fillStyle = '#ffffff'
     const hasEmojiIcon = Array.from(circle.icon).some((char) => (char.codePointAt(0) ?? 0) > 127)
@@ -3470,6 +3648,46 @@ function createInitialGraph() {
     }),
     connections: DEFAULT_STATE.connections.map((connection) => ({ ...connection })),
   })
+}
+
+// A blank canvas for a brand-new account: just the central "you" circle.
+function createFreshGraph(): GraphState {
+  return ensureContainment({
+    circles: [makeCircle('you', 'You', 'YOU', 0, 0, 104, null, null, 'blue')],
+    people: [],
+    connections: [],
+  })
+}
+
+// Put the signed-in user's Google avatar + name on the "you" circle. Only fills
+// the avatar when none is set, so a custom upload from a previous session wins.
+function stampYouIdentity(graph: GraphState, user: User): GraphState {
+  const meta = (user.user_metadata ?? {}) as Record<string, unknown>
+  const avatarUrl =
+    typeof meta.avatar_url === 'string'
+      ? meta.avatar_url
+      : typeof meta.picture === 'string'
+        ? meta.picture
+        : undefined
+  const fullName =
+    typeof meta.full_name === 'string'
+      ? meta.full_name
+      : typeof meta.name === 'string'
+        ? meta.name
+        : undefined
+  if (!avatarUrl && !fullName) return graph
+  return {
+    ...graph,
+    circles: graph.circles.map((circle) =>
+      circle.id === 'you'
+        ? {
+            ...circle,
+            imageUrl: circle.imageUrl ?? avatarUrl,
+            name: circle.name && circle.name !== 'You' ? circle.name : fullName ?? circle.name,
+          }
+        : circle,
+    ),
+  }
 }
 
 function moveCircleSubtree(state: GraphState, circleId: string, nextX: number, nextY: number): GraphState {
