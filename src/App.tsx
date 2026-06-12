@@ -1890,9 +1890,53 @@ function App() {
 
                 {isLinkedInGuideOpen ? (
                   <div className="linkedin-menu__guide">
+                    <div className="linkedin-menu__steps">
+                      {[
+                        {
+                          n: 1,
+                          title: 'Open Settings & Privacy',
+                          body: 'Open your LinkedIn profile menu (top-right "Me" icon) and click Settings & Privacy.',
+                          img: '/linkedin-sync/settings-privacy.png',
+                        },
+                        {
+                          n: 2,
+                          title: 'Open Data privacy',
+                          body: 'In Settings, select Data privacy from the left sidebar.',
+                          img: '/linkedin-sync/data-privacy.png',
+                        },
+                        {
+                          n: 3,
+                          title: 'Open Download my data',
+                          body: 'In the data section, press Download your data.',
+                          img: '/linkedin-sync/download-data.png',
+                        },
+                        {
+                          n: 4,
+                          title: 'Request the larger archive',
+                          body: 'Select the larger data archive, then press Request archive.',
+                          img: '/linkedin-sync/request-archive.png',
+                        },
+                      ].map((step) => (
+                        <div key={step.n} className="linkedin-menu__step">
+                          <div className="linkedin-menu__step-copy">
+                            <span className="linkedin-menu__step-index">{step.n}</span>
+                            <div>
+                              <h3 className="linkedin-menu__step-title">{step.title}</h3>
+                              <p className="linkedin-menu__step-body">{step.body}</p>
+                            </div>
+                          </div>
+                          <img
+                            className="linkedin-menu__step-image"
+                            src={step.img}
+                            alt={step.title}
+                          />
+                        </div>
+                      ))}
+                    </div>
                     <p className="linkedin-menu__wait-note">
-                      Request your LinkedIn data archive, wait for LinkedIn to email you,
-                      then return here and sync the ZIP file that contains Connections.csv.
+                      Wait up to 24 hours. LinkedIn will email you when the archive is ready.
+                      After you receive it, return to this connection menu and press
+                      <strong> Sync your LinkedIn connections</strong>.
                     </p>
                   </div>
                 ) : null}
