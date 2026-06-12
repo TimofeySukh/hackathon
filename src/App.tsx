@@ -791,10 +791,6 @@ function rgbaFromHex(color: string, alpha: number) {
   return `rgb(${hexToRgb(color)} / ${alpha})`
 }
 
-function getNodeColorInGroup(node: PersonNode, group: NodeGroup, tagColorById: Record<string, string>) {
-  return normalizeTagColor(group.memberColors?.[node.id] ?? (node.tag_id ? tagColorById[node.tag_id] : null) ?? group.color)
-}
-
 function getNodeCategoryInGroup(node: PersonNode, group: NodeGroup, tagCategoryById: Record<string, string>) {
   return group.memberCategories?.[node.id] ?? (node.tag_id ? tagCategoryById[node.tag_id] ?? `tag:${node.tag_id}` : 'untagged')
 }
@@ -865,7 +861,7 @@ function getGroupColorBuckets(
 ) {
   const buckets = new Map<string, { category: string; color: string; members: PersonNode[] }>()
   for (const member of members) {
-    const color = getNodeColorInGroup(member, group, tagColorById)
+    const color = getNodeDisplayColor(member, tagColorById)
     const category = getNodeCategoryInGroup(member, group, tagCategoryById)
     const bucket = buckets.get(category) ?? { category, color, members: [] }
     bucket.members.push(member)
@@ -1020,10 +1016,16 @@ function arrangeMembersInSector(
     ringIndex += 1
   }
 
-  if (slots.length === 0) slots.push({ x: centerX, y: centerY })
+  if (slots.length === 0) {
+    const angle = (startAngle + endAngle) / 2
+    slots.push({
+      x: centerX + Math.cos(angle) * GROUP_CORE_RADIUS,
+      y: centerY + Math.sin(angle) * GROUP_CORE_RADIUS,
+    })
+  }
 
   for (let index = 0; index < members.length; index += 1) {
-    const slotIndex = Math.min(slots.length - 1, Math.round(((index + 0.5) * slots.length) / members.length - 0.5))
+    const slotIndex = Math.min(slots.length - 1, Math.floor(((index + 0.5) * slots.length) / members.length))
     positions.set(members[index].id, slots[slotIndex])
   }
 }
@@ -1172,6 +1174,10 @@ const GraphNodeCard = memo(function GraphNodeCard({
         title={node.is_root ? 'Double click the board to create a person' : 'Drag to move'}
         onPointerDown={(event) => {
           if (event.pointerType === 'touch' && !node.is_root) {
+            if (!isUnattached) {
+              suppressClickRef.current = true
+            }
+
             const lastTap = lastTouchTapRef.current
             const isDoubleTap =
               lastTap &&
@@ -2064,7 +2070,7 @@ function App() {
     if (nodeGroups.length === 0 || boardNodes.length === 0) return
     didAutoRepackRef.current = true
 
-    const repackVersion = 'group-layout-v8'
+    const repackVersion = 'group-layout-v10'
     if (window.localStorage.getItem('hackathon-group-repack') === repackVersion) return
     window.localStorage.setItem('hackathon-group-repack', repackVersion)
 
