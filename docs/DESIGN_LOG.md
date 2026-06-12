@@ -25,9 +25,9 @@ rediscover, write it here.
 - Layout: reduced the people collision and containment radii so a two-person circle grows
   only slightly beyond the avatar diameter instead of expanding from a large fixed buffer.
 - Demo editing: demo mode keeps chrome hidden but allows canvas selection, Backspace/Delete
-  deletion, visible connector handles, circle-center link creation when center behavior is
-  set to "Draw connection", and direct connected-circle creation when a circle-center drag
-  ends on empty space. Settings also exposes separate circle-label and person-name toggles.
+  deletion, visible connector handles, link creation, and drag-to-empty create menus for
+  people, subset circles, and external connected circles. Settings also exposes separate
+  circle-label and person-name toggles.
 
 ### 2026-06-12 — Demo Mode and Readable Canvas Links
 

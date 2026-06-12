@@ -1019,37 +1019,7 @@ function App() {
           }))
         }
       } else {
-        if (demoMode) {
-          if (conn.sourceType === 'circle') {
-            const id = `circle-${Date.now()}`
-            setGraph((current) => {
-              const sourceIndex = current.circles.findIndex((circle) => circle.id === conn.sourceId)
-              return ensureContainment({
-                ...current,
-                circles: [
-                  ...current.circles,
-                  {
-                    id,
-                    name: 'New circle',
-                    icon: 'C',
-                    x: conn.endX,
-                    y: conn.endY,
-                    radius: 150,
-                    minRadius: 150,
-                    parentId: null,
-                    connectedTo: conn.sourceId,
-                    tone: nextTone(sourceIndex >= 0 ? sourceIndex + current.circles.length : current.circles.length),
-                    shapeType: 'circle',
-                    sides: 24,
-                    amplitude: 0,
-                  },
-                ],
-              })
-            })
-            setSelectedItem({ type: 'circle', id })
-          }
-          setCreateMenu(null)
-        } else if (conn.sourceType === 'circle') {
+        if (conn.sourceType === 'circle') {
           setCreateMenu({
             sourceCircleId: conn.sourceId,
             x: conn.endX,
@@ -1571,13 +1541,17 @@ function App() {
         <canvas ref={peopleCanvasRef} className="board-canvas-layer" aria-label="Relationship board" />
       </div>
 
-      {!demoMode && createMenu ? (
+      {createMenu ? (
         <div className="create-menu" style={menuPosition(createMenu)}>
           {createMenu.dragSourceType === 'person' ? (
             <>
               <button type="button" onClick={createPerson}>
                 <PersonIcon />
                 <span>Add person</span>
+              </button>
+              <button type="button" onClick={() => createCircle('nested')}>
+                <SubsetIcon />
+                <span>Add subset inside source circle</span>
               </button>
               <button type="button" onClick={() => createCircle('external')}>
                 <CircleIcon />

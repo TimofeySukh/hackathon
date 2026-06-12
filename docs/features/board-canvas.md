@@ -25,13 +25,13 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   another node to draw a relationship link. A dashed draft edge previews the connection.
 - **Select**: click a circle, person, or connection to load it into the inspector for
   rename / styling / notes / delete.
-- **Demo mode**: the Settings panel includes a demo mode switch. When enabled, all chrome,
-  create menus, stress controls, help text, and the inspector disappear; only the board
-  canvas and settings button remain. People and circles can still be moved, and circle
-  edges can still be resized. Existing items can still be selected on the canvas and
-  deleted with Backspace/Delete. Circle-center drag still creates links when the center
-  behavior setting is "Draw connection"; dragging a circle center to empty space creates a
-  new connected circle directly instead of opening a menu.
+- **Demo mode**: the Settings panel includes a demo mode switch. When enabled, chrome,
+  stress controls, help text, and the inspector disappear; only the board canvas and
+  settings button remain. People and circles can still be moved, and circle edges can
+  still be resized. Existing items can still be selected on the canvas and deleted with
+  Backspace/Delete. Connector handles stay visible. Dragging a circle/person connector to
+  an existing node creates a link; dragging to empty space opens the create menu so users
+  can add a person, subset circle, or external connected circle without leaving demo mode.
 - **Labels**: Settings includes separate toggles for circle labels and person names.
   Circle-center icon text scales with the world transform like people avatars; labels use
   the same screen-readable label treatment as person names.

@@ -12,7 +12,7 @@ Current visible prototype behavior:
 - includes nested country/company circles such as Sweden, France, Pandora, Avito, Yandex, US / Canada, and Japan
 - draws curved links from circle centers to circles and people
 - includes settings toggles for demo mode, circle labels, and person names
-- demo mode hides the app chrome and leaves the canvas plus the settings button while still allowing selection, deletion, visible connector handles, link creation, and direct connected-circle creation from circle-center drags
+- demo mode hides the app chrome and leaves the canvas plus the settings button while still allowing selection, deletion, visible connector handles, link creation, and drag-to-empty create menus for people, subset circles, and connected circles
 - includes a people load panel with a 0-10,000 generated-person slider, optional people edges, and live FPS
 - creates people, nested subset circles, or external connected circles from a circle context menu
 - supports Shift-drag from a circle center as a shortcut for creating from that center
