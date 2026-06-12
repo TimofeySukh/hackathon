@@ -17,6 +17,13 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-12 — Geographic Icons in Demo Circles
+
+- Decision: Default region and country circles now use emoji flags or geographic symbols
+  in their center handles. Company circles can continue using short text initials.
+- Rendering: Canvas circle centers detect non-ASCII icons and use a larger emoji-capable
+  font so flags read as icons instead of tiny text.
+
 ### 2026-06-12 — Tighter Demo Graph Spacing
 
 - Decision: Demo data no longer ships with ad hoc person-to-person/custom links; only

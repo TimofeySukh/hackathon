@@ -2536,10 +2536,13 @@ function drawCircleCenter(ctx: CanvasRenderingContext2D, circle: CircleNode, sca
     ctx.drawImage(image, circle.x - radius + 3, circle.y - radius + 3, radius * 2 - 6, radius * 2 - 6)
   } else {
     ctx.fillStyle = '#ffffff'
-    ctx.font = '500 10px Inter, system-ui, sans-serif'
+    const hasEmojiIcon = Array.from(circle.icon).some((char) => (char.codePointAt(0) ?? 0) > 127)
+    ctx.font = hasEmojiIcon
+      ? '18px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif'
+      : '500 10px Inter, system-ui, sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(circle.icon, circle.x, circle.y + 0.5)
+    ctx.fillText(circle.icon, circle.x, circle.y + (hasEmojiIcon ? 1.5 : 0.5))
   }
   ctx.restore()
 }
@@ -2792,15 +2795,15 @@ function clamp(value: number, min: number, max: number) {
 function createDemoGraphState(): GraphState {
   const circles: CircleNode[] = [
     makeCircle('you', 'You', 'YOU', 0, 0, 104, null, null, 'blue'),
-    makeCircle('eu', 'EU', 'EU', 0, -600, 286, null, 'you', 'blue'),
-    makeCircle('denmark', 'Denmark', 'DK', -30, 650, 276, null, 'you', 'red'),
-    makeCircle('russia', 'Russia', 'RU', 720, 20, 286, null, 'you', 'blue'),
-    makeCircle('other', 'Other', 'OT', -720, 20, 268, null, 'you', 'red'),
+    makeCircle('eu', 'EU', '🇪🇺', 0, -600, 286, null, 'you', 'blue'),
+    makeCircle('denmark', 'Denmark', '🇩🇰', -30, 650, 276, null, 'you', 'red'),
+    makeCircle('russia', 'Russia', '🇷🇺', 720, 20, 286, null, 'you', 'blue'),
+    makeCircle('other', 'Other', '🌐', -720, 20, 268, null, 'you', 'red'),
 
-    makeCircle('sweden', 'Sweden', 'SE', -92, -720, 62, 'eu', 'eu', 'blue'),
-    makeCircle('france', 'France', 'FR', 112, -655, 64, 'eu', 'eu', 'blue'),
-    makeCircle('germany', 'Germany', 'DE', 40, -462, 68, 'eu', 'eu', 'amber'),
-    makeCircle('netherlands', 'Netherlands', 'NL', -160, -510, 62, 'eu', 'eu', 'red'),
+    makeCircle('sweden', 'Sweden', '🇸🇪', -92, -720, 62, 'eu', 'eu', 'blue'),
+    makeCircle('france', 'France', '🇫🇷', 112, -655, 64, 'eu', 'eu', 'blue'),
+    makeCircle('germany', 'Germany', '🇩🇪', 40, -462, 68, 'eu', 'eu', 'amber'),
+    makeCircle('netherlands', 'Netherlands', '🇳🇱', -160, -510, 62, 'eu', 'eu', 'red'),
 
     makeCircle('pandora', 'Pandora', 'P', -26, 800, 78, 'denmark', 'denmark', 'red'),
     makeCircle('lego', 'LEGO', 'LG', -190, 565, 62, 'denmark', 'denmark', 'amber'),
@@ -2810,12 +2813,12 @@ function createDemoGraphState(): GraphState {
     makeCircle('yandex', 'Yandex', 'YA', 840, -130, 68, 'russia', 'russia', 'amber'),
     makeCircle('avito', 'Avito', 'AV', 858, 150, 68, 'russia', 'russia', 'green'),
     makeCircle('media-ru', 'Media', 'TV', 600, 170, 62, 'russia', 'russia', 'violet'),
-    makeCircle('moscow', 'Moscow', 'MSK', 600, -170, 66, 'russia', 'russia', 'blue'),
+    makeCircle('moscow', 'Moscow', '🏙️', 600, -170, 66, 'russia', 'russia', 'blue'),
 
-    makeCircle('usa-canada', 'US / Canada', 'NA', -890, -40, 72, 'other', 'other', 'blue'),
-    makeCircle('israel', 'Israel', 'IL', -650, -150, 62, 'other', 'other', 'blue'),
-    makeCircle('japan', 'Japan', 'JP', -595, 150, 62, 'other', 'other', 'red'),
-    makeCircle('singapore', 'Singapore', 'SG', -780, 200, 62, 'other', 'other', 'green'),
+    makeCircle('usa-canada', 'US / Canada', '🌎', -890, -40, 72, 'other', 'other', 'blue'),
+    makeCircle('israel', 'Israel', '🇮🇱', -650, -150, 62, 'other', 'other', 'blue'),
+    makeCircle('japan', 'Japan', '🇯🇵', -595, 150, 62, 'other', 'other', 'red'),
+    makeCircle('singapore', 'Singapore', '🇸🇬', -780, 200, 62, 'other', 'other', 'green'),
   ]
 
   const people: PersonNode[] = [

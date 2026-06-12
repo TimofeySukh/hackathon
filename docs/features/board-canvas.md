@@ -35,6 +35,8 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
 - **Labels**: Settings includes separate toggles for circle labels and person names.
   Circle-center icon text scales with the world transform like people avatars; labels use
   the same screen-readable label treatment as person names.
+- **Seed icons**: default country and region circles use geographic icons or flags in
+  their center handles. Company circles may still use short text initials.
 - **Circle design**: Settings includes two segmented controls for the global circle
   rendering style. `Circle shape` switches between simple circular regions and the stored
   figure shapes; choosing `Figures` also converts all current circles to wavy figure
