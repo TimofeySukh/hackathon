@@ -52,6 +52,7 @@ export type PersonNode = {
   imageUrl?: string
   isFavorite?: boolean
   notes?: PersonNote[]
+  tag?: CircleTone
 }
 
 export type Connection = {
@@ -354,6 +355,7 @@ function App() {
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
   const [hiddenTagIds, setHiddenTagIds] = useState<Record<string, boolean>>({})
+  const [isTagPickerOpen, setIsTagPickerOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showCircleLabels] = useState(true)
   const [showPersonLabels] = useState(true)
@@ -569,6 +571,13 @@ function App() {
     }
   }
 
+  function setPersonTag(personId: string, tag: CircleTone | undefined) {
+    setGraph((current) => ({
+      ...current,
+      people: current.people.map((p) => p.id === personId ? { ...p, tag } : p),
+    }))
+  }
+
   function deletePerson(personId: string) {
     setGraph((current) => ({
       ...current,
@@ -727,6 +736,7 @@ function App() {
       setIsLinkedInGuideOpen(false)
       setIsSearchOpen(false)
       setIsAccountMenuOpen(false)
+      setIsTagPickerOpen(false)
     }
     document.addEventListener('pointerdown', handleOutsideClick)
     return () => {
@@ -2322,9 +2332,59 @@ function App() {
 
             {selectedPerson && (
               <>
-                <button type="button" className="tag-picker__trigger is-ghost">
-                  <span className="tag-picker__ghost-label">+ add tag</span>
-                </button>
+                <div className="tag-picker">
+                  {selectedPerson.tag ? (
+                    <div className="tag-picker__chip-row">
+                      <button
+                        type="button"
+                        className="tag-picker__chip"
+                        style={{ '--tag-color': MATERIAL_TONES[selectedPerson.tag].centerBg } as CSSProperties}
+                        onClick={() => setIsTagPickerOpen((v) => !v)}
+                      >
+                        <span className="tag-picker__chip-dot" />
+                        <span className="tag-picker__chip-label">
+                          {TOP_BAR_TAGS.find((t) => t.id === selectedPerson.tag)?.name ?? selectedPerson.tag}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        className="tag-picker__chip-remove"
+                        aria-label="Remove tag"
+                        onClick={() => { setPersonTag(selectedPerson.id, undefined); setIsTagPickerOpen(false) }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="tag-picker__trigger is-ghost"
+                      onClick={() => setIsTagPickerOpen((v) => !v)}
+                    >
+                      <span className="tag-picker__ghost-label">+ add tag</span>
+                    </button>
+                  )}
+
+                  {isTagPickerOpen && (
+                    <div className="tag-picker__menu">
+                      {TOP_BAR_TAGS.map((tag) => (
+                        <button
+                          key={tag.id}
+                          type="button"
+                          className={`tag-picker__option-row${selectedPerson.tag === tag.id ? ' is-selected' : ''}`}
+                          onClick={() => { setPersonTag(selectedPerson.id, tag.id); setIsTagPickerOpen(false) }}
+                        >
+                          <span
+                            className="tag-picker__option-dot"
+                            style={{ background: MATERIAL_TONES[tag.id].centerBg }}
+                          />
+                          <span className="tag-picker__option-label">{tag.name}</span>
+                          {selectedPerson.tag === tag.id && <span className="tag-picker__option-check">✓</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
                 <div className="note-list">
                   {selectedPerson.notes?.map((note) => {

@@ -1277,6 +1277,10 @@ svg {
   text-align: left;
 }
 
+.tag-picker {
+  position: relative;
+}
+
 .tag-picker__trigger {
   justify-self: start;
   display: inline-flex;
@@ -1299,6 +1303,116 @@ svg {
 .tag-picker__ghost-label {
   font-size: 14px;
   font-weight: 700;
+}
+
+.tag-picker__chip-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tag-picker__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px 5px 8px;
+  border: 1px solid color-mix(in srgb, var(--tag-color) 56%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tag-color) 22%, transparent);
+  color: var(--panel-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.tag-picker__chip-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--tag-color);
+  flex-shrink: 0;
+}
+
+.tag-picker__chip-label {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.tag-picker__chip-remove {
+  display: inline-grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(255, 130, 130, 0.28);
+  border-radius: 999px;
+  background: rgba(255, 130, 130, 0.1);
+  color: var(--panel-muted);
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.tag-picker__chip-remove:hover {
+  background: rgba(255, 130, 130, 0.22);
+  color: var(--panel-danger);
+}
+
+.tag-picker__menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  display: grid;
+  gap: 2px;
+  min-width: 160px;
+  padding: 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 18px;
+  background: var(--panel-bg);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(18px);
+}
+
+.tag-picker__option-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--panel-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.tag-picker__option-row:hover,
+.tag-picker__option-row.is-selected {
+  background: var(--button-bg);
+}
+
+.tag-picker__option-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.tag-picker__option-label {
+  flex: 1 1 auto;
+}
+
+.tag-picker__option-check {
+  color: var(--panel-muted);
+  font-size: 12px;
 }
 
 .note-list {
