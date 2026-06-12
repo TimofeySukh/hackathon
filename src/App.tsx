@@ -805,9 +805,19 @@ function App() {
     }
     return [...displayCircles].sort((a, b) => getDepth(a.parentId) - getDepth(b.parentId))
   }, [displayCircles, circlesById])
+  const visiblePeople = useMemo(() => {
+    const hiddenTones = new Set(
+      Object.entries(hiddenTagIds)
+        .filter(([, hidden]) => hidden)
+        .map(([tone]) => tone),
+    )
+    if (hiddenTones.size === 0) return displayPeople
+    return displayPeople.filter((p) => !p.tag || !hiddenTones.has(p.tag))
+  }, [displayPeople, hiddenTagIds])
+
   const boardIndex = useMemo(
-    () => createBoardIndex(sortedCircles, displayPeople, displayConnections),
-    [sortedCircles, displayPeople, displayConnections],
+    () => createBoardIndex(sortedCircles, visiblePeople, displayConnections),
+    [sortedCircles, visiblePeople, displayConnections],
   )
 
   const selectedCircle = selectedItem?.type === 'circle' ? circlesById.get(selectedItem.id) ?? null : null
@@ -2167,7 +2177,12 @@ function App() {
       <aside className="inspector" aria-label="Selection details" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 120px)' }}>
           <>
             <span className="inspector__eyebrow">
-              {selectedItem.type === 'circle' ? 'Circle' : selectedItem.type === 'person' ? 'Person' : 'Connection'}
+              {selectedItem.type === 'circle' ? 'Circle' : selectedItem.type === 'person' ? (
+                (() => {
+                  const circle = selectedPerson ? circlesById.get(selectedPerson.circleId) : null
+                  return circle ? circle.name : 'Person'
+                })()
+              ) : 'Connection'}
             </span>
             {selectedItem.type !== 'connection' ? (
               <input
