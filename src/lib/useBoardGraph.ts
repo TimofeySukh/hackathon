@@ -387,6 +387,7 @@ export function useBoardGraph(user: User | null) {
           return {
             ...savedGroup,
             memberColors: originalGroup?.memberColors,
+            memberCategories: originalGroup?.memberCategories,
           }
         })
         setGraphState((currentState) => ({

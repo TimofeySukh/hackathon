@@ -69,6 +69,7 @@ type NodeGroupBubble = {
   radius: number
   ringRadii: number[]
   segments: Array<{
+    category: string
     color: string
     fill: string
     stroke: string
@@ -756,12 +757,21 @@ function sanitizeNodeGroups(groups: NodeGroup[], boardId: string, nodes: PersonN
             .filter(([, color]) => Boolean(color)),
         )
       : undefined
+    const memberCategories = group.memberCategories
+      ? Object.fromEntries(
+          memberIds.flatMap((memberId) => {
+            const category = group.memberCategories?.[memberId]
+            return typeof category === 'string' && category.length > 0 ? [[memberId, category] as const] : []
+          }),
+        )
+      : undefined
     nextGroups.push({
       ...group,
       boardId,
       memberIds,
       color: normalizeTagColor(group.color),
       memberColors,
+      memberCategories,
     })
   }
 
@@ -783,6 +793,10 @@ function rgbaFromHex(color: string, alpha: number) {
 
 function getNodeColorInGroup(node: PersonNode, group: NodeGroup, tagColorById: Record<string, string>) {
   return normalizeTagColor(group.memberColors?.[node.id] ?? (node.tag_id ? tagColorById[node.tag_id] : null) ?? group.color)
+}
+
+function getNodeCategoryInGroup(node: PersonNode, group: NodeGroup, tagCategoryById: Record<string, string>) {
+  return group.memberCategories?.[node.id] ?? (node.tag_id ? tagCategoryById[node.tag_id] ?? `tag:${node.tag_id}` : 'untagged')
 }
 
 function getCirclePath(center: Offset, radius: number) {
@@ -843,25 +857,29 @@ function getGroupOuterRadius(memberCount: number) {
   return getGroupRingRadius(Math.max(0, ringIndex - 1)) + GROUP_ZONE_WIDTH * 0.5
 }
 
-function getGroupColorBuckets(members: PersonNode[], group: NodeGroup, tagColorById: Record<string, string>) {
-  const buckets = new Map<string, PersonNode[]>()
+function getGroupColorBuckets(
+  members: PersonNode[],
+  group: NodeGroup,
+  tagColorById: Record<string, string>,
+  tagCategoryById: Record<string, string> = {},
+) {
+  const buckets = new Map<string, { category: string; color: string; members: PersonNode[] }>()
   for (const member of members) {
     const color = getNodeColorInGroup(member, group, tagColorById)
-    const bucket = buckets.get(color) ?? []
-    bucket.push(member)
-    buckets.set(color, bucket)
+    const category = getNodeCategoryInGroup(member, group, tagCategoryById)
+    const bucket = buckets.get(category) ?? { category, color, members: [] }
+    bucket.members.push(member)
+    buckets.set(category, bucket)
   }
 
-  return Array.from(buckets.entries()).map(([color, bucketMembers]) => ({
-    color,
-    members: bucketMembers,
-  }))
+  return Array.from(buckets.values())
 }
 
 function getNodeGroupBubbles(
   groups: NodeGroup[],
   nodes: PersonNode[],
   tagColorById: Record<string, string> = {},
+  tagCategoryById: Record<string, string> = {},
 ): NodeGroupBubble[] {
   const nodesById = new Map(nodes.map((node) => [node.id, node]))
 
@@ -886,24 +904,25 @@ function getNodeGroupBubbles(
         ringRadii.push(getGroupRingRadius(ring))
       }
 
-      const buckets = getGroupColorBuckets(members, group, tagColorById)
+      const buckets = getGroupColorBuckets(members, group, tagColorById, tagCategoryById)
       const totalMembers = members.length
       let currentAngle = -Math.PI / 2
       const segments = buckets.map((bucket, index) => {
         const isLast = index === buckets.length - 1
         const nextAngle = isLast ? Math.PI * 1.5 : currentAngle + (bucket.members.length / totalMembers) * Math.PI * 2
         const segment = {
+          category: bucket.category,
           color: bucket.color,
           fill: rgbaFromHex(bucket.color, 0.16),
-          stroke: rgbaFromHex(bucket.color, 0.42),
+          stroke: 'rgb(83 101 145 / 0.24)',
           path: getPieSegmentPath(center, radius, currentAngle, nextAngle),
         }
         currentAngle = nextAngle
         return segment
       })
       const primarySegment = [...segments].sort((left, right) => {
-        const leftCount = buckets.find((bucket) => bucket.color === left.color)?.members.length ?? 0
-        const rightCount = buckets.find((bucket) => bucket.color === right.color)?.members.length ?? 0
+        const leftCount = buckets.find((bucket) => bucket.category === left.category)?.members.length ?? 0
+        const rightCount = buckets.find((bucket) => bucket.category === right.category)?.members.length ?? 0
         return rightCount - leftCount
       })[0]
 
@@ -974,30 +993,38 @@ function arrangeMembersInSector(
   centerY: number,
   startAngle: number,
   endAngle: number,
+  outerRadius: number,
   positions: Map<string, Offset>,
 ) {
   if (members.length === 0) return
 
   const span = Math.max(0.001, endAngle - startAngle)
-  let placed = 0
+  const slots: Offset[] = []
   let ringIndex = 0
 
-  while (placed < members.length) {
+  while (getGroupRingRadius(ringIndex) < outerRadius) {
     const radius = getGroupRingRadius(ringIndex)
     const fullRingCapacity = Math.max(1, Math.round((Math.PI * 2 * radius) / GROUP_ROW_SPACING))
     const sectorCapacity = Math.max(1, Math.round(fullRingCapacity * (span / (Math.PI * 2))))
-    const countOnRing = Math.min(sectorCapacity, members.length - placed)
+    const ringOffset = (ringIndex * 0.382) % 1
 
-    for (let index = 0; index < countOnRing; index += 1) {
-      const angle = startAngle + ((index + 0.5) / countOnRing) * span
-      const node = members[placed++]
-      positions.set(node.id, {
+    for (let index = 0; index < sectorCapacity; index += 1) {
+      const slotProgress = ((index + 0.5) / sectorCapacity + ringOffset) % 1
+      const angle = startAngle + slotProgress * span
+      slots.push({
         x: centerX + Math.cos(angle) * radius,
         y: centerY + Math.sin(angle) * radius,
       })
     }
 
     ringIndex += 1
+  }
+
+  if (slots.length === 0) slots.push({ x: centerX, y: centerY })
+
+  for (let index = 0; index < members.length; index += 1) {
+    const slotIndex = Math.min(slots.length - 1, Math.round(((index + 0.5) * slots.length) / members.length - 0.5))
+    positions.set(members[index].id, slots[slotIndex])
   }
 }
 
@@ -1007,6 +1034,7 @@ function arrangeGroupMembers(
   centerOverride?: Offset,
   group?: NodeGroup,
   tagColorById: Record<string, string> = {},
+  tagCategoryById: Record<string, string> = {},
 ) {
   const members = memberIds.map((nodeId) => nodes.find((node) => node.id === nodeId)).filter(Boolean) as PersonNode[]
   if (members.length < 2) return new Map<string, Offset>()
@@ -1039,13 +1067,14 @@ function arrangeGroupMembers(
     color: DEFAULT_TAG_COLOR,
     createdAt: '',
   }
-  const buckets = getGroupColorBuckets(members, fallbackGroup, tagColorById)
+  const buckets = getGroupColorBuckets(members, fallbackGroup, tagColorById, tagCategoryById)
+  const outerRadius = getGroupOuterRadius(members.length)
   let currentAngle = -Math.PI / 2
   for (let index = 0; index < buckets.length; index += 1) {
     const bucket = buckets[index]
     const isLast = index === buckets.length - 1
     const nextAngle = isLast ? Math.PI * 1.5 : currentAngle + (bucket.members.length / members.length) * Math.PI * 2
-    arrangeMembersInSector(bucket.members, centerX, centerY, currentAngle, nextAngle, positions)
+    arrangeMembersInSector(bucket.members, centerX, centerY, currentAngle, nextAngle, outerRadius, positions)
     currentAngle = nextAngle
   }
   return positions
@@ -1125,6 +1154,8 @@ const GraphNodeCard = memo(function GraphNodeCard({
   onClick,
   onDoubleClick,
 }: GraphNodeProps) {
+  const lastTouchTapRef = useRef<TapState | null>(null)
+  const suppressClickRef = useRef(false)
   const nodeStyle = {
     transform: `translate(${node.x}px, ${node.y}px)`,
     ...(tagColor ? { '--node-color': tagColor } : {}),
@@ -1139,9 +1170,38 @@ const GraphNodeCard = memo(function GraphNodeCard({
         type="button"
         className="graph-node__button"
         title={node.is_root ? 'Double click the board to create a person' : 'Drag to move'}
-        onPointerDown={(event) => onPointerDown(node, event)}
+        onPointerDown={(event) => {
+          if (event.pointerType === 'touch' && !node.is_root) {
+            const lastTap = lastTouchTapRef.current
+            const isDoubleTap =
+              lastTap &&
+              event.timeStamp - lastTap.time <= DOUBLE_TAP_MS &&
+              Math.hypot(event.clientX - lastTap.clientX, event.clientY - lastTap.clientY) <= DOUBLE_TAP_DISTANCE
+
+            if (isDoubleTap) {
+              event.preventDefault()
+              event.stopPropagation()
+              lastTouchTapRef.current = null
+              suppressClickRef.current = true
+              onDoubleClick(node)
+              return
+            }
+
+            lastTouchTapRef.current = {
+              time: event.timeStamp,
+              clientX: event.clientX,
+              clientY: event.clientY,
+            }
+          }
+
+          onPointerDown(node, event)
+        }}
         onClick={(event) => {
           event.stopPropagation()
+          if (suppressClickRef.current) {
+            suppressClickRef.current = false
+            return
+          }
           onClick(node)
         }}
         onDoubleClick={(event) => {
@@ -1363,6 +1423,13 @@ function App() {
       ) as Record<string, string>,
     [activeTags, tagColorDrafts],
   )
+  const tagCategoryById = useMemo(
+    () =>
+      Object.fromEntries(
+        activeTags.map((tag) => [tag.id, `tag:${normalizeTagName(tag.name).toLowerCase()}`]),
+      ) as Record<string, string>,
+    [activeTags],
+  )
   const visibleTagIds = useMemo(
     () => new Set(tagMenuItems.filter((tag) => !hiddenTagIds[tag.id]).map((tag) => tag.id)),
     [hiddenTagIds, tagMenuItems],
@@ -1392,8 +1459,8 @@ function App() {
     [boardConnections, visibleNodesById],
   )
   const visibleNodeGroupBubbles = useMemo(
-    () => getNodeGroupBubbles(nodeGroups, visibleBoardNodes, tagColorById),
-    [nodeGroups, visibleBoardNodes, tagColorById],
+    () => getNodeGroupBubbles(nodeGroups, visibleBoardNodes, tagColorById, tagCategoryById),
+    [nodeGroups, visibleBoardNodes, tagColorById, tagCategoryById],
   )
   // Every person that belongs to a group; anyone else (non-root) is "unattached".
   const groupedNodeIds = useMemo(() => {
@@ -2003,7 +2070,7 @@ function App() {
 
     const moves: Array<{ id: string; x: number; y: number }> = []
     for (const group of nodeGroups) {
-      const positions = arrangeGroupMembers(boardNodes, group.memberIds, undefined, group, tagColorById)
+      const positions = arrangeGroupMembers(boardNodes, group.memberIds, undefined, group, tagColorById, tagCategoryById)
       for (const [nodeId, position] of positions) {
         const node = boardNodes.find((candidate) => candidate.id === nodeId)
         if (!node || node.is_root) continue
@@ -2024,7 +2091,7 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [isGraphReady, nodeGroups, boardNodes, movePerson, tagColorById])
+  }, [isGraphReady, nodeGroups, boardNodes, movePerson, tagColorById, tagCategoryById])
 
   useEffect(() => {
     areaSelectionRef.current = areaSelection
@@ -2500,9 +2567,13 @@ function App() {
       if (nextMemberIds.length < 2) return false
 
       const sourceColorByMemberId = new Map<string, string>()
+      const sourceCategoryByMemberId = new Map<string, string>()
       for (const group of currentGroups) {
         for (const memberId of group.memberIds) {
           sourceColorByMemberId.set(memberId, normalizeTagColor(group.memberColors?.[memberId] ?? group.color))
+          if (group.memberCategories?.[memberId]) {
+            sourceCategoryByMemberId.set(memberId, group.memberCategories[memberId])
+          }
         }
       }
       const memberColors = Object.fromEntries(
@@ -2512,6 +2583,15 @@ function App() {
           return [memberId, normalizeTagColor(color)]
         }),
       )
+      const memberCategories = Object.fromEntries(
+        nextMemberIds.map((memberId) => {
+          const node = currentNodes.find((candidateNode) => candidateNode.id === memberId)
+          const category =
+            sourceCategoryByMemberId.get(memberId) ??
+            (node?.tag_id ? tagCategoryById[node.tag_id] ?? `tag:${node.tag_id}` : 'untagged')
+          return [memberId, category]
+        }),
+      )
 
       const nextGroup: NodeGroup = {
         id: targetGroup?.id ?? createLocalId('node-group'),
@@ -2519,9 +2599,10 @@ function App() {
         memberIds: nextMemberIds,
         color: targetGroup?.color ?? getNodeDisplayColor(targetNode, tagColorById),
         memberColors,
+        memberCategories,
         createdAt: targetGroup?.createdAt ?? new Date().toISOString(),
       }
-      const nextPositions = arrangeGroupMembers(currentNodes, nextMemberIds, undefined, nextGroup, tagColorById)
+      const nextPositions = arrangeGroupMembers(currentNodes, nextMemberIds, undefined, nextGroup, tagColorById, tagCategoryById)
       if (nextPositions.size === 0) return false
 
       applyNodeGroup(nextGroup)
@@ -2535,14 +2616,14 @@ function App() {
       )
       return true
     },
-    [activeBoardId, applyNodeGroup, movePerson, tagColorById],
+    [activeBoardId, applyNodeGroup, movePerson, tagColorById, tagCategoryById],
   )
 
   const addNodeToContainingGroup = useCallback(
     async (nodeId: string, point: Offset) => {
       const currentNodes = boardNodesRef.current
       const currentGroups = nodeGroupsRef.current
-      const groupBubbles = getNodeGroupBubbles(currentGroups, currentNodes)
+      const groupBubbles = getNodeGroupBubbles(currentGroups, currentNodes, tagColorById, tagCategoryById)
       const targetBubble = groupBubbles.find((bubble) => isPointTouchingPolygon(point, bubble.hull, NODE_RADIUS))
       if (!targetBubble) return false
 
@@ -2554,7 +2635,7 @@ function App() {
 
       return addNodesToGroup([nodeId], targetNode, targetGroup)
     },
-    [addNodesToGroup],
+    [addNodesToGroup, tagColorById, tagCategoryById],
   )
 
   const createPersonAtClientPoint = useCallback(
@@ -2595,7 +2676,7 @@ function App() {
 
       const currentGroups = nodeGroupsRef.current
       const candidateGroupNodes = currentNodes.filter((node) => !draggedIdSet.has(node.id))
-      const groupBubbles = getNodeGroupBubbles(currentGroups, candidateGroupNodes)
+      const groupBubbles = getNodeGroupBubbles(currentGroups, candidateGroupNodes, tagColorById, tagCategoryById)
       const targetBubble = groupBubbles.find((bubble) =>
         draggedPoints.some((point) => isPointTouchingPolygon(point, bubble.hull, NODE_RADIUS)),
       )
@@ -2625,7 +2706,7 @@ function App() {
 
       return false
     },
-    [addNodeToContainingGroup, addNodesToGroup],
+    [addNodeToContainingGroup, addNodesToGroup, tagColorById, tagCategoryById],
   )
 
   const finishConnectionDrag = useCallback(
@@ -4154,14 +4235,21 @@ function App() {
       const remainingGroup = nodeGroupsRef.current.find((candidate) => candidate.id === group.id)
       if (!remainingGroup) return
 
-      const positions = arrangeGroupMembers(boardNodesRef.current, remainingGroup.memberIds, anchor, remainingGroup, tagColorById)
+      const positions = arrangeGroupMembers(
+        boardNodesRef.current,
+        remainingGroup.memberIds,
+        anchor,
+        remainingGroup,
+        tagColorById,
+        tagCategoryById,
+      )
       for (const [nodeId, position] of positions) {
         const memberNode = boardNodesRef.current.find((candidate) => candidate.id === nodeId)
         if (!memberNode || memberNode.is_root) continue
         void movePerson(nodeId, position.x, position.y)
       }
     },
-    [detachNodesFromGroups, movePerson, tagColorById],
+    [detachNodesFromGroups, movePerson, tagColorById, tagCategoryById],
   )
 
   const previewPath = connectionDrag

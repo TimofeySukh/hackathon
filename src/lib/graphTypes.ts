@@ -85,6 +85,7 @@ export type NodeGroup = {
   memberIds: string[]
   color: string
   memberColors?: Record<string, string>
+  memberCategories?: Record<string, string>
   createdAt: string
 }
 

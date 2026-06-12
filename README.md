@@ -8,7 +8,7 @@ A persisted social graph board built with React, Vite, and TypeScript.
 - Create a new node by double-clicking the empty board, or double-tapping it on touch devices
 - Drag a person close to another person, or touching an existing blob area, to create or extend a soft blob group
 - Drag the middle of a blob area to move the whole blob group
-- Blob groups render as filled circular pie zones whose color shares follow the merged member colors
+- Blob groups render as filled circular pie zones whose slices follow merged member categories and use their colors
 - Curved lines between connected nodes
 - New nodes appear immediately with an empty inline name field
 - Compact obsidian-like nodes with labels
