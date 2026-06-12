@@ -11,7 +11,8 @@ The current visible prototype is intentionally narrow:
 - seeded connected region circles and nested country/company circles
 - people placed inside parent region, country, or company circles
 - curved Canvas 2D links from circle centers to people and circles
-- a settings-driven demo mode that hides chrome, menus, stress controls, help text, and the inspector while keeping the canvas and settings button
+- settings toggles for demo mode, circle labels, and person names
+- a settings-driven demo mode that hides chrome, menus, stress controls, help text, and the inspector while keeping the canvas and settings button; canvas selection, deletion, connector handles, link creation, and direct connected-circle creation remain available
 - branch creation from a circle context menu or Shift-drag from a circle center
 - a create menu for choosing person, nested subset circle, or external connected circle
 - direct dragging for people and circle centers

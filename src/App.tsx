@@ -156,12 +156,12 @@ const PERSON_VISUAL_RADIUS = 20
 const CIRCLE_CENTER_RADIUS = 20
 const CONNECTOR_HANDLE_RADIUS = 6
 const HANDLE_HIT_RADIUS = 16
-const PERSON_CONTAINMENT_RADIUS = 62
+const PERSON_CONTAINMENT_RADIUS = 28
 const CIRCLE_CONTAINMENT_PADDING = 28
-const PERSON_COLLISION_RADIUS = 26
-const PERSON_COLLISION_GAP = 10
-const CIRCLE_CENTER_COLLISION_RADIUS = 32
-const PERSON_CIRCLE_COLLISION_GAP = 14
+const PERSON_COLLISION_RADIUS = 21
+const PERSON_COLLISION_GAP = 4
+const CIRCLE_CENTER_COLLISION_RADIUS = 24
+const PERSON_CIRCLE_COLLISION_GAP = 8
 const CIRCLE_COLLISION_GAP = 20
 const COLLISION_PASSES = 10
 
@@ -320,6 +320,8 @@ function App() {
 
   const [showSettings, setShowSettings] = useState(false)
   const [demoMode, setDemoMode] = useState(false)
+  const [showCircleLabels, setShowCircleLabels] = useState(true)
+  const [showPersonLabels, setShowPersonLabels] = useState(true)
   const [centerBehavior, setCenterBehavior] = useState<'connect' | 'move'>('connect')
   const [hoveredConnId, setHoveredConnId] = useState<string | null>(null)
   const [openNotesPersonId, setOpenNotesPersonId] = useState<string | null>(null)
@@ -455,6 +457,16 @@ function App() {
       connections: (current.connections || []).filter((conn) => conn.id !== connId),
     }))
     setSelectedItem(null)
+  }
+
+  function deleteSelectedItem() {
+    if (selectedItem?.type === 'person') {
+      deletePerson(selectedItem.id)
+    } else if (selectedItem?.type === 'circle') {
+      deleteCircle(selectedItem.id)
+    } else if (selectedItem?.type === 'connection') {
+      deleteConnection(selectedItem.id)
+    }
   }
 
   useEffect(() => {
@@ -611,7 +623,19 @@ function App() {
     const canvas = peopleCanvasRef.current
     const surface = surfaceRef.current
     if (canvas && surface) {
-      drawBoardLayer(canvas, surface, cam, boardIndex, selectedItem, hoveredPersonId, hoveredConnId, connector, demoMode)
+      drawBoardLayer(
+        canvas,
+        surface,
+        cam,
+        boardIndex,
+        selectedItem,
+        hoveredPersonId,
+        hoveredConnId,
+        connector,
+        demoMode,
+        showCircleLabels,
+        showPersonLabels,
+      )
     }
   }
 
@@ -683,8 +707,20 @@ function App() {
     const canvas = peopleCanvasRef.current
     const surface = surfaceRef.current
     if (!canvas || !surface) return
-    drawBoardLayer(canvas, surface, camera, boardIndex, selectedItem, hoveredPersonId, hoveredConnId, connector, demoMode)
-  }, [camera, viewport, boardIndex, selectedItem, hoveredPersonId, hoveredConnId, connector, demoMode])
+    drawBoardLayer(
+      canvas,
+      surface,
+      camera,
+      boardIndex,
+      selectedItem,
+      hoveredPersonId,
+      hoveredConnId,
+      connector,
+      demoMode,
+      showCircleLabels,
+      showPersonLabels,
+    )
+  }, [camera, viewport, boardIndex, selectedItem, hoveredPersonId, hoveredConnId, connector, demoMode, showCircleLabels, showPersonLabels])
 
   useEffect(() => {
     const surface = surfaceRef.current
@@ -765,6 +801,7 @@ function App() {
 
   function handleSurfacePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     if (event.button !== 0) return
+    event.currentTarget.focus({ preventScroll: true })
     event.currentTarget.setPointerCapture(event.pointerId)
     if (!demoMode) setCreateMenu(null)
     setOpenNotesPersonId(null)
@@ -774,7 +811,7 @@ function App() {
       y: event.clientY,
     })
 
-    if (!demoMode && hit?.type === 'connector-handle') {
+    if (hit?.type === 'connector-handle') {
       startConnector(event, hit.sourceId, hit.sourceType, hit.x, hit.y)
       return
     }
@@ -786,7 +823,7 @@ function App() {
     }
 
     if (hit?.type === 'circle-center') {
-      if (!demoMode && centerBehavior === 'connect') {
+      if (centerBehavior === 'connect') {
         startConnector(event, hit.circle.id, 'circle', hit.circle.x, hit.circle.y)
       } else {
         setSelectedItem({ type: 'circle', id: hit.circle.id })
@@ -806,7 +843,7 @@ function App() {
       return
     }
 
-    if (!demoMode && hit?.type === 'connection') {
+    if (hit?.type === 'connection') {
       setSelectedItem({ type: 'connection', id: hit.connection.id })
       return
     }
@@ -872,7 +909,7 @@ function App() {
       scheduleDrag()
     }
 
-    if (!demoMode && connector) {
+    if (connector) {
       const world = screenToWorld({ x: event.clientX, y: event.clientY })
       pendingConnectorRef.current = { ...connector, endX: world.x, endY: world.y }
       scheduleDrag()
@@ -887,7 +924,7 @@ function App() {
       })
       const id = hit?.type === 'person' ? hit.person.id : null
       if (id !== hoveredPersonId) setHoveredPersonId(id)
-      const connId = !demoMode && hit?.type === 'connection' ? hit.connection.id : null
+      const connId = hit?.type === 'connection' ? hit.connection.id : null
       if (connId !== hoveredConnId) setHoveredConnId(connId)
     } else {
       if (hoveredPersonId) setHoveredPersonId(null)
@@ -982,7 +1019,37 @@ function App() {
           }))
         }
       } else {
-        if (conn.sourceType === 'circle') {
+        if (demoMode) {
+          if (conn.sourceType === 'circle') {
+            const id = `circle-${Date.now()}`
+            setGraph((current) => {
+              const sourceIndex = current.circles.findIndex((circle) => circle.id === conn.sourceId)
+              return ensureContainment({
+                ...current,
+                circles: [
+                  ...current.circles,
+                  {
+                    id,
+                    name: 'New circle',
+                    icon: 'C',
+                    x: conn.endX,
+                    y: conn.endY,
+                    radius: 150,
+                    minRadius: 150,
+                    parentId: null,
+                    connectedTo: conn.sourceId,
+                    tone: nextTone(sourceIndex >= 0 ? sourceIndex + current.circles.length : current.circles.length),
+                    shapeType: 'circle',
+                    sides: 24,
+                    amplitude: 0,
+                  },
+                ],
+              })
+            })
+            setSelectedItem({ type: 'circle', id })
+          }
+          setCreateMenu(null)
+        } else if (conn.sourceType === 'circle') {
           setCreateMenu({
             sourceCircleId: conn.sourceId,
             x: conn.endX,
@@ -1325,6 +1392,22 @@ function App() {
                 }}
               />
             </label>
+            <label className="m3-switch-row">
+              <span>Circle labels</span>
+              <input
+                type="checkbox"
+                checked={showCircleLabels}
+                onChange={(event) => setShowCircleLabels(event.target.checked)}
+              />
+            </label>
+            <label className="m3-switch-row">
+              <span>Person names</span>
+              <input
+                type="checkbox"
+                checked={showPersonLabels}
+                onChange={(event) => setShowPersonLabels(event.target.checked)}
+              />
+            </label>
             <label style={{ fontSize: '12px', fontWeight: 500, color: 'rgba(28, 37, 40, 0.64)' }}>
               Circle Center Drag Behavior
             </label>
@@ -1465,6 +1548,7 @@ function App() {
       <div
         ref={surfaceRef}
         className="graph-surface"
+        tabIndex={0}
         style={{
           backgroundSize: `${160 * camera.scale}px ${160 * camera.scale}px, ${32 * camera.scale}px ${32 * camera.scale}px`,
           backgroundPosition: `${camera.x}px ${camera.y}px`,
@@ -1473,6 +1557,11 @@ function App() {
         onPointerMove={handleSurfacePointerMove}
         onPointerUp={handleSurfacePointerUp}
         onPointerCancel={handleSurfacePointerUp}
+        onKeyDown={(event) => {
+          if (event.key !== 'Delete' && event.key !== 'Backspace') return
+          event.preventDefault()
+          deleteSelectedItem()
+        }}
         onContextMenu={handleSurfaceContextMenu}
         onPointerLeave={() => {
           if (hoveredPersonId) setHoveredPersonId(null)
@@ -2232,6 +2321,8 @@ function drawBoardLayer(
   hoveredConnId: string | null,
   connector: DragConnector | null,
   demoMode: boolean,
+  showCircleLabels: boolean,
+  showPersonLabels: boolean,
 ) {
   const { dpr, width, height } = resizeCanvas(canvas, surface)
   const ctx = canvas.getContext('2d')
@@ -2254,10 +2345,10 @@ function drawBoardLayer(
   drawCircleEdges(ctx, visibleCircles, index, camera.scale)
   drawPersonEdges(ctx, visiblePeople, index, camera.scale)
   drawCustomConnections(ctx, visiblePeopleIds, visibleCircleIds, index, selectedItem, hoveredConnId, camera.scale)
-  drawCircleDetails(ctx, visibleCircles, camera.scale, demoMode)
-  drawPeople(ctx, visiblePeople, index, selectedItem, hoveredPersonId, camera.scale, dpr)
+  drawCircleDetails(ctx, visibleCircles, camera.scale, demoMode, showCircleLabels)
+  drawPeople(ctx, visiblePeople, index, selectedItem, hoveredPersonId, camera.scale, dpr, showPersonLabels)
   if (connector) drawConnector(ctx, connector, camera.scale)
-  if (!demoMode) drawSelectionHandles(ctx, selectedItem, index, camera.scale)
+  drawSelectionHandles(ctx, selectedItem, index, camera.scale)
 
   ctx.restore()
 }
@@ -2347,9 +2438,15 @@ function drawCircleFills(ctx: CanvasRenderingContext2D, circles: CircleNode[], s
   }
 }
 
-function drawCircleDetails(ctx: CanvasRenderingContext2D, circles: CircleNode[], scale: number, demoMode: boolean) {
+function drawCircleDetails(
+  ctx: CanvasRenderingContext2D,
+  circles: CircleNode[],
+  scale: number,
+  demoMode: boolean,
+  showCircleLabels: boolean,
+) {
   for (const circle of circles) {
-    drawCircleLabel(ctx, circle, scale)
+    if (showCircleLabels) drawCircleLabel(ctx, circle, scale)
     drawCircleCenter(ctx, circle, scale, demoMode)
   }
 }
@@ -2384,10 +2481,10 @@ function drawCircleCenter(ctx: CanvasRenderingContext2D, circle: CircleNode, sca
     ctx.drawImage(image, circle.x - radius + 3, circle.y - radius + 3, radius * 2 - 6, radius * 2 - 6)
   } else {
     ctx.fillStyle = '#ffffff'
-    ctx.font = `500 ${10 / scale}px Inter, system-ui, sans-serif`
+    ctx.font = '500 10px Inter, system-ui, sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(circle.icon, circle.x, circle.y + 0.5 / scale)
+    ctx.fillText(circle.icon, circle.x, circle.y + 0.5)
   }
   ctx.restore()
 }
@@ -2425,6 +2522,7 @@ function drawPeople(
   hoveredPersonId: string | null,
   scale: number,
   dpr: number,
+  showPersonLabels: boolean,
 ) {
   const spriteRes = pickSpriteTier(PERSON_VISUAL_RADIUS * 2 * scale * dpr)
   ctx.imageSmoothingEnabled = true
@@ -2443,7 +2541,7 @@ function drawPeople(
       PERSON_VISUAL_RADIUS * 2,
       PERSON_VISUAL_RADIUS * 2,
     )
-    if (scale >= 0.62 || isSelected || isHovered) drawPersonLabel(ctx, person, scale)
+    if (showPersonLabels && (scale >= 0.62 || isSelected || isHovered)) drawPersonLabel(ctx, person, scale)
   }
 }
 
@@ -2639,30 +2737,30 @@ function clamp(value: number, min: number, max: number) {
 function createDemoGraphState(): GraphState {
   const circles: CircleNode[] = [
     makeCircle('you', 'You', 'YOU', 0, 0, 104, null, null, 'blue'),
-    makeCircle('eu', 'EU', 'EU', 0, -455, 286, null, 'you', 'blue'),
-    makeCircle('denmark', 'Denmark', 'DK', -28, 500, 276, null, 'you', 'red'),
-    makeCircle('russia', 'Russia', 'RU', 560, 8, 286, null, 'you', 'blue'),
-    makeCircle('other', 'Other', 'OT', -520, 30, 268, null, 'you', 'red'),
+    makeCircle('eu', 'EU', 'EU', 0, -600, 286, null, 'you', 'blue'),
+    makeCircle('denmark', 'Denmark', 'DK', -30, 650, 276, null, 'you', 'red'),
+    makeCircle('russia', 'Russia', 'RU', 720, 20, 286, null, 'you', 'blue'),
+    makeCircle('other', 'Other', 'OT', -720, 20, 268, null, 'you', 'red'),
 
-    makeCircle('sweden', 'Sweden', 'SE', -70, -560, 76, 'eu', 'eu', 'blue'),
-    makeCircle('france', 'France', 'FR', 92, -505, 78, 'eu', 'eu', 'blue'),
-    makeCircle('germany', 'Germany', 'DE', 32, -330, 86, 'eu', 'eu', 'amber'),
-    makeCircle('netherlands', 'Netherlands', 'NL', -130, -382, 70, 'eu', 'eu', 'red'),
+    makeCircle('sweden', 'Sweden', 'SE', -92, -720, 62, 'eu', 'eu', 'blue'),
+    makeCircle('france', 'France', 'FR', 112, -655, 64, 'eu', 'eu', 'blue'),
+    makeCircle('germany', 'Germany', 'DE', 40, -462, 68, 'eu', 'eu', 'amber'),
+    makeCircle('netherlands', 'Netherlands', 'NL', -160, -510, 62, 'eu', 'eu', 'red'),
 
-    makeCircle('pandora', 'Pandora', 'P', -28, 646, 92, 'denmark', 'denmark', 'red'),
-    makeCircle('lego', 'LEGO', 'LG', -166, 424, 72, 'denmark', 'denmark', 'amber'),
-    makeCircle('maersk', 'Maersk', 'MA', 132, 418, 74, 'denmark', 'denmark', 'blue'),
-    makeCircle('copenhagen', 'Copenhagen', 'CPH', -214, 600, 80, 'denmark', 'denmark', 'green'),
+    makeCircle('pandora', 'Pandora', 'P', -26, 800, 78, 'denmark', 'denmark', 'red'),
+    makeCircle('lego', 'LEGO', 'LG', -190, 565, 62, 'denmark', 'denmark', 'amber'),
+    makeCircle('maersk', 'Maersk', 'MA', 150, 560, 62, 'denmark', 'denmark', 'blue'),
+    makeCircle('copenhagen', 'Copenhagen', 'CPH', -230, 770, 66, 'denmark', 'denmark', 'green'),
 
-    makeCircle('yandex', 'Yandex', 'YA', 666, -116, 82, 'russia', 'russia', 'amber'),
-    makeCircle('avito', 'Avito', 'AV', 692, 122, 82, 'russia', 'russia', 'green'),
-    makeCircle('media-ru', 'Media', 'TV', 464, 142, 72, 'russia', 'russia', 'violet'),
-    makeCircle('moscow', 'Moscow', 'MSK', 462, -150, 82, 'russia', 'russia', 'blue'),
+    makeCircle('yandex', 'Yandex', 'YA', 840, -130, 68, 'russia', 'russia', 'amber'),
+    makeCircle('avito', 'Avito', 'AV', 858, 150, 68, 'russia', 'russia', 'green'),
+    makeCircle('media-ru', 'Media', 'TV', 600, 170, 62, 'russia', 'russia', 'violet'),
+    makeCircle('moscow', 'Moscow', 'MSK', 600, -170, 66, 'russia', 'russia', 'blue'),
 
-    makeCircle('usa-canada', 'US / Canada', 'NA', -660, -30, 92, 'other', 'other', 'blue'),
-    makeCircle('israel', 'Israel', 'IL', -458, -122, 74, 'other', 'other', 'blue'),
-    makeCircle('japan', 'Japan', 'JP', -404, 118, 70, 'other', 'other', 'red'),
-    makeCircle('singapore', 'Singapore', 'SG', -584, 172, 72, 'other', 'other', 'green'),
+    makeCircle('usa-canada', 'US / Canada', 'NA', -890, -40, 72, 'other', 'other', 'blue'),
+    makeCircle('israel', 'Israel', 'IL', -650, -150, 62, 'other', 'other', 'blue'),
+    makeCircle('japan', 'Japan', 'JP', -595, 150, 62, 'other', 'other', 'red'),
+    makeCircle('singapore', 'Singapore', 'SG', -780, 200, 62, 'other', 'other', 'green'),
   ]
 
   const people: PersonNode[] = [
@@ -2670,53 +2768,46 @@ function createDemoGraphState(): GraphState {
     makePerson('me-b', 'Mira', 'Research', 38, -10, 'you', 'MI'),
     makePerson('me-c', 'Noah', 'Advisor', 8, 60, 'you', 'NO'),
 
-    makePerson('se-1', 'Elin', 'IKEA growth', -106, -585, 'sweden', 'EL'),
-    makePerson('se-2', 'Jonas', 'Fintech', -36, -540, 'sweden', 'JO'),
-    makePerson('fr-1', 'Camille', 'Policy', 60, -532, 'france', 'CA'),
-    makePerson('fr-2', 'Louis', 'Climate tech', 124, -482, 'france', 'LO'),
-    makePerson('de-1', 'Hanna', 'Operations', -8, -350, 'germany', 'HA'),
-    makePerson('de-2', 'Felix', 'Investor', 76, -306, 'germany', 'FE'),
-    makePerson('nl-1', 'Sanne', 'Marketplace', -166, -408, 'netherlands', 'SA'),
-    makePerson('nl-2', 'Milan', 'Logistics', -98, -356, 'netherlands', 'MI'),
+    makePerson('se-1', 'Elin', 'IKEA growth', -126, -740, 'sweden', 'EL'),
+    makePerson('se-2', 'Jonas', 'Fintech', -58, -698, 'sweden', 'JO'),
+    makePerson('fr-1', 'Camille', 'Policy', 78, -682, 'france', 'CA'),
+    makePerson('fr-2', 'Louis', 'Climate tech', 146, -636, 'france', 'LO'),
+    makePerson('de-1', 'Hanna', 'Operations', 6, -486, 'germany', 'HA'),
+    makePerson('de-2', 'Felix', 'Investor', 74, -440, 'germany', 'FE'),
+    makePerson('nl-1', 'Sanne', 'Marketplace', -192, -532, 'netherlands', 'SA'),
+    makePerson('nl-2', 'Milan', 'Logistics', -126, -488, 'netherlands', 'MI'),
 
-    makePerson('pan-1', 'Freja', 'Product', -80, 626, 'pandora', 'FR', true),
-    makePerson('pan-2', 'Sofie', 'Brand', -28, 602, 'pandora', 'SO'),
-    makePerson('pan-3', 'Mads', 'Retail', 24, 642, 'pandora', 'MA'),
-    makePerson('pan-4', 'Nikolaj', 'Data', -8, 696, 'pandora', 'NI'),
-    makePerson('lego-1', 'Liva', 'Partnerships', -198, 406, 'lego', 'LI'),
-    makePerson('lego-2', 'Oscar', 'Design lead', -136, 448, 'lego', 'OC'),
-    makePerson('maersk-1', 'Aksel', 'Shipping', 98, 396, 'maersk', 'AK'),
-    makePerson('maersk-2', 'Ida', 'Strategy', 166, 438, 'maersk', 'ID'),
-    makePerson('cph-1', 'Nora', 'Community', -248, 584, 'copenhagen', 'NO'),
-    makePerson('cph-2', 'Viktor', 'AI builder', -180, 622, 'copenhagen', 'VI'),
+    makePerson('pan-1', 'Freja', 'Product', -70, 784, 'pandora', 'FR', true),
+    makePerson('pan-2', 'Sofie', 'Brand', -26, 752, 'pandora', 'SO'),
+    makePerson('pan-3', 'Mads', 'Retail', 22, 792, 'pandora', 'MA'),
+    makePerson('pan-4', 'Nikolaj', 'Data', -4, 846, 'pandora', 'NI'),
+    makePerson('lego-1', 'Liva', 'Partnerships', -220, 545, 'lego', 'LI'),
+    makePerson('lego-2', 'Oscar', 'Design lead', -162, 590, 'lego', 'OC'),
+    makePerson('maersk-1', 'Aksel', 'Shipping', 120, 540, 'maersk', 'AK'),
+    makePerson('maersk-2', 'Ida', 'Strategy', 178, 584, 'maersk', 'ID'),
+    makePerson('cph-1', 'Nora', 'Community', -260, 748, 'copenhagen', 'NO'),
+    makePerson('cph-2', 'Viktor', 'AI builder', -202, 792, 'copenhagen', 'VI'),
 
-    makePerson('yan-1', 'Dmitry', 'Search', 628, -140, 'yandex', 'DM'),
-    makePerson('yan-2', 'Irina', 'Maps', 700, -100, 'yandex', 'IR'),
-    makePerson('avi-1', 'Oleg', 'Marketplace', 650, 96, 'avito', 'OL', true),
-    makePerson('avi-2', 'Anya', 'Trust', 728, 138, 'avito', 'AN'),
-    makePerson('med-1', 'Vera', 'Journalist', 430, 124, 'media-ru', 'VE'),
-    makePerson('med-2', 'Pavel', 'Analyst', 498, 164, 'media-ru', 'PA'),
-    makePerson('msk-1', 'Katya', 'VC', 426, -178, 'moscow', 'KA'),
-    makePerson('msk-2', 'Sergey', 'Founder', 498, -130, 'moscow', 'SE'),
+    makePerson('yan-1', 'Dmitry', 'Search', 812, -154, 'yandex', 'DM'),
+    makePerson('yan-2', 'Irina', 'Maps', 874, -110, 'yandex', 'IR'),
+    makePerson('avi-1', 'Oleg', 'Marketplace', 830, 128, 'avito', 'OL', true),
+    makePerson('avi-2', 'Anya', 'Trust', 892, 174, 'avito', 'AN'),
+    makePerson('med-1', 'Vera', 'Journalist', 572, 148, 'media-ru', 'VE'),
+    makePerson('med-2', 'Pavel', 'Analyst', 632, 192, 'media-ru', 'PA'),
+    makePerson('msk-1', 'Katya', 'VC', 570, -194, 'moscow', 'KA'),
+    makePerson('msk-2', 'Sergey', 'Founder', 632, -150, 'moscow', 'SE'),
 
-    makePerson('na-1', 'Grace', 'Canada', -704, -56, 'usa-canada', 'GR'),
-    makePerson('na-2', 'Ethan', 'US sales', -634, -10, 'usa-canada', 'ET'),
-    makePerson('il-1', 'Yael', 'Cybersecurity', -490, -146, 'israel', 'YA'),
-    makePerson('il-2', 'Ari', 'Investor', -426, -104, 'israel', 'AR'),
-    makePerson('jp-1', 'Ren', 'Robotics', -438, 94, 'japan', 'RE'),
-    makePerson('jp-2', 'Yuki', 'Enterprise', -374, 138, 'japan', 'YU'),
-    makePerson('sg-1', 'Mei', 'APAC ops', -618, 150, 'singapore', 'ME'),
-    makePerson('sg-2', 'Kai', 'Fintech', -552, 194, 'singapore', 'KA'),
+    makePerson('na-1', 'Grace', 'Canada', -924, -62, 'usa-canada', 'GR'),
+    makePerson('na-2', 'Ethan', 'US sales', -858, -18, 'usa-canada', 'ET'),
+    makePerson('il-1', 'Yael', 'Cybersecurity', -680, -174, 'israel', 'YA'),
+    makePerson('il-2', 'Ari', 'Investor', -622, -130, 'israel', 'AR'),
+    makePerson('jp-1', 'Ren', 'Robotics', -622, 126, 'japan', 'RE'),
+    makePerson('jp-2', 'Yuki', 'Enterprise', -566, 172, 'japan', 'YU'),
+    makePerson('sg-1', 'Mei', 'APAC ops', -808, 178, 'singapore', 'ME'),
+    makePerson('sg-2', 'Kai', 'Fintech', -750, 222, 'singapore', 'KA'),
   ]
 
-  const connections: Connection[] = [
-    { id: 'conn-freja-oleg', fromId: 'pan-1', toId: 'avi-1' },
-    { id: 'conn-artem-camille', fromId: 'me-a', toId: 'fr-1' },
-    { id: 'conn-noah-grace', fromId: 'me-c', toId: 'na-1' },
-    { id: 'conn-pandora-avito', fromId: 'pandora', toId: 'avito' },
-    { id: 'conn-eu-russia', fromId: 'eu', toId: 'russia' },
-    { id: 'conn-denmark-other', fromId: 'denmark', toId: 'other' },
-  ]
+  const connections: Connection[] = []
 
   return { circles, people, connections }
 }

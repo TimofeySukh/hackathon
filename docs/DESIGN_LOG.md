@@ -17,6 +17,18 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-12 — Tighter Demo Graph Spacing
+
+- Decision: Demo data no longer ships with ad hoc person-to-person/custom links; only
+  membership lines and circle hierarchy links are visible by default. Region clusters are
+  positioned farther apart, while small nested circles use smaller radii.
+- Layout: reduced the people collision and containment radii so a two-person circle grows
+  only slightly beyond the avatar diameter instead of expanding from a large fixed buffer.
+- Demo editing: demo mode keeps chrome hidden but allows canvas selection, Backspace/Delete
+  deletion, visible connector handles, circle-center link creation when center behavior is
+  set to "Draw connection", and direct connected-circle creation when a circle-center drag
+  ends on empty space. Settings also exposes separate circle-label and person-name toggles.
+
 ### 2026-06-12 — Demo Mode and Readable Canvas Links
 
 - Decision: Added a settings-driven demo mode for the board. It hides the toolbar brand,

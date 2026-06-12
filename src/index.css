@@ -276,6 +276,10 @@ svg {
   cursor: grabbing;
 }
 
+.graph-surface:focus {
+  outline: none;
+}
+
 .board-canvas-layer {
   position: absolute;
   inset: 0;
