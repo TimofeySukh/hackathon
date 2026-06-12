@@ -104,6 +104,9 @@ type SelectedItem =
     }
   | null
 
+type CircleShapeMode = 'circles' | 'figures'
+type CircleFillMode = 'transparent' | 'solid'
+
 type BoardHit =
   | { type: 'circle-center'; circle: CircleNode }
   | { type: 'circle-edge'; circle: CircleNode }
@@ -322,6 +325,8 @@ function App() {
   const [demoMode, setDemoMode] = useState(false)
   const [showCircleLabels, setShowCircleLabels] = useState(true)
   const [showPersonLabels, setShowPersonLabels] = useState(true)
+  const [circleShapeMode, setCircleShapeMode] = useState<CircleShapeMode>('circles')
+  const [circleFillMode, setCircleFillMode] = useState<CircleFillMode>('transparent')
   const [centerBehavior, setCenterBehavior] = useState<'connect' | 'move'>('connect')
   const [hoveredConnId, setHoveredConnId] = useState<string | null>(null)
   const [openNotesPersonId, setOpenNotesPersonId] = useState<string | null>(null)
@@ -632,9 +637,10 @@ function App() {
         hoveredPersonId,
         hoveredConnId,
         connector,
-        demoMode,
         showCircleLabels,
         showPersonLabels,
+        circleShapeMode,
+        circleFillMode,
       )
     }
   }
@@ -716,11 +722,24 @@ function App() {
       hoveredPersonId,
       hoveredConnId,
       connector,
-      demoMode,
       showCircleLabels,
       showPersonLabels,
+      circleShapeMode,
+      circleFillMode,
     )
-  }, [camera, viewport, boardIndex, selectedItem, hoveredPersonId, hoveredConnId, connector, demoMode, showCircleLabels, showPersonLabels])
+  }, [
+    camera,
+    viewport,
+    boardIndex,
+    selectedItem,
+    hoveredPersonId,
+    hoveredConnId,
+    connector,
+    showCircleLabels,
+    showPersonLabels,
+    circleShapeMode,
+    circleFillMode,
+  ])
 
   useEffect(() => {
     const surface = surfaceRef.current
@@ -1291,6 +1310,21 @@ function App() {
     }))
   }
 
+  function applyCircleShapeMode(nextMode: CircleShapeMode) {
+    setCircleShapeMode(nextMode)
+    if (nextMode !== 'figures') return
+
+    setGraph((current) => ({
+      ...current,
+      circles: current.circles.map((circle) => ({
+        ...circle,
+        shapeType: 'wavy',
+        sides: circle.sides ?? Math.max(8, Math.round(circle.radius / 10)),
+        amplitude: Math.max(4, circle.amplitude && circle.amplitude > 0 ? circle.amplitude : Math.round(circle.radius * 0.055)),
+      })),
+    }))
+  }
+
   function handleImageUpload(event: React.ChangeEvent<HTMLInputElement>, onComplete: (base64: string) => void) {
     const file = event.target.files?.[0]
     if (!file) return
@@ -1362,6 +1396,44 @@ function App() {
                 }}
               />
             </label>
+            <div className="inspector-field">
+              <label>Circle shape</label>
+              <div className="m3-segmented-button">
+                <button
+                  type="button"
+                  className={`m3-segmented-button-item ${circleShapeMode === 'circles' ? 'is-selected' : ''}`}
+                  onClick={() => applyCircleShapeMode('circles')}
+                >
+                  Circles
+                </button>
+                <button
+                  type="button"
+                  className={`m3-segmented-button-item ${circleShapeMode === 'figures' ? 'is-selected' : ''}`}
+                  onClick={() => applyCircleShapeMode('figures')}
+                >
+                  Figures
+                </button>
+              </div>
+            </div>
+            <div className="inspector-field">
+              <label>Circle fill</label>
+              <div className="m3-segmented-button">
+                <button
+                  type="button"
+                  className={`m3-segmented-button-item ${circleFillMode === 'transparent' ? 'is-selected' : ''}`}
+                  onClick={() => setCircleFillMode('transparent')}
+                >
+                  Transparent
+                </button>
+                <button
+                  type="button"
+                  className={`m3-segmented-button-item ${circleFillMode === 'solid' ? 'is-selected' : ''}`}
+                  onClick={() => setCircleFillMode('solid')}
+                >
+                  Solid
+                </button>
+              </div>
+            </div>
             <label className="m3-switch-row">
               <span>Circle labels</span>
               <input
@@ -2294,9 +2366,10 @@ function drawBoardLayer(
   hoveredPersonId: string | null,
   hoveredConnId: string | null,
   connector: DragConnector | null,
-  demoMode: boolean,
   showCircleLabels: boolean,
   showPersonLabels: boolean,
+  circleShapeMode: CircleShapeMode,
+  circleFillMode: CircleFillMode,
 ) {
   const { dpr, width, height } = resizeCanvas(canvas, surface)
   const ctx = canvas.getContext('2d')
@@ -2315,11 +2388,11 @@ function drawBoardLayer(
   ctx.translate(camera.x, camera.y)
   ctx.scale(camera.scale, camera.scale)
 
-  drawCircleFills(ctx, visibleCircles, selectedItem, camera.scale, demoMode)
+  drawCircleFills(ctx, visibleCircles, selectedItem, camera.scale, circleShapeMode, circleFillMode)
   drawCircleEdges(ctx, visibleCircles, index, camera.scale)
   drawPersonEdges(ctx, visiblePeople, index, camera.scale)
   drawCustomConnections(ctx, visiblePeopleIds, visibleCircleIds, index, selectedItem, hoveredConnId, camera.scale)
-  drawCircleDetails(ctx, visibleCircles, camera.scale, demoMode, showCircleLabels)
+  drawCircleDetails(ctx, visibleCircles, camera.scale, circleFillMode, showCircleLabels)
   drawPeople(ctx, visiblePeople, index, selectedItem, hoveredPersonId, camera.scale, dpr, showPersonLabels)
   if (connector) drawConnector(ctx, connector, camera.scale)
   drawSelectionHandles(ctx, selectedItem, index, camera.scale)
@@ -2385,17 +2458,25 @@ function drawCustomConnections(
   }
 }
 
-function drawCircleFills(ctx: CanvasRenderingContext2D, circles: CircleNode[], selectedItem: SelectedItem, scale: number, demoMode: boolean) {
+function drawCircleFills(
+  ctx: CanvasRenderingContext2D,
+  circles: CircleNode[],
+  selectedItem: SelectedItem,
+  scale: number,
+  circleShapeMode: CircleShapeMode,
+  circleFillMode: CircleFillMode,
+) {
+  const isTransparent = circleFillMode === 'transparent'
   for (const circle of circles) {
     const tone = MATERIAL_TONES[circle.tone]
-    const path = new Path2D(getCircleRenderPath(circle, demoMode))
+    const path = new Path2D(getCircleRenderPath(circle, circleShapeMode))
     ctx.save()
-    if (!demoMode) {
+    if (!isTransparent) {
       ctx.shadowColor = 'rgba(0,0,0,0.06)'
       ctx.shadowBlur = 16 / scale
       ctx.shadowOffsetY = 8 / scale
     }
-    ctx.globalAlpha = demoMode ? 0.34 : 1
+    ctx.globalAlpha = isTransparent ? 0.34 : 1
     ctx.fillStyle = tone.fill
     ctx.fill(path)
     ctx.restore()
@@ -2405,8 +2486,8 @@ function drawCircleFills(ctx: CanvasRenderingContext2D, circles: CircleNode[], s
     ctx.lineWidth =
       selectedItem?.type === 'circle' && selectedItem.id === circle.id
         ? Math.max(3.5 / scale, 2)
-        : Math.max((demoMode ? 2.2 : 1.4) / scale, demoMode ? 1.4 : 0.9)
-    if (demoMode) ctx.setLineDash([8 / scale, 7 / scale])
+        : Math.max((isTransparent ? 2.2 : 1.4) / scale, isTransparent ? 1.4 : 0.9)
+    if (isTransparent) ctx.setLineDash([8 / scale, 7 / scale])
     ctx.stroke(path)
     ctx.restore()
   }
@@ -2416,34 +2497,34 @@ function drawCircleDetails(
   ctx: CanvasRenderingContext2D,
   circles: CircleNode[],
   scale: number,
-  demoMode: boolean,
+  circleFillMode: CircleFillMode,
   showCircleLabels: boolean,
 ) {
   for (const circle of circles) {
     if (showCircleLabels) drawCircleLabel(ctx, circle, scale)
-    drawCircleCenter(ctx, circle, scale, demoMode)
+    drawCircleCenter(ctx, circle, scale, circleFillMode)
   }
 }
 
-function getCircleRenderPath(circle: CircleNode, demoMode: boolean) {
+function getCircleRenderPath(circle: CircleNode, circleShapeMode: CircleShapeMode) {
   return getNodePath(
     circle.x,
     circle.y,
     circle.radius,
-    demoMode ? 'circle' : circle.shapeType ?? 'wavy',
-    demoMode ? 80 : circle.sides ?? Math.max(8, Math.round(circle.radius / 10)),
-    demoMode ? 0 : circle.amplitude ?? Math.max(4, circle.radius * 0.06),
+    circleShapeMode === 'circles' ? 'circle' : circle.shapeType ?? 'wavy',
+    circleShapeMode === 'circles' ? 80 : circle.sides ?? Math.max(8, Math.round(circle.radius / 10)),
+    circleShapeMode === 'circles' ? 0 : circle.amplitude ?? Math.max(4, circle.radius * 0.06),
   )
 }
 
-function drawCircleCenter(ctx: CanvasRenderingContext2D, circle: CircleNode, scale: number, demoMode: boolean) {
+function drawCircleCenter(ctx: CanvasRenderingContext2D, circle: CircleNode, scale: number, circleFillMode: CircleFillMode) {
   const tone = MATERIAL_TONES[circle.tone]
   const radius = CIRCLE_CENTER_RADIUS
   ctx.save()
   ctx.beginPath()
   ctx.arc(circle.x, circle.y, radius, 0, Math.PI * 2)
   ctx.fillStyle = tone.centerBg
-  ctx.globalAlpha = demoMode ? 0.92 : 1
+  ctx.globalAlpha = circleFillMode === 'transparent' ? 0.92 : 1
   ctx.fill()
   ctx.lineWidth = Math.max(3 / scale, 2)
   ctx.strokeStyle = '#ffffff'
@@ -2808,9 +2889,9 @@ function makeCircle(
     parentId,
     connectedTo,
     tone,
-    shapeType: 'circle',
-    sides: Math.max(24, Math.round(radius / 8)),
-    amplitude: 0,
+    shapeType: 'wavy',
+    sides: Math.max(8, Math.round(radius / 10)),
+    amplitude: Math.max(4, Math.round(radius * 0.055)),
   }
 }
 

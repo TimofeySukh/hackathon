@@ -22,6 +22,9 @@ rediscover, write it here.
 - Decision: Demo data no longer ships with ad hoc person-to-person/custom links; only
   membership lines and circle hierarchy links are visible by default. Region clusters are
   positioned farther apart, while small nested circles use smaller radii.
+- Design controls: Settings now has global segmented controls for `Circle shape`
+  (simple circles vs stored figure shapes) and `Circle fill` (translucent/dashed vs solid).
+  Demo mode only controls chrome visibility; it no longer owns the visual style.
 - Layout: reduced the people collision and containment radii so a two-person circle grows
   only slightly beyond the avatar diameter instead of expanding from a large fixed buffer.
 - Demo editing: demo mode keeps chrome hidden but allows canvas selection, Backspace/Delete

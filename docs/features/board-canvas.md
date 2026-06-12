@@ -35,6 +35,12 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
 - **Labels**: Settings includes separate toggles for circle labels and person names.
   Circle-center icon text scales with the world transform like people avatars; labels use
   the same screen-readable label treatment as person names.
+- **Circle design**: Settings includes two segmented controls for the global circle
+  rendering style. `Circle shape` switches between simple circular regions and the stored
+  figure shapes; choosing `Figures` also converts all current circles to wavy figure
+  styles so the seeded demo data changes immediately. `Circle fill` switches between the
+  demo-style translucent/dashed regions and solid filled regions. These controls work in
+  normal mode and demo mode.
 - **Favorite**: a person can be starred; favorited people get a thicker neon-yellow
   outline on the canvas.
 - **Collision rules**: people repel other people in their owning circle and the center
@@ -54,8 +60,8 @@ This is the most Material-3-aligned part of the app today; keep it that way.
   that tone's on-container value.
 - **Shapes**: nodes render as `wavy` (flower), soft `polygon`, or `circle` via
   `getNodePath`; circles default to `wavy`, people to `polygon`. Sides and amplitude are
-  per-node and adjustable in the inspector. Demo mode temporarily renders every circle as
-  a simple translucent circle with a persistent dashed outline, regardless of stored shape.
+  per-node and adjustable in the inspector. The global `Circle shape` setting can
+  temporarily render every circle as a simple circle without changing stored node styles.
 - **Surfaces**: node labels draw inside the Canvas 2D board layer, while the help/stress
   panels float above the grid background. Selection is shown by a stronger border/state,
   not a color swap.
