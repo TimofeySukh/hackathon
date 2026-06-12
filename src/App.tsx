@@ -52,7 +52,7 @@ export type PersonNode = {
   imageUrl?: string
   isFavorite?: boolean
   notes?: PersonNote[]
-  tag?: CircleTone
+  tag?: string
 }
 
 export type Connection = {
@@ -192,10 +192,12 @@ const MATERIAL_TONES: Record<CircleTone, { fill: string; border: string; text: s
   violet: { fill: '#EADDFF', border: '#6750A4', text: '#21005D', centerBg: '#7F67BE' },
 }
 
-const TOP_BAR_TAGS: Array<{ id: CircleTone; name: string }> = [
-  { id: 'red', name: 'Work' },
-  { id: 'blue', name: 'Friends' },
-  { id: 'green', name: 'Family' },
+type UserTag = { id: string; name: string; color: string }
+
+const DEFAULT_TAGS: UserTag[] = [
+  { id: 'tag-work', name: 'Work', color: '#C00015' },
+  { id: 'tag-friends', name: 'Friends', color: '#00629D' },
+  { id: 'tag-family', name: 'Family', color: '#1E824A' },
 ]
 
 function getNodePath(
@@ -354,6 +356,7 @@ function App() {
   const [isLinkedInGuideOpen, setIsLinkedInGuideOpen] = useState(false)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
+  const [tags, setTags] = useState<UserTag[]>(DEFAULT_TAGS)
   const [hiddenTagIds, setHiddenTagIds] = useState<Record<string, boolean>>({})
   const [isTagPickerOpen, setIsTagPickerOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -374,6 +377,8 @@ function App() {
   const linkedInMenuRef = useRef<HTMLDivElement>(null)
   const searchPanelRef = useRef<HTMLDivElement>(null)
   const accountPanelRef = useRef<HTMLDivElement>(null)
+  const inspectorRef = useRef<HTMLElement>(null)
+  const tagPickerMenuRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function handleLinkedInImport(event: React.ChangeEvent<HTMLInputElement>) {
@@ -571,7 +576,7 @@ function App() {
     }
   }
 
-  function setPersonTag(personId: string, tag: CircleTone | undefined) {
+  function setPersonTag(personId: string, tag: string | undefined) {
     setGraph((current) => ({
       ...current,
       people: current.people.map((p) => p.id === personId ? { ...p, tag } : p),
@@ -736,7 +741,11 @@ function App() {
       setIsLinkedInGuideOpen(false)
       setIsSearchOpen(false)
       setIsAccountMenuOpen(false)
-      setIsTagPickerOpen(false)
+
+      // only close tag picker when clicking outside the inspector entirely
+      if (!inspectorRef.current?.contains(target)) {
+        setIsTagPickerOpen(false)
+      }
     }
     document.addEventListener('pointerdown', handleOutsideClick)
     return () => {
@@ -1742,7 +1751,7 @@ function App() {
     reader.readAsDataURL(file)
   }
 
-  const areAllTagsVisible = TOP_BAR_TAGS.every((tag) => !hiddenTagIds[tag.id])
+  const areAllTagsVisible = tags.every((tag) => !hiddenTagIds[tag.id])
   const searchResults = searchQuery.trim()
     ? graph.people
         .filter((person) => {
@@ -1763,7 +1772,7 @@ function App() {
   function toggleAllTagsInMenu() {
     setHiddenTagIds(
       areAllTagsVisible
-        ? Object.fromEntries(TOP_BAR_TAGS.map((tag) => [tag.id, true]))
+        ? Object.fromEntries(tags.map((tag) => [tag.id, true]))
         : {},
     )
   }
@@ -1825,23 +1834,36 @@ function App() {
                 </div>
 
                 <div className="tags-menu__list">
-                  {TOP_BAR_TAGS.map((tag) => {
-                    const color = MATERIAL_TONES[tag.id].centerBg
+                  {tags.map((tag) => {
                     const isVisible = !hiddenTagIds[tag.id]
                     return (
                       <div key={tag.id} className="tags-menu__item">
-                        <button
-                          type="button"
+                        <label
                           className="tags-menu__swatch"
-                          style={{ '--tag-color': color } as CSSProperties}
+                          style={{ '--tag-color': tag.color } as CSSProperties}
                           aria-label={`Change ${tag.name} color`}
+                          title="Click to change color"
                         >
+                          <input
+                            type="color"
+                            className="tags-menu__swatch-input"
+                            value={tag.color}
+                            onChange={(e) =>
+                              setTags((prev) =>
+                                prev.map((t) => t.id === tag.id ? { ...t, color: e.target.value } : t)
+                              )
+                            }
+                          />
                           <span className="tags-menu__swatch-core" aria-hidden="true" />
-                        </button>
+                        </label>
                         <input
                           className="tags-menu__name-input"
                           value={tag.name}
-                          readOnly
+                          onChange={(e) =>
+                            setTags((prev) =>
+                              prev.map((t) => t.id === tag.id ? { ...t, name: e.target.value } : t)
+                            )
+                          }
                           aria-label={`Rename ${tag.name} tag`}
                         />
                         <button
@@ -1857,6 +1879,15 @@ function App() {
                           type="button"
                           className="tags-menu__delete"
                           aria-label={`Delete ${tag.name} tag`}
+                          onClick={() => {
+                            setTags((prev) => prev.filter((t) => t.id !== tag.id))
+                            setGraph((current) => ({
+                              ...current,
+                              people: current.people.map((p) =>
+                                p.tag === tag.id ? { ...p, tag: undefined } : p
+                              ),
+                            }))
+                          }}
                         >
                           ×
                         </button>
@@ -1865,7 +1896,18 @@ function App() {
                   })}
                 </div>
 
-                <button type="button" className="tags-menu__new">
+                <button
+                  type="button"
+                  className="tags-menu__new"
+                  onClick={() => {
+                    const newTag: UserTag = {
+                      id: `tag-${Date.now()}`,
+                      name: 'New tag',
+                      color: '#6750A4',
+                    }
+                    setTags((prev) => [...prev, newTag])
+                  }}
+                >
                   + New tag
                 </button>
               </section>
@@ -2174,7 +2216,7 @@ function App() {
       )}
 
       {!demoMode && selectedItem && (
-      <aside className="inspector" aria-label="Selection details" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 120px)' }}>
+      <aside ref={inspectorRef} className="inspector" aria-label="Selection details" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 120px)' }}>
           <>
             <span className="inspector__eyebrow">
               {selectedItem.type === 'circle' ? 'Circle' : selectedItem.type === 'person' ? (
@@ -2348,51 +2390,50 @@ function App() {
             {selectedPerson && (
               <>
                 <div className="tag-picker">
-                  {selectedPerson.tag ? (
-                    <div className="tag-picker__chip-row">
+                  {(() => {
+                    const assignedTag = tags.find((t) => t.id === selectedPerson.tag)
+                    return assignedTag ? (
+                      <div className="tag-picker__chip-row">
+                        <button
+                          type="button"
+                          className="tag-picker__chip"
+                          style={{ '--tag-color': assignedTag.color } as CSSProperties}
+                          onClick={() => setIsTagPickerOpen((v) => !v)}
+                        >
+                          <span className="tag-picker__chip-dot" />
+                          <span className="tag-picker__chip-label">{assignedTag.name}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="tag-picker__chip-remove"
+                          aria-label="Remove tag"
+                          onClick={() => { setPersonTag(selectedPerson.id, undefined); setIsTagPickerOpen(false) }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ) : (
                       <button
                         type="button"
-                        className="tag-picker__chip"
-                        style={{ '--tag-color': MATERIAL_TONES[selectedPerson.tag].centerBg } as CSSProperties}
+                        className="tag-picker__trigger is-ghost"
                         onClick={() => setIsTagPickerOpen((v) => !v)}
                       >
-                        <span className="tag-picker__chip-dot" />
-                        <span className="tag-picker__chip-label">
-                          {TOP_BAR_TAGS.find((t) => t.id === selectedPerson.tag)?.name ?? selectedPerson.tag}
-                        </span>
+                        <span className="tag-picker__ghost-label">+ add tag</span>
                       </button>
-                      <button
-                        type="button"
-                        className="tag-picker__chip-remove"
-                        aria-label="Remove tag"
-                        onClick={() => { setPersonTag(selectedPerson.id, undefined); setIsTagPickerOpen(false) }}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      className="tag-picker__trigger is-ghost"
-                      onClick={() => setIsTagPickerOpen((v) => !v)}
-                    >
-                      <span className="tag-picker__ghost-label">+ add tag</span>
-                    </button>
-                  )}
+                    )
+                  })()}
 
                   {isTagPickerOpen && (
-                    <div className="tag-picker__menu">
-                      {TOP_BAR_TAGS.map((tag) => (
+                    <div ref={tagPickerMenuRef} className="tag-picker__menu">
+                      {tags.map((tag) => (
                         <button
                           key={tag.id}
                           type="button"
                           className={`tag-picker__option-row${selectedPerson.tag === tag.id ? ' is-selected' : ''}`}
+                          onPointerDown={(e) => e.stopPropagation()}
                           onClick={() => { setPersonTag(selectedPerson.id, tag.id); setIsTagPickerOpen(false) }}
                         >
-                          <span
-                            className="tag-picker__option-dot"
-                            style={{ background: MATERIAL_TONES[tag.id].centerBg }}
-                          />
+                          <span className="tag-picker__option-dot" style={{ background: tag.color }} />
                           <span className="tag-picker__option-label">{tag.name}</span>
                           {selectedPerson.tag === tag.id && <span className="tag-picker__option-check">✓</span>}
                         </button>
