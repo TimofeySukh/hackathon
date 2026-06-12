@@ -8,9 +8,10 @@ Current visible prototype behavior:
 
 - opens a full-window relationship circle graph
 - starts with `You` as the central source circle
-- includes seeded connected circles for EU friends, Pandora, and a market circle
-- includes a nested product-team subset inside Pandora
+- includes seeded connected region circles for EU, Denmark, Russia, and Other
+- includes nested country/company circles such as Sweden, France, Pandora, Avito, Yandex, US / Canada, and Japan
 - draws curved links from circle centers to circles and people
+- includes a settings-driven demo mode that hides the app chrome and leaves the canvas plus the settings button
 - includes a people load panel with a 0-10,000 generated-person slider, optional people edges, and live FPS
 - creates people, nested subset circles, or external connected circles from a circle context menu
 - supports Shift-drag from a circle center as a shortcut for creating from that center

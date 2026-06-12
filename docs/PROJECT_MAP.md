@@ -8,9 +8,10 @@ The current visible prototype is intentionally narrow:
 
 - a full-window relationship circle graph
 - a central `You` circle
-- seeded connected circles and nested subset circles
-- people placed inside parent circles or subsets
+- seeded connected region circles and nested country/company circles
+- people placed inside parent region, country, or company circles
 - curved Canvas 2D links from circle centers to people and circles
+- a settings-driven demo mode that hides chrome, menus, stress controls, help text, and the inspector while keeping the canvas and settings button
 - branch creation from a circle context menu or Shift-drag from a circle center
 - a create menu for choosing person, nested subset circle, or external connected circle
 - direct dragging for people and circle centers

@@ -165,133 +165,7 @@ const PERSON_CIRCLE_COLLISION_GAP = 14
 const CIRCLE_COLLISION_GAP = 20
 const COLLISION_PASSES = 10
 
-const DEFAULT_STATE: GraphState = {
-  circles: [
-    {
-      id: 'you',
-      name: 'You',
-      icon: 'YOU',
-      x: 0,
-      y: 0,
-      radius: 126,
-      minRadius: 126,
-      parentId: null,
-      connectedTo: null,
-      tone: 'blue',
-      shapeType: 'wavy',
-      sides: 12,
-      amplitude: 7,
-    },
-    {
-      id: 'eu-network',
-      name: 'EU friends',
-      icon: 'EU',
-      x: 36,
-      y: -430,
-      radius: 250,
-      minRadius: 250,
-      parentId: null,
-      connectedTo: 'you',
-      tone: 'blue',
-      shapeType: 'wavy',
-      sides: 25,
-      amplitude: 15,
-    },
-    {
-      id: 'pandora',
-      name: 'Pandora',
-      icon: 'P',
-      x: -48,
-      y: 450,
-      radius: 270,
-      minRadius: 270,
-      parentId: null,
-      connectedTo: 'you',
-      tone: 'red',
-      shapeType: 'wavy',
-      sides: 27,
-      amplitude: 16,
-    },
-    {
-      id: 'product-team',
-      name: 'Product team',
-      icon: 'PT',
-      x: -56,
-      y: 535,
-      radius: 78,
-      minRadius: 78,
-      parentId: 'pandora',
-      connectedTo: 'pandora',
-      tone: 'blue',
-      shapeType: 'wavy',
-      sides: 8,
-      amplitude: 5,
-    },
-    {
-      id: 'market',
-      name: 'Market circle',
-      icon: 'M',
-      x: 510,
-      y: 72,
-      radius: 236,
-      minRadius: 236,
-      parentId: null,
-      connectedTo: 'you',
-      tone: 'green',
-      shapeType: 'wavy',
-      sides: 23,
-      amplitude: 14,
-    },
-  ],
-  people: [
-    {
-      id: 'p1',
-      name: 'Mia',
-      role: 'Close friend',
-      x: -62,
-      y: -54,
-      circleId: 'you',
-      avatar: 'MI',
-      shapeType: 'wavy',
-      sides: 8,
-      amplitude: 1,
-      notes: [
-        { id: 'note-1', title: 'Gift ideas', body: 'Likes sci-fi books and matcha latte' },
-        { id: 'note-2', title: 'Meeting notes', body: 'Sync up next Tuesday about project timeline' }
-      ]
-    },
-    {
-      id: 'p2',
-      name: 'Noah',
-      role: 'Founder friend',
-      x: 58,
-      y: -6,
-      circleId: 'you',
-      avatar: 'NO',
-      shapeType: 'wavy',
-      sides: 10,
-      amplitude: 1,
-      notes: [
-        { id: 'note-3', title: 'Joint project', body: 'Wants to co-host a demo next month' }
-      ]
-    },
-    { id: 'p3', name: 'Ava', role: 'Design', x: 34, y: 67, circleId: 'you', avatar: 'AV', shapeType: 'wavy', sides: 11, amplitude: 1 },
-    { id: 'p4', name: 'Sofia', role: 'Portugal', x: 168, y: -472, circleId: 'eu-network', avatar: 'SO', shapeType: 'wavy', sides: 9, amplitude: 1 },
-    { id: 'p5', name: 'Lucas', role: 'Germany', x: 28, y: -610, circleId: 'eu-network', avatar: 'LU', shapeType: 'wavy', sides: 12, amplitude: 1 },
-    { id: 'p6', name: 'Emma', role: 'Finland', x: -112, y: -416, circleId: 'eu-network', avatar: 'EM', shapeType: 'wavy', sides: 8, amplitude: 1 },
-    { id: 'p7', name: 'Oscar', role: 'Denmark', x: 106, y: -302, circleId: 'eu-network', avatar: 'OC', shapeType: 'wavy', sides: 10, amplitude: 1 },
-    { id: 'p8', name: 'Olivia', role: 'Brand', x: -166, y: 335, circleId: 'pandora', avatar: 'OL', shapeType: 'wavy', sides: 11, amplitude: 1 },
-    { id: 'p9', name: 'Victor', role: 'Retail', x: 154, y: 360, circleId: 'pandora', avatar: 'VI', shapeType: 'wavy', sides: 9, amplitude: 1 },
-    { id: 'p10', name: 'Freja', role: 'Operations', x: -190, y: 575, circleId: 'pandora', avatar: 'FR', shapeType: 'wavy', sides: 12, amplitude: 1 },
-    { id: 'p11', name: 'Anton', role: 'PM', x: -92, y: 575, circleId: 'product-team', avatar: 'AN', shapeType: 'wavy', sides: 8, amplitude: 1 },
-    { id: 'p12', name: 'Nora', role: 'UX', x: -20, y: 591, circleId: 'product-team', avatar: 'NR', shapeType: 'wavy', sides: 10, amplitude: 1 },
-    { id: 'p13', name: 'Eli', role: 'Engineering', x: 50, y: 575, circleId: 'product-team', avatar: 'EL', shapeType: 'wavy', sides: 11, amplitude: 1 },
-    { id: 'p14', name: 'Karim', role: 'Investor', x: 645, y: -15, circleId: 'market', avatar: 'KA', shapeType: 'wavy', sides: 9, amplitude: 1 },
-    { id: 'p15', name: 'Lina', role: 'Media', x: 423, y: 4, circleId: 'market', avatar: 'LI', shapeType: 'wavy', sides: 12, amplitude: 1 },
-    { id: 'p16', name: 'Yara', role: 'Analyst', x: 580, y: 198, circleId: 'market', avatar: 'YA', shapeType: 'wavy', sides: 8, amplitude: 1 },
-  ],
-  connections: [],
-}
+const DEFAULT_STATE: GraphState = createDemoGraphState()
 
 const MATERIAL_TONES: Record<CircleTone, { fill: string; border: string; text: string; centerBg: string }> = {
   blue: { fill: '#D2E4FF', border: '#004A77', text: '#001D35', centerBg: '#00629D' },
@@ -445,6 +319,7 @@ function App() {
   const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight })
 
   const [showSettings, setShowSettings] = useState(false)
+  const [demoMode, setDemoMode] = useState(false)
   const [centerBehavior, setCenterBehavior] = useState<'connect' | 'move'>('connect')
   const [hoveredConnId, setHoveredConnId] = useState<string | null>(null)
   const [openNotesPersonId, setOpenNotesPersonId] = useState<string | null>(null)
@@ -736,7 +611,7 @@ function App() {
     const canvas = peopleCanvasRef.current
     const surface = surfaceRef.current
     if (canvas && surface) {
-      drawBoardLayer(canvas, surface, cam, boardIndex, selectedItem, hoveredPersonId, hoveredConnId, connector)
+      drawBoardLayer(canvas, surface, cam, boardIndex, selectedItem, hoveredPersonId, hoveredConnId, connector, demoMode)
     }
   }
 
@@ -808,8 +683,8 @@ function App() {
     const canvas = peopleCanvasRef.current
     const surface = surfaceRef.current
     if (!canvas || !surface) return
-    drawBoardLayer(canvas, surface, camera, boardIndex, selectedItem, hoveredPersonId, hoveredConnId, connector)
-  }, [camera, viewport, boardIndex, selectedItem, hoveredPersonId, hoveredConnId, connector])
+    drawBoardLayer(canvas, surface, camera, boardIndex, selectedItem, hoveredPersonId, hoveredConnId, connector, demoMode)
+  }, [camera, viewport, boardIndex, selectedItem, hoveredPersonId, hoveredConnId, connector, demoMode])
 
   useEffect(() => {
     const surface = surfaceRef.current
@@ -891,7 +766,7 @@ function App() {
   function handleSurfacePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     if (event.button !== 0) return
     event.currentTarget.setPointerCapture(event.pointerId)
-    setCreateMenu(null)
+    if (!demoMode) setCreateMenu(null)
     setOpenNotesPersonId(null)
 
     const hit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
@@ -899,20 +774,22 @@ function App() {
       y: event.clientY,
     })
 
-    if (hit?.type === 'connector-handle') {
+    if (!demoMode && hit?.type === 'connector-handle') {
       startConnector(event, hit.sourceId, hit.sourceType, hit.x, hit.y)
       return
     }
 
     if (hit?.type === 'person') {
+      setSelectedItem({ type: 'person', id: hit.person.id })
       startPersonMove(event, hit.person)
       return
     }
 
     if (hit?.type === 'circle-center') {
-      if (centerBehavior === 'connect') {
+      if (!demoMode && centerBehavior === 'connect') {
         startConnector(event, hit.circle.id, 'circle', hit.circle.x, hit.circle.y)
       } else {
+        setSelectedItem({ type: 'circle', id: hit.circle.id })
         startCircleMove(event, hit.circle)
       }
       return
@@ -929,7 +806,7 @@ function App() {
       return
     }
 
-    if (hit?.type === 'connection') {
+    if (!demoMode && hit?.type === 'connection') {
       setSelectedItem({ type: 'connection', id: hit.connection.id })
       return
     }
@@ -995,7 +872,7 @@ function App() {
       scheduleDrag()
     }
 
-    if (connector) {
+    if (!demoMode && connector) {
       const world = screenToWorld({ x: event.clientX, y: event.clientY })
       pendingConnectorRef.current = { ...connector, endX: world.x, endY: world.y }
       scheduleDrag()
@@ -1010,7 +887,7 @@ function App() {
       })
       const id = hit?.type === 'person' ? hit.person.id : null
       if (id !== hoveredPersonId) setHoveredPersonId(id)
-      const connId = hit?.type === 'connection' ? hit.connection.id : null
+      const connId = !demoMode && hit?.type === 'connection' ? hit.connection.id : null
       if (connId !== hoveredConnId) setHoveredConnId(connId)
     } else {
       if (hoveredPersonId) setHoveredPersonId(null)
@@ -1135,6 +1012,7 @@ function App() {
 
   function handleSurfaceContextMenu(event: ReactMouseEvent<HTMLDivElement>) {
     event.preventDefault()
+    if (demoMode) return
     const hit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
       x: event.clientX,
       y: event.clientY,
@@ -1389,13 +1267,17 @@ function App() {
   }
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell ${demoMode ? 'is-demo-mode' : ''}`}>
       <div className="toolbar" aria-label="Graph controls">
+        {!demoMode && (
         <div className="brand">
           <span className="brand__mark">DN</span>
           <span>Circle graph prototype</span>
         </div>
-        <div className="toolbar__group">
+        )}
+        <div className={`toolbar__group ${demoMode ? 'toolbar__group--demo' : ''}`}>
+          {!demoMode && (
+          <>
           <button type="button" onClick={() => setCamera((current) => ({ ...current, scale: clamp(current.scale * 1.14, MIN_SCALE, MAX_SCALE) }))} aria-label="Zoom in">
             <ZoomInIcon />
           </button>
@@ -1405,6 +1287,8 @@ function App() {
           <button type="button" onClick={resetDemo} aria-label="Reset demo">
             <ResetIcon />
           </button>
+          </>
+          )}
           <button
             ref={settingsButtonRef}
             type="button"
@@ -1429,6 +1313,18 @@ function App() {
             Settings
           </strong>
           <div style={{ marginTop: '12px', display: 'grid', gap: '8px' }}>
+            <label className="m3-switch-row">
+              <span>Demo mode</span>
+              <input
+                type="checkbox"
+                checked={demoMode}
+                onChange={(event) => {
+                  setDemoMode(event.target.checked)
+                  setCreateMenu(null)
+                  setConnector(null)
+                }}
+              />
+            </label>
             <label style={{ fontSize: '12px', fontWeight: 500, color: 'rgba(28, 37, 40, 0.64)' }}>
               Circle Center Drag Behavior
             </label>
@@ -1486,7 +1382,7 @@ function App() {
       )}
 
       {/* STRESS TEST — dev-only panel. Hidden when STRESS_TEST_ENABLED is false. */}
-      {STRESS_TEST_ENABLED && (
+      {!demoMode && STRESS_TEST_ENABLED && (
         <section className="stress-panel" aria-label="Performance stress test controls">
           <div className="stress-panel__header">
             <strong>Real-node stress</strong>
@@ -1555,6 +1451,7 @@ function App() {
         </section>
       )}
 
+      {!demoMode && (
       <section className="help-panel" aria-label="How to use the prototype">
         <strong>How it works</strong>
         <span>Drag people or circles to move them.</span>
@@ -1563,6 +1460,7 @@ function App() {
         <span>Shift-drag from a circle center to create from the center.</span>
         <span>Parent circles auto-fit their contents.</span>
       </section>
+      )}
 
       <div
         ref={surfaceRef}
@@ -1584,7 +1482,7 @@ function App() {
         <canvas ref={peopleCanvasRef} className="board-canvas-layer" aria-label="Relationship board" />
       </div>
 
-      {createMenu ? (
+      {!demoMode && createMenu ? (
         <div className="create-menu" style={menuPosition(createMenu)}>
           {createMenu.dragSourceType === 'person' ? (
             <>
@@ -1616,6 +1514,7 @@ function App() {
         </div>
       ) : null}
 
+      {!demoMode && (
       <aside className="inspector" aria-label="Selection details" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 120px)' }}>
         {selectedItem ? (
           <>
@@ -2090,6 +1989,7 @@ function App() {
           </div>
         )}
       </aside>
+      )}
     </main>
   )
 }
@@ -2331,6 +2231,7 @@ function drawBoardLayer(
   hoveredPersonId: string | null,
   hoveredConnId: string | null,
   connector: DragConnector | null,
+  demoMode: boolean,
 ) {
   const { dpr, width, height } = resizeCanvas(canvas, surface)
   const ctx = canvas.getContext('2d')
@@ -2349,21 +2250,22 @@ function drawBoardLayer(
   ctx.translate(camera.x, camera.y)
   ctx.scale(camera.scale, camera.scale)
 
-  drawCircleEdges(ctx, visibleCircles, index)
+  drawCircleFills(ctx, visibleCircles, selectedItem, camera.scale, demoMode)
+  drawCircleEdges(ctx, visibleCircles, index, camera.scale)
   drawPersonEdges(ctx, visiblePeople, index, camera.scale)
   drawCustomConnections(ctx, visiblePeopleIds, visibleCircleIds, index, selectedItem, hoveredConnId, camera.scale)
-  drawCircles(ctx, visibleCircles, selectedItem, camera.scale)
+  drawCircleDetails(ctx, visibleCircles, camera.scale, demoMode)
   drawPeople(ctx, visiblePeople, index, selectedItem, hoveredPersonId, camera.scale, dpr)
   if (connector) drawConnector(ctx, connector, camera.scale)
-  drawSelectionHandles(ctx, selectedItem, index, camera.scale)
+  if (!demoMode) drawSelectionHandles(ctx, selectedItem, index, camera.scale)
 
   ctx.restore()
 }
 
-function drawCircleEdges(ctx: CanvasRenderingContext2D, circles: CircleNode[], index: BoardIndex) {
+function drawCircleEdges(ctx: CanvasRenderingContext2D, circles: CircleNode[], index: BoardIndex, scale: number) {
   ctx.beginPath()
-  ctx.strokeStyle = '#b5b8b9'
-  ctx.lineWidth = 2
+  ctx.strokeStyle = 'rgba(71, 85, 105, 0.52)'
+  ctx.lineWidth = Math.max(2 / scale, 1.1)
   for (const circle of circles) {
     const source = circle.connectedTo ? index.circlesById.get(circle.connectedTo) : null
     if (!source) continue
@@ -2374,8 +2276,8 @@ function drawCircleEdges(ctx: CanvasRenderingContext2D, circles: CircleNode[], i
 
 function drawPersonEdges(ctx: CanvasRenderingContext2D, people: PersonNode[], index: BoardIndex, scale: number) {
   ctx.beginPath()
-  ctx.strokeStyle = 'rgba(120, 130, 138, 0.22)'
-  ctx.lineWidth = Math.max(0.8 / scale, 0.5)
+  ctx.strokeStyle = 'rgba(71, 85, 105, 0.28)'
+  ctx.lineWidth = Math.max(1.15 / scale, 0.7)
   for (const person of people) {
     const circle = index.circlesById.get(person.circleId)
     if (!circle) continue
@@ -2418,38 +2320,59 @@ function drawCustomConnections(
   }
 }
 
-function drawCircles(ctx: CanvasRenderingContext2D, circles: CircleNode[], selectedItem: SelectedItem, scale: number) {
+function drawCircleFills(ctx: CanvasRenderingContext2D, circles: CircleNode[], selectedItem: SelectedItem, scale: number, demoMode: boolean) {
   for (const circle of circles) {
     const tone = MATERIAL_TONES[circle.tone]
-    const path = new Path2D(getNodePath(circle.x, circle.y, circle.radius, circle.shapeType ?? 'wavy', circle.sides ?? Math.max(8, Math.round(circle.radius / 10)), circle.amplitude ?? Math.max(4, circle.radius * 0.06)))
+    const path = new Path2D(getCircleRenderPath(circle, demoMode))
     ctx.save()
-    ctx.shadowColor = 'rgba(0,0,0,0.06)'
-    ctx.shadowBlur = 16 / scale
-    ctx.shadowOffsetY = 8 / scale
+    if (!demoMode) {
+      ctx.shadowColor = 'rgba(0,0,0,0.06)'
+      ctx.shadowBlur = 16 / scale
+      ctx.shadowOffsetY = 8 / scale
+    }
+    ctx.globalAlpha = demoMode ? 0.34 : 1
     ctx.fillStyle = tone.fill
     ctx.fill(path)
     ctx.restore()
 
-    if (selectedItem?.type === 'circle' && selectedItem.id === circle.id) {
-      ctx.save()
-      ctx.strokeStyle = tone.border
-      ctx.lineWidth = Math.max(3.5 / scale, 2)
-      ctx.stroke(path)
-      ctx.restore()
-    }
-
-    drawCircleLabel(ctx, circle, scale)
-    drawCircleCenter(ctx, circle, scale)
+    ctx.save()
+    ctx.strokeStyle = tone.border
+    ctx.lineWidth =
+      selectedItem?.type === 'circle' && selectedItem.id === circle.id
+        ? Math.max(3.5 / scale, 2)
+        : Math.max((demoMode ? 2.2 : 1.4) / scale, demoMode ? 1.4 : 0.9)
+    if (demoMode) ctx.setLineDash([8 / scale, 7 / scale])
+    ctx.stroke(path)
+    ctx.restore()
   }
 }
 
-function drawCircleCenter(ctx: CanvasRenderingContext2D, circle: CircleNode, scale: number) {
+function drawCircleDetails(ctx: CanvasRenderingContext2D, circles: CircleNode[], scale: number, demoMode: boolean) {
+  for (const circle of circles) {
+    drawCircleLabel(ctx, circle, scale)
+    drawCircleCenter(ctx, circle, scale, demoMode)
+  }
+}
+
+function getCircleRenderPath(circle: CircleNode, demoMode: boolean) {
+  return getNodePath(
+    circle.x,
+    circle.y,
+    circle.radius,
+    demoMode ? 'circle' : circle.shapeType ?? 'wavy',
+    demoMode ? 80 : circle.sides ?? Math.max(8, Math.round(circle.radius / 10)),
+    demoMode ? 0 : circle.amplitude ?? Math.max(4, circle.radius * 0.06),
+  )
+}
+
+function drawCircleCenter(ctx: CanvasRenderingContext2D, circle: CircleNode, scale: number, demoMode: boolean) {
   const tone = MATERIAL_TONES[circle.tone]
   const radius = CIRCLE_CENTER_RADIUS
   ctx.save()
   ctx.beginPath()
   ctx.arc(circle.x, circle.y, radius, 0, Math.PI * 2)
   ctx.fillStyle = tone.centerBg
+  ctx.globalAlpha = demoMode ? 0.92 : 1
   ctx.fill()
   ctx.lineWidth = Math.max(3 / scale, 2)
   ctx.strokeStyle = '#ffffff'
@@ -2713,6 +2636,144 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value))
 }
 
+function createDemoGraphState(): GraphState {
+  const circles: CircleNode[] = [
+    makeCircle('you', 'You', 'YOU', 0, 0, 104, null, null, 'blue'),
+    makeCircle('eu', 'EU', 'EU', 0, -455, 286, null, 'you', 'blue'),
+    makeCircle('denmark', 'Denmark', 'DK', -28, 500, 276, null, 'you', 'red'),
+    makeCircle('russia', 'Russia', 'RU', 560, 8, 286, null, 'you', 'blue'),
+    makeCircle('other', 'Other', 'OT', -520, 30, 268, null, 'you', 'red'),
+
+    makeCircle('sweden', 'Sweden', 'SE', -70, -560, 76, 'eu', 'eu', 'blue'),
+    makeCircle('france', 'France', 'FR', 92, -505, 78, 'eu', 'eu', 'blue'),
+    makeCircle('germany', 'Germany', 'DE', 32, -330, 86, 'eu', 'eu', 'amber'),
+    makeCircle('netherlands', 'Netherlands', 'NL', -130, -382, 70, 'eu', 'eu', 'red'),
+
+    makeCircle('pandora', 'Pandora', 'P', -28, 646, 92, 'denmark', 'denmark', 'red'),
+    makeCircle('lego', 'LEGO', 'LG', -166, 424, 72, 'denmark', 'denmark', 'amber'),
+    makeCircle('maersk', 'Maersk', 'MA', 132, 418, 74, 'denmark', 'denmark', 'blue'),
+    makeCircle('copenhagen', 'Copenhagen', 'CPH', -214, 600, 80, 'denmark', 'denmark', 'green'),
+
+    makeCircle('yandex', 'Yandex', 'YA', 666, -116, 82, 'russia', 'russia', 'amber'),
+    makeCircle('avito', 'Avito', 'AV', 692, 122, 82, 'russia', 'russia', 'green'),
+    makeCircle('media-ru', 'Media', 'TV', 464, 142, 72, 'russia', 'russia', 'violet'),
+    makeCircle('moscow', 'Moscow', 'MSK', 462, -150, 82, 'russia', 'russia', 'blue'),
+
+    makeCircle('usa-canada', 'US / Canada', 'NA', -660, -30, 92, 'other', 'other', 'blue'),
+    makeCircle('israel', 'Israel', 'IL', -458, -122, 74, 'other', 'other', 'blue'),
+    makeCircle('japan', 'Japan', 'JP', -404, 118, 70, 'other', 'other', 'red'),
+    makeCircle('singapore', 'Singapore', 'SG', -584, 172, 72, 'other', 'other', 'green'),
+  ]
+
+  const people: PersonNode[] = [
+    makePerson('me-a', 'Artem', 'Founder', -46, -28, 'you', 'AR', true),
+    makePerson('me-b', 'Mira', 'Research', 38, -10, 'you', 'MI'),
+    makePerson('me-c', 'Noah', 'Advisor', 8, 60, 'you', 'NO'),
+
+    makePerson('se-1', 'Elin', 'IKEA growth', -106, -585, 'sweden', 'EL'),
+    makePerson('se-2', 'Jonas', 'Fintech', -36, -540, 'sweden', 'JO'),
+    makePerson('fr-1', 'Camille', 'Policy', 60, -532, 'france', 'CA'),
+    makePerson('fr-2', 'Louis', 'Climate tech', 124, -482, 'france', 'LO'),
+    makePerson('de-1', 'Hanna', 'Operations', -8, -350, 'germany', 'HA'),
+    makePerson('de-2', 'Felix', 'Investor', 76, -306, 'germany', 'FE'),
+    makePerson('nl-1', 'Sanne', 'Marketplace', -166, -408, 'netherlands', 'SA'),
+    makePerson('nl-2', 'Milan', 'Logistics', -98, -356, 'netherlands', 'MI'),
+
+    makePerson('pan-1', 'Freja', 'Product', -80, 626, 'pandora', 'FR', true),
+    makePerson('pan-2', 'Sofie', 'Brand', -28, 602, 'pandora', 'SO'),
+    makePerson('pan-3', 'Mads', 'Retail', 24, 642, 'pandora', 'MA'),
+    makePerson('pan-4', 'Nikolaj', 'Data', -8, 696, 'pandora', 'NI'),
+    makePerson('lego-1', 'Liva', 'Partnerships', -198, 406, 'lego', 'LI'),
+    makePerson('lego-2', 'Oscar', 'Design lead', -136, 448, 'lego', 'OC'),
+    makePerson('maersk-1', 'Aksel', 'Shipping', 98, 396, 'maersk', 'AK'),
+    makePerson('maersk-2', 'Ida', 'Strategy', 166, 438, 'maersk', 'ID'),
+    makePerson('cph-1', 'Nora', 'Community', -248, 584, 'copenhagen', 'NO'),
+    makePerson('cph-2', 'Viktor', 'AI builder', -180, 622, 'copenhagen', 'VI'),
+
+    makePerson('yan-1', 'Dmitry', 'Search', 628, -140, 'yandex', 'DM'),
+    makePerson('yan-2', 'Irina', 'Maps', 700, -100, 'yandex', 'IR'),
+    makePerson('avi-1', 'Oleg', 'Marketplace', 650, 96, 'avito', 'OL', true),
+    makePerson('avi-2', 'Anya', 'Trust', 728, 138, 'avito', 'AN'),
+    makePerson('med-1', 'Vera', 'Journalist', 430, 124, 'media-ru', 'VE'),
+    makePerson('med-2', 'Pavel', 'Analyst', 498, 164, 'media-ru', 'PA'),
+    makePerson('msk-1', 'Katya', 'VC', 426, -178, 'moscow', 'KA'),
+    makePerson('msk-2', 'Sergey', 'Founder', 498, -130, 'moscow', 'SE'),
+
+    makePerson('na-1', 'Grace', 'Canada', -704, -56, 'usa-canada', 'GR'),
+    makePerson('na-2', 'Ethan', 'US sales', -634, -10, 'usa-canada', 'ET'),
+    makePerson('il-1', 'Yael', 'Cybersecurity', -490, -146, 'israel', 'YA'),
+    makePerson('il-2', 'Ari', 'Investor', -426, -104, 'israel', 'AR'),
+    makePerson('jp-1', 'Ren', 'Robotics', -438, 94, 'japan', 'RE'),
+    makePerson('jp-2', 'Yuki', 'Enterprise', -374, 138, 'japan', 'YU'),
+    makePerson('sg-1', 'Mei', 'APAC ops', -618, 150, 'singapore', 'ME'),
+    makePerson('sg-2', 'Kai', 'Fintech', -552, 194, 'singapore', 'KA'),
+  ]
+
+  const connections: Connection[] = [
+    { id: 'conn-freja-oleg', fromId: 'pan-1', toId: 'avi-1' },
+    { id: 'conn-artem-camille', fromId: 'me-a', toId: 'fr-1' },
+    { id: 'conn-noah-grace', fromId: 'me-c', toId: 'na-1' },
+    { id: 'conn-pandora-avito', fromId: 'pandora', toId: 'avito' },
+    { id: 'conn-eu-russia', fromId: 'eu', toId: 'russia' },
+    { id: 'conn-denmark-other', fromId: 'denmark', toId: 'other' },
+  ]
+
+  return { circles, people, connections }
+}
+
+function makeCircle(
+  id: string,
+  name: string,
+  icon: string,
+  x: number,
+  y: number,
+  radius: number,
+  parentId: string | null,
+  connectedTo: string | null,
+  tone: CircleTone,
+): CircleNode {
+  return {
+    id,
+    name,
+    icon,
+    x,
+    y,
+    radius,
+    minRadius: radius,
+    parentId,
+    connectedTo,
+    tone,
+    shapeType: 'circle',
+    sides: Math.max(24, Math.round(radius / 8)),
+    amplitude: 0,
+  }
+}
+
+function makePerson(
+  id: string,
+  name: string,
+  role: string,
+  x: number,
+  y: number,
+  circleId: string,
+  avatar: string,
+  isFavorite = false,
+): PersonNode {
+  return {
+    id,
+    name,
+    role,
+    x,
+    y,
+    circleId,
+    avatar,
+    shapeType: 'circle',
+    sides: 10,
+    amplitude: 0,
+    isFavorite,
+  }
+}
+
 function createInitialGraph() {
   return ensureContainment({
     circles: DEFAULT_STATE.circles.map((circle) => ({
@@ -2730,7 +2791,7 @@ function createInitialGraph() {
         amplitude: person.amplitude ?? 2,
       }
     }),
-    connections: [],
+    connections: DEFAULT_STATE.connections.map((connection) => ({ ...connection })),
   })
 }
 

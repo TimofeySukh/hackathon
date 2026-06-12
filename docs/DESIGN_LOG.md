@@ -17,6 +17,19 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-12 — Demo Mode and Readable Canvas Links
+
+- Decision: Added a settings-driven demo mode for the board. It hides the toolbar brand,
+  zoom/reset controls, stress controls, help panel, create menu, inspector, connector
+  handles, and connection selection while leaving the canvas plus the settings button.
+- Why: demos need a presentation-clean view focused on moving/resizing circles and moving
+  people, without chrome appearing when a node is selected.
+- Rendering: circle fills now draw before relationship links, and circle details draw
+  after links. Demo mode renders circle regions as translucent simple circles with a
+  persistent dashed outline so links remain readable through large region areas.
+- Data: the default demo seed now uses region circles (EU, Denmark, Russia, Other), nested
+  country/company circles, and people arranged similarly to the current product demo map.
+
 ### 2026-06-12 — Chrome Migration to Material 3
 
 - Decision: Migrated all surrounding chrome surfaces (toolbar, settings panel, stress panel, help panel, create menu, inspector, note cards, buttons, and inputs) to match the Material 3 design spec.

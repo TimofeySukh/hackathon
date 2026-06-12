@@ -190,6 +190,34 @@ svg {
   background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
 }
 
+.app-shell.is-demo-mode .toolbar {
+  left: auto;
+  right: 16px;
+  width: auto;
+}
+
+.toolbar__group--demo {
+  border-radius: var(--md-r-full);
+}
+
+.m3-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 40px;
+  color: var(--md-on-surface);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.m3-switch-row input {
+  width: 44px;
+  height: 24px;
+  accent-color: var(--md-primary);
+  cursor: pointer;
+}
+
 .help-panel {
   position: absolute;
   z-index: 9;

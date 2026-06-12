@@ -25,6 +25,11 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   another node to draw a relationship link. A dashed draft edge previews the connection.
 - **Select**: click a circle, person, or connection to load it into the inspector for
   rename / styling / notes / delete.
+- **Demo mode**: the Settings panel includes a demo mode switch. When enabled, all chrome,
+  create menus, stress controls, help text, and the inspector disappear; only the board
+  canvas and settings button remain. People and circles can still be moved, and circle
+  edges can still be resized. Context menus, connector handles, and connection selection
+  are disabled in this mode.
 - **Favorite**: a person can be starred; favorited people get a thicker neon-yellow
   outline on the canvas.
 - **Collision rules**: people repel other people in their owning circle and the center
@@ -43,10 +48,13 @@ This is the most Material-3-aligned part of the app today; keep it that way.
   that tone's on-container value.
 - **Shapes**: nodes render as `wavy` (flower), soft `polygon`, or `circle` via
   `getNodePath`; circles default to `wavy`, people to `polygon`. Sides and amplitude are
-  per-node and adjustable in the inspector.
+  per-node and adjustable in the inspector. Demo mode temporarily renders every circle as
+  a simple translucent circle with a persistent dashed outline, regardless of stored shape.
 - **Surfaces**: node labels draw inside the Canvas 2D board layer, while the help/stress
   panels float above the grid background. Selection is shown by a stronger border/state,
   not a color swap.
+- **Layering**: circle fills render first, then relationship links, then circle centers,
+  labels, and people. This keeps links readable even when they pass through large circles.
 - **Components used**: create menu (M3 menu), inspector (side sheet), toolbar (icon
   buttons). These follow the recipes in the design system.
 - **Known gaps vs. Material 3 target**:
