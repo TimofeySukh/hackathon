@@ -17,6 +17,18 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-12 — Adopt nested-rings chrome without replacing the canvas board
+
+- Decision: ported the `origin/nested-rings` glass top-bar, light/dark theme tokens,
+  settings/menu/panel treatment, and zoom indicator onto the `codex/circle-react-wavy`
+  prototype.
+- Boundary: the canvas-first board renderer, hit testing, people/circle/zone behavior,
+  seeded graph data, create menu actions, inspector actions, and session-only graph state
+  stay from `codex/circle-react-wavy`. The persisted board/auth/tags/blob-group model from
+  `nested-rings` was not imported.
+- Why: the requested direction was to keep the current branch's canvas and all
+  people/zone behavior untouched while taking the interface from `nested-rings`.
+
 ### 2026-06-12 — Geographic Icons in Demo Circles
 
 - Decision: Default region and country circles now use emoji flags or geographic symbols

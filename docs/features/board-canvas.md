@@ -8,8 +8,9 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
 
 ## Behavior
 
-- **Pan / zoom**: drag empty space to pan; mouse wheel or toolbar buttons to zoom
-  (`MIN_SCALE`/`MAX_SCALE` clamp).
+- **Pan / zoom**: drag empty space to pan; mouse wheel or top-bar buttons to zoom
+  (`MIN_SCALE`/`MAX_SCALE` clamp). The bottom-right zoom indicator mirrors the current
+  camera scale.
 - **Move**: drag a person to reposition inside its owning circle; nearby people in the
   same circle are pushed aside instead of overlapping. Drag a circle center or body to move
   the whole circle and everything it contains; circles at the same nesting level push each
@@ -51,6 +52,10 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   belong to. People use a tight collision and containment radius only slightly larger than
   the visual avatar, while larger region/company circles keep their normal spacing.
 - State is browser-session-only in this prototype screen (no backend writes from here).
+- **Shell**: the surrounding interface uses the `nested-rings` glass top bar and
+  light/dark theme persistence. The top-bar LinkedIn button opens the current prototype's
+  existing ZIP import flow; it does not import the persisted board/auth/tag model from
+  `nested-rings`.
 
 ## Design
 
@@ -69,8 +74,9 @@ This is the most Material-3-aligned part of the app today; keep it that way.
   not a color swap.
 - **Layering**: circle fills render first, then relationship links, then circle centers,
   labels, and people. This keeps links readable even when they pass through large circles.
-- **Components used**: create menu (M3 menu), inspector (side sheet), toolbar (icon
-  buttons). These follow the recipes in the design system.
+- **Components used**: create menu, inspector, settings panel, help panel, stress panel,
+  top-bar icon buttons, and zoom indicator. Chrome uses the `nested-rings` glass panel
+  tokens while the board canvas keeps the current branch's canvas-first renderer.
 - **Known gaps vs. Material 3 target**:
   - Canvas-rendered label and shadow tokens should stay aligned with
     [`../DESIGN_SYSTEM.md`](../DESIGN_SYSTEM.md) as the renderer is extracted.

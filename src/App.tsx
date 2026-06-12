@@ -1,13 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react'
 import * as zip from '@zip.js/zip.js'
 
 zip.configure({ useWebWorkers: false })
 // STRESS TEST — dev-only performance harness. See src/lib/stressTest.ts.
 import {
-  STRESS_TEST_ENABLED,
   STRESS_DEFAULT_CONFIG,
-  STRESS_LIMITS,
   generateStressGraph,
   type StressConfig,
 } from './lib/stressTest'
@@ -82,6 +81,10 @@ type DragConnector = {
   endY: number
 }
 
+type ZipTextEntry = zip.Entry & {
+  getData: (writer: zip.TextWriter) => Promise<string>
+}
+
 type CreateMenu = {
   sourceCircleId: string
   x: number
@@ -109,6 +112,9 @@ type SelectedItem =
 
 type CircleShapeMode = 'circles' | 'figures'
 type CircleFillMode = 'transparent' | 'solid'
+type Theme = 'light' | 'dark'
+
+const THEME_STORAGE_KEY = 'hackathon-theme'
 
 type BoardHit =
   | { type: 'circle-center'; circle: CircleNode }
@@ -159,9 +165,6 @@ type ResizeCircleState = {
 
 const MIN_SCALE = 0.35
 const MAX_SCALE = 1.8
-// Render only nodes inside the viewport, padded by this fraction on each side so
-// small pans reveal already-rendered nodes before the gesture settles.
-const CULL_OVERSCAN = 0.45
 const CONNECT_THRESHOLD = 40
 const MIN_CIRCLE_RADIUS = 72
 const EDGE_RESIZE_HIT_SIZE = 18
@@ -187,6 +190,12 @@ const MATERIAL_TONES: Record<CircleTone, { fill: string; border: string; text: s
   amber: { fill: '#FFE082', border: '#B06000', text: '#2A1400', centerBg: '#D87A00' },
   violet: { fill: '#EADDFF', border: '#6750A4', text: '#21005D', centerBg: '#7F67BE' },
 }
+
+const TOP_BAR_TAGS: Array<{ id: CircleTone; name: string }> = [
+  { id: 'red', name: 'Work' },
+  { id: 'blue', name: 'Friends' },
+  { id: 'green', name: 'Family' },
+]
 
 function getNodePath(
   cx: number,
@@ -330,24 +339,39 @@ function App() {
   // can be clicked/dragged even inside a dense circle that's otherwise canvas-only.
   const [hoveredPersonId, setHoveredPersonId] = useState<string | null>(null)
   // STRESS TEST — synthetic-load config (circles / people / cross-links).
-  const [stress, setStress] = useState<StressConfig>(STRESS_DEFAULT_CONFIG)
+  const [stress] = useState<StressConfig>(STRESS_DEFAULT_CONFIG)
   // Viewport size in CSS px, used to cull off-screen nodes. Updated on resize.
   const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight })
 
-  const [showSettings, setShowSettings] = useState(false)
-  const [demoMode, setDemoMode] = useState(false)
-  const [showCircleLabels, setShowCircleLabels] = useState(true)
-  const [showPersonLabels, setShowPersonLabels] = useState(true)
-  const [circleShapeMode, setCircleShapeMode] = useState<CircleShapeMode>('circles')
-  const [circleFillMode, setCircleFillMode] = useState<CircleFillMode>('transparent')
-  const [centerBehavior, setCenterBehavior] = useState<'connect' | 'move'>('connect')
+  const demoMode = false
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window === 'undefined') return 'light'
+    return window.localStorage.getItem(THEME_STORAGE_KEY) === 'dark' ? 'dark' : 'light'
+  })
+  const [isTagsMenuOpen, setIsTagsMenuOpen] = useState(false)
+  const [isLinkedInMenuOpen, setIsLinkedInMenuOpen] = useState(false)
+  const [isLinkedInGuideOpen, setIsLinkedInGuideOpen] = useState(false)
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
+  const [hiddenTagIds, setHiddenTagIds] = useState<Record<string, boolean>>({})
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showCircleLabels] = useState(true)
+  const [showPersonLabels] = useState(true)
+  const [circleShapeMode] = useState<CircleShapeMode>('circles')
+  const [circleFillMode] = useState<CircleFillMode>('transparent')
+  const [centerBehavior] = useState<'connect' | 'move'>('connect')
   const [hoveredConnId, setHoveredConnId] = useState<string | null>(null)
-  const [openNotesPersonId, setOpenNotesPersonId] = useState<string | null>(null)
   const [newNoteBody, setNewNoteBody] = useState('')
-  const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
+  const [collapsedNotes, setCollapsedNotes] = useState<Record<string, boolean>>({})
 
-  const settingsButtonRef = useRef<HTMLButtonElement>(null)
-  const settingsPanelRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme)
+  }, [theme])
+
+  const tagsMenuRef = useRef<HTMLDivElement>(null)
+  const linkedInMenuRef = useRef<HTMLDivElement>(null)
+  const searchPanelRef = useRef<HTMLDivElement>(null)
+  const accountPanelRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function handleLinkedInImport(event: React.ChangeEvent<HTMLInputElement>) {
@@ -358,17 +382,22 @@ function App() {
       const zipReader = new zip.ZipReader(new zip.BlobReader(file))
       const entries = await zipReader.getEntries()
 
-      const connectionsEntry = entries.find(
-        (e) => e.filename === 'Connections.csv' || e.filename.endsWith('/Connections.csv')
-      )
+      const connectionsEntry = entries.find((entry): entry is ZipTextEntry => {
+        const maybeEntry = entry as Partial<ZipTextEntry>
+        return (
+          typeof maybeEntry.filename === 'string' &&
+          (maybeEntry.filename === 'Connections.csv' || maybeEntry.filename.endsWith('/Connections.csv')) &&
+          typeof maybeEntry.getData === 'function'
+        )
+      })
 
-      if (!connectionsEntry || typeof (connectionsEntry as any).getData !== 'function') {
+      if (!connectionsEntry) {
         alert('Could not find Connections.csv inside the ZIP file.')
         await zipReader.close()
         return
       }
 
-      const csvText = await (connectionsEntry as any).getData(new zip.TextWriter())
+      const csvText = await connectionsEntry.getData(new zip.TextWriter())
       await zipReader.close()
 
       const rows = parseCSV(csvText)
@@ -534,9 +563,9 @@ function App() {
       })
 
       alert('LinkedIn data imported successfully!')
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err)
-      alert(`Failed to import LinkedIn ZIP: ${err.message || err}`)
+      alert(`Failed to import LinkedIn ZIP: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
@@ -549,15 +578,6 @@ function App() {
       ),
     }))
     setSelectedItem(null)
-  }
-
-  function togglePersonFavorite(personId: string) {
-    setGraph((current) => ({
-      ...current,
-      people: current.people.map((p) =>
-        p.id === personId ? { ...p, isFavorite: !p.isFavorite } : p
-      ),
-    }))
   }
 
   function addPersonNote(personId: string, title: string, body: string) {
@@ -694,36 +714,25 @@ function App() {
 
   useEffect(() => {
     function handleOutsideClick(event: PointerEvent) {
+      const target = event.target as Node
       if (
-        showSettings &&
-        settingsPanelRef.current &&
-        !settingsPanelRef.current.contains(event.target as Node) &&
-        settingsButtonRef.current &&
-        !settingsButtonRef.current.contains(event.target as Node)
-      ) {
-        setShowSettings(false)
-      }
+        tagsMenuRef.current?.contains(target) ||
+        linkedInMenuRef.current?.contains(target) ||
+        searchPanelRef.current?.contains(target) ||
+        accountPanelRef.current?.contains(target)
+      ) return
+
+      setIsTagsMenuOpen(false)
+      setIsLinkedInMenuOpen(false)
+      setIsLinkedInGuideOpen(false)
+      setIsSearchOpen(false)
+      setIsAccountMenuOpen(false)
     }
     document.addEventListener('pointerdown', handleOutsideClick)
     return () => {
       document.removeEventListener('pointerdown', handleOutsideClick)
     }
-  }, [showSettings])
-
-  useEffect(() => {
-    function handleOutsideNotesClick(event: PointerEvent) {
-      if (openNotesPersonId === null) return
-      const target = event.target as HTMLElement
-      if (target.closest('.notes-popover') || target.closest('.notes-btn')) {
-        return
-      }
-      setOpenNotesPersonId(null)
-    }
-    document.addEventListener('pointerdown', handleOutsideNotesClick)
-    return () => {
-      document.removeEventListener('pointerdown', handleOutsideNotesClick)
-    }
-  }, [openNotesPersonId])
+  }, [])
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -774,10 +783,6 @@ function App() {
 
   const circlesById = useMemo(() => new Map(displayCircles.map((circle) => [circle.id, circle])), [displayCircles])
   const peopleById = useMemo(() => new Map(displayPeople.map((person) => [person.id, person])), [displayPeople])
-  const renderedPeopleCount = displayPeople.length
-  const renderedCircleCount = displayCircles.length
-  const renderedEdgeCount =
-    displayCircles.filter((circle) => circle.connectedTo).length + displayPeople.length + displayConnections.length
   const sortedCircles = useMemo(() => {
     function getDepth(circleId: string | null): number {
       let depth = 0
@@ -795,33 +800,9 @@ function App() {
     [sortedCircles, displayPeople, displayConnections],
   )
 
-  // VIEWPORT CULLING — derive the visible world rectangle from the settled
-  // camera, padded by CULL_OVERSCAN. During a gesture `camera` is frozen (only
-  // cameraRef moves), so these sets stay stable and the GPU-composited world
-  // layer just translates them; on settle they refresh. Keeping the rendered
-  // set small makes both React reconciliation and layer rasterization cheap.
-  const visibleWorld = useMemo(() => {
-    const s = camera.scale
-    const left = -camera.x / s
-    const top = -camera.y / s
-    const right = (viewport.w - camera.x) / s
-    const bottom = (viewport.h - camera.y) / s
-    const mx = (right - left) * CULL_OVERSCAN
-    const my = (bottom - top) * CULL_OVERSCAN
-    return { left: left - mx, right: right + mx, top: top - my, bottom: bottom + my }
-  }, [camera, viewport])
-
-  const visibleCircles = useMemo(() => queryCircles(boardIndex, visibleWorld), [boardIndex, visibleWorld])
-
-  // People are always drawn (on the canvas layer below), so we only need the
-  // culled set to decide which ones also get an interactive DOM overlay.
-  const visiblePeople = useMemo(() => queryPeople(boardIndex, visibleWorld), [boardIndex, visibleWorld])
-
   const selectedCircle = selectedItem?.type === 'circle' ? circlesById.get(selectedItem.id) ?? null : null
   const selectedPerson = selectedItem?.type === 'person' ? graph.people.find((person) => person.id === selectedItem.id) ?? null : null
   const selectedConnection = selectedItem?.type === 'connection' ? (graph.connections || []).find((conn) => conn.id === selectedItem.id) ?? null : null
-
-  const drawnNodeCount = visibleCircles.length + visiblePeople.length
 
   // Push the live camera onto the dotted grid without going through React.
   function applyDomCamera(cam: Camera) {
@@ -1082,7 +1063,6 @@ function App() {
     }
 
     if (!demoMode) setCreateMenu(null)
-    setOpenNotesPersonId(null)
 
     const hit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
       x: event.clientX,
@@ -1149,7 +1129,6 @@ function App() {
 
     setSelectedPeopleIds([])
     setSelectedItem(null)
-    setOpenNotesPersonId(null)
     panRef.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -1706,14 +1685,6 @@ function App() {
     setGraph((current) => ensureContainment({ ...current, people: [...current.people, ...points] }))
   }
 
-  function resetDemo() {
-    setGraph(createInitialGraph())
-    setSelectedItem({ type: 'circle', id: 'you' })
-    setCreateMenu(null)
-    setConnector(null)
-    setCamera({ x: window.innerWidth / 2, y: window.innerHeight / 2, scale: 0.82 })
-  }
-
   function renameSelected(value: string) {
     if (!selectedItem) return
     if (selectedItem.type === 'circle') {
@@ -1739,30 +1710,6 @@ function App() {
     }))
   }
 
-  function updatePersonStyle(id: string, updates: Partial<PersonNode>) {
-    setGraph((current) => ({
-      ...current,
-      people: current.people.map((person) =>
-        person.id === id ? { ...person, ...updates } : person
-      ),
-    }))
-  }
-
-  function applyCircleShapeMode(nextMode: CircleShapeMode) {
-    setCircleShapeMode(nextMode)
-    if (nextMode !== 'figures') return
-
-    setGraph((current) => ({
-      ...current,
-      circles: current.circles.map((circle) => ({
-        ...circle,
-        shapeType: 'wavy',
-        sides: circle.sides ?? Math.max(8, Math.round(circle.radius / 10)),
-        amplitude: Math.max(4, circle.amplitude && circle.amplitude > 0 ? circle.amplitude : Math.round(circle.radius * 0.055)),
-      })),
-    }))
-  }
-
   function handleImageUpload(event: React.ChangeEvent<HTMLInputElement>, onComplete: (base64: string) => void) {
     const file = event.target.files?.[0]
     if (!file) return
@@ -1775,275 +1722,299 @@ function App() {
     reader.readAsDataURL(file)
   }
 
+  const areAllTagsVisible = TOP_BAR_TAGS.every((tag) => !hiddenTagIds[tag.id])
+  const searchResults = searchQuery.trim()
+    ? graph.people
+        .filter((person) => {
+          const query = searchQuery.trim().toLowerCase()
+          return person.name.toLowerCase().includes(query) || person.role.toLowerCase().includes(query)
+        })
+        .slice(0, 8)
+    : []
+
+  function closeTopBarMenus() {
+    setIsTagsMenuOpen(false)
+    setIsLinkedInMenuOpen(false)
+    setIsLinkedInGuideOpen(false)
+    setIsSearchOpen(false)
+    setIsAccountMenuOpen(false)
+  }
+
+  function toggleAllTagsInMenu() {
+    setHiddenTagIds(
+      areAllTagsVisible
+        ? Object.fromEntries(TOP_BAR_TAGS.map((tag) => [tag.id, true]))
+        : {},
+    )
+  }
+
+  function toggleTagVisibility(tagId: string) {
+    setHiddenTagIds((current) => {
+      const next = { ...current }
+      if (next[tagId]) {
+        delete next[tagId]
+      } else {
+        next[tagId] = true
+      }
+      return next
+    })
+  }
+
   return (
-    <main className={`app-shell ${demoMode ? 'is-demo-mode' : ''}`}>
-      <div className="toolbar" aria-label="Graph controls">
-        {!demoMode && (
-        <div className="brand">
-          <span className="brand__mark">DN</span>
-          <span>Circle graph prototype</span>
+    <main className={`app-shell theme-${theme} ${demoMode ? 'is-demo-mode' : ''}`}>
+      {!demoMode && (
+      <div className="top-bar">
+        <div className="top-bar__left">
+          <div ref={tagsMenuRef} className="tags-menu">
+            <button
+              type="button"
+              className="top-bar__icon-button tags-menu__toggle"
+              onClick={() => {
+                const nextIsOpen = !isTagsMenuOpen
+                closeTopBarMenus()
+                setIsTagsMenuOpen(nextIsOpen)
+              }}
+              aria-expanded={isTagsMenuOpen}
+              aria-label="Tags menu"
+            >
+              <svg
+                className="top-bar__icon-glyph"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M8 7.5h10" />
+                <path d="M8 12h10" />
+                <path d="M8 16.5h10" />
+                <circle cx="5.5" cy="7.5" r="1" fill="currentColor" stroke="none" />
+                <circle cx="5.5" cy="12" r="1" fill="currentColor" stroke="none" />
+                <circle cx="5.5" cy="16.5" r="1" fill="currentColor" stroke="none" />
+              </svg>
+            </button>
+
+            {isTagsMenuOpen ? (
+              <section className="tags-menu__panel" aria-label="Tag colors">
+                <div className="tags-menu__actions">
+                  <button type="button" className="tags-menu__action-button" onClick={toggleAllTagsInMenu}>
+                    {areAllTagsVisible ? 'Clear all' : 'Select all'}
+                  </button>
+                </div>
+
+                <div className="tags-menu__list">
+                  {TOP_BAR_TAGS.map((tag) => {
+                    const color = MATERIAL_TONES[tag.id].centerBg
+                    const isVisible = !hiddenTagIds[tag.id]
+                    return (
+                      <div key={tag.id} className="tags-menu__item">
+                        <button
+                          type="button"
+                          className="tags-menu__swatch"
+                          style={{ '--tag-color': color } as CSSProperties}
+                          aria-label={`Change ${tag.name} color`}
+                        >
+                          <span className="tags-menu__swatch-core" aria-hidden="true" />
+                        </button>
+                        <input
+                          className="tags-menu__name-input"
+                          value={tag.name}
+                          readOnly
+                          aria-label={`Rename ${tag.name} tag`}
+                        />
+                        <button
+                          type="button"
+                          className={`tags-menu__visibility-toggle${isVisible ? ' is-active' : ''}`}
+                          onClick={() => toggleTagVisibility(tag.id)}
+                          aria-label={`${isVisible ? 'Hide' : 'Show'} people with ${tag.name} tag`}
+                          aria-pressed={isVisible}
+                        >
+                          {isVisible ? '✓' : ''}
+                        </button>
+                        <button
+                          type="button"
+                          className="tags-menu__delete"
+                          aria-label={`Delete ${tag.name} tag`}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <button type="button" className="tags-menu__new">
+                  + New tag
+                </button>
+              </section>
+            ) : null}
+          </div>
+
+          <div ref={linkedInMenuRef} className="linkedin-menu">
+            <button
+              type="button"
+              className="top-bar__icon-button linkedin-menu__toggle"
+              onClick={() => {
+                const nextIsOpen = !isLinkedInMenuOpen
+                closeTopBarMenus()
+                setIsLinkedInMenuOpen(nextIsOpen)
+              }}
+              aria-expanded={isLinkedInMenuOpen}
+              aria-label="LinkedIn connection menu"
+            >
+              <span className="linkedin-menu__logo" aria-hidden="true">
+                in
+              </span>
+            </button>
+
+            {isLinkedInMenuOpen ? (
+              <section className="linkedin-menu__panel" aria-label="LinkedIn connection sync">
+                <div className="linkedin-menu__actions">
+                  <button
+                    type="button"
+                    className="linkedin-menu__action"
+                    onClick={() => setIsLinkedInGuideOpen(true)}
+                  >
+                    How to sync your LinkedIn connections
+                  </button>
+                  <button
+                    type="button"
+                    className="linkedin-menu__action"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    Sync your LinkedIn connections
+                  </button>
+                </div>
+
+                {isLinkedInGuideOpen ? (
+                  <div className="linkedin-menu__guide">
+                    <p className="linkedin-menu__wait-note">
+                      Request your LinkedIn data archive, wait for LinkedIn to email you,
+                      then return here and sync the ZIP file that contains Connections.csv.
+                    </p>
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
+          </div>
         </div>
-        )}
-        <div className={`toolbar__group ${demoMode ? 'toolbar__group--demo' : ''}`}>
-          {!demoMode && (
-          <>
-          <button type="button" onClick={() => setCamera((current) => ({ ...current, scale: clamp(current.scale * 1.14, MIN_SCALE, MAX_SCALE) }))} aria-label="Zoom in">
-            <ZoomInIcon />
-          </button>
-          <button type="button" onClick={() => setCamera((current) => ({ ...current, scale: clamp(current.scale / 1.14, MIN_SCALE, MAX_SCALE) }))} aria-label="Zoom out">
-            <ZoomOutIcon />
-          </button>
-          <button type="button" onClick={resetDemo} aria-label="Reset demo">
-            <ResetIcon />
-          </button>
-          </>
-          )}
+
+        <div className="top-bar__right">
+          <div ref={searchPanelRef} className="search-panel">
+            <div className="search-panel__bar">
+              <input
+                className="search-panel__input"
+                value={searchQuery}
+                onFocus={() => {
+                  closeTopBarMenus()
+                  setIsSearchOpen(true)
+                }}
+                onChange={(event) => {
+                  setSearchQuery(event.target.value)
+                  setIsSearchOpen(true)
+                }}
+                placeholder="Search people"
+                aria-label="Search people"
+                aria-expanded={isSearchOpen}
+                aria-controls="people-search-panel"
+              />
+            </div>
+
+            {isSearchOpen ? (
+              <div id="people-search-panel" className="search-panel__dropdown">
+                {searchQuery.trim() ? (
+                  searchResults.length > 0 ? (
+                    <div className="search-panel__results">
+                      {searchResults.map((person) => (
+                        <button
+                          key={person.id}
+                          type="button"
+                          className="search-result"
+                          onClick={() => {
+                            setSelectedItem({ type: 'person', id: person.id })
+                            closeTopBarMenus()
+                          }}
+                        >
+                          <span className="search-result__title">{person.name}</span>
+                          <span className="search-result__meta">{person.role || 'Person'}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="search-panel__empty">No people match this query yet.</p>
+                  )
+                ) : (
+                  <p className="search-panel__empty">
+                    Type naturally, for example: "someone who can help with n8n automation".
+                  </p>
+                )}
+              </div>
+            ) : null}
+          </div>
+
+          <div ref={accountPanelRef} className="account-panel" aria-live="polite">
+            <button
+              type="button"
+              className="top-bar__icon-button account-panel__trigger"
+              onClick={() => {
+                const nextIsOpen = !isAccountMenuOpen
+                closeTopBarMenus()
+                setIsAccountMenuOpen(nextIsOpen)
+              }}
+              aria-expanded={isAccountMenuOpen}
+              aria-label="Account menu"
+            >
+              <span className="account-panel__avatar" aria-hidden="true">
+                @
+              </span>
+            </button>
+
+            {isAccountMenuOpen ? (
+              <div className="account-panel__popover">
+                <div className="account-panel__text">
+                  <span className="account-panel__label">Social graph</span>
+                  <span className="account-panel__meta">Sign in to save your network space</span>
+                </div>
+                <button type="button" className="account-panel__button">
+                  Sign in with Google
+                </button>
+                <div className="account-panel__divider" />
+                <button type="button" className="account-panel__button">
+                  Export local graph
+                </button>
+                <button type="button" className="account-panel__button">
+                  Import local graph
+                </button>
+                <button type="button" className="account-panel__button">
+                  Clear local graph
+                </button>
+              </div>
+            ) : null}
+          </div>
+
           <button
-            ref={settingsButtonRef}
             type="button"
-            onClick={() => setShowSettings(!showSettings)}
-            aria-label="Settings"
-            style={{
-              background: showSettings ? 'var(--md-secondary-container)' : 'transparent',
-              color: showSettings ? 'var(--md-on-secondary-container)' : 'var(--md-on-surface-variant)',
-            }}
+            className="top-bar__icon-button theme-toggle"
+            onClick={() => setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))}
+            aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
           >
-            <SettingsIcon />
+            <span className="theme-toggle__glyph" aria-hidden="true">
+              {theme === 'dark' ? '☀' : '☾'}
+            </span>
           </button>
         </div>
       </div>
-
-      {showSettings && (
-        <div
-          ref={settingsPanelRef}
-          className="settings-panel"
-        >
-          <strong style={{ fontSize: '16px', fontWeight: 500, color: 'var(--md-on-surface)' }}>
-            Settings
-          </strong>
-          <div style={{ marginTop: '12px', display: 'grid', gap: '8px' }}>
-            <label className="m3-switch-row">
-              <span>Demo mode</span>
-              <input
-                type="checkbox"
-                checked={demoMode}
-                onChange={(event) => {
-                  setDemoMode(event.target.checked)
-                  setCreateMenu(null)
-                  setConnector(null)
-                }}
-              />
-            </label>
-            <div className="inspector-field">
-              <label>Circle shape</label>
-              <div className="m3-segmented-button">
-                <button
-                  type="button"
-                  className={`m3-segmented-button-item ${circleShapeMode === 'circles' ? 'is-selected' : ''}`}
-                  onClick={() => applyCircleShapeMode('circles')}
-                >
-                  Circles
-                </button>
-                <button
-                  type="button"
-                  className={`m3-segmented-button-item ${circleShapeMode === 'figures' ? 'is-selected' : ''}`}
-                  onClick={() => applyCircleShapeMode('figures')}
-                >
-                  Figures
-                </button>
-              </div>
-            </div>
-            <div className="inspector-field">
-              <label>Circle fill</label>
-              <div className="m3-segmented-button">
-                <button
-                  type="button"
-                  className={`m3-segmented-button-item ${circleFillMode === 'transparent' ? 'is-selected' : ''}`}
-                  onClick={() => setCircleFillMode('transparent')}
-                >
-                  Transparent
-                </button>
-                <button
-                  type="button"
-                  className={`m3-segmented-button-item ${circleFillMode === 'solid' ? 'is-selected' : ''}`}
-                  onClick={() => setCircleFillMode('solid')}
-                >
-                  Solid
-                </button>
-              </div>
-            </div>
-            <label className="m3-switch-row">
-              <span>Circle labels</span>
-              <input
-                type="checkbox"
-                checked={showCircleLabels}
-                onChange={(event) => setShowCircleLabels(event.target.checked)}
-              />
-            </label>
-            <label className="m3-switch-row">
-              <span>Person names</span>
-              <input
-                type="checkbox"
-                checked={showPersonLabels}
-                onChange={(event) => setShowPersonLabels(event.target.checked)}
-              />
-            </label>
-            <label style={{ fontSize: '12px', fontWeight: 500, color: 'rgba(28, 37, 40, 0.64)' }}>
-              Circle Center Drag Behavior
-            </label>
-            <div
-              style={{
-                display: 'flex',
-                border: '1px solid var(--md-outline-variant)',
-                borderRadius: 'var(--md-r-full)',
-                overflow: 'hidden',
-                marginTop: '4px',
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => setCenterBehavior('connect')}
-                style={{
-                  flex: 1,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '8px 12px',
-                  fontSize: '12px',
-                  fontWeight: 500,
-                  background: centerBehavior === 'connect' ? 'var(--md-secondary-container)' : 'transparent',
-                  color: centerBehavior === 'connect' ? 'var(--md-on-secondary-container)' : 'var(--md-on-surface-variant)',
-                  cursor: 'pointer',
-                }}
-              >
-                {centerBehavior === 'connect' && <CheckIcon />}
-                <span>Draw connection</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setCenterBehavior('move')}
-                style={{
-                  flex: 1,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '8px 12px',
-                  fontSize: '12px',
-                  fontWeight: 500,
-                  background: centerBehavior === 'move' ? 'var(--md-secondary-container)' : 'transparent',
-                  color: centerBehavior === 'move' ? 'var(--md-on-secondary-container)' : 'var(--md-on-surface-variant)',
-                  cursor: 'pointer',
-                  borderLeft: '1px solid var(--md-outline-variant)',
-                }}
-              >
-                {centerBehavior === 'move' && <CheckIcon />}
-                <span>Move circle</span>
-              </button>
-            </div>
-            <div style={{ marginTop: '12px', borderTop: '1px solid var(--md-outline-variant)', paddingTop: '12px' }}>
-              <label style={{ fontSize: '12px', fontWeight: 500, color: 'rgba(28, 37, 40, 0.64)', display: 'block', marginBottom: '8px' }}>
-                LinkedIn Data Import
-              </label>
-              <button
-                type="button"
-                className="m3-primary-button"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <UploadIcon />
-                <span>Import LinkedIn ZIP</span>
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".zip"
-                style={{ display: 'none' }}
-                onChange={handleLinkedInImport}
-              />
-            </div>
-          </div>
-        </div>
       )}
 
-      {/* STRESS TEST — dev-only panel. Hidden when STRESS_TEST_ENABLED is false. */}
-      {!demoMode && STRESS_TEST_ENABLED && (
-        <section className="stress-panel" aria-label="Performance stress test controls">
-          <div className="stress-panel__header">
-            <strong>Real-node stress</strong>
-            <FpsMeter />
-          </div>
-          <label className="stress-slider">
-            <span>{stress.circleCount.toLocaleString('en-US')} circles</span>
-            <input
-              type="range"
-              min="0"
-              max={STRESS_LIMITS.circleCount}
-              step="5"
-              value={stress.circleCount}
-              onChange={(event) => setStress((current) => ({ ...current, circleCount: Number(event.target.value) }))}
-            />
-          </label>
-          <label className="stress-slider">
-            <span>{stress.peoplePerCircle.toLocaleString('en-US')} people / circle</span>
-            <input
-              type="range"
-              min="0"
-              max={STRESS_LIMITS.peoplePerCircle}
-              step="1"
-              value={stress.peoplePerCircle}
-              onChange={(event) => setStress((current) => ({ ...current, peoplePerCircle: Number(event.target.value) }))}
-            />
-          </label>
-          <label className="stress-slider">
-            <span>{stress.crossLinks.toLocaleString('en-US')} cross-links</span>
-            <input
-              type="range"
-              min="0"
-              max={STRESS_LIMITS.crossLinks}
-              step="25"
-              value={stress.crossLinks}
-              onChange={(event) => setStress((current) => ({ ...current, crossLinks: Number(event.target.value) }))}
-            />
-          </label>
-          <div className="stress-toggles" style={{ gap: '16px' }}>
-            <button
-              type="button"
-              className="m3-text-button"
-              onClick={() => setStress(STRESS_DEFAULT_CONFIG)}
-            >
-              Clear
-            </button>
-          </div>
-          <dl>
-            <div>
-              <dt>Circles</dt>
-              <dd>{renderedCircleCount.toLocaleString('en-US')}</dd>
-            </div>
-            <div>
-              <dt>People</dt>
-              <dd>{renderedPeopleCount.toLocaleString('en-US')}</dd>
-            </div>
-            <div>
-              <dt>Edges</dt>
-              <dd>{renderedEdgeCount.toLocaleString('en-US')}</dd>
-            </div>
-            <div>
-              <dt>On screen</dt>
-              <dd>{drawnNodeCount.toLocaleString('en-US')}</dd>
-            </div>
-          </dl>
-        </section>
-      )}
-
-      {!demoMode && (
-      <section className="help-panel" aria-label="How to use the prototype">
-        <strong>How it works</strong>
-        <span>Drag people or circles to move them.</span>
-        <span>Grab a circle edge to resize it.</span>
-        <span>Right-click a circle to add a person, subset, or connected circle.</span>
-        <span>Shift-drag from a circle center to create from the center.</span>
-        <span>Parent circles auto-fit their contents.</span>
-      </section>
-      )}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".zip"
+        style={{ display: 'none' }}
+        onChange={handleLinkedInImport}
+      />
 
       <div
         ref={surfaceRef}
@@ -2071,6 +2042,12 @@ function App() {
       >
         <canvas ref={peopleCanvasRef} className="board-canvas-layer" aria-label="Relationship board" />
       </div>
+
+      {!demoMode && (
+        <div className="zoom-indicator" aria-live="polite">
+          {Math.round(camera.scale * 100)}%
+        </div>
+      )}
 
       {createMenu ? (
         <div className="create-menu" style={menuPosition(createMenu)}>
@@ -2132,9 +2109,8 @@ function App() {
         </div>
       )}
 
-      {!demoMode && (
+      {!demoMode && selectedItem && (
       <aside className="inspector" aria-label="Selection details" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 120px)' }}>
-        {selectedItem ? (
           <>
             <span className="inspector__eyebrow">
               {selectedItem.type === 'circle' ? 'Circle' : selectedItem.type === 'person' ? 'Person' : 'Connection'}
@@ -2147,7 +2123,7 @@ function App() {
                 aria-label="Selected item name"
               />
             ) : (
-              <div style={{ fontSize: '15px', fontWeight: 500, padding: '4px 0 12px 0', borderBottom: '1px solid rgba(28, 37, 40, 0.08)', marginBottom: '8px' }}>
+              <div style={{ fontSize: '15px', fontWeight: 800, padding: '4px 0 12px 0', borderBottom: '1px solid var(--button-border)', marginBottom: '8px' }}>
                 Relationship Link
               </div>
             )}
@@ -2288,8 +2264,8 @@ function App() {
                       type="button"
                       className="primary-action"
                       style={{
-                        background: 'var(--md-error-container)',
-                        color: 'var(--md-on-error-container)',
+                        background: 'rgba(255, 130, 130, 0.12)',
+                        color: 'var(--panel-danger)',
                       }}
                       onClick={() => deleteCircle(selectedCircle.id)}
                     >
@@ -2302,264 +2278,94 @@ function App() {
 
             {selectedPerson && (
               <>
-                {/* Favorite Star Button at top-right of inspector */}
-                <button
-                  type="button"
-                  className="star-favorite-btn"
-                  onClick={() => togglePersonFavorite(selectedPerson.id)}
-                  style={{
-                    position: 'absolute',
-                    top: 18,
-                    right: 18,
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    display: 'grid',
-                    placeItems: 'center',
-                    padding: 4,
-                    zIndex: 20,
-                    outline: 'none',
-                  }}
-                  title={selectedPerson.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-                >
-                  <svg viewBox="0 0 24 24" style={{ width: 20, height: 20 }}>
-                    <path
-                      d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
-                      fill={selectedPerson.isFavorite ? 'var(--md-favorite-fill)' : 'none'}
-                      stroke={selectedPerson.isFavorite ? 'var(--md-favorite-stroke)' : 'var(--md-outline-variant)'}
-                      strokeWidth={2}
-                    />
-                  </svg>
+                <button type="button" className="tag-picker__trigger is-ghost">
+                  <span className="tag-picker__ghost-label">+ add tag</span>
                 </button>
 
-                {/* Visual Settings Row: Select Circle + Avatar Photo Upload */}
-                <div className="inspector-visual-row">
-                  <div className="inspector-field" style={{ flex: 1, marginTop: 0 }}>
-                    <label>Circle</label>
-                    <div className="m3-select-wrapper">
-                      <select
-                        value={selectedPerson.circleId}
-                        onChange={(e) => {
-                          const newCircleId = e.target.value
-                          setGraph((current) => ({
-                            ...current,
-                            people: current.people.map((p) =>
-                              p.id === selectedPerson.id ? { ...p, circleId: newCircleId } : p
-                            ),
-                          }))
-                        }}
-                      >
-                        {graph.circles.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="m3-avatar-picker-container">
-                    <label>Photo</label>
-                    <label className="m3-avatar-picker" title="Upload person photo">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="m3-file-input-hidden"
-                        onChange={(e) => handleImageUpload(e, (base64) => updatePersonStyle(selectedPerson.id, { imageUrl: base64 }))}
-                      />
-                      {selectedPerson.imageUrl ? (
-                        <img src={selectedPerson.imageUrl} alt="Person avatar" />
-                      ) : (
-                        <svg className="m3-avatar-picker-default-icon" viewBox="0 0 24 24">
-                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                          <circle cx="12" cy="7" r="4" />
-                        </svg>
-                      )}
-                      <div className="m3-avatar-picker-overlay">
-                        <UploadIcon />
-                      </div>
-                    </label>
-                  </div>
-                </div>
-
-                <div className="inspector-field" style={{ marginTop: '4px' }}>
-                  <label>Role</label>
-                  <input
-                    type="text"
-                    value={selectedPerson.role}
-                    onChange={(e) => {
-                      const newRole = e.target.value
-                      setGraph((current) => ({
-                        ...current,
-                        people: current.people.map((p) =>
-                          p.id === selectedPerson.id ? { ...p, role: newRole } : p
-                        ),
-                      }))
-                    }}
-                    placeholder="E.g., Software Developer"
-                    className="m3-input-field"
-                  />
-                </div>
-
-                {/* Notes Section */}
-                <div className="inspector-notes-section" style={{ marginTop: '12px', borderTop: '1px solid var(--md-outline-variant)', paddingTop: '12px' }}>
-                  <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 500, color: 'var(--md-on-surface)' }}>Notes</h4>
-
-                  {/* Scrollable list */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px' }}>
-                    {(!selectedPerson.notes || selectedPerson.notes.length === 0) ? (
-                      <span style={{ fontSize: '11px', color: 'var(--md-on-surface-variant)', fontStyle: 'italic' }}>No notes yet.</span>
-                    ) : (
-                      selectedPerson.notes.map((note) => (
-                        <div key={note.id}>
-                          {editingNoteId === note.id ? (
-                            <div className="note-card__editor">
-                              <textarea
-                                className="m3-input-field"
-                                autoFocus
-                                value={note.body}
-                                onChange={(e) => updatePersonNote(selectedPerson.id, note.id, e.target.value.split('\n')[0].substr(0, 30) || 'Untitled note', e.target.value)}
-                                onBlur={() => setEditingNoteId(null)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter' && !e.shiftKey) {
-                                    e.preventDefault()
-                                    setEditingNoteId(null)
-                                  }
-                                }}
-                                style={{
-                                  fontSize: '11.5px',
-                                  resize: 'vertical',
-                                  minHeight: '60px',
-                                  lineHeight: '1.4',
-                                }}
-                              />
-                            </div>
-                          ) : (
-                            <div
-                              className="note-card"
-                              onClick={() => setEditingNoteId(note.id)}
-                            >
-                              <div className="note-card__body">{note.body}</div>
-                              <button
-                                type="button"
-                                className="note-card__delete-btn"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  deletePersonNote(selectedPerson.id, note.id)
-                                }}
-                                title="Delete note"
-                              >
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                                  <polyline points="3 6 5 6 21 6" />
-                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                                </svg>
-                              </button>
-                            </div>
-                          )}
+                <div className="note-list">
+                  {selectedPerson.notes?.map((note) => {
+                    const isCollapsed = collapsedNotes[note.id] ?? true
+                    return (
+                      <article key={note.id} className={`note-card${isCollapsed ? ' is-collapsed' : ''}`}>
+                        <div className="note-card__header">
+                          <button
+                            type="button"
+                            className="note-card__icon"
+                            onClick={() => setCollapsedNotes((prev) => ({ ...prev, [note.id]: !isCollapsed }))}
+                            aria-label={isCollapsed ? 'Expand note' : 'Collapse note'}
+                          >
+                            {isCollapsed ? '▸' : '▾'}
+                          </button>
+                          <input
+                            className="note-card__title"
+                            value={note.title}
+                            readOnly
+                            onClick={() => setCollapsedNotes((prev) => ({ ...prev, [note.id]: !isCollapsed }))}
+                            placeholder="Untitled note"
+                          />
+                          <button
+                            type="button"
+                            className="note-card__icon note-card__icon--danger"
+                            aria-label="Delete note"
+                            onClick={() => deletePersonNote(selectedPerson.id, note.id)}
+                          >
+                            ×
+                          </button>
                         </div>
-                      ))
-                    )}
-                  </div>
+                        {!isCollapsed && (
+                          <textarea
+                            className="note-card__body"
+                            value={note.body}
+                            onChange={(event) =>
+                              updatePersonNote(
+                                selectedPerson.id,
+                                note.id,
+                                event.target.value.split('\n')[0].slice(0, 30) || 'Untitled note',
+                                event.target.value,
+                              )
+                            }
+                            onBlur={() => {}}
+                            rows={3}
+                          />
+                        )}
+                      </article>
+                    )
+                  })}
+                </div>
 
-                  {/* Add note fields */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <article className="note-card note-card--draft">
+                  <div className="note-card__composer-shell">
                     <textarea
-                      placeholder="Write a note..."
+                      className="note-card__composer"
+                      placeholder={'Write a note\nTitle on the first line, details below'}
                       value={newNoteBody}
-                      onChange={(e) => setNewNoteBody(e.target.value)}
-                      rows={2}
-                      className="m3-input-field"
-                      style={{ resize: 'none' }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
+                      rows={4}
+                      onChange={(event) => setNewNoteBody(event.target.value)}
+                      onBlur={() => {
                         if (!newNoteBody.trim()) return
                         addPersonNote(
                           selectedPerson.id,
-                          newNoteBody.trim().split('\n')[0].substr(0, 30) || 'Untitled note',
-                          newNoteBody.trim()
+                          newNoteBody.trim().split('\n')[0].slice(0, 30) || 'Untitled note',
+                          newNoteBody.trim(),
                         )
                         setNewNoteBody('')
                       }}
-                      className="primary-action"
-                      style={{ width: '100%' }}
-                    >
-                      Add note
-                    </button>
-                  </div>
-                </div>
-
-                {/* Appearance Options */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px', borderTop: '1px solid var(--md-outline-variant)', paddingTop: '12px' }}>
-                  <div className="inspector-field">
-                    <label>Shape Type</label>
-                    <div className="m3-segmented-button">
-                      <button
-                        type="button"
-                        className={`m3-segmented-button-item ${(!selectedPerson.shapeType || selectedPerson.shapeType === 'wavy') ? 'is-selected' : ''}`}
-                        onClick={() => {
-                          updatePersonStyle(selectedPerson.id, { shapeType: 'wavy', amplitude: 1 })
-                        }}
-                      >
-                        Wavy
-                      </button>
-                      <button
-                        type="button"
-                        className={`m3-segmented-button-item ${selectedPerson.shapeType === 'polygon' ? 'is-selected' : ''}`}
-                        onClick={() => {
-                          updatePersonStyle(selectedPerson.id, { shapeType: 'polygon', amplitude: 8 })
-                        }}
-                      >
-                        Polygon
-                      </button>
-                      <button
-                        type="button"
-                        className={`m3-segmented-button-item ${selectedPerson.shapeType === 'circle' ? 'is-selected' : ''}`}
-                        onClick={() => {
-                          updatePersonStyle(selectedPerson.id, { shapeType: 'circle', amplitude: 0 })
-                        }}
-                      >
-                        Circle
-                      </button>
-                    </div>
-                  </div>
-                  
-                  {(selectedPerson.shapeType ?? 'wavy') !== 'circle' && (
-                    <>
-                      <div className="inspector-field">
-                        <label>Sides / Petals ({selectedPerson.sides ?? 8})</label>
-                        <input
-                          type="range"
-                          min="3"
-                          max="20"
-                          value={selectedPerson.sides ?? 8}
-                          onChange={(e) => updatePersonStyle(selectedPerson.id, { sides: parseInt(e.target.value) })}
-                        />
-                      </div>
-                    </>
-                  )}
-
-                  <div className="inspector-field">
-                    <label>Photo Image URL</label>
-                    <input
-                      type="text"
-                      placeholder="https://example.com/image.jpg"
-                      value={selectedPerson.imageUrl ?? ''}
-                      onChange={(e) => updatePersonStyle(selectedPerson.id, { imageUrl: e.target.value })}
-                      className="m3-input-field"
+                      onKeyDown={(event) => {
+                        if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+                          event.currentTarget.blur()
+                        }
+                      }}
                     />
                   </div>
-                </div>
+                </article>
 
-                {/* Sticky Actions at Bottom */}
                 <div className="inspector-actions-section">
                   <button
                     type="button"
                     className="primary-action"
                     style={{
-                      background: 'var(--md-error-container)',
-                      color: 'var(--md-on-error-container)',
+                      background: 'rgba(255, 130, 130, 0.12)',
+                      color: 'var(--panel-danger)',
                     }}
                     onClick={() => deletePerson(selectedPerson.id)}
                   >
@@ -2590,8 +2396,8 @@ function App() {
                     className="primary-action"
                     style={{
                       marginTop: '16px',
-                      background: 'var(--md-error-container)',
-                      color: 'var(--md-on-error-container)',
+                      background: 'rgba(255, 130, 130, 0.12)',
+                      color: 'var(--panel-danger)',
                     }}
                     onClick={() => deleteConnection(selectedConnection.id)}
                   >
@@ -2601,48 +2407,10 @@ function App() {
               )
             })()}
           </>
-        ) : (
-          <div style={{ display: 'grid', placeItems: 'center', height: '100px', color: 'rgba(28, 37, 40, 0.52)' }}>
-            <span style={{ fontSize: '13px', fontWeight: 500 }}>Select an item to view details</span>
-          </div>
-        )}
       </aside>
       )}
     </main>
   )
-}
-
-function useFrameRate() {
-  const [fps, setFps] = useState(0)
-
-  useEffect(() => {
-    let frameCount = 0
-    let lastMeasuredAt = performance.now()
-    let animationFrameId = 0
-
-    function tick(now: number) {
-      frameCount += 1
-      if (now - lastMeasuredAt >= 500) {
-        setFps(Math.round((frameCount * 1000) / (now - lastMeasuredAt)))
-        frameCount = 0
-        lastMeasuredAt = now
-      }
-
-      animationFrameId = window.requestAnimationFrame(tick)
-    }
-
-    animationFrameId = window.requestAnimationFrame(tick)
-    return () => window.cancelAnimationFrame(animationFrameId)
-  }, [])
-
-  return fps
-}
-
-// Isolated so its 2 Hz state tick only re-renders this badge, not the whole
-// board tree (which would otherwise reconcile every visible node twice a second).
-function FpsMeter() {
-  const fps = useFrameRate()
-  return <span>{fps} FPS</span>
 }
 
 // ---- Canvas board renderer ---------------------------------------------------
@@ -3802,33 +3570,6 @@ function nextTone(index: number): CircleTone {
   return (['blue', 'red', 'green', 'amber', 'violet'] as CircleTone[])[index % 5]
 }
 
-function ZoomInIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="10.5" cy="10.5" r="6.5" />
-      <path d="M16 16l4 4M10.5 7.5v6M7.5 10.5h6" />
-    </svg>
-  )
-}
-
-function ZoomOutIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="10.5" cy="10.5" r="6.5" />
-      <path d="M16 16l4 4M7.5 10.5h6" />
-    </svg>
-  )
-}
-
-function ResetIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M4 12a8 8 0 1 0 2.34-5.66" />
-      <path d="M4 5v6h6" />
-    </svg>
-  )
-}
-
 function PersonIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -3851,36 +3592,6 @@ function CircleIcon() {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="12" cy="12" r="8" />
       <path d="M4 12h16" />
-    </svg>
-  )
-}
-
-function SettingsIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  )
-}
-
-function CheckIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      style={{
-        width: '14px',
-        height: '14px',
-        fill: 'none',
-        stroke: 'currentColor',
-        strokeWidth: 3,
-        strokeLinecap: 'round',
-        strokeLinejoin: 'round',
-        marginRight: '6px',
-      }}
-    >
-      <path d="M20 6L9 17l-5-5" />
     </svg>
   )
 }
