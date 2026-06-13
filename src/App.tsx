@@ -1812,7 +1812,7 @@ function App() {
 
   return (
     <main className={`app-shell ${demoMode ? 'is-demo-mode' : ''}`}>
-      <div className="toolbar" aria-label="Graph controls">
+      <div className="toolbar" aria-label="Graph controls" style={{ justifyContent: 'flex-end' }}>
         <div className={`toolbar__group ${demoMode ? 'toolbar__group--demo' : ''}`}>
           <button
             ref={settingsButtonRef}
