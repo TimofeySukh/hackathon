@@ -1440,7 +1440,7 @@ input[type="range"]::-webkit-slider-thumb:active {
    until they sign in. */
 .local-save-hint {
   position: fixed;
-  bottom: 16px;
+  top: 16px;
   left: 16px;
   z-index: 90;
   display: flex;
