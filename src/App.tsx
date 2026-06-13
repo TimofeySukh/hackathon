@@ -355,6 +355,7 @@ function App() {
   useEffect(() => {
     if (auth.status !== 'authenticated' || !userId || !auth.session) return
     let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setGraphLoaded(false)
     loadGraph(userId)
       .then((saved) => {
@@ -373,6 +374,7 @@ function App() {
     return () => {
       cancelled = true
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth.status, userId])
 
   // Debounced autosave: a flood of drags or a bulk import collapses into one write.
@@ -398,7 +400,7 @@ function App() {
 
   const [connector, setConnector] = useState<DragConnector | null>(null)
   const [createMenu, setCreateMenu] = useState<CreateMenu | null>(null)
-  const [selectedItem, setSelectedItem] = useState<SelectedItem>({ type: 'circle', id: 'you' })
+  const [selectedItem, setSelectedItem] = useState<SelectedItem>(null)
   const [selectedPeopleIds, setSelectedPeopleIds] = useState<string[]>([])
   // Person currently under the cursor — promoted to an interactive DOM node so it
   // can be clicked/dragged even inside a dense circle that's otherwise canvas-only.
@@ -436,12 +438,14 @@ function App() {
         (e) => e.filename === 'Connections.csv' || e.filename.endsWith('/Connections.csv')
       )
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if (!connectionsEntry || typeof (connectionsEntry as any).getData !== 'function') {
         alert('Could not find Connections.csv inside the ZIP file.')
         await zipReader.close()
         return
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const csvText = await (connectionsEntry as any).getData(new zip.TextWriter())
       await zipReader.close()
 
@@ -608,9 +612,10 @@ function App() {
       })
 
       alert('LinkedIn data imported successfully!')
-    } catch (err: any) {
+    } catch (err) {
       console.error(err)
-      alert(`Failed to import LinkedIn ZIP: ${err.message || err}`)
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      alert(`Failed to import LinkedIn ZIP: ${errorMessage}`)
     }
   }
 
@@ -1783,7 +1788,7 @@ function App() {
 
   function resetDemo() {
     setGraph(createInitialGraph())
-    setSelectedItem({ type: 'circle', id: 'you' })
+    setSelectedItem(null)
     setCreateMenu(null)
     setConnector(null)
     setCamera({ x: window.innerWidth / 2, y: window.innerHeight / 2, scale: 0.82 })
@@ -1862,14 +1867,14 @@ function App() {
   return (
     <main className={`app-shell ${demoMode ? 'is-demo-mode' : ''}`}>
       <div className="toolbar" aria-label="Graph controls">
-        {!demoMode && (
+        {!demoMode && selectedItem && (
         <div className="brand">
           <span className="brand__mark">DN</span>
           <span>Circle graph prototype</span>
         </div>
         )}
         <div className={`toolbar__group ${demoMode ? 'toolbar__group--demo' : ''}`}>
-          {!demoMode && (
+          {!demoMode && selectedItem && (
           <>
           <button type="button" onClick={() => setCamera((current) => ({ ...current, scale: clamp(current.scale * 1.14, MIN_SCALE, MAX_SCALE) }))} aria-label="Zoom in">
             <ZoomInIcon />
@@ -2086,7 +2091,7 @@ function App() {
       )}
 
       {/* STRESS TEST — dev-only panel. Hidden when STRESS_TEST_ENABLED is false. */}
-      {!demoMode && STRESS_TEST_ENABLED && (
+      {!demoMode && STRESS_TEST_ENABLED && selectedItem && (
         <section className="stress-panel" aria-label="Performance stress test controls">
           <div className="stress-panel__header">
             <strong>Real-node stress</strong>
@@ -2155,7 +2160,7 @@ function App() {
         </section>
       )}
 
-      {!demoMode && (
+      {!demoMode && selectedItem && (
       <section className="help-panel" aria-label="How to use the prototype">
         <strong>How it works</strong>
         <span>Drag people or circles to move them.</span>
@@ -2253,11 +2258,9 @@ function App() {
         </div>
       )}
 
-      {!demoMode && (
+      {!demoMode && selectedItem && (
       <aside className="inspector" aria-label="Selection details" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 120px)' }}>
-        {selectedItem ? (
-          <>
-            <span className="inspector__eyebrow">
+        <span className="inspector__eyebrow">
               {selectedItem.type === 'circle' ? 'Circle' : selectedItem.type === 'person' ? 'Person' : 'Connection'}
             </span>
             {selectedItem.type !== 'connection' ? (
@@ -2721,12 +2724,6 @@ function App() {
                 </>
               )
             })()}
-          </>
-        ) : (
-          <div style={{ display: 'grid', placeItems: 'center', height: '100px', color: 'rgba(28, 37, 40, 0.52)' }}>
-            <span style={{ fontSize: '13px', fontWeight: 500 }}>Select an item to view details</span>
-          </div>
-        )}
       </aside>
       )}
 
