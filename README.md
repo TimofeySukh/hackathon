@@ -10,7 +10,7 @@ A local social circle graph prototype built with React, Vite, and TypeScript.
 - People placed either directly inside a circle or inside a nested subset
 - Curved visual links from circle centers to connected circles and people
 - Right-click a circle to open the create menu with two actions: add person or add circle
-- Double-tap anywhere to create a blob: inside a circle it nests a subset, on empty space it drops a standalone blob
+- Double-tap anywhere to create a person inside the circle it lands in (empty space falls back to the root `You` circle)
 - People are endpoints; only circle centers can create new outgoing branches
 - Drag people to reposition them inside their owning circle
 - Drag any circle center, including `You`, to move that circle and all contained people and subset circles together

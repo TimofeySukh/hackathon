@@ -1567,9 +1567,10 @@ function App() {
     }
   }
 
-  // Double-tap creates a blob and figures out containment on its own: tapping
-  // inside an existing circle nests a subset blob in it, tapping empty space
-  // drops a fresh standalone blob. This replaces the old Shift+drag shortcut.
+  // Double-tap creates a person and figures out its circle on its own: tapping
+  // inside a circle drops the person into that circle, tapping near someone uses
+  // their owning circle, and tapping empty space falls back to the root "you"
+  // circle. This replaces the old Shift+drag shortcut.
   function handleSurfaceDoubleClick(event: React.MouseEvent<HTMLDivElement>) {
     if (event.button !== 0) return
     if (demoMode) return
@@ -1578,50 +1579,44 @@ function App() {
       y: event.clientY,
     })
 
-    // Resolve the circle we double-tapped inside, if any. A person hit counts as
-    // its owning circle so tapping near someone still nests in their blob.
-    let containerId: string | null = null
+    // Resolve the circle we double-tapped inside. A person hit counts as its
+    // owning circle; empty space falls back to the root "you" circle so a
+    // double-tap always produces a person somewhere sensible.
+    let containerId = 'you'
     if (hit && (hit.type === 'circle-body' || hit.type === 'circle-center' || hit.type === 'circle-edge')) {
       containerId = hit.circle.id
     } else if (hit && hit.type === 'person') {
-      containerId = hit.person.circleId ?? null
+      containerId = hit.person.circleId ?? 'you'
     }
 
-    const world = screenToWorld({ x: event.clientX, y: event.clientY })
-    createBlobAt(world, containerId)
-  }
+    const source = circlesById.get(containerId)
+    if (!source) return
 
-  // Shared blob factory used by the double-tap shortcut. `containerId` decides
-  // nested-subset vs. standalone top-level styling and linkage.
-  function createBlobAt(world: { x: number; y: number }, containerId: string | null) {
-    const source = containerId ? circlesById.get(containerId) : null
-    const isNested = Boolean(source)
-    const id = `circle-${Date.now()}`
+    const world = screenToWorld({ x: event.clientX, y: event.clientY })
+    const id = `person-${Date.now()}`
+    const sides = Math.floor(Math.random() * 5) + 8
     setGraph((current) =>
       ensureContainment({
         ...current,
-        circles: [
-          ...current.circles,
+        people: [
+          ...current.people,
           {
             id,
-            name: isNested ? `${source!.name} subset` : 'New circle',
-            icon: isNested ? 'SUB' : 'C',
+            name: `New person ${current.people.length + 1}`,
+            role: `Inside ${source.name}`,
             x: world.x,
             y: world.y,
-            radius: isNested ? 82 : 190,
-            minRadius: isNested ? 82 : 190,
-            parentId: isNested ? source!.id : null,
-            connectedTo: isNested ? source!.id : null,
-            tone: isNested ? 'violet' : nextTone(current.circles.length),
-            shapeType: isNested ? 'polygon' : 'wavy',
-            sides: isNested ? 6 : 12,
-            amplitude: isNested ? 4 : 8,
+            circleId: source.id,
+            avatar: makeAvatar(current.people.length + 1),
+            shapeType: 'circle',
+            sides,
+            amplitude: 0,
           },
         ],
       }),
     )
     setSelectedPeopleIds([])
-    setSelectedItem({ type: 'circle', id })
+    setSelectedItem({ type: 'person', id })
   }
 
   function handleMergeSelected() {
