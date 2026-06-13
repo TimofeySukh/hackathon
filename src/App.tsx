@@ -154,7 +154,7 @@ type ResizeCircleState = {
 }
 
 const MIN_SCALE = 0.35
-const MAX_SCALE = 1.8
+const MAX_SCALE = 4.0
 
 const CONNECT_THRESHOLD = 40
 const MIN_CIRCLE_RADIUS = 72
