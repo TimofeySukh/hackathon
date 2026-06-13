@@ -5,7 +5,7 @@ import * as zip from '@zip.js/zip.js'
 
 zip.configure({ useWebWorkers: false })
 import { useAuth } from './lib/useAuth'
-import { loadGraph, saveGraph } from './lib/graphPersistence'
+import { loadGraph, saveGraph, loadLocalGraph, saveLocalGraph } from './lib/graphPersistence'
 // STRESS TEST — dev-only performance harness. See src/lib/stressTest.ts.
 
 export type CircleTone = 'blue' | 'red' | 'green' | 'amber' | 'violet'
@@ -376,6 +376,31 @@ function App() {
     }, 800)
     return () => window.clearTimeout(timer)
   }, [graph, graphLoaded, auth.status, userId])
+
+  // Signed-out visitors aren't blocked: their board is restored from (and saved
+  // to) localStorage so work survives a reload without an account. Signing in
+  // takes over with the Supabase-backed graph via the effects above.
+  const isLocalMode = auth.status === 'anonymous' || auth.status === 'unconfigured'
+
+  useEffect(() => {
+    if (!isLocalMode) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setGraphLoaded(false)
+    const saved = loadLocalGraph()
+    if (saved) {
+      setGraph(saved)
+    }
+    setGraphLoaded(true)
+  }, [isLocalMode])
+
+  // Debounced local autosave for signed-out visitors.
+  useEffect(() => {
+    if (!graphLoaded || !isLocalMode) return
+    const timer = window.setTimeout(() => {
+      saveLocalGraph(graph)
+    }, 800)
+    return () => window.clearTimeout(timer)
+  }, [graph, graphLoaded, isLocalMode])
 
   const [camera, setCamera] = useState<Camera>({ x: window.innerWidth / 2, y: window.innerHeight / 2, scale: 0.82 })
   // cameraRef holds the *live* camera during a pan/zoom gesture. `camera` state
@@ -1823,10 +1848,12 @@ function App() {
   // mounts — its mount-time effects (e.g. the native wheel listener for trackpad
   // pinch-zoom / two-finger pan) need surfaceRef to exist on first commit. When
   // Supabase isn't configured we just never show the overlay (local dev mode).
-  const isAuthLoading =
+  // Signed-out visitors are no longer gated behind a sign-in wall: the only
+  // blocking overlay left is the brief "loading your board" state for a user
+  // whose Supabase graph is still being fetched.
+  const showAuthOverlay =
     auth.status !== 'unconfigured' &&
     (auth.status === 'loading' || (auth.status === 'authenticated' && !graphLoaded))
-  const showAuthOverlay = isAuthLoading || auth.status === 'anonymous'
 
   // Keep references to unused features so they remain in codebase for future use and satisfy TS/ESLint checks
   if (false as boolean) {
@@ -1916,6 +1943,26 @@ function App() {
                 >
                   Sign out
                 </button>
+              </div>
+            )}
+            {auth.status === 'anonymous' && (
+              <div style={{ borderTop: '1px solid var(--md-outline-variant)', paddingTop: '16px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 500, color: 'rgba(28, 37, 40, 0.64)', display: 'block', marginBottom: '8px' }}>
+                  Account
+                </label>
+                <p style={{ margin: '0 0 12px', fontSize: '13px', color: 'var(--md-on-surface-variant)' }}>
+                  Sign in to save your data across devices. Until then it stays in this browser.
+                </p>
+                <button
+                  type="button"
+                  className="m3-primary-button"
+                  onClick={() => void auth.signInWithGoogle()}
+                >
+                  Sign in with Google
+                </button>
+                {auth.error && (
+                  <p style={{ margin: '8px 0 0', color: 'var(--md-error, #b3261e)', fontSize: '13px' }}>{auth.error}</p>
+                )}
               </div>
             )}
           </div>
@@ -2646,25 +2693,21 @@ function App() {
         <div style={authOverlayStyle}>
           <div style={authCardStyle}>
             <span className="brand__mark">DN</span>
-            {auth.status === 'anonymous' ? (
-              <>
-                <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 500, color: 'var(--md-on-surface)' }}>
-                  Circle graph
-                </h1>
-                <p style={{ margin: 0, color: 'var(--md-on-surface-variant)', textAlign: 'center' }}>
-                  Sign in to save your connections across sessions.
-                </p>
-                <button type="button" className="m3-primary-button" onClick={() => void auth.signInWithGoogle()}>
-                  Continue with Google
-                </button>
-                {auth.error && (
-                  <p style={{ margin: 0, color: 'var(--md-error, #b3261e)', fontSize: '13px' }}>{auth.error}</p>
-                )}
-              </>
-            ) : (
-              <p style={{ margin: 0, color: 'var(--md-on-surface-variant)' }}>Loading your board…</p>
-            )}
+            <p style={{ margin: 0, color: 'var(--md-on-surface-variant)' }}>Loading your board…</p>
           </div>
+        </div>
+      )}
+
+      {auth.status === 'anonymous' && (
+        <div className="local-save-hint" role="note">
+          <span>Sign in to save your data — your board is kept locally for now.</span>
+          <button
+            type="button"
+            className="local-save-hint__action"
+            onClick={() => void auth.signInWithGoogle()}
+          >
+            Sign in
+          </button>
         </div>
       )}
     </main>

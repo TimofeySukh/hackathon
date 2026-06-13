@@ -1435,3 +1435,46 @@ input[type="range"]::-webkit-slider-thumb:active {
 .m3-primary-button:active {
   background: color-mix(in srgb, var(--md-primary) 85%, black);
 }
+
+/* Bottom-left hint shown to signed-out visitors: their work is saved locally
+   until they sign in. */
+.local-save-hint {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 320px;
+  padding: 8px 12px 8px 16px;
+  border-radius: var(--md-r-full);
+  border: 1px solid var(--md-outline-variant);
+  background: var(--md-surface-container-high);
+  box-shadow: var(--md-elev-2);
+  font-size: 13px;
+  color: var(--md-on-surface-variant);
+  pointer-events: auto;
+}
+
+.local-save-hint__action {
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--md-r-full);
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+.local-save-hint__action:hover {
+  background: color-mix(in srgb, var(--md-primary) 92%, black);
+  box-shadow: var(--md-elev-1);
+}
+
+.is-demo-mode .local-save-hint {
+  display: none;
+}
