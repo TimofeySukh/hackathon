@@ -57,7 +57,6 @@ Completed tasks can remain listed here when they explain repository history. Liv
 - `docs/PROJECT_MAP.md`: where the project structure is recorded.
 - `docs/RUNBOOK.md`: how to run or verify the repo.
 - `docs/ARCHITECTURE.md`: invariants and boundaries.
-- `docs/PROBLEMS.md`: known open and resolved problems that must stay visible across work sessions.
 - `docs/product-vision.md`: product direction and scope.
 - `docs/project-structure.md`: file-by-file project structure notes.
 - `docs/DESIGN_SYSTEM.md`: Material 3 design language, tokens, and component recipes that all UI must follow.
@@ -88,7 +87,6 @@ Task ownership is tracked in Linear. Code ownership is not split by directory ye
 ## Next Steps
 
 - Keep the circle graph prototype easy to evaluate while product scope is finalized.
-- Check `docs/PROBLEMS.md` before starting work, add newly discovered durable problems, and mark fixed problems as resolved.
 - Link any implementation task or pull request back to the relevant Linear issue.
 - Update `docs/product-vision.md` when product scope changes.
 - Update `docs/project-structure.md` and `docs/ARCHITECTURE.md` when source structure or boundaries change.

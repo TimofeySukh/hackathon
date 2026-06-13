@@ -103,7 +103,6 @@ This is the most Material-3-aligned part of the app today; keep it that way.
 
 ## Open questions / TODO
 
-- Windows laptops reportedly cannot add new nodes — see
-  [`../PROBLEMS.md`](../PROBLEMS.md).
+- Windows laptops reportedly cannot add new nodes (needs reproduction details, including browser, input device, and gesture/button behaviors).
 - The single-file `App.tsx` mixes many concerns; component extraction would make the
   Material 3 chrome migration cleaner but is not required for it.

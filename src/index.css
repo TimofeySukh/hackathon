@@ -804,12 +804,13 @@ svg {
 
 /* Trello-Style Note List and Cards */
 .trello-list {
-  background-color: #f1f2f4; /* Trello standard gray */
-  border-radius: 12px;
-  padding: 10px 8px 8px 8px;
+  background-color: var(--md-surface-container-high); /* M3 tonal elevated container */
+  border: 1px solid var(--md-outline-variant); /* Card border */
+  border-radius: var(--md-r-md); /* M3 round corners (12px) */
+  padding: 12px 10px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   width: 100%;
   box-sizing: border-box;
 }
@@ -818,13 +819,13 @@ svg {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 2px 8px 6px 8px;
+  padding: 2px 4px 6px 4px;
 }
 
 .trello-list__title {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: #172b4d;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--md-on-surface);
   margin: 0;
 }
 
@@ -838,8 +839,8 @@ svg {
 }
 
 .trello-card {
-  background-color: #ffffff;
-  border-radius: 8px;
+  background-color: #ffffff; /* Pure white card background */
+  border-radius: var(--md-r-md);
   padding: 8px 12px;
   position: relative;
   box-shadow: 0px 1px 1px #091e4240, 0px 0px 1px #091e424f;
@@ -852,7 +853,7 @@ svg {
 }
 
 .trello-card:hover {
-  background-color: #f4f5f7;
+  background-color: #f5f6f9; /* Subtle gray/blue tint hover */
 }
 
 .trello-card__body {
@@ -900,8 +901,8 @@ svg {
 
 /* Trello Card Editor */
 .trello-card__editor {
-  background-color: #ffffff;
-  border-radius: 8px;
+  background-color: #ffffff; /* Pure white background when editing */
+  border-radius: var(--md-r-md);
   padding: 8px 12px;
   box-shadow: 0px 1px 1px #091e4240, 0px 0px 1px #091e424f;
   box-sizing: border-box;
@@ -930,9 +931,9 @@ svg {
   width: 100%;
   border: none;
   background: transparent;
-  color: #44546f;
-  padding: 8px 10px;
-  border-radius: 8px;
+  color: var(--md-on-surface-variant);
+  padding: 8px 12px;
+  border-radius: var(--md-r-full); /* Pill shape */
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;
@@ -941,8 +942,8 @@ svg {
 }
 
 .trello-list__add-btn:hover {
-  background-color: #091e420f;
-  color: #172b4d;
+  background-color: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+  color: var(--md-on-surface);
 }
 
 .trello-list__composer {
@@ -953,10 +954,16 @@ svg {
 
 .trello-list__composer-card {
   background-color: #ffffff;
-  border-radius: 8px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-r-md); /* 12px */
   padding: 8px 12px;
-  box-shadow: 0px 1px 1px #091e4240, 0px 0px 1px #091e424f;
+  box-shadow: none;
   box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.trello-list__composer-card:focus-within {
+  border-color: var(--md-primary);
 }
 
 .trello-list__composer-textarea {
@@ -968,7 +975,7 @@ svg {
   font-size: 12.5px !important;
   line-height: 1.4 !important;
   resize: none !important;
-  color: #172b4d !important;
+  color: var(--md-on-surface) !important;
   font-family: inherit !important;
   box-shadow: none !important;
   margin: 0 !important;
@@ -977,70 +984,49 @@ svg {
 .trello-list__composer-controls {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 0 2px;
+  gap: 8px;
+  padding: 2px 2px;
 }
 
 .trello-list__composer-add-btn {
-  background-color: #0c66e4;
-  color: #ffffff;
+  background-color: var(--md-primary);
+  color: var(--md-on-primary);
   border: none;
-  border-radius: 3px;
-  padding: 6px 12px;
+  border-radius: var(--md-r-full); /* Pill shape */
+  height: 32px;
+  padding: 0 16px;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: background-color 0.15s;
 }
 
 .trello-list__composer-add-btn:hover {
-  background-color: #0055cc;
-}
-
-/* Lightbulb Tip button in Screenshot 2 */
-.trello-list__composer-tip-btn {
-  background-color: #f7f1ff;
-  color: #6e25c9;
-  border: none;
-  border-radius: 3px;
-  padding: 6px 10px;
-  font-size: 13px;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-  transition: background-color 0.15s;
-}
-
-.trello-list__composer-tip-btn:hover {
-  background-color: #ebdfff;
-}
-
-.trello-list__composer-tip-btn svg {
-  width: 14px;
-  height: 14px;
-  stroke: currentColor;
-  fill: none;
-  stroke-width: 2;
+  background-color: color-mix(in srgb, var(--md-primary) 92%, var(--md-on-primary));
 }
 
 .trello-list__composer-cancel-btn {
   background: transparent;
-  border: none;
-  border-radius: 3px;
-  padding: 6px;
-  display: flex;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-r-full); /* Circle shape */
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #44546f;
-  transition: background-color 0.15s, color 0.15s;
+  color: var(--md-on-surface-variant);
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+  padding: 0;
 }
 
 .trello-list__composer-cancel-btn:hover {
-  background-color: #091e420f;
-  color: #172b4d;
+  background-color: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+  color: var(--md-on-surface);
+  border-color: var(--md-outline);
 }
 
 .trello-list__composer-cancel-btn svg {
@@ -1208,10 +1194,10 @@ input[type="range"]::-webkit-slider-thumb:active {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin: 12px 0;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--md-outline-variant);
+  gap: 12px;
+  margin: 8px 0 0 0;
+  padding-bottom: 0;
+  border-bottom: none;
 }
 
 /* Avatar circular picker */
@@ -1299,9 +1285,9 @@ input[type="range"]::-webkit-slider-thumb:active {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-top: auto; /* Push to the bottom */
-  padding-top: 16px;
-  border-top: 1px solid var(--md-outline-variant);
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: none;
 }
 
 .inspector-actions-section button {
@@ -1477,4 +1463,68 @@ input[type="range"]::-webkit-slider-thumb:active {
 
 .is-demo-mode .local-save-hint {
   display: none;
+}
+
+/* Custom Color-Coded Select Dropdown & Rounded Menu */
+.custom-select-trigger {
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-radius: 9999px;
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+  transition: filter 0.15s, background-color 0.15s;
+}
+
+.custom-select-trigger:hover {
+  filter: brightness(1.08);
+}
+
+.custom-select-dropdown {
+  position: absolute;
+  z-index: 1000;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid rgba(9, 30, 66, 0.08);
+  border-radius: 20px;
+  box-shadow: 0px 8px 16px -4px rgba(9, 30, 66, 0.25), 0px 0px 1px rgba(9, 30, 66, 0.31);
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 8px;
+  display: grid;
+  gap: 6px;
+}
+
+.custom-select-option {
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-radius: 9999px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+  transition: filter 0.15s, background-color 0.15s;
+}
+
+.custom-select-option:hover {
+  filter: brightness(1.08);
+}
+
+.custom-select-option:active {
+  filter: brightness(0.95);
 }
