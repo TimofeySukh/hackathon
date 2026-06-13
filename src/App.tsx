@@ -392,6 +392,7 @@ function App() {
   const [connector, setConnector] = useState<DragConnector | null>(null)
   const [createMenu, setCreateMenu] = useState<CreateMenu | null>(null)
   const [selectedItem, setSelectedItem] = useState<SelectedItem>(null)
+  const [showCircleDropdown, setShowCircleDropdown] = useState(false)
   const [selectedPeopleIds, setSelectedPeopleIds] = useState<string[]>([])
   // Person currently under the cursor — promoted to an interactive DOM node so it
   // can be clicked/dragged even inside a dense circle that's otherwise canvas-only.
@@ -820,6 +821,20 @@ function App() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedItem])
+
+  useEffect(() => {
+    if (!showCircleDropdown) return
+    function handleOutsideClick() {
+      setShowCircleDropdown(false)
+    }
+    const timeout = setTimeout(() => {
+      window.addEventListener('click', handleOutsideClick)
+    }, 0)
+    return () => {
+      clearTimeout(timeout)
+      window.removeEventListener('click', handleOutsideClick)
+    }
+  }, [showCircleDropdown])
 
   const displayCircles = graph.circles
   const displayPeople = graph.people
@@ -2110,9 +2125,7 @@ function App() {
 
       {!demoMode && selectedItem && (
       <aside className="inspector" aria-label="Selection details" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 120px)' }}>
-        {selectedItem.type === 'connection' && (
-          <span className="inspector__eyebrow">Connection</span>
-        )}
+
             {selectedItem.type !== 'connection' ? (
               <input
                 className="inspector__name-input"
@@ -2128,9 +2141,9 @@ function App() {
             
             {selectedCircle && (
               <>
-                {/* Visual Settings Row: Color swatches */}
+                {/* Visual Settings Row: Color swatches + Avatar Photo Upload */}
                 <div className="inspector-visual-row">
-                  <div className="m3-color-swatches-container" style={{ flex: 1 }}>
+                  <div className="m3-color-swatches-container">
                     <label>Color Tone</label>
                     <div className="m3-color-swatches">
                       {(['blue', 'red', 'green', 'amber', 'violet'] as CircleTone[]).map((t) => (
@@ -2146,7 +2159,6 @@ function App() {
                     </div>
                   </div>
 
-                  {/* Commented out Photo picker to hide from menu, keeping in code for future use
                   <div className="m3-avatar-picker-container">
                     <label>Photo</label>
                     <label className="m3-avatar-picker" title="Upload circle photo">
@@ -2170,7 +2182,6 @@ function App() {
                       </div>
                     </label>
                   </div>
-                  */}
                 </div>
 
                 {/* Commented out Shape settings and Center Image URL to hide from menu, keeping in code for future use
@@ -2255,7 +2266,7 @@ function App() {
                 */}
 
                 {/* Sticky Actions at Bottom */}
-                <div className="inspector-actions-section">
+                <div className="inspector-actions-section" style={{ borderTop: 'none', paddingTop: 0 }}>
                   {/* Commented out Add 3 demo people to hide from menu, keeping in code for future use
                   <button type="button" className="primary-action" onClick={addDemoCluster}>
                     Add 3 demo people
@@ -2315,25 +2326,109 @@ function App() {
                 <div className="inspector-visual-row">
                   <div className="inspector-field" style={{ flex: 1, marginTop: 0 }}>
                     <label>Circle</label>
-                    <div className="m3-select-wrapper">
-                      <select
-                        value={selectedPerson.circleId}
-                        onChange={(e) => {
-                          const newCircleId = e.target.value
-                          setGraph((current) => ({
-                            ...current,
-                            people: current.people.map((p) =>
-                              p.id === selectedPerson.id ? { ...p, circleId: newCircleId } : p
-                            ),
-                          }))
+                    <div style={{ position: 'relative', width: '100%' }}>
+                      <button
+                        type="button"
+                        onClick={() => setShowCircleDropdown(!showCircleDropdown)}
+                        className="custom-select-trigger"
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          background: 'transparent',
+                          color: 'var(--md-on-surface)',
+                          border: '1px solid var(--md-outline-variant)',
+                          borderRadius: 'var(--md-r-sm)',
+                          padding: '10px 36px 10px 12px',
+                          fontSize: '13px',
+                          fontWeight: 400,
+                          outline: 'none',
+                          cursor: 'pointer',
+                          position: 'relative',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          boxSizing: 'border-box',
                         }}
                       >
-                        {graph.circles.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
+                        <span>{circlesById.get(selectedPerson.circleId)?.name || 'Select circle'}</span>
+                        <svg
+                          viewBox="0 0 24 24"
+                          style={{
+                            width: 16,
+                            height: 16,
+                            fill: 'none',
+                            stroke: '#43474e',
+                            strokeWidth: 2,
+                            strokeLinecap: 'round',
+                            strokeLinejoin: 'round',
+                            transform: showCircleDropdown ? 'rotate(180deg)' : 'none',
+                            transition: 'transform 0.2s',
+                          }}
+                        >
+                          <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                      </button>
+
+                      {showCircleDropdown && (
+                        <div
+                          className="custom-select-dropdown"
+                          style={{
+                            position: 'absolute',
+                            zIndex: 1000,
+                            top: 'calc(100% + 4px)',
+                            left: 0,
+                            right: 0,
+                            background: 'var(--md-surface-container-high, #edf1f3)',
+                            border: '1px solid var(--md-outline-variant)',
+                            borderRadius: 'var(--md-r-sm)',
+                            boxShadow: 'var(--md-elev-2)',
+                            maxHeight: '200px',
+                            overflowY: 'auto',
+                            padding: '4px 0',
+                          }}
+                        >
+                          {graph.circles.map((c) => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => {
+                                setGraph((current) => ({
+                                  ...current,
+                                  people: current.people.map((p) =>
+                                    p.id === selectedPerson.id ? { ...p, circleId: c.id } : p
+                                  ),
+                                }))
+                                setShowCircleDropdown(false)
+                              }}
+                              className="custom-select-option"
+                              style={{
+                                width: '100%',
+                                textAlign: 'left',
+                                background: selectedPerson.circleId === c.id ? 'var(--md-secondary-container, #e2e7ec)' : 'transparent',
+                                color: 'var(--md-on-surface)',
+                                border: 'none',
+                                padding: '8px 12px',
+                                fontSize: '13px',
+                                cursor: 'pointer',
+                                display: 'block',
+                                transition: 'background-color 0.15s',
+                              }}
+                              onMouseEnter={(e) => {
+                                if (selectedPerson.circleId !== c.id) {
+                                  e.currentTarget.style.backgroundColor = 'var(--md-surface-container-highest, rgba(0,0,0,0.04))'
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (selectedPerson.circleId !== c.id) {
+                                  e.currentTarget.style.backgroundColor = 'transparent'
+                                }
+                              }}
+                            >
+                              {c.name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -2383,7 +2478,7 @@ function App() {
                 */}
 
                 {/* Notes Section */}
-                <div className="inspector-notes-section" style={{ marginTop: '12px', borderTop: '1px solid var(--md-outline-variant)', paddingTop: '12px' }}>
+                <div className="inspector-notes-section" style={{ marginTop: '12px', paddingTop: '12px' }}>
                   <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 500, color: 'var(--md-on-surface)' }}>Notes</h4>
 
                   {/* Scrollable list */}
