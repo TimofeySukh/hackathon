@@ -1441,8 +1441,8 @@ input[type="range"]::-webkit-slider-thumb:active {
   width: 100%;
   text-align: left;
   border: none;
-  border-radius: 12px;
-  padding: 10px 12px;
+  border-radius: 9999px;
+  padding: 10px 18px;
   font-size: 13px;
   font-weight: 500;
   outline: none;
@@ -1480,8 +1480,8 @@ input[type="range"]::-webkit-slider-thumb:active {
   width: 100%;
   text-align: left;
   border: none;
-  border-radius: 12px;
-  padding: 8px 12px;
+  border-radius: 9999px;
+  padding: 8px 16px;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
