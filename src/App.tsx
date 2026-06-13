@@ -413,6 +413,7 @@ function App() {
   const [newNoteBody, setNewNoteBody] = useState('')
   const [isAddingNote, setIsAddingNote] = useState(false)
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
+  const noteInputRef = useRef<HTMLTextAreaElement>(null)
 
   const settingsButtonRef = useRef<HTMLButtonElement>(null)
   const settingsPanelRef = useRef<HTMLDivElement>(null)
@@ -643,6 +644,21 @@ function App() {
         return p
       }),
     }))
+  }
+
+  function handleSaveNewNote(personId: string) {
+    const trimmed = newNoteBody.trim()
+    if (trimmed) {
+      addPersonNote(
+        personId,
+        trimmed.split('\n')[0].substring(0, 30) || 'Untitled note',
+        trimmed
+      )
+      setNewNoteBody('')
+      requestAnimationFrame(() => {
+        noteInputRef.current?.focus()
+      })
+    }
   }
 
   function updatePersonNote(personId: string, noteId: string, title: string, body: string) {
@@ -2334,11 +2350,8 @@ function App() {
                 <div className="trello-list" style={{ marginTop: '8px' }}>
                   <div className="trello-list__header">
                     <h4 className="trello-list__title">Notes</h4>
-                    <span className="trello-list__count">
-                      {selectedPerson.notes?.length ?? 0}
-                    </span>
                   </div>
-
+ 
                   {/* Scrollable list */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     {(!selectedPerson.notes || selectedPerson.notes.length === 0) ? (
@@ -2402,13 +2415,14 @@ function App() {
                       ))
                     )}
                   </div>
-
+ 
                   {/* Trello Card Composer */}
                   {isAddingNote ? (
                     <div className="trello-list__composer">
                       <div className="trello-list__composer-card">
                         <textarea
-                          placeholder="Enter a title or paste a link"
+                          ref={noteInputRef}
+                          placeholder="Write a note..."
                           value={newNoteBody}
                           onChange={(e) => setNewNoteBody(e.target.value)}
                           className="trello-list__composer-textarea"
@@ -2416,14 +2430,7 @@ function App() {
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' && !e.shiftKey) {
                               e.preventDefault()
-                              if (newNoteBody.trim()) {
-                                addPersonNote(
-                                  selectedPerson.id,
-                                  newNoteBody.trim().split('\n')[0].substring(0, 30) || 'Untitled note',
-                                  newNoteBody.trim()
-                                )
-                                setNewNoteBody('')
-                              }
+                              handleSaveNewNote(selectedPerson.id)
                             } else if (e.key === 'Escape') {
                               setIsAddingNote(false)
                               setNewNoteBody('')
@@ -2438,29 +2445,9 @@ function App() {
                         <button
                           type="button"
                           className="trello-list__composer-add-btn"
-                          onClick={() => {
-                            if (!newNoteBody.trim()) return
-                            addPersonNote(
-                              selectedPerson.id,
-                              newNoteBody.trim().split('\n')[0].substring(0, 30) || 'Untitled note',
-                              newNoteBody.trim()
-                            )
-                            setNewNoteBody('')
-                          }}
+                          onClick={() => handleSaveNewNote(selectedPerson.id)}
                         >
-                          Add card
-                        </button>
-                        <button
-                          type="button"
-                          className="trello-list__composer-tip-btn"
-                          onClick={() => {
-                            alert("Tip: Press Enter to quickly create a note, Shift+Enter for new line, or Escape to close.")
-                          }}
-                        >
-                          <svg viewBox="0 0 24 24">
-                            <path d="M9.663 17h4.673a2 2 0 0 1-2 2h-.673a2 2 0 0 1-2-2zM12 3a7 7 0 0 0-4.896 12h9.792A7 7 0 0 0 12 3zm-6 7a6 6 0 0 1 6-6V3a7 7 0 0 0-7 7h1z" />
-                          </svg>
-                          <span>Tip</span>
+                          Save note
                         </button>
                         <button
                           type="button"
@@ -2469,7 +2456,7 @@ function App() {
                             setIsAddingNote(false)
                             setNewNoteBody('')
                           }}
-                          title="Cancel"
+                          title="Discard"
                         >
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                             <line x1="18" y1="6" x2="6" y2="18" />
