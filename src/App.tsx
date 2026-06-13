@@ -4,6 +4,8 @@ import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent }
 import * as zip from '@zip.js/zip.js'
 
 zip.configure({ useWebWorkers: false })
+import { useAuth } from './lib/useAuth'
+import { loadGraph, saveGraph } from './lib/graphPersistence'
 // STRESS TEST — dev-only performance harness. See src/lib/stressTest.ts.
 import {
   STRESS_DEFAULT_CONFIG,
@@ -61,7 +63,7 @@ export type Connection = {
   toId: string
 }
 
-type GraphState = {
+export type GraphState = {
   circles: CircleNode[]
   people: PersonNode[]
   connections: Connection[]
@@ -321,7 +323,39 @@ function App() {
   const dragRafRef = useRef<number | null>(null)
   const pendingGraphRef = useRef<((current: GraphState) => GraphState) | null>(null)
   const pendingConnectorRef = useRef<DragConnector | null>(null)
+  const auth = useAuth()
+  const userId = auth.session?.user?.id ?? null
+  const [graphLoaded, setGraphLoaded] = useState(false)
+
   const [graph, setGraph] = useState(createInitialGraph)
+
+  // Load saved graph for signed-in user; skip demo seed so it never gets persisted.
+  useEffect(() => {
+    if (auth.status !== 'authenticated' || !userId) return
+    let cancelled = false
+    setGraphLoaded(false)
+    loadGraph(userId)
+      .then((saved) => {
+        if (cancelled) return
+        if (saved) setGraph(saved)
+        setGraphLoaded(true)
+      })
+      .catch((err) => {
+        console.error('Failed to load graph', err)
+        if (!cancelled) setGraphLoaded(true)
+      })
+    return () => { cancelled = true }
+  }, [auth.status, userId])
+
+  // Debounced autosave on every graph change after initial load.
+  useEffect(() => {
+    if (!graphLoaded || auth.status !== 'authenticated' || !userId) return
+    const timer = window.setTimeout(() => {
+      void saveGraph(userId, graph).catch((err) => console.error('Failed to save graph', err))
+    }, 800)
+    return () => window.clearTimeout(timer)
+  }, [graph, graphLoaded, auth.status, userId])
+
   const [camera, setCamera] = useState<Camera>({ x: window.innerWidth / 2, y: window.innerHeight / 2, scale: 0.82 })
   // cameraRef holds the *live* camera during a pan/zoom gesture. `camera` state
   // is only the last *settled* value (committed when the gesture stops moving).
