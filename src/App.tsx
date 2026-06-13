@@ -161,7 +161,6 @@ const MIN_CIRCLE_RADIUS = 72
 const EDGE_RESIZE_HIT_SIZE = 18
 const PERSON_VISUAL_RADIUS = 20
 const CIRCLE_CENTER_RADIUS = 20
-const CONNECTOR_HANDLE_RADIUS = 6
 const HANDLE_HIT_RADIUS = 16
 const PERSON_CONTAINMENT_RADIUS = 28
 const CIRCLE_CONTAINMENT_PADDING = 28
@@ -3138,10 +3137,23 @@ function drawSelectionHandles(ctx: CanvasRenderingContext2D, selectedItem: Selec
       ? index.circlesById.get(selectedItem.id)
       : null
   if (!selected) return
+
+  let tone: CircleTone = 'blue'
+  if (selectedItem?.type === 'circle') {
+    tone = (selected as CircleNode).tone
+  } else if (selectedItem?.type === 'person') {
+    const person = selected as PersonNode
+    const circle = person.circleId ? index.circlesById.get(person.circleId) : null
+    tone = circle?.tone ?? 'blue'
+  }
+  const color = MATERIAL_TONES[tone].centerBg
+  const screenRadius = 3.5 + 2.5 * Math.sqrt(scale)
+  const worldRadius = screenRadius / scale
+
   for (const handle of connectorHandlesFor(selected)) {
     ctx.beginPath()
-    ctx.arc(handle.x, handle.y, CONNECTOR_HANDLE_RADIUS / scale, 0, Math.PI * 2)
-    ctx.fillStyle = selectedItem?.type === 'circle' ? MATERIAL_TONES[(selected as CircleNode).tone].centerBg : '#00629d'
+    ctx.arc(handle.x, handle.y, worldRadius, 0, Math.PI * 2)
+    ctx.fillStyle = color
     ctx.fill()
     ctx.lineWidth = 2 / scale
     ctx.strokeStyle = '#ffffff'
