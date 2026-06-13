@@ -15,7 +15,7 @@ Provides a compact links menu for person nodes inside the inspector. Connections
 
 ## Design
 
-- The menu is intentionally dense and sits above Notes in the person inspector.
+- The menu is intentionally dense and sits below Notes in the person inspector, without a divider line between the two blocks.
 - Each connection row uses a left service icon, one-line label, and a small external-link icon.
 - The block uses the same Material 3 neutral container roles as the inspector and notes list.
 

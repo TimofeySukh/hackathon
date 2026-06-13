@@ -125,6 +125,12 @@ type SelectedItem =
 type CircleShapeMode = 'circles' | 'figures'
 type CircleFillMode = 'transparent' | 'solid'
 
+type HsvColor = {
+  h: number
+  s: number
+  v: number
+}
+
 type BoardHit =
   | { type: 'circle-center'; circle: CircleNode }
   | { type: 'circle-edge'; circle: CircleNode }
@@ -265,6 +271,48 @@ function rgbToHex(r: number, g: number, b: number) {
   return `#${[r, g, b].map((value) => value.toString(16).padStart(2, '0')).join('')}`
 }
 
+function hexToHsv(hex: string): HsvColor {
+  const rgb = hexToRgb(hex) ?? { r: 0, g: 98, b: 157 }
+  const r = rgb.r / 255
+  const g = rgb.g / 255
+  const b = rgb.b / 255
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const delta = max - min
+  let h = 0
+  if (delta !== 0) {
+    if (max === r) h = 60 * (((g - b) / delta) % 6)
+    else if (max === g) h = 60 * ((b - r) / delta + 2)
+    else h = 60 * ((r - g) / delta + 4)
+  }
+  if (h < 0) h += 360
+  return {
+    h,
+    s: max === 0 ? 0 : delta / max,
+    v: max,
+  }
+}
+
+function hsvToHex({ h, s, v }: HsvColor) {
+  const c = v * s
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
+  const m = v - c
+  let r = 0
+  let g = 0
+  let b = 0
+  if (h < 60) [r, g, b] = [c, x, 0]
+  else if (h < 120) [r, g, b] = [x, c, 0]
+  else if (h < 180) [r, g, b] = [0, c, x]
+  else if (h < 240) [r, g, b] = [0, x, c]
+  else if (h < 300) [r, g, b] = [x, 0, c]
+  else [r, g, b] = [c, 0, x]
+  return rgbToHex(
+    Math.round((r + m) * 255),
+    Math.round((g + m) * 255),
+    Math.round((b + m) * 255),
+  )
+}
+
 function inferLinkService(rawValue: string): PersonLinkService {
   const value = rawValue.trim().toLowerCase()
   if (value.includes('linkedin.com')) return 'linkedin'
@@ -319,28 +367,11 @@ function getNodePath(
   sides: number,
   amplitude: number
 ) {
-  if (shapeType === 'circle' || (shapeType === 'wavy' && amplitude === 0)) {
+  if (shapeType === 'circle') {
     let path = ''
     const points = Math.max(120, Math.round(r * 2))
     for (let i = 0; i <= points; i++) {
       const angle = (i * 2 * Math.PI) / points
-      const x = cx + r * Math.cos(angle)
-      const y = cy + r * Math.sin(angle)
-      if (i === 0) {
-        path += `M ${x.toFixed(2)} ${y.toFixed(2)}`
-      } else {
-        path += ` L ${x.toFixed(2)} ${y.toFixed(2)}`
-      }
-    }
-    path += ' Z'
-    return path
-  }
-
-  if (shapeType === 'polygon' && amplitude === 0) {
-    let path = ''
-    const angleStep = (2 * Math.PI) / sides
-    for (let i = 0; i < sides; i++) {
-      const angle = i * angleStep - Math.PI / 2
       const x = cx + r * Math.cos(angle)
       const y = cy + r * Math.sin(angle)
       if (i === 0) {
@@ -373,7 +404,7 @@ function getNodePath(
   }
 
   // shapeType === 'polygon'
-  const softness = Math.min(1.0, Math.max(0.0, amplitude / 20.0))
+  const softness = amplitude === 0 ? 0.42 : Math.min(1.0, Math.max(0.0, amplitude / 20.0))
   const vertices: { x: number; y: number }[] = []
   const angleStep = (2 * Math.PI) / sides
   for (let i = 0; i < sides; i++) {
@@ -875,6 +906,54 @@ function App() {
     setNewLinkValue('')
     setShowLinkServicePicker(false)
     setNewLinkService('website')
+  }
+
+  function setCircleColorFromHsv(circleId: string, hsv: HsvColor) {
+    updateCircleStyle(circleId, { customColor: hsvToHex(hsv) })
+  }
+
+  function handleColorFieldPointer(event: ReactPointerEvent<HTMLButtonElement>, circle: CircleNode) {
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    const rect = event.currentTarget.getBoundingClientRect()
+    const x = clamp((event.clientX - rect.left) / rect.width, 0, 1)
+    const y = clamp((event.clientY - rect.top) / rect.height, 0, 1)
+    const current = hexToHsv(getCircleColors(circle).centerBg)
+    setCircleColorFromHsv(circle.id, {
+      h: current.h,
+      s: x,
+      v: 1 - y,
+    })
+  }
+
+  function handleHuePointer(event: ReactPointerEvent<HTMLButtonElement>, circle: CircleNode) {
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    const rect = event.currentTarget.getBoundingClientRect()
+    const x = clamp((event.clientX - rect.left) / rect.width, 0, 1)
+    const current = hexToHsv(getCircleColors(circle).centerBg)
+    setCircleColorFromHsv(circle.id, {
+      ...current,
+      h: x * 360,
+    })
+  }
+
+  function updateCircleCorners(circle: CircleNode, sides: number) {
+    const currentAmplitude = circle.amplitude ?? 0
+    updateCircleStyle(circle.id, {
+      shapeType: currentAmplitude > 0 ? 'wavy' : sides >= 25 ? 'circle' : 'polygon',
+      sides,
+      amplitude: currentAmplitude,
+    })
+  }
+
+  function updateCircleAmplitude(circle: CircleNode, amplitude: number) {
+    const sides = circle.sides ?? 25
+    updateCircleStyle(circle.id, {
+      shapeType: amplitude > 0 ? 'wavy' : sides >= 25 ? 'circle' : 'polygon',
+      sides,
+      amplitude,
+    })
   }
 
   function deleteCircle(circleId: string) {
@@ -2523,7 +2602,25 @@ function App() {
             
             {selectedCircle && (
               <>
+                {(() => {
+                  const selectedCircleColors = getCircleColors(selectedCircle)
+                  const selectedCircleHsv = hexToHsv(selectedCircleColors.centerBg)
+                  const selectedCircleSides = selectedCircle.sides ?? 25
+                  const selectedCircleAmplitude = selectedCircle.amplitude ?? 0
+                  return (
                 <div className="inspector-visual-row">
+                  <div className="quick-circle-colors" aria-label="Quick circle colors">
+                    {(['blue', 'red', 'green', 'amber', 'violet'] as CircleTone[]).map((tone) => (
+                      <button
+                        key={tone}
+                        type="button"
+                        className={`quick-circle-color ${selectedCircle.tone === tone && !selectedCircle.customColor ? 'is-selected' : ''}`}
+                        style={{ backgroundColor: MATERIAL_TONES[tone].centerBg }}
+                        onClick={() => updateCircleStyle(selectedCircle.id, { tone, customColor: undefined })}
+                        aria-label={`Set quick color ${tone}`}
+                      />
+                    ))}
+                  </div>
                   <div className="circle-style-control">
                     <button
                       type="button"
@@ -2536,27 +2633,7 @@ function App() {
                     </button>
                     {showCircleStylePanel && (
                       <div className="circle-style-popover">
-                        <div className="circle-style-presets">
-                          {CIRCLE_COLOR_PRESETS.map((color) => (
-                            <button
-                              key={color}
-                              type="button"
-                              className={`circle-style-preset ${selectedCircle.customColor === color ? 'is-selected' : ''}`}
-                              style={{ backgroundColor: color }}
-                              onClick={() => updateCircleStyle(selectedCircle.id, { customColor: color })}
-                              aria-label={`Set circle color ${color}`}
-                            />
-                          ))}
-                        </div>
-                        <label className="circle-style-color-input">
-                          <span>Custom color</span>
-                          <input
-                            type="color"
-                            value={selectedCircle.customColor ?? getCircleColors(selectedCircle).centerBg}
-                            onChange={(event) => updateCircleStyle(selectedCircle.id, { customColor: event.target.value })}
-                          />
-                        </label>
-                        <div className="circle-style-segmented">
+                        <div className="circle-style-theme-tabs">
                           <button
                             type="button"
                             className={(selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'is-selected' : ''}
@@ -2572,53 +2649,81 @@ function App() {
                             Solid
                           </button>
                         </div>
-                        <div className="circle-style-control-row">
-                          <label>Shape</label>
-                          <div className="circle-style-segmented">
+                        <button
+                          type="button"
+                          className="arc-color-field"
+                          style={{
+                            '--arc-hue': String(Math.round(selectedCircleHsv.h)),
+                            '--arc-color': selectedCircleColors.centerBg,
+                            '--arc-s': `${selectedCircleHsv.s * 100}%`,
+                            '--arc-v': `${(1 - selectedCircleHsv.v) * 100}%`,
+                          } as CSSProperties}
+                          onPointerDown={(event) => handleColorFieldPointer(event, selectedCircle)}
+                          onPointerMove={(event) => {
+                            if (event.buttons === 1) handleColorFieldPointer(event, selectedCircle)
+                          }}
+                          aria-label="Pick circle color"
+                        >
+                          <span className="arc-color-field__thumb" />
+                        </button>
+                        <button
+                          type="button"
+                          className="arc-hue-slider"
+                          style={{ '--arc-hue-pos': `${(selectedCircleHsv.h / 360) * 100}%` } as CSSProperties}
+                          onPointerDown={(event) => handleHuePointer(event, selectedCircle)}
+                          onPointerMove={(event) => {
+                            if (event.buttons === 1) handleHuePointer(event, selectedCircle)
+                          }}
+                          aria-label="Pick color hue"
+                        >
+                          <span className="arc-hue-slider__thumb" />
+                        </button>
+                        <div className="circle-style-presets">
+                          <button
+                            type="button"
+                            className="circle-style-preset-nav"
+                            aria-label="Previous color presets"
+                          >
+                            <ChevronLeftIcon />
+                          </button>
+                          {CIRCLE_COLOR_PRESETS.slice(0, 8).map((color) => (
                             <button
+                              key={color}
                               type="button"
-                              className={(selectedCircle.shapeType ?? 'circle') === 'circle' ? 'is-selected' : ''}
-                              onClick={() => updateCircleStyle(selectedCircle.id, { shapeType: 'circle', amplitude: 0 })}
-                            >
-                              Circle
-                            </button>
-                            <button
-                              type="button"
-                              className={selectedCircle.shapeType === 'wavy' ? 'is-selected' : ''}
-                              onClick={() => updateCircleStyle(selectedCircle.id, { shapeType: 'wavy', amplitude: Math.max(4, selectedCircle.amplitude ?? 8), sides: selectedCircle.sides ?? 12 })}
-                            >
-                              Wavy
-                            </button>
-                            <button
-                              type="button"
-                              className={selectedCircle.shapeType === 'polygon' ? 'is-selected' : ''}
-                              onClick={() => updateCircleStyle(selectedCircle.id, { shapeType: 'polygon', amplitude: selectedCircle.amplitude ?? 8, sides: selectedCircle.sides ?? 8 })}
-                            >
-                              Polygon
-                            </button>
-                          </div>
+                              className={`circle-style-preset ${selectedCircleColors.centerBg.toLowerCase() === color.toLowerCase() ? 'is-selected' : ''}`}
+                              style={{ backgroundColor: color }}
+                              onClick={() => updateCircleStyle(selectedCircle.id, { customColor: color })}
+                              aria-label={`Set circle color ${color}`}
+                            />
+                          ))}
+                          <button
+                            type="button"
+                            className="circle-style-preset-nav"
+                            aria-label="Next color presets"
+                          >
+                            <ChevronRightIcon />
+                          </button>
                         </div>
                         <label className="circle-style-control-row">
-                          <span>Amplitude {Math.round(selectedCircle.amplitude ?? 0)}</span>
+                          <span>{`Amplitude ${Math.round(selectedCircleAmplitude)}`}</span>
                           <input
+                            className="wave-slider"
                             type="range"
                             min="0"
                             max="28"
-                            value={selectedCircle.amplitude ?? 0}
-                            onChange={(event) => updateCircleStyle(selectedCircle.id, { shapeType: selectedCircle.shapeType === 'polygon' ? 'polygon' : 'wavy', amplitude: Number(event.target.value) })}
+                            value={selectedCircleAmplitude}
+                            onChange={(event) => updateCircleAmplitude(selectedCircle, Number(event.target.value))}
                           />
                         </label>
                         <label className="circle-style-control-row">
-                          <span>{(selectedCircle.sides ?? 0) <= 3 ? 'Corners circle' : `Corners ${selectedCircle.sides ?? 12}`}</span>
+                          <span>{selectedCircleSides >= 25 ? 'Corners circle' : `Corners ${selectedCircleSides}`}</span>
                           <input
+                            className="corner-slider"
                             type="range"
-                            min="3"
+                            min="5"
                             max="25"
-                            value={selectedCircle.shapeType === 'circle' ? 3 : selectedCircle.sides ?? 12}
-                            onChange={(event) => {
-                              const sides = Number(event.target.value)
-                              updateCircleStyle(selectedCircle.id, sides <= 3 ? { shapeType: 'circle', sides, amplitude: 0 } : { shapeType: selectedCircle.shapeType === 'polygon' ? 'polygon' : 'wavy', sides })
-                            }}
+                            value={selectedCircleSides}
+                            onChange={(event) => updateCircleCorners(selectedCircle, Number(event.target.value))}
                           />
                         </label>
                       </div>
@@ -2648,6 +2753,8 @@ function App() {
                     </label>
                   </div>
                 </div>
+                  )
+                })()}
 
                 {/* Commented out Shape settings and Center Image URL to hide from menu, keeping in code for future use
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px' }}>
@@ -2909,87 +3016,6 @@ function App() {
                 </div>
                 */}
 
-                <div className="connections-list">
-                  <div className="connections-list__header">
-                    <h4 className="connections-list__title">Connections</h4>
-                  </div>
-                  <div className="connections-list__items">
-                    {selectedPerson.links?.map((link) => (
-                      <div key={link.id} className="connection-item">
-                        <button
-                          type="button"
-                          className={`connection-item__main connection-item__main--${link.service}`}
-                          onClick={() => window.open(link.url, '_blank', 'noopener,noreferrer')}
-                          title={link.url}
-                        >
-                          <ConnectionServiceIcon service={link.service} />
-                          <span>{link.label}</span>
-                          <ExternalLinkIcon />
-                        </button>
-                        <button
-                          type="button"
-                          className="connection-item__delete"
-                          onClick={() => deletePersonLink(selectedPerson.id, link.id)}
-                          title="Delete connection"
-                        >
-                          <CloseIcon />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="connection-composer">
-                    <input
-                      type="text"
-                      value={newLinkValue}
-                      placeholder="Add link, @handle, or phone"
-                      onChange={(event) => {
-                        setNewLinkValue(event.target.value)
-                        setShowLinkServicePicker(false)
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          event.preventDefault()
-                          handleSaveNewLink(selectedPerson.id)
-                        } else if (event.key === 'Escape') {
-                          setNewLinkValue('')
-                          setShowLinkServicePicker(false)
-                        }
-                      }}
-                    />
-                    <button type="button" onClick={() => handleSaveNewLink(selectedPerson.id)}>
-                      Save
-                    </button>
-                  </div>
-                  {showLinkServicePicker && (
-                    <div className="connection-service-picker">
-                      {LINK_SERVICE_OPTIONS.filter((option) =>
-                        newLinkValue.trim().startsWith('@')
-                          ? ['telegram', 'instagram', 'x'].includes(option.service)
-                          : ['whatsapp', 'telegram', 'website'].includes(option.service)
-                      ).map((option) => (
-                        <button
-                          key={option.service}
-                          type="button"
-                          className={newLinkService === option.service ? 'is-selected' : ''}
-                          onClick={() => {
-                            setNewLinkService(option.service)
-                            addPersonLink(selectedPerson.id, newLinkValue, option.service)
-                            setNewLinkValue('')
-                            setShowLinkServicePicker(false)
-                            setNewLinkService('website')
-                          }}
-                        >
-                          <ConnectionServiceIcon service={option.service} />
-                          <span>{option.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Divider to separate notes section from metadata */}
-                <div style={{ height: '1px', backgroundColor: 'var(--md-outline-variant)', margin: '6px 0' }} />
-
                 {/* Notes Section (Trello-Style) */}
                 <div className="trello-list">
                   <div className="trello-list__header">
@@ -3123,6 +3149,84 @@ function App() {
                       </svg>
                       <span>Add a card</span>
                     </button>
+                  )}
+                </div>
+
+                <div className="connections-list">
+                  <div className="connections-list__header">
+                    <h4 className="connections-list__title">Connections</h4>
+                  </div>
+                  <div className="connections-list__items">
+                    {selectedPerson.links?.map((link) => (
+                      <div key={link.id} className="connection-item">
+                        <button
+                          type="button"
+                          className={`connection-item__main connection-item__main--${link.service}`}
+                          onClick={() => window.open(link.url, '_blank', 'noopener,noreferrer')}
+                          title={link.url}
+                        >
+                          <ConnectionServiceIcon service={link.service} />
+                          <span>{link.label}</span>
+                          <ExternalLinkIcon />
+                        </button>
+                        <button
+                          type="button"
+                          className="connection-item__delete"
+                          onClick={() => deletePersonLink(selectedPerson.id, link.id)}
+                          title="Delete connection"
+                        >
+                          <CloseIcon />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="connection-composer">
+                    <input
+                      type="text"
+                      value={newLinkValue}
+                      placeholder="Add link, @handle, or phone"
+                      onChange={(event) => {
+                        setNewLinkValue(event.target.value)
+                        setShowLinkServicePicker(false)
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault()
+                          handleSaveNewLink(selectedPerson.id)
+                        } else if (event.key === 'Escape') {
+                          setNewLinkValue('')
+                          setShowLinkServicePicker(false)
+                        }
+                      }}
+                    />
+                    <button type="button" onClick={() => handleSaveNewLink(selectedPerson.id)}>
+                      Save
+                    </button>
+                  </div>
+                  {showLinkServicePicker && (
+                    <div className="connection-service-picker">
+                      {LINK_SERVICE_OPTIONS.filter((option) =>
+                        newLinkValue.trim().startsWith('@')
+                          ? ['telegram', 'instagram', 'x'].includes(option.service)
+                          : ['whatsapp', 'telegram', 'website'].includes(option.service)
+                      ).map((option) => (
+                        <button
+                          key={option.service}
+                          type="button"
+                          className={newLinkService === option.service ? 'is-selected' : ''}
+                          onClick={() => {
+                            setNewLinkService(option.service)
+                            addPersonLink(selectedPerson.id, newLinkValue, option.service)
+                            setNewLinkValue('')
+                            setShowLinkServicePicker(false)
+                            setNewLinkService('website')
+                          }}
+                        >
+                          <ConnectionServiceIcon service={option.service} />
+                          <span>{option.label}</span>
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
 
@@ -3441,9 +3545,9 @@ function drawImageCover(
   ctx.drawImage(image, sx, sy, sw, sh, dx, dy, dWidth, dHeight)
 }
 
-function getPersonSprite(person: PersonNode, tone: CircleTone, size: number, stroke: string, strokeWidth: number): HTMLCanvasElement {
+function getPersonSprite(person: PersonNode, fillColor: string, size: number, stroke: string, strokeWidth: number): HTMLCanvasElement {
   const imageKey = person.imageUrl ? `img:${person.imageUrl.length}` : person.avatar
-  const key = `${tone}|${imageKey}|${person.shapeType ?? 'wavy'}|${person.sides ?? 8}|${person.amplitude ?? 1}|${stroke}|${strokeWidth}|${size}`
+  const key = `${fillColor}|${imageKey}|${person.shapeType ?? 'wavy'}|${person.sides ?? 8}|${person.amplitude ?? 1}|${stroke}|${strokeWidth}|${size}`
   const cached = personSpriteCache.get(key)
   if (cached) return cached
 
@@ -3456,7 +3560,7 @@ function getPersonSprite(person: PersonNode, tone: CircleTone, size: number, str
   const scale = size / 40
   const path = new Path2D(getNodePath(20 * scale, 20 * scale, 18 * scale, person.shapeType ?? 'wavy', person.sides ?? 8, (person.amplitude ?? 1) * scale))
   ctx.save()
-  ctx.fillStyle = MATERIAL_TONES[tone].centerBg
+  ctx.fillStyle = fillColor
   ctx.strokeStyle = stroke
   ctx.lineWidth = strokeWidth * scale
   ctx.stroke(path)
@@ -3667,13 +3771,16 @@ function drawCircleDetails(
 
 function getCircleRenderPath(circle: CircleNode, circleShapeMode: CircleShapeMode) {
   void circleShapeMode
+  const amplitude = circle.amplitude ?? 0
+  const sides = circle.sides ?? 25
+  const shapeType: ShapeType = amplitude > 0 ? 'wavy' : sides >= 25 ? 'circle' : 'polygon'
   return getNodePath(
     circle.x,
     circle.y,
     circle.radius,
-    circle.shapeType ?? 'circle',
-    circle.sides ?? Math.max(8, Math.round(circle.radius / 10)),
-    circle.amplitude ?? 0,
+    shapeType,
+    sides,
+    amplitude,
   )
 }
 
@@ -3749,13 +3856,13 @@ function drawPeople(
   ctx.imageSmoothingQuality = 'high'
   for (const person of people) {
     const circle = index.circlesById.get(person.circleId)
-    const tone = circle?.tone ?? 'blue'
+    const circleColor = circle ? getCircleColors(circle).centerBg : MATERIAL_TONES.blue.centerBg
     const isSelected = (selectedItem?.type === 'person' && selectedItem.id === person.id) || selectedPeopleIds.includes(person.id)
     const isHovered = hoveredPersonId === person.id
-    const stroke = person.isFavorite ? '#ffd600' : isSelected ? '#00629d' : isHovered ? '#64748b' : MATERIAL_TONES[tone].centerBg
+    const stroke = person.isFavorite ? '#ffd600' : isSelected ? '#00629d' : isHovered ? '#64748b' : circleColor
     const strokeWidth = person.isFavorite ? (isSelected ? 5.5 : 4.5) : isSelected || isHovered ? 2.5 : 1.5
     ctx.drawImage(
-      getPersonSprite(person, tone, spriteRes, stroke, strokeWidth),
+      getPersonSprite(person, circleColor, spriteRes, stroke, strokeWidth),
       person.x - PERSON_VISUAL_RADIUS,
       person.y - PERSON_VISUAL_RADIUS,
       PERSON_VISUAL_RADIUS * 2,
@@ -3797,15 +3904,14 @@ function drawSelectionHandles(ctx: CanvasRenderingContext2D, selectedItem: Selec
       : null
   if (!selected) return
 
-  let tone: CircleTone = 'blue'
+  let color = MATERIAL_TONES.blue.centerBg
   if (selectedItem?.type === 'circle') {
-    tone = (selected as CircleNode).tone
+    color = getCircleColors(selected as CircleNode).centerBg
   } else if (selectedItem?.type === 'person') {
     const person = selected as PersonNode
     const circle = person.circleId ? index.circlesById.get(person.circleId) : null
-    tone = circle?.tone ?? 'blue'
+    color = circle ? getCircleColors(circle).centerBg : MATERIAL_TONES.blue.centerBg
   }
-  const color = MATERIAL_TONES[tone].centerBg
   const screenRadius = 3.5 + 2.5 * Math.sqrt(scale)
   const worldRadius = screenRadius / scale
 
@@ -4677,6 +4783,22 @@ function CloseIcon() {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M18 6 6 18" />
       <path d="m6 6 12 12" />
+    </svg>
+  )
+}
+
+function ChevronLeftIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m15 18-6-6 6-6" />
+    </svg>
+  )
+}
+
+function ChevronRightIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m9 18 6-6-6-6" />
     </svg>
   )
 }

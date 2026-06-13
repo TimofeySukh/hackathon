@@ -17,6 +17,12 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-13 — Arc-Like Circle Color Picker
+
+- Decision: Replaced the native color input in the circle style popover with an in-app HSV picker inspired by Arc-style color panels: a large dotted spatial color field, a hue rail, quick preset swatches, and solid/transparent tabs. The circle inspector keeps five quick color buttons directly visible.
+- Shape rule: Circle shape customization is driven by only two sliders. `Amplitude = 0` renders a smooth polygon, or a true circle at 25 corners. `Amplitude > 0` renders the same corner count as a flower/wavy shape. There is no separate rounding control.
+- Rendering: People inside a custom-colored circle and connector handles now use the circle's resolved custom color, not just its legacy tone.
+
 ### 2026-06-13 — Compact Inspector, Person Connections, and Circle Style Popover
 
 - Decision: Tightened the person/circle inspector spacing and added a dedicated Person Connections block for imported LinkedIn profile URLs, custom URLs, handles, and phone-app links. Handles such as `@name` now ask for the target social service before saving when ambiguous.
