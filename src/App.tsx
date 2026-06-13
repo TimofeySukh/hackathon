@@ -1567,44 +1567,61 @@ function App() {
     }
   }
 
+  // Double-tap creates a blob and figures out containment on its own: tapping
+  // inside an existing circle nests a subset blob in it, tapping empty space
+  // drops a fresh standalone blob. This replaces the old Shift+drag shortcut.
   function handleSurfaceDoubleClick(event: React.MouseEvent<HTMLDivElement>) {
     if (event.button !== 0) return
+    if (demoMode) return
     const hit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
       x: event.clientX,
       y: event.clientY,
     })
 
+    // Resolve the circle we double-tapped inside, if any. A person hit counts as
+    // its owning circle so tapping near someone still nests in their blob.
+    let containerId: string | null = null
     if (hit && (hit.type === 'circle-body' || hit.type === 'circle-center' || hit.type === 'circle-edge')) {
-      const circleId = hit.circle.id
-      const world = screenToWorld({ x: event.clientX, y: event.clientY })
-      const source = circlesById.get(circleId)
-      if (!source) return
-
-      const id = `person-${Date.now()}`
-      const sides = Math.floor(Math.random() * 5) + 8
-      setGraph((current) => {
-        return ensureContainment({
-          ...current,
-          people: [
-            ...current.people,
-            {
-              id,
-              name: `New person ${current.people.length + 1}`,
-              role: `Inside ${source.name}`,
-              x: world.x,
-              y: world.y,
-              circleId: source.id,
-              avatar: makeAvatar(current.people.length + 1),
-              shapeType: 'circle',
-              sides,
-              amplitude: 0,
-            },
-          ],
-        })
-      })
-      setSelectedPeopleIds([])
-      setSelectedItem({ type: 'person', id: id })
+      containerId = hit.circle.id
+    } else if (hit && hit.type === 'person') {
+      containerId = hit.person.circleId ?? null
     }
+
+    const world = screenToWorld({ x: event.clientX, y: event.clientY })
+    createBlobAt(world, containerId)
+  }
+
+  // Shared blob factory used by the double-tap shortcut. `containerId` decides
+  // nested-subset vs. standalone top-level styling and linkage.
+  function createBlobAt(world: { x: number; y: number }, containerId: string | null) {
+    const source = containerId ? circlesById.get(containerId) : null
+    const isNested = Boolean(source)
+    const id = `circle-${Date.now()}`
+    setGraph((current) =>
+      ensureContainment({
+        ...current,
+        circles: [
+          ...current.circles,
+          {
+            id,
+            name: isNested ? `${source!.name} subset` : 'New circle',
+            icon: isNested ? 'SUB' : 'C',
+            x: world.x,
+            y: world.y,
+            radius: isNested ? 82 : 190,
+            minRadius: isNested ? 82 : 190,
+            parentId: isNested ? source!.id : null,
+            connectedTo: isNested ? source!.id : null,
+            tone: isNested ? 'violet' : nextTone(current.circles.length),
+            shapeType: isNested ? 'polygon' : 'wavy',
+            sides: isNested ? 6 : 12,
+            amplitude: isNested ? 4 : 8,
+          },
+        ],
+      }),
+    )
+    setSelectedPeopleIds([])
+    setSelectedItem({ type: 'circle', id })
   }
 
   function handleMergeSelected() {
@@ -1705,6 +1722,17 @@ function App() {
     })
     setSelectedItem({ type: 'person', id })
     setCreateMenu(null)
+  }
+
+  // "Add circle" in the create menu auto-detects containment the same way the
+  // double-tap shortcut does: a target point inside the source circle nests a
+  // subset, otherwise it spawns a connected circle outside.
+  function createCircleAuto() {
+    if (!createMenu) return
+    const source = circlesById.get(createMenu.sourceCircleId)
+    if (!source) return
+    const inside = Math.hypot(createMenu.x - source.x, createMenu.y - source.y) <= source.radius
+    createCircle(inside ? 'nested' : 'external')
   }
 
   function createCircle(mode: 'nested' | 'external') {
@@ -1857,7 +1885,7 @@ function App() {
 
   // Keep references to unused features so they remain in codebase for future use and satisfy TS/ESLint checks
   if (false as boolean) {
-    console.log(setDemoMode, setShowCircleLabels, setShowPersonLabels, setCircleFillMode, setCenterBehavior, applyCircleShapeMode, CheckIcon)
+    console.log(setDemoMode, setShowCircleLabels, setShowPersonLabels, setCircleFillMode, setCenterBehavior, applyCircleShapeMode, CheckIcon, SubsetIcon)
   }
 
   return (
@@ -2000,37 +2028,14 @@ function App() {
 
       {createMenu ? (
         <div className="create-menu" style={menuPosition(createMenu)}>
-          {createMenu.dragSourceType === 'person' ? (
-            <>
-              <button type="button" onClick={createPerson}>
-                <PersonIcon />
-                <span>Add person</span>
-              </button>
-              <button type="button" onClick={() => createCircle('nested')}>
-                <SubsetIcon />
-                <span>Add subset inside source circle</span>
-              </button>
-              <button type="button" onClick={() => createCircle('external')}>
-                <CircleIcon />
-                <span>Add circle</span>
-              </button>
-            </>
-          ) : (
-            <>
-              <button type="button" onClick={createPerson}>
-                <PersonIcon />
-                <span>Add person here</span>
-              </button>
-              <button type="button" onClick={() => createCircle('nested')}>
-                <SubsetIcon />
-                <span>Add subset inside source circle</span>
-              </button>
-              <button type="button" onClick={() => createCircle('external')}>
-                <CircleIcon />
-                <span>Create connected circle outside</span>
-              </button>
-            </>
-          )}
+          <button type="button" onClick={createPerson}>
+            <PersonIcon />
+            <span>Add person</span>
+          </button>
+          <button type="button" onClick={createCircleAuto}>
+            <CircleIcon />
+            <span>Add circle</span>
+          </button>
         </div>
       ) : null}
 

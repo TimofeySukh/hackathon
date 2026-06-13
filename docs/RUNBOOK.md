@@ -14,8 +14,8 @@ Current visible prototype behavior:
 - includes settings controls for demo mode, circle labels, person names, global circle shape, and global circle fill style
 - demo mode hides the app chrome and leaves the canvas plus the settings button while still allowing selection, deletion, visible connector handles, link creation, and drag-to-empty create menus for people, subset circles, and connected circles
 - includes a people load panel with a 0-10,000 generated-person slider, optional people edges, and live FPS
-- creates people, nested subset circles, or external connected circles from a circle context menu
-- supports Shift-drag from a circle center as a shortcut for creating from that center
+- creates a person or a circle from a circle context menu (containment auto-detected for circles)
+- supports double-tap anywhere to create a blob, nesting a subset inside a circle or dropping a standalone blob on empty space
 - keeps people as endpoints and circle centers as the only branch-creation sources
 - selects and renames circles or people in the inspector
 - adds three demo people to the selected circle

@@ -18,9 +18,13 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   minimum) as their contents move. Shrinking a circle pulls its contained people and subset
   circles toward the center, and nested subset circles shrink with the parent when position
   packing alone cannot fit them.
-- **Create**: right-click a circle, or Shift-drag from a circle center, to open the
-  create menu (add person / nested subset circle / connected external circle). People are
-  endpoints; only circle centers spawn new branches.
+- **Create**: right-click a circle to open the create menu, which now offers two actions —
+  add person and add circle. "Add circle" auto-detects containment from the target point:
+  inside the source circle it nests a subset blob, outside it spawns a connected circle.
+- **Double-tap create**: double-click (double-tap) anywhere to drop a blob. The board
+  resolves containment on its own — double-tapping inside an existing circle nests a subset
+  blob in it, while double-tapping empty space drops a fresh standalone blob. This replaces
+  the older Shift-drag-from-center shortcut.
 - **Connect**: with the "Draw Connection" center behavior, drag from a circle center to
   another node to draw a relationship link. A dashed draft edge previews the connection.
 - **Select**: click a circle, person, or connection to load it into the inspector for
@@ -31,7 +35,7 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   still be resized. Existing items can still be selected on the canvas and deleted with
   Backspace/Delete. Connector handles stay visible. Dragging a circle/person connector to
   an existing node creates a link; dragging to empty space opens the create menu so users
-  can add a person, subset circle, or external connected circle without leaving demo mode.
+  can add a person or a circle without leaving demo mode.
 - **Labels**: Settings includes separate toggles for circle labels and person names.
   Circle-center icon text scales with the world transform like people avatars; labels use
   the same screen-readable label treatment as person names.
