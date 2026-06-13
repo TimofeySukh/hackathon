@@ -7,13 +7,6 @@ zip.configure({ useWebWorkers: false })
 import { useAuth } from './lib/useAuth'
 import { loadGraph, saveGraph } from './lib/graphPersistence'
 // STRESS TEST — dev-only performance harness. See src/lib/stressTest.ts.
-import {
-  STRESS_TEST_ENABLED,
-  STRESS_DEFAULT_CONFIG,
-  STRESS_LIMITS,
-  generateStressGraph,
-  type StressConfig,
-} from './lib/stressTest'
 
 export type CircleTone = 'blue' | 'red' | 'green' | 'amber' | 'violet'
 
@@ -162,9 +155,7 @@ type ResizeCircleState = {
 
 const MIN_SCALE = 0.35
 const MAX_SCALE = 1.8
-// Render only nodes inside the viewport, padded by this fraction on each side so
-// small pans reveal already-rendered nodes before the gesture settles.
-const CULL_OVERSCAN = 0.45
+
 const CONNECT_THRESHOLD = 40
 const MIN_CIRCLE_RADIUS = 72
 const EDGE_RESIZE_HIT_SIZE = 18
@@ -405,8 +396,7 @@ function App() {
   // Person currently under the cursor — promoted to an interactive DOM node so it
   // can be clicked/dragged even inside a dense circle that's otherwise canvas-only.
   const [hoveredPersonId, setHoveredPersonId] = useState<string | null>(null)
-  // STRESS TEST — synthetic-load config (circles / people / cross-links).
-  const [stress, setStress] = useState<StressConfig>(STRESS_DEFAULT_CONFIG)
+
   // Viewport size in CSS px, used to cull off-screen nodes. Updated on resize.
   const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight })
 
@@ -831,32 +821,12 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedItem])
 
-  // STRESS TEST — generate real synthetic entities (circles, people, links)
-  // and merge them into the arrays that feed the render passes, so they go
-  // through the exact same React DOM + SVG path as production data.
-  const stressGraph = useMemo(() => generateStressGraph(stress), [stress])
-  const displayCircles = useMemo(
-    () => (stressGraph.circles.length ? [...graph.circles, ...stressGraph.circles] : graph.circles),
-    [graph.circles, stressGraph.circles],
-  )
-  const displayPeople = useMemo(
-    () => (stressGraph.people.length ? [...graph.people, ...stressGraph.people] : graph.people),
-    [graph.people, stressGraph.people],
-  )
-  const displayConnections = useMemo(
-    () =>
-      stressGraph.connections.length
-        ? [...(graph.connections || []), ...stressGraph.connections]
-        : graph.connections || [],
-    [graph.connections, stressGraph.connections],
-  )
+  const displayCircles = graph.circles
+  const displayPeople = graph.people
+  const displayConnections = useMemo(() => graph.connections || [], [graph.connections])
 
   const circlesById = useMemo(() => new Map(displayCircles.map((circle) => [circle.id, circle])), [displayCircles])
   const peopleById = useMemo(() => new Map(displayPeople.map((person) => [person.id, person])), [displayPeople])
-  const renderedPeopleCount = displayPeople.length
-  const renderedCircleCount = displayCircles.length
-  const renderedEdgeCount =
-    displayCircles.filter((circle) => circle.connectedTo).length + displayPeople.length + displayConnections.length
   const sortedCircles = useMemo(() => {
     function getDepth(circleId: string | null): number {
       let depth = 0
@@ -874,33 +844,15 @@ function App() {
     [sortedCircles, displayPeople, displayConnections],
   )
 
-  // VIEWPORT CULLING — derive the visible world rectangle from the settled
-  // camera, padded by CULL_OVERSCAN. During a gesture `camera` is frozen (only
-  // cameraRef moves), so these sets stay stable and the GPU-composited world
-  // layer just translates them; on settle they refresh. Keeping the rendered
-  // set small makes both React reconciliation and layer rasterization cheap.
-  const visibleWorld = useMemo(() => {
-    const s = camera.scale
-    const left = -camera.x / s
-    const top = -camera.y / s
-    const right = (viewport.w - camera.x) / s
-    const bottom = (viewport.h - camera.y) / s
-    const mx = (right - left) * CULL_OVERSCAN
-    const my = (bottom - top) * CULL_OVERSCAN
-    return { left: left - mx, right: right + mx, top: top - my, bottom: bottom + my }
-  }, [camera, viewport])
 
-  const visibleCircles = useMemo(() => queryCircles(boardIndex, visibleWorld), [boardIndex, visibleWorld])
 
-  // People are always drawn (on the canvas layer below), so we only need the
-  // culled set to decide which ones also get an interactive DOM overlay.
-  const visiblePeople = useMemo(() => queryPeople(boardIndex, visibleWorld), [boardIndex, visibleWorld])
+
 
   const selectedCircle = selectedItem?.type === 'circle' ? circlesById.get(selectedItem.id) ?? null : null
   const selectedPerson = selectedItem?.type === 'person' ? graph.people.find((person) => person.id === selectedItem.id) ?? null : null
   const selectedConnection = selectedItem?.type === 'connection' ? (graph.connections || []).find((conn) => conn.id === selectedItem.id) ?? null : null
 
-  const drawnNodeCount = visibleCircles.length + visiblePeople.length
+
 
   // Push the live camera onto the dotted grid without going through React.
   function applyDomCamera(cam: Camera) {
@@ -1786,13 +1738,7 @@ function App() {
     setGraph((current) => ensureContainment({ ...current, people: [...current.people, ...points] }))
   }
 
-  function resetDemo() {
-    setGraph(createInitialGraph())
-    setSelectedItem(null)
-    setCreateMenu(null)
-    setConnector(null)
-    setCamera({ x: window.innerWidth / 2, y: window.innerHeight / 2, scale: 0.82 })
-  }
+
 
   function renameSelected(value: string) {
     if (!selectedItem) return
@@ -1867,26 +1813,7 @@ function App() {
   return (
     <main className={`app-shell ${demoMode ? 'is-demo-mode' : ''}`}>
       <div className="toolbar" aria-label="Graph controls">
-        {!demoMode && selectedItem && (
-        <div className="brand">
-          <span className="brand__mark">DN</span>
-          <span>Circle graph prototype</span>
-        </div>
-        )}
         <div className={`toolbar__group ${demoMode ? 'toolbar__group--demo' : ''}`}>
-          {!demoMode && selectedItem && (
-          <>
-          <button type="button" onClick={() => setCamera((current) => ({ ...current, scale: clamp(current.scale * 1.14, MIN_SCALE, MAX_SCALE) }))} aria-label="Zoom in">
-            <ZoomInIcon />
-          </button>
-          <button type="button" onClick={() => setCamera((current) => ({ ...current, scale: clamp(current.scale / 1.14, MIN_SCALE, MAX_SCALE) }))} aria-label="Zoom out">
-            <ZoomOutIcon />
-          </button>
-          <button type="button" onClick={resetDemo} aria-label="Reset demo">
-            <ResetIcon />
-          </button>
-          </>
-          )}
           <button
             ref={settingsButtonRef}
             type="button"
@@ -2090,86 +2017,7 @@ function App() {
         </div>
       )}
 
-      {/* STRESS TEST — dev-only panel. Hidden when STRESS_TEST_ENABLED is false. */}
-      {!demoMode && STRESS_TEST_ENABLED && selectedItem && (
-        <section className="stress-panel" aria-label="Performance stress test controls">
-          <div className="stress-panel__header">
-            <strong>Real-node stress</strong>
-            <FpsMeter />
-          </div>
-          <label className="stress-slider">
-            <span>{stress.circleCount.toLocaleString('en-US')} circles</span>
-            <input
-              type="range"
-              min="0"
-              max={STRESS_LIMITS.circleCount}
-              step="5"
-              value={stress.circleCount}
-              onChange={(event) => setStress((current) => ({ ...current, circleCount: Number(event.target.value) }))}
-            />
-          </label>
-          <label className="stress-slider">
-            <span>{stress.peoplePerCircle.toLocaleString('en-US')} people / circle</span>
-            <input
-              type="range"
-              min="0"
-              max={STRESS_LIMITS.peoplePerCircle}
-              step="1"
-              value={stress.peoplePerCircle}
-              onChange={(event) => setStress((current) => ({ ...current, peoplePerCircle: Number(event.target.value) }))}
-            />
-          </label>
-          <label className="stress-slider">
-            <span>{stress.crossLinks.toLocaleString('en-US')} cross-links</span>
-            <input
-              type="range"
-              min="0"
-              max={STRESS_LIMITS.crossLinks}
-              step="25"
-              value={stress.crossLinks}
-              onChange={(event) => setStress((current) => ({ ...current, crossLinks: Number(event.target.value) }))}
-            />
-          </label>
-          <div className="stress-toggles" style={{ gap: '16px' }}>
-            <button
-              type="button"
-              className="m3-text-button"
-              onClick={() => setStress(STRESS_DEFAULT_CONFIG)}
-            >
-              Clear
-            </button>
-          </div>
-          <dl>
-            <div>
-              <dt>Circles</dt>
-              <dd>{renderedCircleCount.toLocaleString('en-US')}</dd>
-            </div>
-            <div>
-              <dt>People</dt>
-              <dd>{renderedPeopleCount.toLocaleString('en-US')}</dd>
-            </div>
-            <div>
-              <dt>Edges</dt>
-              <dd>{renderedEdgeCount.toLocaleString('en-US')}</dd>
-            </div>
-            <div>
-              <dt>On screen</dt>
-              <dd>{drawnNodeCount.toLocaleString('en-US')}</dd>
-            </div>
-          </dl>
-        </section>
-      )}
 
-      {!demoMode && selectedItem && (
-      <section className="help-panel" aria-label="How to use the prototype">
-        <strong>How it works</strong>
-        <span>Drag people or circles to move them.</span>
-        <span>Grab a circle edge to resize it.</span>
-        <span>Right-click a circle to add a person, subset, or connected circle.</span>
-        <span>Shift-drag from a circle center to create from the center.</span>
-        <span>Parent circles auto-fit their contents.</span>
-      </section>
-      )}
 
       <div
         ref={surfaceRef}
@@ -2756,38 +2604,7 @@ function App() {
   )
 }
 
-function useFrameRate() {
-  const [fps, setFps] = useState(0)
 
-  useEffect(() => {
-    let frameCount = 0
-    let lastMeasuredAt = performance.now()
-    let animationFrameId = 0
-
-    function tick(now: number) {
-      frameCount += 1
-      if (now - lastMeasuredAt >= 500) {
-        setFps(Math.round((frameCount * 1000) / (now - lastMeasuredAt)))
-        frameCount = 0
-        lastMeasuredAt = now
-      }
-
-      animationFrameId = window.requestAnimationFrame(tick)
-    }
-
-    animationFrameId = window.requestAnimationFrame(tick)
-    return () => window.cancelAnimationFrame(animationFrameId)
-  }, [])
-
-  return fps
-}
-
-// Isolated so its 2 Hz state tick only re-renders this badge, not the whole
-// board tree (which would otherwise reconcile every visible node twice a second).
-function FpsMeter() {
-  const fps = useFrameRate()
-  return <span>{fps} FPS</span>
-}
 
 // ---- Canvas board renderer ---------------------------------------------------
 // The relationship board is canvas-first: React owns chrome/inspector/menu UI,
@@ -4017,32 +3834,7 @@ function nextTone(index: number): CircleTone {
   return (['blue', 'red', 'green', 'amber', 'violet'] as CircleTone[])[index % 5]
 }
 
-function ZoomInIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="10.5" cy="10.5" r="6.5" />
-      <path d="M16 16l4 4M10.5 7.5v6M7.5 10.5h6" />
-    </svg>
-  )
-}
 
-function ZoomOutIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="10.5" cy="10.5" r="6.5" />
-      <path d="M16 16l4 4M7.5 10.5h6" />
-    </svg>
-  )
-}
-
-function ResetIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M4 12a8 8 0 1 0 2.34-5.66" />
-      <path d="M4 5v6h6" />
-    </svg>
-  )
-}
 
 function PersonIcon() {
   return (

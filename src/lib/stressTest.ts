@@ -23,7 +23,7 @@
 import type { CircleNode, PersonNode, Connection, CircleTone } from '../App'
 
 /** Master switch. Set to `false` to hide the panel and disable generation. */
-export const STRESS_TEST_ENABLED = true
+export const STRESS_TEST_ENABLED = false
 
 export type StressConfig = {
   /** How many synthetic circles to spawn (in addition to the real board). */
