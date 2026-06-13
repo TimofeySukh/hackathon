@@ -21,10 +21,11 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
 - **Create**: right-click a circle to open the create menu, which now offers two actions —
   add person and add circle. "Add circle" auto-detects containment from the target point:
   inside the source circle it nests a subset blob, outside it spawns a connected circle.
-- **Double-tap create**: double-click (double-tap) anywhere to drop a person. The board
-  resolves the owning circle on its own — a tap inside a circle drops the person into that
-  circle, a tap near someone uses their owning circle, and a tap on empty space falls back
-  to the root "you" circle. This replaces the older Shift-drag-from-center shortcut.
+- **Double-tap create**: double-click (double-tap) anywhere to drop a person exactly at the
+  tapped point. It adopts a circle only when the tap lands inside one (or on someone already
+  in a circle); tapping empty space leaves the person free-floating with no owning circle.
+  The creation deliberately skips containment fitting so the rest of the board never reflows
+  or jumps. This replaces the older Shift-drag-from-center shortcut.
 - **Connect**: with the "Draw Connection" center behavior, drag from a circle center to
   another node to draw a relationship link. A dashed draft edge previews the connection.
 - **Select**: click a circle, person, or connection to load it into the inspector for

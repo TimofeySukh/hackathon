@@ -1567,10 +1567,11 @@ function App() {
     }
   }
 
-  // Double-tap creates a person and figures out its circle on its own: tapping
-  // inside a circle drops the person into that circle, tapping near someone uses
-  // their owning circle, and tapping empty space falls back to the root "you"
-  // circle. This replaces the old Shift+drag shortcut.
+  // Double-tap creates a person exactly where you tapped. It only adopts a
+  // circle when the tap lands inside one (or on someone already in a circle);
+  // tapping empty space leaves the person free-floating instead of dragging it
+  // into the "you" blob. We deliberately skip ensureContainment so the rest of
+  // the board never reflows or visibly jumps around the new person.
   function handleSurfaceDoubleClick(event: React.MouseEvent<HTMLDivElement>) {
     if (event.button !== 0) return
     if (demoMode) return
@@ -1579,42 +1580,35 @@ function App() {
       y: event.clientY,
     })
 
-    // Resolve the circle we double-tapped inside. A person hit counts as its
-    // owning circle; empty space falls back to the root "you" circle so a
-    // double-tap always produces a person somewhere sensible.
-    let containerId = 'you'
+    // An empty-space tap yields no owning circle (''), so the person stays put.
+    let circleId = ''
     if (hit && (hit.type === 'circle-body' || hit.type === 'circle-center' || hit.type === 'circle-edge')) {
-      containerId = hit.circle.id
+      circleId = hit.circle.id
     } else if (hit && hit.type === 'person') {
-      containerId = hit.person.circleId ?? 'you'
+      circleId = hit.person.circleId ?? ''
     }
-
-    const source = circlesById.get(containerId)
-    if (!source) return
 
     const world = screenToWorld({ x: event.clientX, y: event.clientY })
     const id = `person-${Date.now()}`
     const sides = Math.floor(Math.random() * 5) + 8
-    setGraph((current) =>
-      ensureContainment({
-        ...current,
-        people: [
-          ...current.people,
-          {
-            id,
-            name: `New person ${current.people.length + 1}`,
-            role: `Inside ${source.name}`,
-            x: world.x,
-            y: world.y,
-            circleId: source.id,
-            avatar: makeAvatar(current.people.length + 1),
-            shapeType: 'circle',
-            sides,
-            amplitude: 0,
-          },
-        ],
-      }),
-    )
+    setGraph((current) => ({
+      ...current,
+      people: [
+        ...current.people,
+        {
+          id,
+          name: `New person ${current.people.length + 1}`,
+          role: circleId ? `Inside ${circlesById.get(circleId)?.name ?? ''}` : '',
+          x: world.x,
+          y: world.y,
+          circleId,
+          avatar: makeAvatar(current.people.length + 1),
+          shapeType: 'circle',
+          sides,
+          amplitude: 0,
+        },
+      ],
+    }))
     setSelectedPeopleIds([])
     setSelectedItem({ type: 'person', id })
   }

@@ -13,7 +13,7 @@ The current visible prototype is intentionally narrow:
 - curved Canvas 2D links from circle centers to people and circles
 - settings controls for demo mode, circle labels, person names, global circle shape, and global circle fill style
 - a settings-driven demo mode that hides chrome, stress controls, help text, and the inspector while keeping the canvas and settings button; canvas selection, deletion, connector handles, link creation, and drag-to-empty create menus remain available
-- branch creation from a circle context menu, or a double-tap that creates a person in the circle it lands in
+- branch creation from a circle context menu, or a double-tap that creates a person at the tapped point (free-floating unless tapped inside a circle)
 - a create menu offering two actions: add person or add circle (containment auto-detected)
 - direct dragging for people and circle centers
 - circle subtree movement for contained people and nested circles
