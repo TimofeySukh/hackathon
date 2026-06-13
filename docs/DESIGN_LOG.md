@@ -19,8 +19,8 @@ rediscover, write it here.
 
 ### 2026-06-13 — Arc-Like Circle Color Picker
 
-- Decision: Replaced the native color input in the circle style popover with an in-app HSV picker inspired by Arc-style color panels: a large dotted spatial color field, a hue rail, quick preset swatches, and solid/transparent tabs. The circle inspector keeps five quick color buttons directly visible.
-- Shape rule: Circle shape customization is driven by only two sliders. `Amplitude = 0` renders a smooth polygon, or a true circle at 25 corners. `Amplitude > 0` renders the same corner count as a flower/wavy shape. There is no separate rounding control.
+- Decision: Replaced the native color input in the circle style popover with an in-app wheel picker plus brightness slider. The circle inspector keeps five quick color buttons directly visible and shows the palette button as the custom color when one is active.
+- Shape rule: The old amplitude/corners controls remain in the code but are hidden from the visible popover for now. `Amplitude = 0` still renders a smooth polygon, or a true circle at 25 corners. `Amplitude > 0` still renders the same corner count as a flower/wavy shape.
 - Rendering: People inside a custom-colored circle and connector handles now use the circle's resolved custom color, not just its legacy tone.
 
 ### 2026-06-13 — Compact Inspector, Person Connections, and Circle Style Popover

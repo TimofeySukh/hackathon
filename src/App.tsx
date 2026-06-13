@@ -227,6 +227,14 @@ const CIRCLE_COLOR_PRESETS = [
   '#00838F',
   '#8D6E63',
   '#455A64',
+  '#F4D35E',
+  '#EE964B',
+  '#F95738',
+  '#A23E48',
+  '#6A4C93',
+  '#1982C4',
+  '#8AC926',
+  '#B8C480',
 ]
 
 const LINK_SERVICE_OPTIONS: { service: PersonLinkService; label: string; placeholder: string }[] = [
@@ -311,6 +319,13 @@ function hsvToHex({ h, s, v }: HsvColor) {
     Math.round((g + m) * 255),
     Math.round((b + m) * 255),
   )
+}
+
+function getReadableColor(background: string) {
+  const rgb = hexToRgb(background)
+  if (!rgb) return '#ffffff'
+  const luminance = (0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b) / 255
+  return luminance > 0.58 ? '#1a1c1e' : '#ffffff'
 }
 
 function inferLinkService(rawValue: string): PersonLinkService {
@@ -587,6 +602,11 @@ function App() {
   const settingsPanelRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  function selectItem(item: SelectedItem) {
+    setShowCircleStylePanel(false)
+    setSelectedItem(item)
+  }
+
   async function handleLinkedInImport(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file) return
@@ -790,7 +810,7 @@ function App() {
         (conn) => conn.fromId !== personId && conn.toId !== personId
       ),
     }))
-    setSelectedItem(null)
+    selectItem(null)
   }
 
   function togglePersonFavorite(personId: string) {
@@ -912,21 +932,27 @@ function App() {
     updateCircleStyle(circleId, { customColor: hsvToHex(hsv) })
   }
 
-  function handleColorFieldPointer(event: ReactPointerEvent<HTMLButtonElement>, circle: CircleNode) {
+  function handleColorWheelPointer(event: ReactPointerEvent<HTMLButtonElement>, circle: CircleNode) {
     event.preventDefault()
     event.currentTarget.setPointerCapture(event.pointerId)
     const rect = event.currentTarget.getBoundingClientRect()
-    const x = clamp((event.clientX - rect.left) / rect.width, 0, 1)
-    const y = clamp((event.clientY - rect.top) / rect.height, 0, 1)
+    const centerX = rect.left + rect.width / 2
+    const centerY = rect.top + rect.height / 2
+    const dx = event.clientX - centerX
+    const dy = event.clientY - centerY
+    const radius = Math.max(1, Math.min(rect.width, rect.height) / 2)
+    const distance = Math.min(radius, Math.hypot(dx, dy))
     const current = hexToHsv(getCircleColors(circle).centerBg)
+    const angle = Math.atan2(dy, dx)
+    const hue = (angle * 180) / Math.PI + 180
     setCircleColorFromHsv(circle.id, {
-      h: current.h,
-      s: x,
-      v: 1 - y,
+      h: hue,
+      s: distance / radius,
+      v: current.v,
     })
   }
 
-  function handleHuePointer(event: ReactPointerEvent<HTMLButtonElement>, circle: CircleNode) {
+  function handleBrightnessPointer(event: ReactPointerEvent<HTMLButtonElement>, circle: CircleNode) {
     event.preventDefault()
     event.currentTarget.setPointerCapture(event.pointerId)
     const rect = event.currentTarget.getBoundingClientRect()
@@ -934,7 +960,7 @@ function App() {
     const current = hexToHsv(getCircleColors(circle).centerBg)
     setCircleColorFromHsv(circle.id, {
       ...current,
-      h: x * 360,
+      v: x,
     })
   }
 
@@ -1011,7 +1037,7 @@ function App() {
       })
     })
 
-    setSelectedItem(null)
+    selectItem(null)
   }
 
   function deleteConnection(connId: string) {
@@ -1019,7 +1045,7 @@ function App() {
       ...current,
       connections: (current.connections || []).filter((conn) => conn.id !== connId),
     }))
-    setSelectedItem(null)
+    selectItem(null)
   }
 
   function deleteSelectedItem() {
@@ -1072,7 +1098,7 @@ function App() {
       })
       setSelectedPeopleIds([])
       setSelectedCircleIds([])
-      setSelectedItem(null)
+      selectItem(null)
     } else if (selectedItem?.type === 'person') {
       deletePerson(selectedItem.id)
     } else if (selectedItem?.type === 'circle') {
@@ -1103,6 +1129,19 @@ function App() {
       document.removeEventListener('pointerdown', handleOutsideClick)
     }
   }, [showSettings])
+
+  useEffect(() => {
+    if (!showCircleStylePanel) return
+    function handleOutsideCircleStyleClick(event: PointerEvent) {
+      const target = event.target as HTMLElement
+      if (target.closest('.circle-style-popover') || target.closest('.circle-style-button')) return
+      setShowCircleStylePanel(false)
+    }
+    document.addEventListener('pointerdown', handleOutsideCircleStyleClick)
+    return () => {
+      document.removeEventListener('pointerdown', handleOutsideCircleStyleClick)
+    }
+  }, [showCircleStylePanel])
 
   useEffect(() => {
     function handleOutsideNotesClick(event: PointerEvent) {
@@ -1481,7 +1520,7 @@ function App() {
         }))
         setSelectedPeopleIds([])
         setSelectedCircleIds([])
-        setSelectedItem({ type: 'person', id: hit.person.id })
+        selectItem({ type: 'person', id: hit.person.id })
         startPersonMove(event, hit.person)
       } else {
         if (event.shiftKey) {
@@ -1497,12 +1536,12 @@ function App() {
             }
             return next
           })
-          setSelectedItem(null)
+          selectItem(null)
         } else {
           if (!selectedPeopleIds.includes(hit.person.id)) {
             setSelectedPeopleIds([])
             setSelectedCircleIds([])
-            setSelectedItem({ type: 'person', id: hit.person.id })
+            selectItem({ type: 'person', id: hit.person.id })
           }
           startPersonMove(event, hit.person)
         }
@@ -1523,7 +1562,7 @@ function App() {
         }))
         setSelectedPeopleIds([])
         setSelectedCircleIds([])
-        setSelectedItem({ type: 'circle', id: hit.circle.id })
+        selectItem({ type: 'circle', id: hit.circle.id })
         startCircleMove(event, hit.circle)
       } else {
         if (event.shiftKey) {
@@ -1539,12 +1578,12 @@ function App() {
             }
             return next
           })
-          setSelectedItem(null)
+          selectItem(null)
         } else {
           if (!selectedCircleIds.includes(hit.circle.id)) {
             setSelectedPeopleIds([])
             setSelectedCircleIds([])
-            setSelectedItem({ type: 'circle', id: hit.circle.id })
+            selectItem({ type: 'circle', id: hit.circle.id })
           }
           if (centerBehavior === 'connect') {
             startConnector(event, hit.circle.id, 'circle', hit.circle.x, hit.circle.y)
@@ -1559,7 +1598,7 @@ function App() {
     if (isRightClick) {
       setSelectedPeopleIds([])
       setSelectedCircleIds([])
-      setSelectedItem(null)
+      selectItem(null)
       setOpenNotesPersonId(null)
       const marqueeState = {
         startX: event.clientX,
@@ -1593,12 +1632,12 @@ function App() {
           }
           return next
         })
-        setSelectedItem(null)
+        selectItem(null)
       } else {
         if (!selectedCircleIds.includes(hit.circle.id)) {
           setSelectedPeopleIds([])
           setSelectedCircleIds([])
-          setSelectedItem({ type: 'circle', id: hit.circle.id })
+          selectItem({ type: 'circle', id: hit.circle.id })
         }
         startCircleMove(event, hit.circle)
       }
@@ -1608,13 +1647,13 @@ function App() {
     if (hit?.type === 'connection') {
       setSelectedPeopleIds([])
       setSelectedCircleIds([])
-      setSelectedItem({ type: 'connection', id: hit.connection.id })
+      selectItem({ type: 'connection', id: hit.connection.id })
       return
     }
 
     setSelectedPeopleIds([])
     setSelectedCircleIds([])
-    setSelectedItem(null)
+    selectItem(null)
     setOpenNotesPersonId(null)
     panRef.current = {
       pointerId: event.pointerId,
@@ -1802,7 +1841,7 @@ function App() {
 
       setSelectedPeopleIds(selectedPIds)
       setSelectedCircleIds(selectedCIds)
-      setSelectedItem(null)
+      selectItem(null)
 
       marqueeRef.current = null
       setMarquee(null)
@@ -1989,7 +2028,7 @@ function App() {
     })
     if (hit?.type !== 'circle-body' && hit?.type !== 'circle-edge' && hit?.type !== 'circle-center') return
 
-    setSelectedItem({ type: 'circle', id: hit.circle.id })
+    selectItem({ type: 'circle', id: hit.circle.id })
   }
 
   function startConnector(
@@ -2003,7 +2042,7 @@ function App() {
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
     setCreateMenu(null)
-    setSelectedItem({ type: sourceType, id: sourceId })
+    selectItem({ type: sourceType, id: sourceId })
     setConnector({
       sourceId,
       sourceType,
@@ -2055,7 +2094,7 @@ function App() {
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
     setCreateMenu(null)
-    setSelectedItem({ type: 'person', id: person.id })
+    selectItem({ type: 'person', id: person.id })
 
     const selectedOrigins: Record<string, { x: number; y: number }> = {}
     const targets = selectedPeopleIds.includes(person.id) ? selectedPeopleIds : [person.id]
@@ -2082,7 +2121,7 @@ function App() {
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
     setCreateMenu(null)
-    setSelectedItem({ type: 'circle', id: circle.id })
+    selectItem({ type: 'circle', id: circle.id })
     resizeCircleRef.current = {
       pointerId: event.pointerId,
       circleId: circle.id,
@@ -2125,7 +2164,7 @@ function App() {
         })
       })
       setSelectedPeopleIds([])
-      setSelectedItem({ type: 'person', id: id })
+      selectItem({ type: 'person', id: id })
     }
   }
 
@@ -2196,7 +2235,7 @@ function App() {
       })
     })
 
-    setSelectedItem({ type: 'circle', id: newCircleId })
+    selectItem({ type: 'circle', id: newCircleId })
     setSelectedPeopleIds([])
     setSelectedCircleIds([])
   }
@@ -2243,7 +2282,7 @@ function App() {
       }
       return nextGraph
     })
-    setSelectedItem({ type: 'person', id })
+    selectItem({ type: 'person', id })
     setCreateMenu(null)
   }
 
@@ -2292,7 +2331,7 @@ function App() {
       }
       return nextGraph
     })
-    setSelectedItem({ type: 'circle', id })
+    selectItem({ type: 'circle', id })
     setCreateMenu(null)
   }
 
@@ -2609,6 +2648,21 @@ function App() {
                   const selectedCircleAmplitude = selectedCircle.amplitude ?? 0
                   return (
                 <div className="inspector-visual-row">
+                  <div className="circle-style-control">
+                    <button
+                      type="button"
+                      className={`circle-style-button ${selectedCircle.customColor ? 'is-custom-color' : ''} ${showCircleStylePanel ? 'is-open' : ''}`}
+                      style={{
+                        backgroundColor: selectedCircle.customColor ? selectedCircleColors.centerBg : undefined,
+                        color: selectedCircle.customColor ? getReadableColor(selectedCircleColors.centerBg) : undefined,
+                      }}
+                      onClick={() => setShowCircleStylePanel(!showCircleStylePanel)}
+                      title="Customize circle"
+                      aria-label="Customize circle"
+                    >
+                      <PaletteIcon />
+                    </button>
+                  </div>
                   <div className="quick-circle-colors" aria-label="Quick circle colors">
                     {(['blue', 'red', 'green', 'amber', 'violet'] as CircleTone[]).map((tone) => (
                       <button
@@ -2621,16 +2675,6 @@ function App() {
                       />
                     ))}
                   </div>
-                  <div className="circle-style-control">
-                    <button
-                      type="button"
-                      className="circle-style-button"
-                      onClick={() => setShowCircleStylePanel(!showCircleStylePanel)}
-                      title="Customize circle"
-                      aria-label="Customize circle"
-                    >
-                      <PaletteIcon />
-                    </button>
                     {showCircleStylePanel && (
                       <div className="circle-style-popover">
                         <div className="circle-style-theme-tabs">
@@ -2651,42 +2695,37 @@ function App() {
                         </div>
                         <button
                           type="button"
-                          className="arc-color-field"
+                          className="color-wheel"
                           style={{
-                            '--arc-hue': String(Math.round(selectedCircleHsv.h)),
-                            '--arc-color': selectedCircleColors.centerBg,
-                            '--arc-s': `${selectedCircleHsv.s * 100}%`,
-                            '--arc-v': `${(1 - selectedCircleHsv.v) * 100}%`,
+                            '--wheel-color': selectedCircleColors.centerBg,
+                            '--wheel-x': `${50 + Math.cos((selectedCircleHsv.h - 180) * Math.PI / 180) * selectedCircleHsv.s * 50}%`,
+                            '--wheel-y': `${50 + Math.sin((selectedCircleHsv.h - 180) * Math.PI / 180) * selectedCircleHsv.s * 50}%`,
                           } as CSSProperties}
-                          onPointerDown={(event) => handleColorFieldPointer(event, selectedCircle)}
+                          onPointerDown={(event) => handleColorWheelPointer(event, selectedCircle)}
                           onPointerMove={(event) => {
-                            if (event.buttons === 1) handleColorFieldPointer(event, selectedCircle)
+                            if (event.buttons === 1) handleColorWheelPointer(event, selectedCircle)
                           }}
                           aria-label="Pick circle color"
                         >
-                          <span className="arc-color-field__thumb" />
+                          <span className="color-wheel__thumb" />
                         </button>
                         <button
                           type="button"
-                          className="arc-hue-slider"
-                          style={{ '--arc-hue-pos': `${(selectedCircleHsv.h / 360) * 100}%` } as CSSProperties}
-                          onPointerDown={(event) => handleHuePointer(event, selectedCircle)}
+                          className="brightness-slider"
+                          style={{
+                            '--brightness-color': hsvToHex({ ...selectedCircleHsv, v: 1 }),
+                            '--brightness-pos': `${selectedCircleHsv.v * 100}%`,
+                          } as CSSProperties}
+                          onPointerDown={(event) => handleBrightnessPointer(event, selectedCircle)}
                           onPointerMove={(event) => {
-                            if (event.buttons === 1) handleHuePointer(event, selectedCircle)
+                            if (event.buttons === 1) handleBrightnessPointer(event, selectedCircle)
                           }}
-                          aria-label="Pick color hue"
+                          aria-label="Pick color brightness"
                         >
-                          <span className="arc-hue-slider__thumb" />
+                          <span className="brightness-slider__thumb" />
                         </button>
                         <div className="circle-style-presets">
-                          <button
-                            type="button"
-                            className="circle-style-preset-nav"
-                            aria-label="Previous color presets"
-                          >
-                            <ChevronLeftIcon />
-                          </button>
-                          {CIRCLE_COLOR_PRESETS.slice(0, 8).map((color) => (
+                          {CIRCLE_COLOR_PRESETS.map((color) => (
                             <button
                               key={color}
                               type="button"
@@ -2696,14 +2735,8 @@ function App() {
                               aria-label={`Set circle color ${color}`}
                             />
                           ))}
-                          <button
-                            type="button"
-                            className="circle-style-preset-nav"
-                            aria-label="Next color presets"
-                          >
-                            <ChevronRightIcon />
-                          </button>
                         </div>
+                        <div className="circle-style-shape-controls" aria-hidden="true">
                         <label className="circle-style-control-row">
                           <span>{`Amplitude ${Math.round(selectedCircleAmplitude)}`}</span>
                           <input
@@ -2726,9 +2759,9 @@ function App() {
                             onChange={(event) => updateCircleCorners(selectedCircle, Number(event.target.value))}
                           />
                         </label>
+                        </div>
                       </div>
                     )}
-                  </div>
 
                   <div className="m3-avatar-picker-container">
                     <label className="m3-avatar-picker" title="Upload circle photo">
@@ -4783,22 +4816,6 @@ function CloseIcon() {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M18 6 6 18" />
       <path d="m6 6 12 12" />
-    </svg>
-  )
-}
-
-function ChevronLeftIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="m15 18-6-6 6-6" />
-    </svg>
-  )
-}
-
-function ChevronRightIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="m9 18 6-6-6-6" />
     </svg>
   )
 }
