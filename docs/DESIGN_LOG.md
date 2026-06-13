@@ -17,6 +17,10 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-13 — Trello-Style Notes List and Composer
+
+- Decision: Redesigned the notes list and adding experience in the inspector to look and feel like Trello cards. Notes are grouped in a light gray column with a count badge. Creating cards uses an inline textarea composer with quick keys: Enter to submit/add and keep focus, Shift+Enter for newline, and Escape/✕ to cancel. Editing a note inline converts it directly into a card text box footprints.
+
 ### 2026-06-13 — Default Person Shapes & Settings Pruning
 
 - Decision: Newly created person nodes default to perfect circles (`shapeType: 'circle'`, `amplitude: 0`) rather than wavy shapes. The settings panel has been simplified to show only the LinkedIn Data Import and Account controls, while retaining other toggle settings in the codebase for potential future reuse.

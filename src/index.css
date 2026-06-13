@@ -802,63 +802,250 @@ svg {
   text-align: left;
 }
 
-/* Minimalist Note Cards */
-.note-card {
+/* Trello-Style Note List and Cards */
+.trello-list {
+  background-color: #f1f2f4; /* Trello standard gray */
+  border-radius: 12px;
+  padding: 10px 8px 8px 8px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  background-color: var(--md-surface-container);
-  border-radius: var(--md-r-md);
-  padding: 10px 12px;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.trello-list__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 8px 6px 8px;
+}
+
+.trello-list__title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #172b4d;
+  margin: 0;
+}
+
+.trello-list__count {
+  background-color: #091e420f;
+  border-radius: 20px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #44546f;
+}
+
+.trello-card {
+  background-color: #ffffff;
+  border-radius: 8px;
+  padding: 8px 12px;
   position: relative;
-  border: 1px solid transparent;
-  transition: background-color 0.2s, border-color 0.2s;
+  box-shadow: 0px 1px 1px #091e4240, 0px 0px 1px #091e424f;
   cursor: pointer;
+  transition: background-color 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
 }
 
-.note-card:hover {
-  background-color: var(--md-surface-container-high);
-  border-color: var(--md-outline-variant);
+.trello-card:hover {
+  background-color: #f4f5f7;
 }
 
-.note-card__body {
-  color: var(--md-on-surface);
-  font-size: 12px;
+.trello-card__body {
+  color: #172b4d;
+  font-size: 12.5px;
   line-height: 1.4;
   white-space: pre-wrap;
   word-break: break-word;
+  padding-right: 18px; /* space for delete button */
+  flex: 1;
 }
 
-.note-card__delete-btn {
+.trello-card__delete-btn {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 6px;
+  right: 6px;
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--md-on-surface-variant);
+  color: #44546f;
   padding: 4px;
-  border-radius: var(--md-r-full);
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 0;
-  transition: opacity 0.2s, background-color 0.2s, color 0.2s;
+  transition: opacity 0.15s, background-color 0.15s, color 0.15s;
   z-index: 10;
 }
 
-.note-card:hover .note-card__delete-btn {
+.trello-card:hover .trello-card__delete-btn {
   opacity: 1;
 }
 
-.note-card__delete-btn:hover {
-  background-color: color-mix(in srgb, var(--md-error) 12%, transparent);
+.trello-card__delete-btn:hover {
+  background-color: #091e420f;
   color: var(--md-error);
 }
 
-.note-card__delete-btn svg {
+.trello-card__delete-btn svg {
+  width: 13px;
+  height: 13px;
+  stroke: currentColor;
+}
+
+/* Trello Card Editor */
+.trello-card__editor {
+  background-color: #ffffff;
+  border-radius: 8px;
+  padding: 8px 12px;
+  box-shadow: 0px 1px 1px #091e4240, 0px 0px 1px #091e424f;
+  box-sizing: border-box;
+}
+
+.trello-card__editor-textarea {
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  width: 100% !important;
+  padding: 0 !important;
+  font-size: 12.5px !important;
+  line-height: 1.4 !important;
+  resize: none !important;
+  color: #172b4d !important;
+  font-family: inherit !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+}
+
+/* Trello Card Composer at the bottom */
+.trello-list__add-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: #44546f;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.trello-list__add-btn:hover {
+  background-color: #091e420f;
+  color: #172b4d;
+}
+
+.trello-list__composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.trello-list__composer-card {
+  background-color: #ffffff;
+  border-radius: 8px;
+  padding: 8px 12px;
+  box-shadow: 0px 1px 1px #091e4240, 0px 0px 1px #091e424f;
+  box-sizing: border-box;
+}
+
+.trello-list__composer-textarea {
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  width: 100% !important;
+  padding: 0 !important;
+  font-size: 12.5px !important;
+  line-height: 1.4 !important;
+  resize: none !important;
+  color: #172b4d !important;
+  font-family: inherit !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+}
+
+.trello-list__composer-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 2px;
+}
+
+.trello-list__composer-add-btn {
+  background-color: #0c66e4;
+  color: #ffffff;
+  border: none;
+  border-radius: 3px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.trello-list__composer-add-btn:hover {
+  background-color: #0055cc;
+}
+
+/* Lightbulb Tip button in Screenshot 2 */
+.trello-list__composer-tip-btn {
+  background-color: #f7f1ff;
+  color: #6e25c9;
+  border: none;
+  border-radius: 3px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.trello-list__composer-tip-btn:hover {
+  background-color: #ebdfff;
+}
+
+.trello-list__composer-tip-btn svg {
   width: 14px;
   height: 14px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+}
+
+.trello-list__composer-cancel-btn {
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #44546f;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.trello-list__composer-cancel-btn:hover {
+  background-color: #091e420f;
+  color: #172b4d;
+}
+
+.trello-list__composer-cancel-btn svg {
+  width: 16px;
+  height: 16px;
   stroke: currentColor;
 }
 

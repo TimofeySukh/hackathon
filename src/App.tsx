@@ -411,6 +411,7 @@ function App() {
   const [hoveredConnId, setHoveredConnId] = useState<string | null>(null)
   const [openNotesPersonId, setOpenNotesPersonId] = useState<string | null>(null)
   const [newNoteBody, setNewNoteBody] = useState('')
+  const [isAddingNote, setIsAddingNote] = useState(false)
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
 
   const settingsButtonRef = useRef<HTMLButtonElement>(null)
@@ -2364,48 +2365,61 @@ function App() {
                 </div>
                 */}
 
-                {/* Notes Section */}
-                <div className="inspector-notes-section" style={{ marginTop: '12px', paddingTop: '12px' }}>
-                  <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 500, color: 'var(--md-on-surface)' }}>Notes</h4>
+                {/* Notes Section (Trello-Style) */}
+                <div className="trello-list" style={{ marginTop: '12px' }}>
+                  <div className="trello-list__header">
+                    <h4 className="trello-list__title">Notes</h4>
+                    <span className="trello-list__count">
+                      {selectedPerson.notes?.length ?? 0}
+                    </span>
+                  </div>
 
                   {/* Scrollable list */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     {(!selectedPerson.notes || selectedPerson.notes.length === 0) ? (
-                      <span style={{ fontSize: '11px', color: 'var(--md-on-surface-variant)', fontStyle: 'italic' }}>No notes yet.</span>
+                      <span style={{ fontSize: '11px', color: 'rgba(23, 43, 77, 0.6)', fontStyle: 'italic', padding: '4px 8px' }}>
+                        No notes yet.
+                      </span>
                     ) : (
                       selectedPerson.notes.map((note) => (
                         <div key={note.id}>
                           {editingNoteId === note.id ? (
-                            <div className="note-card__editor">
+                            <div className="trello-card__editor">
                               <textarea
-                                className="m3-input-field"
+                                className="trello-card__editor-textarea"
                                 autoFocus
                                 value={note.body}
-                                onChange={(e) => updatePersonNote(selectedPerson.id, note.id, e.target.value.split('\n')[0].substr(0, 30) || 'Untitled note', e.target.value)}
+                                onChange={(e) => {
+                                  updatePersonNote(
+                                    selectedPerson.id,
+                                    note.id,
+                                    e.target.value.split('\n')[0].substring(0, 30) || 'Untitled note',
+                                    e.target.value
+                                  )
+                                }}
                                 onBlur={() => setEditingNoteId(null)}
                                 onKeyDown={(e) => {
                                   if (e.key === 'Enter' && !e.shiftKey) {
                                     e.preventDefault()
                                     setEditingNoteId(null)
+                                  } else if (e.key === 'Escape') {
+                                    setEditingNoteId(null)
                                   }
                                 }}
                                 style={{
-                                  fontSize: '11.5px',
-                                  resize: 'vertical',
-                                  minHeight: '60px',
-                                  lineHeight: '1.4',
+                                  minHeight: '40px',
                                 }}
                               />
                             </div>
                           ) : (
                             <div
-                              className="note-card"
+                              className="trello-card"
                               onClick={() => setEditingNoteId(note.id)}
                             >
-                              <div className="note-card__body">{note.body}</div>
+                              <div className="trello-card__body">{note.body}</div>
                               <button
                                 type="button"
-                                className="note-card__delete-btn"
+                                className="trello-card__delete-btn"
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   deletePersonNote(selectedPerson.id, note.id)
@@ -2424,33 +2438,94 @@ function App() {
                     )}
                   </div>
 
-                  {/* Add note fields */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <textarea
-                      placeholder="Write a note..."
-                      value={newNoteBody}
-                      onChange={(e) => setNewNoteBody(e.target.value)}
-                      rows={2}
-                      className="m3-input-field"
-                      style={{ resize: 'none' }}
-                    />
+                  {/* Trello Card Composer */}
+                  {isAddingNote ? (
+                    <div className="trello-list__composer">
+                      <div className="trello-list__composer-card">
+                        <textarea
+                          placeholder="Enter a title or paste a link"
+                          value={newNoteBody}
+                          onChange={(e) => setNewNoteBody(e.target.value)}
+                          className="trello-list__composer-textarea"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault()
+                              if (newNoteBody.trim()) {
+                                addPersonNote(
+                                  selectedPerson.id,
+                                  newNoteBody.trim().split('\n')[0].substring(0, 30) || 'Untitled note',
+                                  newNoteBody.trim()
+                                )
+                                setNewNoteBody('')
+                              }
+                            } else if (e.key === 'Escape') {
+                              setIsAddingNote(false)
+                              setNewNoteBody('')
+                            }
+                          }}
+                          style={{
+                            minHeight: '54px',
+                          }}
+                        />
+                      </div>
+                      <div className="trello-list__composer-controls">
+                        <button
+                          type="button"
+                          className="trello-list__composer-add-btn"
+                          onClick={() => {
+                            if (!newNoteBody.trim()) return
+                            addPersonNote(
+                              selectedPerson.id,
+                              newNoteBody.trim().split('\n')[0].substring(0, 30) || 'Untitled note',
+                              newNoteBody.trim()
+                            )
+                            setNewNoteBody('')
+                          }}
+                        >
+                          Add card
+                        </button>
+                        <button
+                          type="button"
+                          className="trello-list__composer-tip-btn"
+                          onClick={() => {
+                            alert("Tip: Press Enter to quickly create a note, Shift+Enter for new line, or Escape to close.")
+                          }}
+                        >
+                          <svg viewBox="0 0 24 24">
+                            <path d="M9.663 17h4.673a2 2 0 0 1-2 2h-.673a2 2 0 0 1-2-2zM12 3a7 7 0 0 0-4.896 12h9.792A7 7 0 0 0 12 3zm-6 7a6 6 0 0 1 6-6V3a7 7 0 0 0-7 7h1z" />
+                          </svg>
+                          <span>Tip</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="trello-list__composer-cancel-btn"
+                          onClick={() => {
+                            setIsAddingNote(false)
+                            setNewNoteBody('')
+                          }}
+                          title="Cancel"
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
                     <button
                       type="button"
-                      onClick={() => {
-                        if (!newNoteBody.trim()) return
-                        addPersonNote(
-                          selectedPerson.id,
-                          newNoteBody.trim().split('\n')[0].substr(0, 30) || 'Untitled note',
-                          newNoteBody.trim()
-                        )
-                        setNewNoteBody('')
-                      }}
-                      className="primary-action"
-                      style={{ width: '100%' }}
+                      className="trello-list__add-btn"
+                      onClick={() => setIsAddingNote(true)}
                     >
-                      Add note
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ width: 14, height: 14 }}>
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                      </svg>
+                      <span>Add a card</span>
                     </button>
-                  </div>
+                  )}
                 </div>
 
                 {/* Commented out Appearance Options to hide from menu, keeping in code for future use
