@@ -2579,12 +2579,15 @@ function App() {
                                      key={c.id}
                                      type="button"
                                      onClick={() => {
-                                       setGraph((current) => ({
-                                         ...current,
-                                         people: current.people.map((p) =>
-                                           p.id === selectedPerson.id ? { ...p, circleId: c.id, x: c.x, y: c.y } : p
-                                         ),
-                                       }))
+                                       setGraph((current) => {
+                                         const freePos = findFreeSpaceInCircle(current.circles, current.people, c.id)
+                                         return ensureContainment({
+                                           ...current,
+                                           people: current.people.map((p) =>
+                                             p.id === selectedPerson.id ? { ...p, circleId: c.id, x: freePos.x, y: freePos.y } : p
+                                           ),
+                                         })
+                                       })
                                        setShowCircleDropdown(false)
                                      }}
                                      className="custom-select-option"
@@ -3867,6 +3870,56 @@ function stampYouIdentity(graph: GraphState, user: User): GraphState {
   }
 }
 
+function findFreeSpaceInCircle(
+  circles: CircleNode[],
+  people: PersonNode[],
+  circleId: string
+): { x: number; y: number } {
+  const circle = circles.find((c) => c.id === circleId)
+  if (!circle) return { x: 0, y: 0 }
+
+  const candidateRadii = [circle.radius * 0.3, circle.radius * 0.6]
+  const numAngles = 12
+  let bestPoint = { x: circle.x, y: circle.y }
+  let maxMinDist = -1
+
+  const elements = [
+    ...people.map((p) => ({ x: p.x, y: p.y, r: 24 })),
+    ...circles.filter((c) => c.id !== circleId).map((c) => ({ x: c.x, y: c.y, r: c.radius })),
+  ]
+
+  for (const r of candidateRadii) {
+    for (let i = 0; i < numAngles; i++) {
+      const angle = (i * 2 * Math.PI) / numAngles
+      const px = circle.x + r * Math.cos(angle)
+      const py = circle.y + r * Math.sin(angle)
+
+      let minDist = Infinity
+      for (const el of elements) {
+        const dist = Math.hypot(px - el.x, py - el.y) - el.r
+        if (dist < minDist) {
+          minDist = dist
+        }
+      }
+
+      if (minDist > maxMinDist) {
+        maxMinDist = minDist
+        bestPoint = { x: px, y: py }
+      }
+    }
+  }
+
+  if (maxMinDist === Infinity || maxMinDist < 5) {
+    const randomAngle = Math.random() * 2 * Math.PI
+    const randomRadius = circle.radius * 0.4
+    return {
+      x: circle.x + randomRadius * Math.cos(randomAngle),
+      y: circle.y + randomRadius * Math.sin(randomAngle),
+    }
+  }
+
+  return bestPoint
+}
 
 function resizeCircleFromPoint(state: GraphState, circleId: string, point: { x: number; y: number }): GraphState {
   const circle = state.circles.find((candidate) => candidate.id === circleId)
