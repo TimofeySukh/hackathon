@@ -175,7 +175,7 @@ const PERSON_COLLISION_RADIUS = 21
 const PERSON_COLLISION_GAP = 4
 const CIRCLE_CENTER_COLLISION_RADIUS = 24
 const PERSON_CIRCLE_COLLISION_GAP = 8
-const CIRCLE_COLLISION_GAP = 20
+const CIRCLE_COLLISION_GAP = 4
 const COLLISION_PASSES = 10
 
 const DEFAULT_STATE: GraphState = createDemoGraphState()
@@ -3820,8 +3820,16 @@ function resolveCollisions(state: GraphState, context: LayoutContext): GraphStat
         if (!separation) continue
 
         const activeSide = context.activeCircleId === a.id ? 'a' : context.activeCircleId === b.id ? 'b' : null
-        const moveA = activeSide === 'a' ? 0 : activeSide === 'b' ? 1 : 0.5
-        const moveB = activeSide === 'b' ? 0 : activeSide === 'a' ? 1 : 0.5
+        let moveA = activeSide === 'a' ? 0 : activeSide === 'b' ? 1 : 0.5
+        let moveB = activeSide === 'b' ? 0 : activeSide === 'a' ? 1 : 0.5
+
+        if (a.id === 'you') {
+          moveA = 0
+          moveB = 1
+        } else if (b.id === 'you') {
+          moveA = 1
+          moveB = 0
+        }
 
         if (moveA > 0) {
           const translated = translateCircleSubtree(circles, people, a.id, -separation.x * moveA, -separation.y * moveA)
