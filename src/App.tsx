@@ -326,6 +326,9 @@ function App() {
   const pendingGraphRef = useRef<((current: GraphState) => GraphState) | null>(null)
   const pendingConnectorRef = useRef<DragConnector | null>(null)
   const [graph, setGraph] = useState(createInitialGraph)
+  // True once the current drag/resize gesture has recorded its undo snapshot.
+  // Only touched from pointer event handlers, never during render.
+  const gestureSnapshotTakenRef = useRef(false)
   const auth = useAuth()
   const userId = auth.session?.user?.id ?? null
   // True once we've pulled this user's saved graph (or confirmed they have none).
@@ -443,6 +446,55 @@ function App() {
   const settingsPanelRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Snapshot the current graph before a mutating action so Ctrl+Z can restore
+  // it. History lives in module-level state (see undoHistory) rather than a
+  // useRef so these helpers don't read React refs — that keeps the React
+  // Compiler from treating every mutating action as ref access during render.
+  // `graph` is the latest committed value in each render's closure, which for a
+  // drag's first move is still the pre-drag state, so one snapshot per gesture.
+  function pushHistory() {
+    undoHistory.push(graph)
+    if (undoHistory.length > MAX_UNDO_STEPS) undoHistory.shift()
+  }
+
+  // Record one snapshot per drag/resize gesture, on its first actual move.
+  function ensureGestureSnapshot() {
+    if (gestureSnapshotTakenRef.current) return
+    gestureSnapshotTakenRef.current = true
+    pushHistory()
+  }
+
+  function undo() {
+    const previous = undoHistory.pop()
+    if (!previous) return
+    // Drop any in-flight drag frame so it can't clobber the restored state.
+    if (dragRafRef.current != null) {
+      window.cancelAnimationFrame(dragRafRef.current)
+      dragRafRef.current = null
+    }
+    pendingGraphRef.current = null
+    setGraph(previous)
+    setSelectedItem(null)
+    setSelectedPeopleIds([])
+    setCreateMenu(null)
+  }
+
+  // Global Ctrl/Cmd+Z, so undo works regardless of board focus. Ignored while
+  // typing in a field so it doesn't fight the input's own native undo.
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (!(event.key === 'z' || event.key === 'Z') || !(event.metaKey || event.ctrlKey)) return
+      if (event.shiftKey) return
+      const target = event.target as HTMLElement | null
+      const tag = target?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return
+      event.preventDefault()
+      undo()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
   async function handleLinkedInImport(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file) return
@@ -508,6 +560,7 @@ function App() {
         companyGroups[company].push(row)
       }
 
+      pushHistory()
       setGraph((current) => {
         const nextCircles = [...current.circles]
         const nextPeople = [...current.people]
@@ -637,6 +690,7 @@ function App() {
   }
 
   function deletePerson(personId: string) {
+    pushHistory()
     setGraph((current) => ({
       ...current,
       people: current.people.filter((p) => p.id !== personId),
@@ -648,6 +702,7 @@ function App() {
   }
 
   function togglePersonFavorite(personId: string) {
+    pushHistory()
     setGraph((current) => ({
       ...current,
       people: current.people.map((p) =>
@@ -657,6 +712,7 @@ function App() {
   }
 
   function addPersonNote(personId: string, title: string, body: string) {
+    pushHistory()
     setGraph((current) => ({
       ...current,
       people: current.people.map((p) => {
@@ -686,6 +742,7 @@ function App() {
   }
 
   function deletePersonNote(personId: string, noteId: string) {
+    pushHistory()
     setGraph((current) => ({
       ...current,
       people: current.people.map((p) => {
@@ -701,6 +758,7 @@ function App() {
   function deleteCircle(circleId: string) {
     if (circleId === 'you') return
 
+    pushHistory()
     setGraph((current) => {
       // 1. Gather all descendant circle IDs recursively
       const deletedCircleIds = new Set<string>([circleId])
@@ -757,6 +815,7 @@ function App() {
   }
 
   function deleteConnection(connId: string) {
+    pushHistory()
     setGraph((current) => ({
       ...current,
       connections: (current.connections || []).filter((conn) => conn.id !== connId),
@@ -766,6 +825,7 @@ function App() {
 
   function deleteSelectedItem() {
     if (selectedPeopleIds.length > 0) {
+      pushHistory()
       setGraph((current) => ({
         ...current,
         people: current.people.filter((p) => !selectedPeopleIds.includes(p.id)),
@@ -821,32 +881,41 @@ function App() {
     }
   }, [openNotesPersonId])
 
+  // Keep the latest delete-selection logic in a ref so the global keydown
+  // listener can subscribe once yet always call the current selection/actions.
+  // (The delete helpers are unstable now that they snapshot undo history, so
+  // listing them as deps would re-subscribe every render.)
+  const deleteSelectionRef = useRef<() => void>(() => {})
+  useEffect(() => {
+    deleteSelectionRef.current = () => {
+      if (selectedItem?.type === 'person') {
+        deletePerson(selectedItem.id)
+      } else if (selectedItem?.type === 'circle') {
+        deleteCircle(selectedItem.id)
+      } else if (selectedItem?.type === 'connection') {
+        deleteConnection(selectedItem.id)
+      }
+    }
+  })
+
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Delete' || event.key === 'Backspace') {
-        const activeEl = document.activeElement
-        if (
-          activeEl &&
-          (activeEl.tagName === 'INPUT' ||
-            activeEl.tagName === 'TEXTAREA' ||
-            activeEl.getAttribute('contenteditable') === 'true')
-        ) {
-          return
-        }
-
-        if (selectedItem?.type === 'person') {
-          deletePerson(selectedItem.id)
-        } else if (selectedItem?.type === 'circle') {
-          deleteCircle(selectedItem.id)
-        } else if (selectedItem?.type === 'connection') {
-          deleteConnection(selectedItem.id)
-        }
+      if (event.key !== 'Delete' && event.key !== 'Backspace') return
+      const activeEl = document.activeElement
+      if (
+        activeEl &&
+        (activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          activeEl.getAttribute('contenteditable') === 'true')
+      ) {
+        return
       }
+      deleteSelectionRef.current()
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedItem])
+  }, [])
 
   useEffect(() => {
     if (!showCircleDropdown) return
@@ -1156,6 +1225,8 @@ function App() {
 
     if (!demoMode) setCreateMenu(null)
     setOpenNotesPersonId(null)
+    // A fresh gesture hasn't recorded its undo snapshot yet.
+    gestureSnapshotTakenRef.current = false
 
     const hit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
       x: event.clientX,
@@ -1300,6 +1371,7 @@ function App() {
     // active item stays under the pointer while collision layout pushes blockers.
     const moving = moveCircleRef.current
     if (moving?.pointerId === event.pointerId) {
+      ensureGestureSnapshot()
       const deltaX = (event.clientX - moving.startX) / camera.scale
       const deltaY = (event.clientY - moving.startY) / camera.scale
       pendingGraphRef.current = (current) =>
@@ -1312,6 +1384,7 @@ function App() {
 
     const movingPerson = movePersonRef.current
     if (movingPerson?.pointerId === event.pointerId) {
+      ensureGestureSnapshot()
       const deltaX = (event.clientX - movingPerson.startX) / camera.scale
       const deltaY = (event.clientY - movingPerson.startY) / camera.scale
       pendingGraphRef.current = (current) =>
@@ -1331,6 +1404,7 @@ function App() {
 
     const resizing = resizeCircleRef.current
     if (resizing?.pointerId === event.pointerId) {
+      ensureGestureSnapshot()
       const world = screenToWorld({ x: event.clientX, y: event.clientY })
       pendingGraphRef.current = (current) => resizeCircleFromPoint(current, resizing.circleId, world)
       scheduleDrag()
@@ -1405,6 +1479,7 @@ function App() {
       const targetCircle = graph.circles.find((c) => Math.hypot(c.x - conn.endX, c.y - conn.endY) < 30)
 
       if (targetPerson && targetPerson.id !== conn.sourceId) {
+        pushHistory()
         setGraph((current) => ({
           ...current,
           connections: [
@@ -1417,6 +1492,7 @@ function App() {
           ],
         }))
       } else if (targetCircle && targetCircle.id !== conn.sourceId) {
+        pushHistory()
         if (conn.sourceType === 'circle') {
           setGraph((current) => {
             const srcCircle = current.circles.find((c) => c.id === conn.sourceId)
@@ -1591,6 +1667,7 @@ function App() {
     const world = screenToWorld({ x: event.clientX, y: event.clientY })
     const id = `person-${Date.now()}`
     const sides = Math.floor(Math.random() * 5) + 8
+    pushHistory()
     setGraph((current) => ({
       ...current,
       people: [
@@ -1629,6 +1706,7 @@ function App() {
 
     const newCircleId = `circle-${Date.now()}`
 
+    pushHistory()
     setGraph((current) => {
       const newCircle = {
         id: newCircleId,
@@ -1675,6 +1753,7 @@ function App() {
 
     const id = `person-${Date.now()}`
     const sides = Math.floor(Math.random() * 5) + 8
+    pushHistory()
     setGraph((current) => {
       const nextGraph = ensureContainment({
         ...current,
@@ -1732,6 +1811,7 @@ function App() {
 
     const id = `circle-${Date.now()}`
     const isNested = mode === 'nested'
+    pushHistory()
     setGraph((current) => {
       const nextGraph = ensureContainment({
         ...current,
@@ -2321,6 +2401,7 @@ function App() {
                               key={c.id}
                               type="button"
                               onClick={() => {
+                                pushHistory()
                                 setGraph((current) => ({
                                   ...current,
                                   people: current.people.map((p) =>
@@ -2649,37 +2730,33 @@ function App() {
               </>
             )}
 
-            {selectedConnection && (() => {
-              const fromNode = peopleById.get(selectedConnection.fromId) || circlesById.get(selectedConnection.fromId)
-              const toNode = peopleById.get(selectedConnection.toId) || circlesById.get(selectedConnection.toId)
-              return (
-                <>
-                  <dl>
-                    <div>
-                      <dt>From</dt>
-                      <dd>{fromNode ? fromNode.name : 'Unknown'}</dd>
-                    </div>
-                    <div>
-                      <dt>To</dt>
-                      <dd>{toNode ? toNode.name : 'Unknown'}</dd>
-                    </div>
-                  </dl>
+            {selectedConnection && (
+              <>
+                <dl>
+                  <div>
+                    <dt>From</dt>
+                    <dd>{(peopleById.get(selectedConnection.fromId) || circlesById.get(selectedConnection.fromId))?.name ?? 'Unknown'}</dd>
+                  </div>
+                  <div>
+                    <dt>To</dt>
+                    <dd>{(peopleById.get(selectedConnection.toId) || circlesById.get(selectedConnection.toId))?.name ?? 'Unknown'}</dd>
+                  </div>
+                </dl>
 
-                  <button
-                    type="button"
-                    className="primary-action"
-                    style={{
-                      marginTop: '16px',
-                      background: 'var(--md-error-container)',
-                      color: 'var(--md-on-error-container)',
-                    }}
-                    onClick={() => deleteConnection(selectedConnection.id)}
-                  >
-                    Delete connection
-                  </button>
-                </>
-              )
-            })()}
+                <button
+                  type="button"
+                  className="primary-action"
+                  style={{
+                    marginTop: '16px',
+                    background: 'var(--md-error-container)',
+                    color: 'var(--md-on-error-container)',
+                  }}
+                  onClick={() => deleteConnection(selectedConnection.id)}
+                >
+                  Delete connection
+                </button>
+              </>
+            )}
       </aside>
       )}
 
@@ -2844,6 +2921,12 @@ function cameraWorldRect(surface: HTMLElement, camera: Camera, padPx = 120): Wor
 // Set by the board so freshly-decoded images can trigger a repaint (otherwise an
 // avatar only appears after the next interaction-driven redraw).
 let requestBoardRepaint: (() => void) | null = null
+
+// Undo history kept at module scope (not useRef) so the mutating helpers that
+// read/write it aren't analyzed as accessing React refs during render. Single
+// mount in this app, so a plain stack is enough; one snapshot per user action.
+const MAX_UNDO_STEPS = 100
+const undoHistory: GraphState[] = []
 
 function getCanvasImage(src: string): HTMLImageElement | null {
   const cached = imageCache.get(src)

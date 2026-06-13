@@ -18,6 +18,7 @@ Current visible prototype behavior:
 - supports double-tap anywhere to create a person at the tapped point, joining a circle only when tapped inside one and otherwise staying free-floating
 - keeps people as endpoints and circle centers as the only branch-creation sources
 - selects and renames circles or people in the inspector
+- undoes the last structural change (create, delete, move, resize, connect, merge, change-circle, favorite, add/delete note, import) with Ctrl/Cmd+Z, one step per drag gesture
 - adds three demo people to the selected circle
 - drags people directly
 - drags any circle center, including `You`

@@ -18,6 +18,7 @@ A local social circle graph prototype built with React, Vite, and TypeScript.
 - Parent circles automatically expand or shrink back toward their minimum size as contained objects move
 - The visible help panel explains the prototype controls on the page
 - Select circles or people to inspect and rename them
+- Undo the last structural change (create, delete, move, resize, connect, merge) with Ctrl/Cmd+Z
 - Add three demo people to the selected circle from the inspector
 - Drag non-root circle centers to reposition circles
 - Pan the board by dragging empty space and zoom with the mouse wheel or toolbar

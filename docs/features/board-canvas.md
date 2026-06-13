@@ -30,6 +30,12 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   another node to draw a relationship link. A dashed draft edge previews the connection.
 - **Select**: click a circle, person, or connection to load it into the inspector for
   rename / styling / notes / delete.
+- **Undo**: Ctrl/Cmd+Z reverts the last graph-mutating action — create, delete, move,
+  resize, connect, merge, change-circle, favorite, add/delete note, and LinkedIn import.
+  A whole drag or resize gesture is a single undo step, and the shortcut is ignored while
+  typing in a field so it never fights an input's native undo. History is in-memory only
+  (lost on reload) and structural; rename and style tweaks are intentionally excluded so
+  undo stays at meaningful boundaries.
 - **Demo mode**: the Settings panel includes a demo mode switch. When enabled, chrome,
   stress controls, help text, and the inspector disappear; only the board canvas and
   settings button remain. People and circles can still be moved, and circle edges can
