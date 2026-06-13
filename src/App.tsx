@@ -655,6 +655,9 @@ function App() {
         trimmed
       )
       setNewNoteBody('')
+      if (noteInputRef.current) {
+        noteInputRef.current.style.height = 'auto'
+      }
       requestAnimationFrame(() => {
         noteInputRef.current?.focus()
       })
@@ -2421,7 +2424,11 @@ function App() {
                           ref={noteInputRef}
                           placeholder="Write a note..."
                           value={newNoteBody}
-                          onChange={(e) => setNewNoteBody(e.target.value)}
+                          onChange={(e) => {
+                            setNewNoteBody(e.target.value)
+                            e.target.style.height = 'auto'
+                            e.target.style.height = `${e.target.scrollHeight}px`
+                          }}
                           className="trello-list__composer-textarea"
                           autoFocus
                           rows={1}
@@ -2436,7 +2443,9 @@ function App() {
                           }}
                           style={{
                             minHeight: '20px',
+                            height: 'auto',
                             resize: 'none',
+                            overflowY: 'hidden',
                           }}
                         />
                       </div>

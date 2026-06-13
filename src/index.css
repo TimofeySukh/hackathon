@@ -839,7 +839,7 @@ svg {
 }
 
 .trello-card {
-  background-color: #fff9c4; /* Soft warm sticky note yellow */
+  background-color: #ffffff; /* Pure white card background */
   border-radius: var(--md-r-md);
   padding: 8px 12px;
   position: relative;
@@ -853,7 +853,7 @@ svg {
 }
 
 .trello-card:hover {
-  background-color: #fff59d; /* Slightly darker warm yellow on hover */
+  background-color: #f5f6f9; /* Subtle gray/blue tint hover */
 }
 
 .trello-card__body {
@@ -901,7 +901,7 @@ svg {
 
 /* Trello Card Editor */
 .trello-card__editor {
-  background-color: #fff9c4; /* Match the sticky note color when editing */
+  background-color: #ffffff; /* Pure white background when editing */
   border-radius: var(--md-r-md);
   padding: 8px 12px;
   box-shadow: 0px 1px 1px #091e4240, 0px 0px 1px #091e424f;
