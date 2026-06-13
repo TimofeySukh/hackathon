@@ -20,3 +20,4 @@ design without reverse-engineering `src/App.tsx`.
 - [Board canvas](board-canvas.md) — the relationship graph surface: circles, people,
   connections, pan/zoom, create menu, inspector.
 - [Person notes (Trello-Style)](person-notes.md) — Trello-style notes list column, cards, composer, and inline editing.
+- [Person connections](person-connections.md) — profile links, social handles, phone-app links, LinkedIn import links, and quick open/delete controls.

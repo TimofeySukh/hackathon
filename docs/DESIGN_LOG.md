@@ -17,6 +17,12 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-13 — Compact Inspector, Person Connections, and Circle Style Popover
+
+- Decision: Tightened the person/circle inspector spacing and added a dedicated Person Connections block for imported LinkedIn profile URLs, custom URLs, handles, and phone-app links. Handles such as `@name` now ask for the target social service before saving when ambiguous.
+- Circle design: Replaced the fully color-filled circle membership dropdown with neutral rows and a left color dot. Circle customization moved behind a palette button that exposes color presets, a custom color input, transparent/solid fill, shape mode, amplitude, and corner count controls.
+- Rendering: Circle color, fill mode, shape type, sides, and amplitude are now per-circle JSON fields so hidden global settings are no longer required for wavy/polygon customization.
+
 ### 2026-06-13 — Simplified Notes Composer & Yellow Cards
 
 - Decision: Simplified the Trello-style notes list header (removed the count badge) and composer (removed the "Tip" button). Updated the note cards to use a soft yellow sticky note color (`#fff9c4`) with a matching editor container to visually distinguish notes from other input elements. Improved composer keyboard and click handling so that saving/adding a note immediately saves, clears the input, and programmatically refocuses the textarea so users can quickly write multiple notes in a row without manual click refocusing.

@@ -27,12 +27,23 @@ export type CircleNode = {
   sides?: number
   amplitude?: number
   imageUrl?: string
+  customColor?: string
+  fillMode?: CircleFillMode
 }
 
 type PersonNote = {
   id: string
   title: string
   body: string
+}
+
+type PersonLinkService = 'linkedin' | 'telegram' | 'instagram' | 'facebook' | 'whatsapp' | 'x' | 'website'
+
+type PersonLink = {
+  id: string
+  service: PersonLinkService
+  label: string
+  url: string
 }
 
 export type PersonNode = {
@@ -49,6 +60,7 @@ export type PersonNode = {
   imageUrl?: string
   isFavorite?: boolean
   notes?: PersonNote[]
+  links?: PersonLink[]
 }
 
 export type Connection = {
@@ -190,6 +202,113 @@ const MATERIAL_TONES: Record<CircleTone, { fill: string; border: string; text: s
   green: { fill: '#D1E8D2', border: '#0F6D38', text: '#00210B', centerBg: '#1E824A' },
   amber: { fill: '#FFE082', border: '#B06000', text: '#2A1400', centerBg: '#D87A00' },
   violet: { fill: '#EADDFF', border: '#6750A4', text: '#21005D', centerBg: '#7F67BE' },
+}
+
+const CIRCLE_COLOR_PRESETS = [
+  '#00629D',
+  '#C00015',
+  '#1E824A',
+  '#D87A00',
+  '#7F67BE',
+  '#0B57D0',
+  '#00897B',
+  '#6D4C41',
+  '#AD1457',
+  '#546E7A',
+  '#F57C00',
+  '#2E7D32',
+  '#5E35B1',
+  '#00838F',
+  '#8D6E63',
+  '#455A64',
+]
+
+const LINK_SERVICE_OPTIONS: { service: PersonLinkService; label: string; placeholder: string }[] = [
+  { service: 'linkedin', label: 'LinkedIn', placeholder: 'linkedin.com/in/name' },
+  { service: 'telegram', label: 'Telegram', placeholder: '@username' },
+  { service: 'instagram', label: 'Instagram', placeholder: '@username' },
+  { service: 'facebook', label: 'Facebook', placeholder: 'facebook.com/name' },
+  { service: 'whatsapp', label: 'WhatsApp', placeholder: '+45 12 34 56 78' },
+  { service: 'x', label: 'X', placeholder: '@username' },
+  { service: 'website', label: 'Custom', placeholder: 'https://example.com/profile' },
+]
+
+function getCircleColors(circle: CircleNode) {
+  if (!circle.customColor) return MATERIAL_TONES[circle.tone]
+  return {
+    fill: colorMix(circle.customColor, '#ffffff', 0.78),
+    border: colorMix(circle.customColor, '#000000', 0.28),
+    text: '#1a1c1e',
+    centerBg: circle.customColor,
+  }
+}
+
+function colorMix(hex: string, target: string, amount: number) {
+  const sourceRgb = hexToRgb(hex)
+  const targetRgb = hexToRgb(target)
+  if (!sourceRgb || !targetRgb) return hex
+  const mix = (a: number, b: number) => Math.round(a + (b - a) * amount)
+  return rgbToHex(mix(sourceRgb.r, targetRgb.r), mix(sourceRgb.g, targetRgb.g), mix(sourceRgb.b, targetRgb.b))
+}
+
+function hexToRgb(hex: string) {
+  const normalized = hex.trim().replace(/^#/, '')
+  if (!/^[\da-fA-F]{6}$/.test(normalized)) return null
+  return {
+    r: parseInt(normalized.slice(0, 2), 16),
+    g: parseInt(normalized.slice(2, 4), 16),
+    b: parseInt(normalized.slice(4, 6), 16),
+  }
+}
+
+function rgbToHex(r: number, g: number, b: number) {
+  return `#${[r, g, b].map((value) => value.toString(16).padStart(2, '0')).join('')}`
+}
+
+function inferLinkService(rawValue: string): PersonLinkService {
+  const value = rawValue.trim().toLowerCase()
+  if (value.includes('linkedin.com')) return 'linkedin'
+  if (value.includes('t.me') || value.includes('telegram.me')) return 'telegram'
+  if (value.includes('instagram.com')) return 'instagram'
+  if (value.includes('facebook.com') || value.includes('fb.com')) return 'facebook'
+  if (value.includes('wa.me') || value.includes('whatsapp.com')) return 'whatsapp'
+  if (value.includes('x.com') || value.includes('twitter.com')) return 'x'
+  if (value.startsWith('@')) return 'telegram'
+  if (/^\+?[\d\s().-]{7,}$/.test(value)) return 'whatsapp'
+  return 'website'
+}
+
+function normalizeLinkInput(rawValue: string, service: PersonLinkService): { label: string; url: string } {
+  const value = rawValue.trim()
+  const cleanHandle = value.replace(/^@/, '').replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '')
+  if (service === 'telegram') {
+    const handle = cleanHandle.replace(/^t\.me\//, '').replace(/^telegram\.me\//, '')
+    return { label: `@${handle}`, url: `https://t.me/${handle}` }
+  }
+  if (service === 'instagram') {
+    const handle = cleanHandle.replace(/^instagram\.com\//, '')
+    return { label: `@${handle}`, url: `https://instagram.com/${handle}` }
+  }
+  if (service === 'x') {
+    const handle = cleanHandle.replace(/^x\.com\//, '').replace(/^twitter\.com\//, '')
+    return { label: `@${handle}`, url: `https://x.com/${handle}` }
+  }
+  if (service === 'whatsapp') {
+    const digits = value.replace(/[^\d+]/g, '')
+    return { label: digits || value, url: digits ? `https://wa.me/${digits.replace(/^\+/, '')}` : value }
+  }
+  if (service === 'linkedin') {
+    const url = /^https?:\/\//i.test(value) ? value : `https://${cleanHandle}`
+    return { label: cleanHandle.replace(/^linkedin\.com\/in\//, ''), url }
+  }
+  if (service === 'facebook') {
+    const url = /^https?:\/\//i.test(value) ? value : `https://${cleanHandle}`
+    return { label: cleanHandle.replace(/^facebook\.com\//, '').replace(/^fb\.com\//, ''), url }
+  }
+  return {
+    label: cleanHandle || value,
+    url: /^https?:\/\//i.test(value) ? value : `https://${value}`,
+  }
 }
 
 function getNodePath(
@@ -406,6 +525,7 @@ function App() {
   const [createMenu, setCreateMenu] = useState<CreateMenu | null>(null)
   const [selectedItem, setSelectedItem] = useState<SelectedItem>(null)
   const [showCircleDropdown, setShowCircleDropdown] = useState(false)
+  const [showCircleStylePanel, setShowCircleStylePanel] = useState(false)
   const [selectedPeopleIds, setSelectedPeopleIds] = useState<string[]>([])
   const [selectedCircleIds, setSelectedCircleIds] = useState<string[]>([])
   // Person currently under the cursor — promoted to an interactive DOM node so it
@@ -427,6 +547,9 @@ function App() {
   const [newNoteBody, setNewNoteBody] = useState('')
   const [isAddingNote, setIsAddingNote] = useState(false)
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
+  const [newLinkValue, setNewLinkValue] = useState('')
+  const [newLinkService, setNewLinkService] = useState<PersonLinkService>('website')
+  const [showLinkServicePicker, setShowLinkServicePicker] = useState(false)
   const noteInputRef = useRef<HTMLTextAreaElement>(null)
 
   const settingsButtonRef = useRef<HTMLButtonElement>(null)
@@ -586,13 +709,14 @@ function App() {
                 body: email
               })
             }
-            if (url) {
-              notesList.push({
-                id: `note-url-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                title: 'LinkedIn Profile',
-                body: url
-              })
-            }
+            const linksList: PersonLink[] = url
+              ? [{
+                  id: `link-linkedin-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                  service: 'linkedin',
+                  label: 'LinkedIn',
+                  url,
+                }]
+              : []
 
             nextPeople.push({
               id: personId,
@@ -605,7 +729,8 @@ function App() {
               shapeType: 'circle',
               sides: 10,
               amplitude: 0,
-              notes: notesList
+              notes: notesList,
+              links: linksList,
             })
             personIndex++
           }
@@ -704,6 +829,52 @@ function App() {
         return p
       }),
     }))
+  }
+
+  function addPersonLink(personId: string, rawValue: string, service: PersonLinkService) {
+    const trimmed = rawValue.trim()
+    if (!trimmed) return
+    const normalized = normalizeLinkInput(trimmed, service)
+    setGraph((current) => ({
+      ...current,
+      people: current.people.map((p) => {
+        if (p.id !== personId) return p
+        const links = p.links ? [...p.links] : []
+        links.push({
+          id: `link-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          service,
+          label: normalized.label,
+          url: normalized.url,
+        })
+        return { ...p, links }
+      }),
+    }))
+  }
+
+  function deletePersonLink(personId: string, linkId: string) {
+    setGraph((current) => ({
+      ...current,
+      people: current.people.map((p) => {
+        if (p.id !== personId || !p.links) return p
+        return { ...p, links: p.links.filter((link) => link.id !== linkId) }
+      }),
+    }))
+  }
+
+  function handleSaveNewLink(personId: string) {
+    const trimmed = newLinkValue.trim()
+    if (!trimmed) return
+    const inferredService = inferLinkService(trimmed)
+    const needsChoice = trimmed.startsWith('@') || /^\+?[\d\s().-]{7,}$/.test(trimmed)
+    if (needsChoice && !showLinkServicePicker) {
+      setNewLinkService(inferredService)
+      setShowLinkServicePicker(true)
+      return
+    }
+    addPersonLink(personId, trimmed, showLinkServicePicker ? newLinkService : inferredService)
+    setNewLinkValue('')
+    setShowLinkServicePicker(false)
+    setNewLinkService('website')
   }
 
   function deleteCircle(circleId: string) {
@@ -2335,7 +2506,7 @@ function App() {
       )}
 
       {!demoMode && selectedItem && (
-      <aside className="inspector" aria-label="Selection details" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 120px)' }}>
+      <aside className="inspector" aria-label="Selection details" style={{ overflow: 'visible', maxHeight: 'calc(100vh - 120px)' }}>
 
             {selectedItem.type !== 'connection' ? (
               <input
@@ -2352,26 +2523,109 @@ function App() {
             
             {selectedCircle && (
               <>
-                {/* Visual Settings Row: Color swatches + Avatar Photo Upload */}
                 <div className="inspector-visual-row">
-                  <div className="m3-color-swatches-container">
-                    <label>Color Tone</label>
-                    <div className="m3-color-swatches">
-                      {(['blue', 'red', 'green', 'amber', 'violet'] as CircleTone[]).map((t) => (
-                        <button
-                          key={t}
-                          type="button"
-                          className={`m3-color-swatch m3-color-swatch--${t} ${selectedCircle.tone === t ? 'is-selected' : ''}`}
-                          onClick={() => updateCircleStyle(selectedCircle.id, { tone: t })}
-                          title={`Set tone to ${t}`}
-                          aria-label={`Set tone to ${t}`}
-                        />
-                      ))}
-                    </div>
+                  <div className="circle-style-control">
+                    <button
+                      type="button"
+                      className="circle-style-button"
+                      onClick={() => setShowCircleStylePanel(!showCircleStylePanel)}
+                      title="Customize circle"
+                      aria-label="Customize circle"
+                    >
+                      <PaletteIcon />
+                    </button>
+                    {showCircleStylePanel && (
+                      <div className="circle-style-popover">
+                        <div className="circle-style-presets">
+                          {CIRCLE_COLOR_PRESETS.map((color) => (
+                            <button
+                              key={color}
+                              type="button"
+                              className={`circle-style-preset ${selectedCircle.customColor === color ? 'is-selected' : ''}`}
+                              style={{ backgroundColor: color }}
+                              onClick={() => updateCircleStyle(selectedCircle.id, { customColor: color })}
+                              aria-label={`Set circle color ${color}`}
+                            />
+                          ))}
+                        </div>
+                        <label className="circle-style-color-input">
+                          <span>Custom color</span>
+                          <input
+                            type="color"
+                            value={selectedCircle.customColor ?? getCircleColors(selectedCircle).centerBg}
+                            onChange={(event) => updateCircleStyle(selectedCircle.id, { customColor: event.target.value })}
+                          />
+                        </label>
+                        <div className="circle-style-segmented">
+                          <button
+                            type="button"
+                            className={(selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'is-selected' : ''}
+                            onClick={() => updateCircleStyle(selectedCircle.id, { fillMode: 'transparent' })}
+                          >
+                            Transparent
+                          </button>
+                          <button
+                            type="button"
+                            className={(selectedCircle.fillMode ?? circleFillMode) === 'solid' ? 'is-selected' : ''}
+                            onClick={() => updateCircleStyle(selectedCircle.id, { fillMode: 'solid' })}
+                          >
+                            Solid
+                          </button>
+                        </div>
+                        <div className="circle-style-control-row">
+                          <label>Shape</label>
+                          <div className="circle-style-segmented">
+                            <button
+                              type="button"
+                              className={(selectedCircle.shapeType ?? 'circle') === 'circle' ? 'is-selected' : ''}
+                              onClick={() => updateCircleStyle(selectedCircle.id, { shapeType: 'circle', amplitude: 0 })}
+                            >
+                              Circle
+                            </button>
+                            <button
+                              type="button"
+                              className={selectedCircle.shapeType === 'wavy' ? 'is-selected' : ''}
+                              onClick={() => updateCircleStyle(selectedCircle.id, { shapeType: 'wavy', amplitude: Math.max(4, selectedCircle.amplitude ?? 8), sides: selectedCircle.sides ?? 12 })}
+                            >
+                              Wavy
+                            </button>
+                            <button
+                              type="button"
+                              className={selectedCircle.shapeType === 'polygon' ? 'is-selected' : ''}
+                              onClick={() => updateCircleStyle(selectedCircle.id, { shapeType: 'polygon', amplitude: selectedCircle.amplitude ?? 8, sides: selectedCircle.sides ?? 8 })}
+                            >
+                              Polygon
+                            </button>
+                          </div>
+                        </div>
+                        <label className="circle-style-control-row">
+                          <span>Amplitude {Math.round(selectedCircle.amplitude ?? 0)}</span>
+                          <input
+                            type="range"
+                            min="0"
+                            max="28"
+                            value={selectedCircle.amplitude ?? 0}
+                            onChange={(event) => updateCircleStyle(selectedCircle.id, { shapeType: selectedCircle.shapeType === 'polygon' ? 'polygon' : 'wavy', amplitude: Number(event.target.value) })}
+                          />
+                        </label>
+                        <label className="circle-style-control-row">
+                          <span>{(selectedCircle.sides ?? 0) <= 3 ? 'Corners circle' : `Corners ${selectedCircle.sides ?? 12}`}</span>
+                          <input
+                            type="range"
+                            min="3"
+                            max="25"
+                            value={selectedCircle.shapeType === 'circle' ? 3 : selectedCircle.sides ?? 12}
+                            onChange={(event) => {
+                              const sides = Number(event.target.value)
+                              updateCircleStyle(selectedCircle.id, sides <= 3 ? { shapeType: 'circle', sides, amplitude: 0 } : { shapeType: selectedCircle.shapeType === 'polygon' ? 'polygon' : 'wavy', sides })
+                            }}
+                          />
+                        </label>
+                      </div>
+                    )}
                   </div>
 
                   <div className="m3-avatar-picker-container">
-                    <label>Photo</label>
                     <label className="m3-avatar-picker" title="Upload circle photo">
                       <input
                         type="file"
@@ -2536,7 +2790,7 @@ function App() {
                  {/* Visual Settings Row: Select Circle + Avatar Photo Upload */}
                  {(() => {
                    const personCircle = circlesById.get(selectedPerson.circleId)
-                   const toneColors = personCircle ? MATERIAL_TONES[personCircle.tone] : null
+                   const toneColors = personCircle ? getCircleColors(personCircle) : null
                    return (
                      <div className="inspector-visual-row">
                        <div className="inspector-field" style={{ flex: 1, marginTop: 0 }}>
@@ -2545,12 +2799,11 @@ function App() {
                              type="button"
                              onClick={() => setShowCircleDropdown(!showCircleDropdown)}
                              className="custom-select-trigger"
-                             style={{
-                               background: toneColors ? toneColors.centerBg : 'var(--md-surface-container-highest, #edf1f3)',
-                               color: toneColors ? '#ffffff' : 'var(--md-on-surface)',
-                               border: toneColors ? 'none' : '1px solid var(--md-outline-variant)',
-                             }}
                            >
+                             <span
+                               className="circle-color-dot"
+                               style={{ backgroundColor: toneColors ? toneColors.centerBg : 'var(--md-outline-variant)' }}
+                             />
                              <span>{personCircle?.name || 'Select circle'}</span>
                              <svg
                                viewBox="0 0 24 24"
@@ -2558,7 +2811,7 @@ function App() {
                                  width: 16,
                                  height: 16,
                                  fill: 'none',
-                                 stroke: toneColors ? '#ffffff' : 'var(--md-on-surface-variant, #43474e)',
+                                 stroke: 'var(--md-on-surface-variant, #43474e)',
                                  strokeWidth: 2,
                                  strokeLinecap: 'round',
                                  strokeLinejoin: 'round',
@@ -2573,7 +2826,7 @@ function App() {
                            {showCircleDropdown && (
                              <div className="custom-select-dropdown">
                                {graph.circles.map((c) => {
-                                 const optionColors = MATERIAL_TONES[c.tone]
+                                 const optionColors = getCircleColors(c)
                                  return (
                                    <button
                                      key={c.id}
@@ -2591,14 +2844,14 @@ function App() {
                                        setShowCircleDropdown(false)
                                      }}
                                      className="custom-select-option"
-                                     style={{
-                                       background: optionColors.centerBg,
-                                       color: '#ffffff',
-                                     }}
                                    >
+                                     <span
+                                       className="circle-color-dot"
+                                       style={{ backgroundColor: optionColors.centerBg }}
+                                     />
                                      <span>{c.name}</span>
                                      {selectedPerson.circleId === c.id && (
-                                       <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, stroke: '#ffffff', strokeWidth: 3, fill: 'none' }}>
+                                       <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, stroke: 'var(--md-primary)', strokeWidth: 3, fill: 'none' }}>
                                          <polyline points="20 6 9 17 4 12" />
                                        </svg>
                                      )}
@@ -2656,8 +2909,86 @@ function App() {
                 </div>
                 */}
 
+                <div className="connections-list">
+                  <div className="connections-list__header">
+                    <h4 className="connections-list__title">Connections</h4>
+                  </div>
+                  <div className="connections-list__items">
+                    {selectedPerson.links?.map((link) => (
+                      <div key={link.id} className="connection-item">
+                        <button
+                          type="button"
+                          className={`connection-item__main connection-item__main--${link.service}`}
+                          onClick={() => window.open(link.url, '_blank', 'noopener,noreferrer')}
+                          title={link.url}
+                        >
+                          <ConnectionServiceIcon service={link.service} />
+                          <span>{link.label}</span>
+                          <ExternalLinkIcon />
+                        </button>
+                        <button
+                          type="button"
+                          className="connection-item__delete"
+                          onClick={() => deletePersonLink(selectedPerson.id, link.id)}
+                          title="Delete connection"
+                        >
+                          <CloseIcon />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="connection-composer">
+                    <input
+                      type="text"
+                      value={newLinkValue}
+                      placeholder="Add link, @handle, or phone"
+                      onChange={(event) => {
+                        setNewLinkValue(event.target.value)
+                        setShowLinkServicePicker(false)
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault()
+                          handleSaveNewLink(selectedPerson.id)
+                        } else if (event.key === 'Escape') {
+                          setNewLinkValue('')
+                          setShowLinkServicePicker(false)
+                        }
+                      }}
+                    />
+                    <button type="button" onClick={() => handleSaveNewLink(selectedPerson.id)}>
+                      Save
+                    </button>
+                  </div>
+                  {showLinkServicePicker && (
+                    <div className="connection-service-picker">
+                      {LINK_SERVICE_OPTIONS.filter((option) =>
+                        newLinkValue.trim().startsWith('@')
+                          ? ['telegram', 'instagram', 'x'].includes(option.service)
+                          : ['whatsapp', 'telegram', 'website'].includes(option.service)
+                      ).map((option) => (
+                        <button
+                          key={option.service}
+                          type="button"
+                          className={newLinkService === option.service ? 'is-selected' : ''}
+                          onClick={() => {
+                            setNewLinkService(option.service)
+                            addPersonLink(selectedPerson.id, newLinkValue, option.service)
+                            setNewLinkValue('')
+                            setShowLinkServicePicker(false)
+                            setNewLinkService('website')
+                          }}
+                        >
+                          <ConnectionServiceIcon service={option.service} />
+                          <span>{option.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 {/* Divider to separate notes section from metadata */}
-                <div style={{ height: '1px', backgroundColor: 'var(--md-outline-variant)', margin: '16px 0' }} />
+                <div style={{ height: '1px', backgroundColor: 'var(--md-outline-variant)', margin: '6px 0' }} />
 
                 {/* Notes Section (Trello-Style) */}
                 <div className="trello-list">
@@ -3293,9 +3624,9 @@ function drawCircleFills(
   circleFillMode: CircleFillMode,
   selectedCircleIds: string[] = [],
 ) {
-  const isTransparent = circleFillMode === 'transparent'
   for (const circle of circles) {
-    const tone = MATERIAL_TONES[circle.tone]
+    const tone = getCircleColors(circle)
+    const isTransparent = (circle.fillMode ?? circleFillMode) === 'transparent'
     const path = new Path2D(getCircleRenderPath(circle, circleShapeMode))
     ctx.save()
     if (!isTransparent) {
@@ -3335,24 +3666,25 @@ function drawCircleDetails(
 }
 
 function getCircleRenderPath(circle: CircleNode, circleShapeMode: CircleShapeMode) {
+  void circleShapeMode
   return getNodePath(
     circle.x,
     circle.y,
     circle.radius,
-    circleShapeMode === 'circles' ? 'circle' : circle.shapeType ?? 'wavy',
-    circleShapeMode === 'circles' ? 80 : circle.sides ?? Math.max(8, Math.round(circle.radius / 10)),
-    circleShapeMode === 'circles' ? 0 : circle.amplitude ?? Math.max(4, circle.radius * 0.06),
+    circle.shapeType ?? 'circle',
+    circle.sides ?? Math.max(8, Math.round(circle.radius / 10)),
+    circle.amplitude ?? 0,
   )
 }
 
 function drawCircleCenter(ctx: CanvasRenderingContext2D, circle: CircleNode, scale: number, circleFillMode: CircleFillMode) {
-  const tone = MATERIAL_TONES[circle.tone]
+  const tone = getCircleColors(circle)
   const radius = CIRCLE_CENTER_RADIUS
   ctx.save()
   ctx.beginPath()
   ctx.arc(circle.x, circle.y, radius, 0, Math.PI * 2)
   ctx.fillStyle = tone.centerBg
-  ctx.globalAlpha = circleFillMode === 'transparent' ? 0.92 : 1
+  ctx.globalAlpha = (circle.fillMode ?? circleFillMode) === 'transparent' ? 0.92 : 1
   ctx.fill()
   ctx.lineWidth = Math.max(3 / scale, 2)
   ctx.strokeStyle = '#ffffff'
@@ -4317,6 +4649,46 @@ function UploadIcon() {
       <line x1="12" y1="3" x2="12" y2="15" />
     </svg>
   )
+}
+
+function PaletteIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="13.5" cy="6.5" r=".5" />
+      <circle cx="17.5" cy="10.5" r=".5" />
+      <circle cx="8.5" cy="7.5" r=".5" />
+      <circle cx="6.5" cy="12.5" r=".5" />
+      <path d="M12 3a9 9 0 0 0 0 18h1.6a2.4 2.4 0 0 0 1.7-4.1l-.4-.4a1.2 1.2 0 0 1 .8-2h1.8A3.5 3.5 0 0 0 21 11c0-4.4-4-8-9-8Z" />
+    </svg>
+  )
+}
+
+function ExternalLinkIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M7 17 17 7" />
+      <path d="M8 7h9v9" />
+    </svg>
+  )
+}
+
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
+  )
+}
+
+function ConnectionServiceIcon({ service }: { service: PersonLinkService }) {
+  if (service === 'linkedin') return <span className="service-icon service-icon--linkedin">in</span>
+  if (service === 'telegram') return <span className="service-icon service-icon--telegram">tg</span>
+  if (service === 'instagram') return <span className="service-icon service-icon--instagram">ig</span>
+  if (service === 'facebook') return <span className="service-icon service-icon--facebook">f</span>
+  if (service === 'whatsapp') return <span className="service-icon service-icon--whatsapp">wa</span>
+  if (service === 'x') return <span className="service-icon service-icon--x">x</span>
+  return <span className="service-icon service-icon--website">web</span>
 }
 
 export default App

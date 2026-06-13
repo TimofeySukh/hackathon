@@ -2,11 +2,11 @@
 
 ## Purpose
 
-Provides a compact, highly interactive notes list for person nodes inside the inspector sidebar panel, structured and styled like Trello list columns and cards. It allows users to write notes quickly with minimal screen space and useful keyboard shortcuts.
+Provides a compact, highly interactive notes list for person nodes inside the inspector sidebar panel, structured and styled like Trello list columns and cards. It allows users to write notes quickly with minimal screen space and useful keyboard shortcuts. Profile links and social handles live in the separate Person Connections feature, not in notes.
 
 ## Behavior
 
-- **Notes List Column**: Grouped under a light gray `#f1f2f4` column header containing the title "Notes".
+- **Notes List Column**: Grouped under a compact Material 3 neutral container header containing the title "Notes".
 - **Trello Cards**: Each note is rendered as a warm pastel yellow sticky note (`#fff9c4`) with rounded corners, a subtle drop shadow, and a dark slate text color. Hovering over a card reveals a small trash icon to delete the card.
 - **Add Note Composer**:
   - Toggled by clicking `+ Add a card` at the bottom of the list.
@@ -20,7 +20,7 @@ Provides a compact, highly interactive notes list for person nodes inside the in
 
 ## Design
 
-- **Surfaces / elevation**: Cards use a light box shadow (`0px 1px 1px #091e4240, 0px 0px 1px #091e424f`) and a warm soft yellow (`#fff9c4`) background. The list uses a solid light gray `#f1f2f4` container.
+- **Surfaces / elevation**: Cards use a light box shadow (`0px 1px 1px #091e4240, 0px 0px 1px #091e424f`). The list uses a Material 3 neutral container.
 - **Components used**: Composer buttons (`.trello-list__composer-add-btn`, `.trello-list__composer-cancel-btn`) matching layout.
 - **Color roles used**: Neutral surface container colors and sticky note yellow (#fff9c4).
 
