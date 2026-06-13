@@ -2346,74 +2346,71 @@ function App() {
                 </div>
                 */}
 
+                {/* Divider to separate notes section from metadata */}
+                <div style={{ height: '1px', backgroundColor: 'var(--md-outline-variant)', margin: '16px 0' }} />
+
                 {/* Notes Section (Trello-Style) */}
-                <div className="trello-list" style={{ marginTop: '8px' }}>
+                <div className="trello-list">
                   <div className="trello-list__header">
                     <h4 className="trello-list__title">Notes</h4>
                   </div>
  
                   {/* Scrollable list */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {(!selectedPerson.notes || selectedPerson.notes.length === 0) ? (
-                      <span style={{ fontSize: '11px', color: 'rgba(23, 43, 77, 0.6)', fontStyle: 'italic', padding: '4px 8px' }}>
-                        No notes yet.
-                      </span>
-                    ) : (
-                      selectedPerson.notes.map((note) => (
-                        <div key={note.id}>
-                          {editingNoteId === note.id ? (
-                            <div className="trello-card__editor">
-                              <textarea
-                                className="trello-card__editor-textarea"
-                                autoFocus
-                                value={note.body}
-                                onChange={(e) => {
-                                  updatePersonNote(
-                                    selectedPerson.id,
-                                    note.id,
-                                    e.target.value.split('\n')[0].substring(0, 30) || 'Untitled note',
-                                    e.target.value
-                                  )
-                                }}
-                                onBlur={() => setEditingNoteId(null)}
-                                onKeyDown={(e) => {
+                    {selectedPerson.notes?.map((note) => (
+                      <div key={note.id}>
+                        {editingNoteId === note.id ? (
+                          <div className="trello-card__editor">
+                            <textarea
+                              className="trello-card__editor-textarea"
+                              autoFocus
+                              value={note.body}
+                              onChange={(e) => {
+                                updatePersonNote(
+                                  selectedPerson.id,
+                                  note.id,
+                                  e.target.value.split('\n')[0].substring(0, 30) || 'Untitled note',
+                                  e.target.value
+                                )
+                              }}
+                              onBlur={() => setEditingNoteId(null)}
+                              onKeyDown={(e) => {
                                   if (e.key === 'Enter' && !e.shiftKey) {
                                     e.preventDefault()
                                     setEditingNoteId(null)
                                   } else if (e.key === 'Escape') {
                                     setEditingNoteId(null)
                                   }
-                                }}
-                                style={{
-                                  minHeight: '40px',
-                                }}
-                              />
-                            </div>
-                          ) : (
-                            <div
-                              className="trello-card"
-                              onClick={() => setEditingNoteId(note.id)}
+                              }}
+                              style={{
+                                minHeight: '40px',
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <div
+                            className="trello-card"
+                            onClick={() => setEditingNoteId(note.id)}
+                          >
+                            <div className="trello-card__body">{note.body}</div>
+                            <button
+                              type="button"
+                              className="trello-card__delete-btn"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                deletePersonNote(selectedPerson.id, note.id)
+                              }}
+                              title="Delete note"
                             >
-                              <div className="trello-card__body">{note.body}</div>
-                              <button
-                                type="button"
-                                className="trello-card__delete-btn"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  deletePersonNote(selectedPerson.id, note.id)
-                                }}
-                                title="Delete note"
-                              >
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                                  <polyline points="3 6 5 6 21 6" />
-                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                                </svg>
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ))
-                    )}
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                                <polyline points="3 6 5 6 21 6" />
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                              </svg>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
  
                   {/* Trello Card Composer */}
@@ -2427,6 +2424,7 @@ function App() {
                           onChange={(e) => setNewNoteBody(e.target.value)}
                           className="trello-list__composer-textarea"
                           autoFocus
+                          rows={1}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' && !e.shiftKey) {
                               e.preventDefault()
@@ -2437,7 +2435,8 @@ function App() {
                             }
                           }}
                           style={{
-                            minHeight: '54px',
+                            minHeight: '20px',
+                            resize: 'none',
                           }}
                         />
                       </div>
