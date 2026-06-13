@@ -806,7 +806,7 @@ svg {
 .trello-list {
   background-color: #f1f2f4; /* Trello standard gray */
   border-radius: 12px;
-  padding: 10px 8px 8px 8px;
+  padding: 8px 6px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1208,10 +1208,10 @@ input[type="range"]::-webkit-slider-thumb:active {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin: 12px 0;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--md-outline-variant);
+  gap: 12px;
+  margin: 8px 0 0 0;
+  padding-bottom: 0;
+  border-bottom: none;
 }
 
 /* Avatar circular picker */
@@ -1299,9 +1299,9 @@ input[type="range"]::-webkit-slider-thumb:active {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-top: auto; /* Push to the bottom */
-  padding-top: 16px;
-  border-top: 1px solid var(--md-outline-variant);
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: none;
 }
 
 .inspector-actions-section button {
