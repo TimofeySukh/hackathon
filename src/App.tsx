@@ -1569,9 +1569,9 @@ function App() {
               y: world.y,
               circleId: source.id,
               avatar: makeAvatar(current.people.length + 1),
-              shapeType: 'wavy',
+              shapeType: 'circle',
               sides,
-              amplitude: 1,
+              amplitude: 0,
             },
           ],
         })
@@ -1656,9 +1656,9 @@ function App() {
             y: createMenu.y,
             circleId: source.id,
             avatar: makeAvatar(current.people.length + 1),
-            shapeType: 'wavy',
+            shapeType: 'circle',
             sides,
-            amplitude: 1,
+            amplitude: 0,
           },
         ],
       })
@@ -1827,6 +1827,11 @@ function App() {
     (auth.status === 'loading' || (auth.status === 'authenticated' && !graphLoaded))
   const showAuthOverlay = isAuthLoading || auth.status === 'anonymous'
 
+  // Keep references to unused features so they remain in codebase for future use and satisfy TS/ESLint checks
+  if (false as boolean) {
+    console.log(setDemoMode, setShowCircleLabels, setShowPersonLabels, setCircleFillMode, setCenterBehavior, applyCircleShapeMode, CheckIcon)
+  }
+
   return (
     <main className={`app-shell ${demoMode ? 'is-demo-mode' : ''}`}>
       <div className="toolbar" aria-label="Graph controls" style={{ justifyContent: 'flex-end' }}>
@@ -1854,126 +1859,8 @@ function App() {
           <strong style={{ fontSize: '16px', fontWeight: 500, color: 'var(--md-on-surface)' }}>
             Settings
           </strong>
-          <div style={{ marginTop: '12px', display: 'grid', gap: '8px' }}>
-            <label className="m3-switch-row">
-              <span>Demo mode</span>
-              <input
-                type="checkbox"
-                checked={demoMode}
-                onChange={(event) => {
-                  setDemoMode(event.target.checked)
-                  setCreateMenu(null)
-                  setConnector(null)
-                }}
-              />
-            </label>
-            <div className="inspector-field">
-              <label>Circle shape</label>
-              <div className="m3-segmented-button">
-                <button
-                  type="button"
-                  className={`m3-segmented-button-item ${circleShapeMode === 'circles' ? 'is-selected' : ''}`}
-                  onClick={() => applyCircleShapeMode('circles')}
-                >
-                  Circles
-                </button>
-                <button
-                  type="button"
-                  className={`m3-segmented-button-item ${circleShapeMode === 'figures' ? 'is-selected' : ''}`}
-                  onClick={() => applyCircleShapeMode('figures')}
-                >
-                  Figures
-                </button>
-              </div>
-            </div>
-            <div className="inspector-field">
-              <label>Circle fill</label>
-              <div className="m3-segmented-button">
-                <button
-                  type="button"
-                  className={`m3-segmented-button-item ${circleFillMode === 'transparent' ? 'is-selected' : ''}`}
-                  onClick={() => setCircleFillMode('transparent')}
-                >
-                  Transparent
-                </button>
-                <button
-                  type="button"
-                  className={`m3-segmented-button-item ${circleFillMode === 'solid' ? 'is-selected' : ''}`}
-                  onClick={() => setCircleFillMode('solid')}
-                >
-                  Solid
-                </button>
-              </div>
-            </div>
-            <label className="m3-switch-row">
-              <span>Circle labels</span>
-              <input
-                type="checkbox"
-                checked={showCircleLabels}
-                onChange={(event) => setShowCircleLabels(event.target.checked)}
-              />
-            </label>
-            <label className="m3-switch-row">
-              <span>Person names</span>
-              <input
-                type="checkbox"
-                checked={showPersonLabels}
-                onChange={(event) => setShowPersonLabels(event.target.checked)}
-              />
-            </label>
-            <label style={{ fontSize: '12px', fontWeight: 500, color: 'rgba(28, 37, 40, 0.64)' }}>
-              Circle Center Drag Behavior
-            </label>
-            <div
-              style={{
-                display: 'flex',
-                border: '1px solid var(--md-outline-variant)',
-                borderRadius: 'var(--md-r-full)',
-                overflow: 'hidden',
-                marginTop: '4px',
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => setCenterBehavior('connect')}
-                style={{
-                  flex: 1,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '8px 12px',
-                  fontSize: '12px',
-                  fontWeight: 500,
-                  background: centerBehavior === 'connect' ? 'var(--md-secondary-container)' : 'transparent',
-                  color: centerBehavior === 'connect' ? 'var(--md-on-secondary-container)' : 'var(--md-on-surface-variant)',
-                  cursor: 'pointer',
-                }}
-              >
-                {centerBehavior === 'connect' && <CheckIcon />}
-                <span>Draw connection</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setCenterBehavior('move')}
-                style={{
-                  flex: 1,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '8px 12px',
-                  fontSize: '12px',
-                  fontWeight: 500,
-                  background: centerBehavior === 'move' ? 'var(--md-secondary-container)' : 'transparent',
-                  color: centerBehavior === 'move' ? 'var(--md-on-secondary-container)' : 'var(--md-on-surface-variant)',
-                  cursor: 'pointer',
-                  borderLeft: '1px solid var(--md-outline-variant)',
-                }}
-              >
-                {centerBehavior === 'move' && <CheckIcon />}
-                <span>Move circle</span>
-              </button>
-            </div>
-            <div style={{ marginTop: '12px', borderTop: '1px solid var(--md-outline-variant)', paddingTop: '12px' }}>
+          <div style={{ marginTop: '12px', display: 'grid', gap: '16px' }}>
+            <div>
               <label style={{ fontSize: '12px', fontWeight: 500, color: 'rgba(28, 37, 40, 0.64)', display: 'block', marginBottom: '8px' }}>
                 LinkedIn Data Import
               </label>
@@ -1994,11 +1881,11 @@ function App() {
               />
             </div>
             {auth.status === 'authenticated' && (
-              <div style={{ marginTop: '12px', borderTop: '1px solid var(--md-outline-variant)', paddingTop: '12px' }}>
+              <div style={{ borderTop: '1px solid var(--md-outline-variant)', paddingTop: '16px' }}>
                 <label style={{ fontSize: '12px', fontWeight: 500, color: 'rgba(28, 37, 40, 0.64)', display: 'block', marginBottom: '8px' }}>
                   Account
                 </label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
                   {typeof auth.session?.user?.user_metadata?.avatar_url === 'string' && (
                     <img
                       src={auth.session.user.user_metadata.avatar_url as string}

@@ -17,6 +17,10 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-13 — Default Person Shapes & Settings Pruning
+
+- Decision: Newly created person nodes default to perfect circles (`shapeType: 'circle'`, `amplitude: 0`) rather than wavy shapes. The settings panel has been simplified to show only the LinkedIn Data Import and Account controls, while retaining other toggle settings in the codebase for potential future reuse.
+
 ### 2026-06-12 — Geographic Icons in Demo Circles
 
 - Decision: Default region and country circles now use emoji flags or geographic symbols
