@@ -2210,118 +2210,79 @@ function App() {
                   </svg>
                 </button>
 
-                {/* Visual Settings Row: Select Circle + Avatar Photo Upload */}
-                {(() => {
-                  const personCircle = circlesById.get(selectedPerson.circleId)
-                  const toneColors = personCircle ? MATERIAL_TONES[personCircle.tone] : null
-                  return (
-                    <div className="inspector-visual-row">
-                      <div className="inspector-field" style={{ flex: 1, marginTop: 0 }}>
-                        <div style={{ position: 'relative', width: '100%' }}>
-                          <button
-                            type="button"
-                            onClick={() => setShowCircleDropdown(!showCircleDropdown)}
-                            className="custom-select-trigger"
-                            style={{
-                              width: '100%',
-                              textAlign: 'left',
-                              background: toneColors ? toneColors.fill : 'transparent',
-                              color: toneColors ? toneColors.text : 'var(--md-on-surface)',
-                              border: toneColors ? `1px solid ${toneColors.border}` : '1px solid var(--md-outline-variant)',
-                              borderRadius: 'var(--md-r-sm)',
-                              padding: '10px 12px',
-                              fontSize: '13px',
-                              fontWeight: 500,
-                              outline: 'none',
-                              cursor: 'pointer',
-                              position: 'relative',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              boxSizing: 'border-box',
-                            }}
-                          >
-                            <span>{personCircle?.name || 'Select circle'}</span>
-                            <svg
-                              viewBox="0 0 24 24"
-                              style={{
-                                width: 16,
-                                height: 16,
-                                fill: 'none',
-                                stroke: toneColors ? toneColors.text : '#43474e',
-                                strokeWidth: 2,
-                                strokeLinecap: 'round',
-                                strokeLinejoin: 'round',
-                                transform: showCircleDropdown ? 'rotate(180deg)' : 'none',
-                                transition: 'transform 0.2s',
-                              }}
-                            >
-                              <polyline points="6 9 12 15 18 9" />
-                            </svg>
-                          </button>
+                 {/* Visual Settings Row: Select Circle + Avatar Photo Upload */}
+                 {(() => {
+                   const personCircle = circlesById.get(selectedPerson.circleId)
+                   const toneColors = personCircle ? MATERIAL_TONES[personCircle.tone] : null
+                   return (
+                     <div className="inspector-visual-row">
+                       <div className="inspector-field" style={{ flex: 1, marginTop: 0 }}>
+                         <div style={{ position: 'relative', width: '100%' }}>
+                           <button
+                             type="button"
+                             onClick={() => setShowCircleDropdown(!showCircleDropdown)}
+                             className="custom-select-trigger"
+                             style={{
+                               background: toneColors ? toneColors.centerBg : 'var(--md-surface-container-highest, #edf1f3)',
+                               color: toneColors ? '#ffffff' : 'var(--md-on-surface)',
+                               border: toneColors ? 'none' : '1px solid var(--md-outline-variant)',
+                             }}
+                           >
+                             <span>{personCircle?.name || 'Select circle'}</span>
+                             <svg
+                               viewBox="0 0 24 24"
+                               style={{
+                                 width: 16,
+                                 height: 16,
+                                 fill: 'none',
+                                 stroke: toneColors ? '#ffffff' : 'var(--md-on-surface-variant, #43474e)',
+                                 strokeWidth: 2,
+                                 strokeLinecap: 'round',
+                                 strokeLinejoin: 'round',
+                                 transform: showCircleDropdown ? 'rotate(180deg)' : 'none',
+                                 transition: 'transform 0.2s',
+                               }}
+                             >
+                               <polyline points="6 9 12 15 18 9" />
+                             </svg>
+                           </button>
 
-                          {showCircleDropdown && (
-                            <div
-                              className="custom-select-dropdown"
-                              style={{
-                                position: 'absolute',
-                                zIndex: 1000,
-                                top: 'calc(100% + 4px)',
-                                left: 0,
-                                right: 0,
-                                background: 'var(--md-surface-container-high, #edf1f3)',
-                                border: '1px solid var(--md-outline-variant)',
-                                borderRadius: 'var(--md-r-sm)',
-                                boxShadow: 'var(--md-elev-2)',
-                                maxHeight: '200px',
-                                overflowY: 'auto',
-                                padding: '4px 0',
-                              }}
-                            >
-                              {graph.circles.map((c) => (
-                                <button
-                                  key={c.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setGraph((current) => ({
-                                      ...current,
-                                      people: current.people.map((p) =>
-                                        p.id === selectedPerson.id ? { ...p, circleId: c.id, x: c.x, y: c.y } : p
-                                      ),
-                                    }))
-                                    setShowCircleDropdown(false)
-                                  }}
-                                  className="custom-select-option"
-                                  style={{
-                                    width: '100%',
-                                    textAlign: 'left',
-                                    background: selectedPerson.circleId === c.id ? 'var(--md-secondary-container, #e2e7ec)' : 'transparent',
-                                    color: 'var(--md-on-surface)',
-                                    border: 'none',
-                                    padding: '8px 12px',
-                                    fontSize: '13px',
-                                    cursor: 'pointer',
-                                    display: 'block',
-                                    transition: 'background-color 0.15s',
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    if (selectedPerson.circleId !== c.id) {
-                                      e.currentTarget.style.backgroundColor = 'var(--md-surface-container-highest, rgba(0,0,0,0.04))'
-                                    }
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    if (selectedPerson.circleId !== c.id) {
-                                      e.currentTarget.style.backgroundColor = 'transparent'
-                                    }
-                                  }}
-                                >
-                                  {c.name}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                           {showCircleDropdown && (
+                             <div className="custom-select-dropdown">
+                               {graph.circles.map((c) => {
+                                 const optionColors = MATERIAL_TONES[c.tone]
+                                 return (
+                                   <button
+                                     key={c.id}
+                                     type="button"
+                                     onClick={() => {
+                                       setGraph((current) => ({
+                                         ...current,
+                                         people: current.people.map((p) =>
+                                           p.id === selectedPerson.id ? { ...p, circleId: c.id, x: c.x, y: c.y } : p
+                                         ),
+                                       }))
+                                       setShowCircleDropdown(false)
+                                     }}
+                                     className="custom-select-option"
+                                     style={{
+                                       background: optionColors.centerBg,
+                                       color: '#ffffff',
+                                     }}
+                                   >
+                                     <span>{c.name}</span>
+                                     {selectedPerson.circleId === c.id && (
+                                       <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, stroke: '#ffffff', strokeWidth: 3, fill: 'none' }}>
+                                         <polyline points="20 6 9 17 4 12" />
+                                       </svg>
+                                     )}
+                                   </button>
+                                 )
+                               })}
+                             </div>
+                           )}
+                         </div>
+                       </div>
 
                       <div className="m3-avatar-picker-container">
                         <label className="m3-avatar-picker" title="Upload person photo">
