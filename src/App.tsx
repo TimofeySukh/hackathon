@@ -144,6 +144,9 @@ type MoveCircleState = {
   startY: number
   originX: number
   originY: number
+  circleOrigins?: Record<string, { x: number; y: number }>
+  personOrigins?: Record<string, { x: number; y: number }>
+  disconnectedCircleIds?: string[]
 }
 
 type MovePersonState = {
@@ -153,6 +156,7 @@ type MovePersonState = {
   startY: number
   originX: number
   originY: number
+  selectedOrigins?: Record<string, { x: number; y: number }>
 }
 
 type ResizeCircleState = {
@@ -403,6 +407,7 @@ function App() {
   const [selectedItem, setSelectedItem] = useState<SelectedItem>(null)
   const [showCircleDropdown, setShowCircleDropdown] = useState(false)
   const [selectedPeopleIds, setSelectedPeopleIds] = useState<string[]>([])
+  const [selectedCircleIds, setSelectedCircleIds] = useState<string[]>([])
   // Person currently under the cursor — promoted to an interactive DOM node so it
   // can be clicked/dragged even inside a dense circle that's otherwise canvas-only.
   const [hoveredPersonId, setHoveredPersonId] = useState<string | null>(null)
@@ -768,15 +773,55 @@ function App() {
   }
 
   function deleteSelectedItem() {
-    if (selectedPeopleIds.length > 0) {
-      setGraph((current) => ({
-        ...current,
-        people: current.people.filter((p) => !selectedPeopleIds.includes(p.id)),
-        connections: (current.connections || []).filter(
-          (conn) => !selectedPeopleIds.includes(conn.fromId) && !selectedPeopleIds.includes(conn.toId)
-        ),
-      }))
+    if (selectedPeopleIds.length > 0 || selectedCircleIds.length > 0) {
+      setGraph((current) => {
+        const deletedCircleIds = new Set<string>(selectedCircleIds)
+        let expanded = true
+        while (expanded) {
+          expanded = false
+          for (const c of current.circles) {
+            if (c.parentId && deletedCircleIds.has(c.parentId) && !deletedCircleIds.has(c.id)) {
+              deletedCircleIds.add(c.id)
+              expanded = true
+            }
+          }
+        }
+
+        const deletedPeopleIds = new Set<string>(selectedPeopleIds)
+        for (const p of current.people) {
+          if (deletedCircleIds.has(p.circleId)) {
+            deletedPeopleIds.add(p.id)
+          }
+        }
+
+        const nextCircles = current.circles
+          .filter((c) => !deletedCircleIds.has(c.id))
+          .map((c) => {
+            if (c.connectedTo && deletedCircleIds.has(c.connectedTo)) {
+              return { ...c, connectedTo: 'you' }
+            }
+            return c
+          })
+
+        const nextPeople = current.people.filter((p) => !deletedPeopleIds.has(p.id))
+
+        const nextConnections = (current.connections || []).filter(
+          (conn) =>
+            !deletedPeopleIds.has(conn.fromId) &&
+            !deletedPeopleIds.has(conn.toId) &&
+            !deletedCircleIds.has(conn.fromId) &&
+            !deletedCircleIds.has(conn.toId)
+        )
+
+        return ensureContainment({
+          ...current,
+          circles: nextCircles,
+          people: nextPeople,
+          connections: nextConnections,
+        })
+      })
       setSelectedPeopleIds([])
+      setSelectedCircleIds([])
       setSelectedItem(null)
     } else if (selectedItem?.type === 'person') {
       deletePerson(selectedItem.id)
@@ -837,19 +882,14 @@ function App() {
           return
         }
 
-        if (selectedItem?.type === 'person') {
-          deletePerson(selectedItem.id)
-        } else if (selectedItem?.type === 'circle') {
-          deleteCircle(selectedItem.id)
-        } else if (selectedItem?.type === 'connection') {
-          deleteConnection(selectedItem.id)
-        }
+        deleteSelectedItem()
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedItem])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedItem, selectedPeopleIds, selectedCircleIds])
 
   useEffect(() => {
     if (!showCircleDropdown) return
@@ -932,6 +972,7 @@ function App() {
         circleFillMode,
         selectedPeopleIds,
         marqueeRef.current,
+        selectedCircleIds,
       )
     }
   }
@@ -1019,6 +1060,7 @@ function App() {
       circleFillMode,
       selectedPeopleIds,
       marquee,
+      selectedCircleIds,
     )
   }, [
     camera,
@@ -1035,6 +1077,7 @@ function App() {
     selectedPeopleIds,
     imageEpoch,
     marquee,
+    selectedCircleIds,
   ])
 
   useEffect(() => {
@@ -1187,6 +1230,7 @@ function App() {
           ),
         }))
         setSelectedPeopleIds([])
+        setSelectedCircleIds([])
         setSelectedItem({ type: 'person', id: hit.person.id })
         startPersonMove(event, hit.person)
       } else {
@@ -1205,8 +1249,11 @@ function App() {
           })
           setSelectedItem(null)
         } else {
-          setSelectedPeopleIds([])
-          setSelectedItem({ type: 'person', id: hit.person.id })
+          if (!selectedPeopleIds.includes(hit.person.id)) {
+            setSelectedPeopleIds([])
+            setSelectedCircleIds([])
+            setSelectedItem({ type: 'person', id: hit.person.id })
+          }
           startPersonMove(event, hit.person)
         }
       }
@@ -1225,15 +1272,35 @@ function App() {
           ),
         }))
         setSelectedPeopleIds([])
+        setSelectedCircleIds([])
         setSelectedItem({ type: 'circle', id: hit.circle.id })
         startCircleMove(event, hit.circle)
       } else {
-        setSelectedPeopleIds([])
-        if (centerBehavior === 'connect') {
-          startConnector(event, hit.circle.id, 'circle', hit.circle.x, hit.circle.y)
+        if (event.shiftKey) {
+          setSelectedCircleIds((prev) => {
+            let next = [...prev]
+            if (selectedItem?.type === 'circle' && !next.includes(selectedItem.id)) {
+              next.push(selectedItem.id)
+            }
+            if (next.includes(hit.circle.id)) {
+              next = next.filter((id) => id !== hit.circle.id)
+            } else {
+              next.push(hit.circle.id)
+            }
+            return next
+          })
+          setSelectedItem(null)
         } else {
-          setSelectedItem({ type: 'circle', id: hit.circle.id })
-          startCircleMove(event, hit.circle)
+          if (!selectedCircleIds.includes(hit.circle.id)) {
+            setSelectedPeopleIds([])
+            setSelectedCircleIds([])
+            setSelectedItem({ type: 'circle', id: hit.circle.id })
+          }
+          if (centerBehavior === 'connect') {
+            startConnector(event, hit.circle.id, 'circle', hit.circle.x, hit.circle.y)
+          } else {
+            startCircleMove(event, hit.circle)
+          }
         }
       }
       return
@@ -1241,6 +1308,7 @@ function App() {
 
     if (isRightClick) {
       setSelectedPeopleIds([])
+      setSelectedCircleIds([])
       setSelectedItem(null)
       setOpenNotesPersonId(null)
       const marqueeState = {
@@ -1256,24 +1324,46 @@ function App() {
 
     if (hit?.type === 'circle-edge') {
       setSelectedPeopleIds([])
+      setSelectedCircleIds([])
       startCircleResize(event, hit.circle)
       return
     }
 
     if (hit?.type === 'circle-body') {
-      setSelectedPeopleIds([])
-      setSelectedItem({ type: 'circle', id: hit.circle.id })
-      startCircleMove(event, hit.circle)
+      if (event.shiftKey) {
+        setSelectedCircleIds((prev) => {
+          let next = [...prev]
+          if (selectedItem?.type === 'circle' && !next.includes(selectedItem.id)) {
+            next.push(selectedItem.id)
+          }
+          if (next.includes(hit.circle.id)) {
+            next = next.filter((id) => id !== hit.circle.id)
+          } else {
+            next.push(hit.circle.id)
+          }
+          return next
+        })
+        setSelectedItem(null)
+      } else {
+        if (!selectedCircleIds.includes(hit.circle.id)) {
+          setSelectedPeopleIds([])
+          setSelectedCircleIds([])
+          setSelectedItem({ type: 'circle', id: hit.circle.id })
+        }
+        startCircleMove(event, hit.circle)
+      }
       return
     }
 
     if (hit?.type === 'connection') {
       setSelectedPeopleIds([])
+      setSelectedCircleIds([])
       setSelectedItem({ type: 'connection', id: hit.connection.id })
       return
     }
 
     setSelectedPeopleIds([])
+    setSelectedCircleIds([])
     setSelectedItem(null)
     setOpenNotesPersonId(null)
     panRef.current = {
@@ -1362,9 +1452,22 @@ function App() {
     if (moving?.pointerId === event.pointerId) {
       const deltaX = (event.clientX - moving.startX) / camera.scale
       const deltaY = (event.clientY - moving.startY) / camera.scale
+      const { circleOrigins, personOrigins } = moving
       pendingGraphRef.current = (current) =>
         ensureContainment(
-          moveCircleSubtree(current, moving.circleId, moving.originX + deltaX, moving.originY + deltaY),
+          {
+            ...current,
+            circles: current.circles.map((c) =>
+              circleOrigins && c.id in circleOrigins
+                ? { ...c, x: circleOrigins[c.id].x + deltaX, y: circleOrigins[c.id].y + deltaY }
+                : c
+            ),
+            people: current.people.map((p) =>
+              personOrigins && p.id in personOrigins
+                ? { ...p, x: personOrigins[p.id].x + deltaX, y: personOrigins[p.id].y + deltaY }
+                : p
+            ),
+          },
           { activeCircleId: moving.circleId },
         )
       scheduleDrag()
@@ -1374,15 +1477,20 @@ function App() {
     if (movingPerson?.pointerId === event.pointerId) {
       const deltaX = (event.clientX - movingPerson.startX) / camera.scale
       const deltaY = (event.clientY - movingPerson.startY) / camera.scale
+      const { selectedOrigins } = movingPerson
       pendingGraphRef.current = (current) =>
         ensureContainment(
           {
             ...current,
-            people: current.people.map((person) =>
-              person.id === movingPerson.personId
-                ? { ...person, x: movingPerson.originX + deltaX, y: movingPerson.originY + deltaY }
-                : person,
-            ),
+            people: current.people.map((person) => {
+              if (selectedOrigins && person.id in selectedOrigins) {
+                const origin = selectedOrigins[person.id]
+                return { ...person, x: origin.x + deltaX, y: origin.y + deltaY }
+              } else if (person.id === movingPerson.personId) {
+                return { ...person, x: movingPerson.originX + deltaX, y: movingPerson.originY + deltaY }
+              }
+              return person
+            }),
           },
           { activePersonId: movingPerson.personId },
         )
@@ -1434,11 +1542,16 @@ function App() {
       const pStart = screenToWorld({ x: Math.min(startX, currentX), y: Math.min(startY, currentY) })
       const pEnd = screenToWorld({ x: Math.max(startX, currentX), y: Math.max(startY, currentY) })
 
-      const selectedIds = graph.people
+      const selectedPIds = graph.people
         .filter((p) => p.x >= pStart.x && p.x <= pEnd.x && p.y >= pStart.y && p.y <= pEnd.y)
         .map((p) => p.id)
 
-      setSelectedPeopleIds(selectedIds)
+      const selectedCIds = graph.circles
+        .filter((c) => c.id !== 'you' && c.x >= pStart.x && c.x <= pEnd.x && c.y >= pStart.y && c.y <= pEnd.y)
+        .map((c) => c.id)
+
+      setSelectedPeopleIds(selectedPIds)
+      setSelectedCircleIds(selectedCIds)
       setSelectedItem(null)
 
       marqueeRef.current = null
@@ -1459,6 +1572,8 @@ function App() {
 
     const movingPersonId = movePersonRef.current?.pointerId === event.pointerId ? movePersonRef.current.personId : null
     const movingCircleId = moveCircleRef.current?.pointerId === event.pointerId ? moveCircleRef.current.circleId : null
+    const selectedOrigins = movePersonRef.current?.pointerId === event.pointerId ? movePersonRef.current.selectedOrigins : null
+    const disconnectedCircleIds = moveCircleRef.current?.pointerId === event.pointerId ? moveCircleRef.current.disconnectedCircleIds : null
     const wasRightClickDrag = isRightClickDragRef.current
 
     const endingMove =
@@ -1477,23 +1592,24 @@ function App() {
         let next = pending ? pending(prev) : prev
         if (wasRightClickDrag) {
           if (movingPersonId) {
-            const person = next.people.find((p) => p.id === movingPersonId)
-            if (person) {
-              const innermost = next.circles
-                .filter((c) => Math.hypot(person.x - c.x, person.y - c.y) <= c.radius)
-                .sort((a, b) => a.radius - b.radius)[0]
-              const nextCircleId = innermost ? innermost.id : ''
-              next = {
-                ...next,
-                people: next.people.map((p) =>
-                  p.id === movingPersonId ? { ...p, circleId: nextCircleId } : p
-                ),
+            const draggedIds = selectedOrigins ? Object.keys(selectedOrigins) : [movingPersonId]
+            let nextPeople = next.people
+            for (const pid of draggedIds) {
+              const person = nextPeople.find((p) => p.id === pid)
+              if (person) {
+                const innermost = next.circles
+                  .filter((c) => Math.hypot(person.x - c.x, person.y - c.y) <= c.radius)
+                  .sort((a, b) => a.radius - b.radius)[0]
+                const nextCircleId = innermost ? innermost.id : ''
+                nextPeople = nextPeople.map((p) => p.id === pid ? { ...p, circleId: nextCircleId } : p)
               }
             }
+            next = { ...next, people: nextPeople }
           } else if (movingCircleId) {
-            const circle = next.circles.find((c) => c.id === movingCircleId)
-            if (circle) {
-              const circlesById = new Map(next.circles.map((c) => [c.id, c]))
+            const draggedCircleIds = disconnectedCircleIds || [movingCircleId]
+            let nextCircles = next.circles
+            for (const cid of draggedCircleIds) {
+              const circlesById = new Map(nextCircles.map((c) => [c.id, c]))
               const isDescendant = (childId: string, parentId: string): boolean => {
                 let curr: string | null = childId
                 while (curr) {
@@ -1502,17 +1618,16 @@ function App() {
                 }
                 return false
               }
-              const innermost = next.circles
-                .filter((c) => c.id !== movingCircleId && !isDescendant(c.id, movingCircleId) && Math.hypot(circle.x - c.x, circle.y - c.y) <= c.radius)
-                .sort((a, b) => a.radius - b.radius)[0]
-              const nextParentId = innermost ? innermost.id : null
-              next = {
-                ...next,
-                circles: next.circles.map((c) =>
-                  c.id === movingCircleId ? { ...c, parentId: nextParentId } : c
-                ),
+              const circle = nextCircles.find((c) => c.id === cid)
+              if (circle) {
+                const innermost = nextCircles
+                  .filter((c) => c.id !== cid && !isDescendant(c.id, cid) && Math.hypot(circle.x - c.x, circle.y - c.y) <= c.radius)
+                  .sort((a, b) => a.radius - b.radius)[0]
+                const nextParentId = innermost ? innermost.id : null
+                nextCircles = nextCircles.map((c) => c.id === cid ? { ...c, parentId: nextParentId } : c)
               }
             }
+            next = { ...next, circles: nextCircles }
           }
         }
         return ensureContainment(next)
@@ -1624,15 +1739,7 @@ function App() {
     })
     if (hit?.type !== 'circle-body' && hit?.type !== 'circle-edge' && hit?.type !== 'circle-center') return
 
-    const world = screenToWorld({ x: event.clientX, y: event.clientY })
     setSelectedItem({ type: 'circle', id: hit.circle.id })
-    setCreateMenu({
-      sourceCircleId: hit.circle.id,
-      x: world.x,
-      y: world.y,
-      screenX: event.clientX,
-      screenY: event.clientY,
-    })
   }
 
   function startConnector(
@@ -1661,6 +1768,25 @@ function App() {
     event.preventDefault()
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
+
+    const targets = selectedCircleIds.includes(circle.id) ? selectedCircleIds : [circle.id]
+    const subtreeIds = new Set<string>()
+    for (const cid of targets) {
+      subtreeIds.add(cid)
+      for (const descId of getDescendantCircleIds(graph.circles, cid)) {
+        subtreeIds.add(descId)
+      }
+    }
+
+    const circleOrigins: Record<string, { x: number; y: number }> = {}
+    const personOrigins: Record<string, { x: number; y: number }> = {}
+    for (const c of graph.circles) {
+      if (subtreeIds.has(c.id)) circleOrigins[c.id] = { x: c.x, y: c.y }
+    }
+    for (const p of graph.people) {
+      if (subtreeIds.has(p.circleId)) personOrigins[p.id] = { x: p.x, y: p.y }
+    }
+
     moveCircleRef.current = {
       pointerId: event.pointerId,
       circleId: circle.id,
@@ -1668,6 +1794,9 @@ function App() {
       startY: event.clientY,
       originX: circle.x,
       originY: circle.y,
+      circleOrigins,
+      personOrigins,
+      disconnectedCircleIds: targets,
     }
   }
 
@@ -1677,6 +1806,16 @@ function App() {
     event.currentTarget.setPointerCapture(event.pointerId)
     setCreateMenu(null)
     setSelectedItem({ type: 'person', id: person.id })
+
+    const selectedOrigins: Record<string, { x: number; y: number }> = {}
+    const targets = selectedPeopleIds.includes(person.id) ? selectedPeopleIds : [person.id]
+    for (const pid of targets) {
+      const p = boardIndex.peopleById.get(pid)
+      if (p) {
+        selectedOrigins[pid] = { x: p.x, y: p.y }
+      }
+    }
+
     movePersonRef.current = {
       pointerId: event.pointerId,
       personId: person.id,
@@ -1684,6 +1823,7 @@ function App() {
       startY: event.clientY,
       originX: person.x,
       originY: person.y,
+      selectedOrigins,
     }
   }
 
@@ -1740,16 +1880,23 @@ function App() {
   }
 
   function handleMergeSelected() {
-    if (selectedPeopleIds.length < 2) return
+    const totalCount = selectedPeopleIds.length + selectedCircleIds.length
+    if (totalCount < 2) return
 
     const selectedPeople = graph.people.filter((p) => selectedPeopleIds.includes(p.id))
-    if (selectedPeople.length === 0) return
+    const selectedCircles = graph.circles.filter((c) => selectedCircleIds.includes(c.id))
 
-    const avgX = selectedPeople.reduce((sum, p) => sum + p.x, 0) / selectedPeople.length
-    const avgY = selectedPeople.reduce((sum, p) => sum + p.y, 0) / selectedPeople.length
+    const sumX = selectedPeople.reduce((sum, p) => sum + p.x, 0) + selectedCircles.reduce((sum, c) => sum + c.x, 0)
+    const sumY = selectedPeople.reduce((sum, p) => sum + p.y, 0) + selectedCircles.reduce((sum, c) => sum + c.y, 0)
+    const avgX = sumX / totalCount
+    const avgY = sumY / totalCount
 
-    const firstPerson = selectedPeople[0]
-    const parentCircleId = firstPerson.circleId || 'you'
+    let parentCircleId = 'you'
+    if (selectedPeople.length > 0) {
+      parentCircleId = selectedPeople[0].circleId || 'you'
+    } else if (selectedCircles.length > 0) {
+      parentCircleId = selectedCircles[0].parentId || 'you'
+    }
     const parentCircle = circlesById.get(parentCircleId)
     const parentName = parentCircle ? parentCircle.name : 'subset'
 
@@ -1772,6 +1919,16 @@ function App() {
         amplitude: 4,
       }
 
+      const nextCircles = current.circles.map((c) => {
+        if (selectedCircleIds.includes(c.id)) {
+          return {
+            ...c,
+            parentId: newCircleId,
+          }
+        }
+        return c
+      })
+
       const nextPeople = current.people.map((person) => {
         if (selectedPeopleIds.includes(person.id)) {
           return {
@@ -1784,13 +1941,14 @@ function App() {
 
       return ensureContainment({
         ...current,
-        circles: [...current.circles, newCircle],
+        circles: [...nextCircles, newCircle],
         people: nextPeople,
       })
     })
 
     setSelectedItem({ type: 'circle', id: newCircleId })
     setSelectedPeopleIds([])
+    setSelectedCircleIds([])
   }
 
   function createPerson() {
@@ -2144,10 +2302,15 @@ function App() {
         </div>
       ) : null}
 
-      {selectedPeopleIds.length >= 2 && (
+      {(selectedPeopleIds.length + selectedCircleIds.length) >= 2 && (
         <div className="merge-prompt-panel">
           <span className="merge-prompt-text">
-            Selected <strong>{selectedPeopleIds.length}</strong> people
+            Selected{' '}
+            <strong>
+              {selectedPeopleIds.length > 0 && `${selectedPeopleIds.length} ${selectedPeopleIds.length === 1 ? 'person' : 'people'}`}
+              {selectedPeopleIds.length > 0 && selectedCircleIds.length > 0 && ' and '}
+              {selectedCircleIds.length > 0 && `${selectedCircleIds.length} ${selectedCircleIds.length === 1 ? 'circle' : 'circles'}`}
+            </strong>
           </span>
           <div className="merge-prompt-buttons">
             <button
@@ -2160,7 +2323,10 @@ function App() {
             <button
               type="button"
               className="m3-text-button"
-              onClick={() => setSelectedPeopleIds([])}
+              onClick={() => {
+                setSelectedPeopleIds([])
+                setSelectedCircleIds([])
+              }}
             >
               Cancel
             </button>
@@ -3011,6 +3177,7 @@ function drawBoardLayer(
   circleFillMode: CircleFillMode,
   selectedPeopleIds: string[] = [],
   marquee: MarqueeState | null = null,
+  selectedCircleIds: string[] = [],
 ) {
   const { dpr, width, height } = resizeCanvas(canvas, surface)
   const ctx = canvas.getContext('2d')
@@ -3029,7 +3196,7 @@ function drawBoardLayer(
   ctx.translate(camera.x, camera.y)
   ctx.scale(camera.scale, camera.scale)
 
-  drawCircleFills(ctx, visibleCircles, selectedItem, camera.scale, circleShapeMode, circleFillMode)
+  drawCircleFills(ctx, visibleCircles, selectedItem, camera.scale, circleShapeMode, circleFillMode, selectedCircleIds)
   drawCircleEdges(ctx, visibleCircles, index, camera.scale)
   drawPersonEdges(ctx, visiblePeople, index, camera.scale)
   drawCustomConnections(ctx, visiblePeopleIds, visibleCircleIds, index, selectedItem, hoveredConnId, camera.scale)
@@ -3121,6 +3288,7 @@ function drawCircleFills(
   scale: number,
   circleShapeMode: CircleShapeMode,
   circleFillMode: CircleFillMode,
+  selectedCircleIds: string[] = [],
 ) {
   const isTransparent = circleFillMode === 'transparent'
   for (const circle of circles) {
@@ -3139,8 +3307,9 @@ function drawCircleFills(
 
     ctx.save()
     ctx.strokeStyle = tone.border
+    const isSelected = (selectedItem?.type === 'circle' && selectedItem.id === circle.id) || selectedCircleIds.includes(circle.id)
     ctx.lineWidth =
-      selectedItem?.type === 'circle' && selectedItem.id === circle.id
+      isSelected
         ? Math.max(3.5 / scale, 2)
         : Math.max((isTransparent ? 2.2 : 1.4) / scale, isTransparent ? 1.4 : 0.9)
     if (isTransparent) ctx.setLineDash([8 / scale, 7 / scale])
@@ -3698,25 +3867,6 @@ function stampYouIdentity(graph: GraphState, user: User): GraphState {
   }
 }
 
-function moveCircleSubtree(state: GraphState, circleId: string, nextX: number, nextY: number): GraphState {
-  const circle = state.circles.find((candidate) => candidate.id === circleId)
-  if (!circle) return state
-
-  const deltaX = nextX - circle.x
-  const deltaY = nextY - circle.y
-  const subtreeIds = getDescendantCircleIds(state.circles, circleId)
-  subtreeIds.add(circleId)
-
-  return {
-    ...state,
-    circles: state.circles.map((candidate) =>
-      subtreeIds.has(candidate.id) ? { ...candidate, x: candidate.x + deltaX, y: candidate.y + deltaY } : candidate,
-    ),
-    people: state.people.map((person) =>
-      subtreeIds.has(person.circleId) ? { ...person, x: person.x + deltaX, y: person.y + deltaY } : person,
-    ),
-  }
-}
 
 function resizeCircleFromPoint(state: GraphState, circleId: string, point: { x: number; y: number }): GraphState {
   const circle = state.circles.find((candidate) => candidate.id === circleId)
