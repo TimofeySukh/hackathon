@@ -78,6 +78,13 @@ type DragConnector = {
   endY: number
 }
 
+type MarqueeState = {
+  startX: number
+  startY: number
+  currentX: number
+  currentY: number
+}
+
 type CreateMenu = {
   sourceCircleId: string
   x: number
@@ -319,6 +326,8 @@ function App() {
   const resizeCircleRef = useRef<ResizeCircleState | null>(null)
   const activePointersRef = useRef<PointerEvent[]>([])
   const pinchRef = useRef<PinchState | null>(null)
+  const marqueeRef = useRef<MarqueeState | null>(null)
+  const isRightClickDragRef = useRef(false)
   // Drag updates are coalesced to one React commit per animation frame (like the
   // pan/zoom gesture) so a move event flood doesn't trigger a re-render storm.
   const dragRafRef = useRef<number | null>(null)
@@ -389,6 +398,7 @@ function App() {
   const settleGestureRef = useRef<() => void>(() => {})
 
   const [connector, setConnector] = useState<DragConnector | null>(null)
+  const [marquee, setMarquee] = useState<MarqueeState | null>(null)
   const [createMenu, setCreateMenu] = useState<CreateMenu | null>(null)
   const [selectedItem, setSelectedItem] = useState<SelectedItem>(null)
   const [showCircleDropdown, setShowCircleDropdown] = useState(false)
@@ -921,6 +931,7 @@ function App() {
         circleShapeMode,
         circleFillMode,
         selectedPeopleIds,
+        marqueeRef.current,
       )
     }
   }
@@ -1007,6 +1018,7 @@ function App() {
       circleShapeMode,
       circleFillMode,
       selectedPeopleIds,
+      marquee,
     )
   }, [
     camera,
@@ -1022,6 +1034,7 @@ function App() {
     circleFillMode,
     selectedPeopleIds,
     imageEpoch,
+    marquee,
   ])
 
   useEffect(() => {
@@ -1102,7 +1115,10 @@ function App() {
   }
 
   function handleSurfacePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
-    if (event.pointerType !== 'touch' && event.button !== 0) return
+    if (event.pointerType !== 'touch' && event.button !== 0 && event.button !== 2) return
+    const isRightClick = event.pointerType !== 'touch' && event.button === 2
+    isRightClickDragRef.current = isRightClick
+
     event.currentTarget.focus({ preventScroll: true })
     event.currentTarget.setPointerCapture(event.pointerId)
 
@@ -1156,41 +1172,85 @@ function App() {
     })
 
     if (hit?.type === 'connector-handle') {
+      if (isRightClick) return
       startConnector(event, hit.sourceId, hit.sourceType, hit.x, hit.y)
       return
     }
 
     if (hit?.type === 'person') {
-      if (event.shiftKey) {
-        setSelectedPeopleIds((prev) => {
-          let next = [...prev]
-          if (selectedItem?.type === 'person' && !next.includes(selectedItem.id)) {
-            next.push(selectedItem.id)
-          }
-          if (next.includes(hit.person.id)) {
-            next = next.filter((id) => id !== hit.person.id)
-          } else {
-            next.push(hit.person.id)
-          }
-          return next
-        })
-        setSelectedItem(null)
-      } else {
+      if (isRightClick) {
+        setGraph((current) => ({
+          ...current,
+          people: current.people.map((p) => p.id === hit.person.id ? { ...p, circleId: '' } : p),
+          connections: (current.connections || []).filter(
+            (conn) => conn.fromId !== hit.person.id && conn.toId !== hit.person.id
+          ),
+        }))
         setSelectedPeopleIds([])
         setSelectedItem({ type: 'person', id: hit.person.id })
         startPersonMove(event, hit.person)
+      } else {
+        if (event.shiftKey) {
+          setSelectedPeopleIds((prev) => {
+            let next = [...prev]
+            if (selectedItem?.type === 'person' && !next.includes(selectedItem.id)) {
+              next.push(selectedItem.id)
+            }
+            if (next.includes(hit.person.id)) {
+              next = next.filter((id) => id !== hit.person.id)
+            } else {
+              next.push(hit.person.id)
+            }
+            return next
+          })
+          setSelectedItem(null)
+        } else {
+          setSelectedPeopleIds([])
+          setSelectedItem({ type: 'person', id: hit.person.id })
+          startPersonMove(event, hit.person)
+        }
       }
       return
     }
 
     if (hit?.type === 'circle-center') {
-      setSelectedPeopleIds([])
-      if (centerBehavior === 'connect') {
-        startConnector(event, hit.circle.id, 'circle', hit.circle.x, hit.circle.y)
-      } else {
+      if (isRightClick) {
+        setGraph((current) => ({
+          ...current,
+          circles: current.circles.map((c) =>
+            c.id === hit.circle.id ? { ...c, parentId: null, connectedTo: null } : c
+          ),
+          connections: (current.connections || []).filter(
+            (conn) => conn.fromId !== hit.circle.id && conn.toId !== hit.circle.id
+          ),
+        }))
+        setSelectedPeopleIds([])
         setSelectedItem({ type: 'circle', id: hit.circle.id })
         startCircleMove(event, hit.circle)
+      } else {
+        setSelectedPeopleIds([])
+        if (centerBehavior === 'connect') {
+          startConnector(event, hit.circle.id, 'circle', hit.circle.x, hit.circle.y)
+        } else {
+          setSelectedItem({ type: 'circle', id: hit.circle.id })
+          startCircleMove(event, hit.circle)
+        }
       }
+      return
+    }
+
+    if (isRightClick) {
+      setSelectedPeopleIds([])
+      setSelectedItem(null)
+      setOpenNotesPersonId(null)
+      const marqueeState = {
+        startX: event.clientX,
+        startY: event.clientY,
+        currentX: event.clientX,
+        currentY: event.clientY,
+      }
+      marqueeRef.current = marqueeState
+      setMarquee(marqueeState)
       return
     }
 
@@ -1229,6 +1289,13 @@ function App() {
     activePointersRef.current = activePointersRef.current.map((p) =>
       p.pointerId === event.pointerId ? event.nativeEvent : p
     )
+
+    if (marqueeRef.current) {
+      marqueeRef.current.currentX = event.clientX
+      marqueeRef.current.currentY = event.clientY
+      setMarquee({ ...marqueeRef.current })
+      return
+    }
 
     if (activePointersRef.current.length >= 2 && !pinchRef.current) {
       const p1 = activePointersRef.current[0]
@@ -1358,6 +1425,29 @@ function App() {
       pinchRef.current = null
     }
 
+    if (marqueeRef.current) {
+      const startX = marqueeRef.current.startX
+      const startY = marqueeRef.current.startY
+      const currentX = event.clientX
+      const currentY = event.clientY
+
+      const pStart = screenToWorld({ x: Math.min(startX, currentX), y: Math.min(startY, currentY) })
+      const pEnd = screenToWorld({ x: Math.max(startX, currentX), y: Math.max(startY, currentY) })
+
+      const selectedIds = graph.people
+        .filter((p) => p.x >= pStart.x && p.x <= pEnd.x && p.y >= pStart.y && p.y <= pEnd.y)
+        .map((p) => p.id)
+
+      setSelectedPeopleIds(selectedIds)
+      setSelectedItem(null)
+
+      marqueeRef.current = null
+      setMarquee(null)
+      settleGesture()
+      isRightClickDragRef.current = false
+      return
+    }
+
     if (activePointersRef.current.length === 0) {
       settleGesture()
     }
@@ -1366,6 +1456,10 @@ function App() {
       panRef.current = null
       settleGesture()
     }
+
+    const movingPersonId = movePersonRef.current?.pointerId === event.pointerId ? movePersonRef.current.personId : null
+    const movingCircleId = moveCircleRef.current?.pointerId === event.pointerId ? moveCircleRef.current.circleId : null
+    const wasRightClickDrag = isRightClickDragRef.current
 
     const endingMove =
       moveCircleRef.current?.pointerId === event.pointerId ||
@@ -1379,7 +1473,52 @@ function App() {
     if (endingMove) {
       // Apply the final dragged position immediately, including any queued layout pass.
       const pending = takePendingGraphUpdate()
-      setGraph((prev) => ensureContainment(pending ? pending(prev) : prev))
+      setGraph((prev) => {
+        let next = pending ? pending(prev) : prev
+        if (wasRightClickDrag) {
+          if (movingPersonId) {
+            const person = next.people.find((p) => p.id === movingPersonId)
+            if (person) {
+              const innermost = next.circles
+                .filter((c) => Math.hypot(person.x - c.x, person.y - c.y) <= c.radius)
+                .sort((a, b) => a.radius - b.radius)[0]
+              const nextCircleId = innermost ? innermost.id : ''
+              next = {
+                ...next,
+                people: next.people.map((p) =>
+                  p.id === movingPersonId ? { ...p, circleId: nextCircleId } : p
+                ),
+              }
+            }
+          } else if (movingCircleId) {
+            const circle = next.circles.find((c) => c.id === movingCircleId)
+            if (circle) {
+              const circlesById = new Map(next.circles.map((c) => [c.id, c]))
+              const isDescendant = (childId: string, parentId: string): boolean => {
+                let curr: string | null = childId
+                while (curr) {
+                  if (curr === parentId) return true
+                  curr = circlesById.get(curr)?.parentId ?? null
+                }
+                return false
+              }
+              const innermost = next.circles
+                .filter((c) => c.id !== movingCircleId && !isDescendant(c.id, movingCircleId) && Math.hypot(circle.x - c.x, circle.y - c.y) <= c.radius)
+                .sort((a, b) => a.radius - b.radius)[0]
+              const nextParentId = innermost ? innermost.id : null
+              next = {
+                ...next,
+                circles: next.circles.map((c) =>
+                  c.id === movingCircleId ? { ...c, parentId: nextParentId } : c
+                ),
+              }
+            }
+          }
+        }
+        return ensureContainment(next)
+      })
+      isRightClickDragRef.current = false
+      settleGesture()
     }
 
     // Resolve the connector against its latest endpoint (which may still be queued
@@ -2871,6 +3010,7 @@ function drawBoardLayer(
   circleShapeMode: CircleShapeMode,
   circleFillMode: CircleFillMode,
   selectedPeopleIds: string[] = [],
+  marquee: MarqueeState | null = null,
 ) {
   const { dpr, width, height } = resizeCanvas(canvas, surface)
   const ctx = canvas.getContext('2d')
@@ -2899,6 +3039,21 @@ function drawBoardLayer(
   drawSelectionHandles(ctx, selectedItem, index, camera.scale)
 
   ctx.restore()
+
+  if (marquee) {
+    ctx.save()
+    ctx.strokeStyle = '#00629d'
+    ctx.lineWidth = 1.5
+    ctx.fillStyle = 'rgba(0, 98, 157, 0.08)'
+    const rect = canvas.getBoundingClientRect()
+    const x = Math.min(marquee.startX, marquee.currentX) - rect.left
+    const y = Math.min(marquee.startY, marquee.currentY) - rect.top
+    const w = Math.abs(marquee.startX - marquee.currentX)
+    const h = Math.abs(marquee.startY - marquee.currentY)
+    ctx.strokeRect(x, y, w, h)
+    ctx.fillRect(x, y, w, h)
+    ctx.restore()
+  }
 }
 
 function drawCircleEdges(ctx: CanvasRenderingContext2D, circles: CircleNode[], index: BoardIndex, scale: number) {
