@@ -1715,6 +1715,7 @@ function App() {
     setCreateMenu(null)
   }
 
+  /* Commented out to hide from menu, keeping in code for future use
   function addDemoCluster() {
     const source = selectedCircle ?? circlesById.get('you')
     if (!source) return
@@ -1737,6 +1738,7 @@ function App() {
     })
     setGraph((current) => ensureContainment({ ...current, people: [...current.people, ...points] }))
   }
+  */
 
 
 
@@ -2108,9 +2110,9 @@ function App() {
 
       {!demoMode && selectedItem && (
       <aside className="inspector" aria-label="Selection details" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 120px)' }}>
-        <span className="inspector__eyebrow">
-              {selectedItem.type === 'circle' ? 'Circle' : selectedItem.type === 'person' ? 'Person' : 'Connection'}
-            </span>
+        {selectedItem.type === 'connection' && (
+          <span className="inspector__eyebrow">Connection</span>
+        )}
             {selectedItem.type !== 'connection' ? (
               <input
                 className="inspector__name-input"
@@ -2126,9 +2128,9 @@ function App() {
             
             {selectedCircle && (
               <>
-                {/* Visual Settings Row: Color swatches + Avatar Photo Upload */}
+                {/* Visual Settings Row: Color swatches */}
                 <div className="inspector-visual-row">
-                  <div className="m3-color-swatches-container">
+                  <div className="m3-color-swatches-container" style={{ flex: 1 }}>
                     <label>Color Tone</label>
                     <div className="m3-color-swatches">
                       {(['blue', 'red', 'green', 'amber', 'violet'] as CircleTone[]).map((t) => (
@@ -2144,6 +2146,7 @@ function App() {
                     </div>
                   </div>
 
+                  {/* Commented out Photo picker to hide from menu, keeping in code for future use
                   <div className="m3-avatar-picker-container">
                     <label>Photo</label>
                     <label className="m3-avatar-picker" title="Upload circle photo">
@@ -2167,9 +2170,10 @@ function App() {
                       </div>
                     </label>
                   </div>
+                  */}
                 </div>
 
-                {/* Shape Type Selection */}
+                {/* Commented out Shape settings and Center Image URL to hide from menu, keeping in code for future use
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px' }}>
                   <div className="inspector-field">
                     <label>Shape Type</label>
@@ -2248,12 +2252,15 @@ function App() {
                     />
                   </div>
                 </div>
+                */}
 
                 {/* Sticky Actions at Bottom */}
                 <div className="inspector-actions-section">
+                  {/* Commented out Add 3 demo people to hide from menu, keeping in code for future use
                   <button type="button" className="primary-action" onClick={addDemoCluster}>
                     Add 3 demo people
                   </button>
+                  */}
 
                   {selectedCircle.id !== 'you' && (
                     <button
@@ -2354,6 +2361,7 @@ function App() {
                   </div>
                 </div>
 
+                {/* Commented out Role to hide from menu, keeping in code for future use
                 <div className="inspector-field" style={{ marginTop: '4px' }}>
                   <label>Role</label>
                   <input
@@ -2372,6 +2380,7 @@ function App() {
                     className="m3-input-field"
                   />
                 </div>
+                */}
 
                 {/* Notes Section */}
                 <div className="inspector-notes-section" style={{ marginTop: '12px', borderTop: '1px solid var(--md-outline-variant)', paddingTop: '12px' }}>
@@ -2462,7 +2471,7 @@ function App() {
                   </div>
                 </div>
 
-                {/* Appearance Options */}
+                {/* Commented out Appearance Options to hide from menu, keeping in code for future use
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px', borderTop: '1px solid var(--md-outline-variant)', paddingTop: '12px' }}>
                   <div className="inspector-field">
                     <label>Shape Type</label>
@@ -2523,6 +2532,7 @@ function App() {
                     />
                   </div>
                 </div>
+                */}
 
                 {/* Sticky Actions at Bottom */}
                 <div className="inspector-actions-section">
