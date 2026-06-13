@@ -2062,31 +2062,44 @@ function App() {
   function createPerson() {
     if (!createMenu) return
 
-    const source = circlesById.get(createMenu.sourceCircleId)
-    if (!source) return
+    // Drop the person exactly where the menu was opened and auto-detect which
+    // bubble that point falls inside (innermost). Empty space -> free-floating,
+    // not forced into the source circle. We skip ensureContainment so the rest
+    // of the board never reflows or jumps. selectedItem is passed as null so the
+    // hit test reports the containing circle/person, not a connector handle.
+    const hit = hitTestBoard(boardIndex, cameraRef.current, null, {
+      x: createMenu.screenX,
+      y: createMenu.screenY,
+    })
+    let circleId = ''
+    if (hit && (hit.type === 'circle-body' || hit.type === 'circle-center' || hit.type === 'circle-edge')) {
+      circleId = hit.circle.id
+    } else if (hit && hit.type === 'person') {
+      circleId = hit.person.circleId ?? ''
+    }
 
     const id = `person-${Date.now()}`
     const sides = Math.floor(Math.random() * 5) + 8
     pushHistory()
     setGraph((current) => {
-      const nextGraph = ensureContainment({
+      const nextGraph: GraphState = {
         ...current,
         people: [
           ...current.people,
           {
             id,
             name: `New person ${current.people.length + 1}`,
-            role: `Inside ${source.name}`,
+            role: circleId ? `Inside ${circlesById.get(circleId)?.name ?? ''}` : '',
             x: createMenu.x,
             y: createMenu.y,
-            circleId: source.id,
+            circleId,
             avatar: makeAvatar(current.people.length + 1),
             shapeType: 'circle',
             sides,
             amplitude: 0,
           },
         ],
-      })
+      }
       if (createMenu.dragSourceType === 'person' && createMenu.dragSourceId) {
         return {
           ...nextGraph,
