@@ -17,6 +17,10 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-13 — Simplified Notes Composer & Yellow Cards
+
+- Decision: Simplified the Trello-style notes list header (removed the count badge) and composer (removed the "Tip" button). Updated the note cards to use a soft yellow sticky note color (`#fff9c4`) with a matching editor container to visually distinguish notes from other input elements. Improved composer keyboard and click handling so that saving/adding a note immediately saves, clears the input, and programmatically refocuses the textarea so users can quickly write multiple notes in a row without manual click refocusing.
+
 ### 2026-06-13 — Trello-Style Notes List and Composer
 
 - Decision: Redesigned the notes list and adding experience in the inspector to look and feel like Trello cards. Notes are grouped in a light gray column with a count badge. Creating cards uses an inline textarea composer with quick keys: Enter to submit/add and keep focus, Shift+Enter for newline, and Escape/✕ to cancel. Editing a note inline converts it directly into a card text box footprints.
