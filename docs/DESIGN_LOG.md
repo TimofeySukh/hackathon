@@ -17,6 +17,19 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-13 — Circle Picker Affordances and Favorite Treatment
+
+- Decision: new circles always spawn as clean circles (`sides: 25`, `amplitude: 0`) even
+  though the hidden shape controls can still revive polygon and flower variants later.
+- Decision: the circle quick menu keeps five fast presets, adds a compact fill-mode toggle,
+  and opens the full custom picker from the palette button. The custom picker wheel allows
+  its thumb to extend past the wheel edge instead of clipping it.
+- Decision: favorite people no longer change their primary avatar outline. Favorite state
+  is shown as a separate dotted ring around the person, using that person's circle color.
+- Why: the quick menu should stay dense and direct, while advanced color work lives in the
+  larger picker. Favorite styling should read as an added mark, not as a replacement for
+  selection, hover, or circle-color ownership.
+
 ### 2026-06-13 — Arc-Like Circle Color Picker
 
 - Decision: Replaced the native color input in the circle style popover with an in-app wheel picker plus brightness slider. The circle inspector keeps five quick color buttons directly visible and shows the palette button as the custom color when one is active.

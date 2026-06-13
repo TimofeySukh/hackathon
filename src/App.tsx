@@ -2203,9 +2203,9 @@ function App() {
         parentId: parentCircleId,
         connectedTo: parentCircleId,
         tone: 'violet' as const,
-        shapeType: 'polygon' as const,
-        sides: 6,
-        amplitude: 4,
+        shapeType: 'circle' as const,
+        sides: 25,
+        amplitude: 0,
       }
 
       const nextCircles = current.circles.map((c) => {
@@ -2310,9 +2310,9 @@ function App() {
             parentId: isNested ? source.id : null,
             connectedTo: source.id,
             tone: isNested ? 'violet' : nextTone(current.circles.length),
-            shapeType: isNested ? 'polygon' : 'wavy',
-            sides: isNested ? 6 : 12,
-            amplitude: isNested ? 4 : 8,
+            shapeType: 'circle',
+            sides: 25,
+            amplitude: 0,
           },
         ],
       })
@@ -2675,6 +2675,15 @@ function App() {
                       />
                     ))}
                   </div>
+                  <button
+                    type="button"
+                    className={`circle-fill-toggle ${(selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'is-transparent' : 'is-solid'}`}
+                    onClick={() => updateCircleStyle(selectedCircle.id, { fillMode: (selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'solid' : 'transparent' })}
+                    title={(selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'Switch to solid fill' : 'Switch to transparent fill'}
+                    aria-label={(selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'Switch to solid fill' : 'Switch to transparent fill'}
+                  >
+                    <TransparencyIcon />
+                  </button>
                     {showCircleStylePanel && (
                       <div className="circle-style-popover">
                         <div className="circle-style-theme-tabs">
@@ -3618,6 +3627,28 @@ function getPersonSprite(person: PersonNode, fillColor: string, size: number, st
   return canvas
 }
 
+function drawFavoritePersonOutline(ctx: CanvasRenderingContext2D, person: PersonNode, color: string, scale: number) {
+  const radius = PERSON_VISUAL_RADIUS + 7 / scale
+  const dotCount = 18
+  const haloRadius = Math.max(2.5 / scale, 1.6)
+  const dotRadius = Math.max(1.45 / scale, 0.95)
+  ctx.save()
+  for (let i = 0; i < dotCount; i += 1) {
+    const angle = (Math.PI * 2 * i) / dotCount - Math.PI / 2
+    const x = person.x + Math.cos(angle) * radius
+    const y = person.y + Math.sin(angle) * radius
+    ctx.beginPath()
+    ctx.arc(x, y, haloRadius, 0, Math.PI * 2)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.92)'
+    ctx.fill()
+    ctx.beginPath()
+    ctx.arc(x, y, dotRadius, 0, Math.PI * 2)
+    ctx.fillStyle = color
+    ctx.fill()
+  }
+  ctx.restore()
+}
+
 function resizeCanvas(canvas: HTMLCanvasElement, surface: HTMLElement) {
   const dpr = Math.min(window.devicePixelRatio || 1, 1.75)
   const width = Math.max(1, surface.clientWidth)
@@ -3892,8 +3923,8 @@ function drawPeople(
     const circleColor = circle ? getCircleColors(circle).centerBg : MATERIAL_TONES.blue.centerBg
     const isSelected = (selectedItem?.type === 'person' && selectedItem.id === person.id) || selectedPeopleIds.includes(person.id)
     const isHovered = hoveredPersonId === person.id
-    const stroke = person.isFavorite ? '#ffd600' : isSelected ? '#00629d' : isHovered ? '#64748b' : circleColor
-    const strokeWidth = person.isFavorite ? (isSelected ? 5.5 : 4.5) : isSelected || isHovered ? 2.5 : 1.5
+    const stroke = isSelected ? '#00629d' : isHovered ? '#64748b' : circleColor
+    const strokeWidth = isSelected || isHovered ? 2.5 : 1.5
     ctx.drawImage(
       getPersonSprite(person, circleColor, spriteRes, stroke, strokeWidth),
       person.x - PERSON_VISUAL_RADIUS,
@@ -3901,6 +3932,7 @@ function drawPeople(
       PERSON_VISUAL_RADIUS * 2,
       PERSON_VISUAL_RADIUS * 2,
     )
+    if (person.isFavorite) drawFavoritePersonOutline(ctx, person, circleColor, scale)
     if (showPersonLabels && (scale >= 0.62 || isSelected || isHovered)) drawPersonLabel(ctx, person, scale)
   }
 }
@@ -4798,6 +4830,19 @@ function PaletteIcon() {
       <circle cx="8.5" cy="7.5" r=".5" />
       <circle cx="6.5" cy="12.5" r=".5" />
       <path d="M12 3a9 9 0 0 0 0 18h1.6a2.4 2.4 0 0 0 1.7-4.1l-.4-.4a1.2 1.2 0 0 1 .8-2h1.8A3.5 3.5 0 0 0 21 11c0-4.4-4-8-9-8Z" />
+    </svg>
+  )
+}
+
+function TransparencyIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="8" />
+      <path d="M8 6.9v10.2" />
+      <path d="M12 4v16" />
+      <path d="M16 6.9v10.2" />
+      <path d="M5.4 10h13.2" />
+      <path d="M5.4 14h13.2" />
     </svg>
   )
 }

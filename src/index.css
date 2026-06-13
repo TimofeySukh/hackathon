@@ -1570,6 +1570,7 @@ input[type="range"]::-webkit-slider-thumb:active {
 }
 
 .circle-style-button svg,
+.circle-fill-toggle svg,
 .connection-item svg,
 .connection-service-picker svg {
   width: 18px;
@@ -1579,6 +1580,41 @@ input[type="range"]::-webkit-slider-thumb:active {
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.circle-fill-toggle {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: 1px solid var(--md-outline-variant);
+  background: var(--md-surface-container-highest);
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  transition: background-color 0.18s, color 0.18s, transform 0.18s, box-shadow 0.18s;
+}
+
+.circle-fill-toggle:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0,0,0,.12);
+}
+
+.circle-fill-toggle.is-transparent {
+  background:
+    linear-gradient(45deg, rgba(67, 71, 78, 0.16) 25%, transparent 25% 75%, rgba(67, 71, 78, 0.16) 75%),
+    linear-gradient(45deg, rgba(67, 71, 78, 0.16) 25%, transparent 25% 75%, rgba(67, 71, 78, 0.16) 75%),
+    var(--md-surface);
+  background-position: 0 0, 5px 5px, 0 0;
+  background-size: 10px 10px, 10px 10px, auto;
+  color: var(--md-primary);
+}
+
+.circle-fill-toggle.is-solid {
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  border-color: var(--md-primary);
 }
 
 .circle-style-popover {
@@ -1634,20 +1670,31 @@ input[type="range"]::-webkit-slider-thumb:active {
   display: block;
   width: min(248px, 76vw);
   aspect-ratio: 1;
-  overflow: hidden;
+  overflow: visible;
+  border-radius: 50%;
+  border: 0;
+  cursor: crosshair;
+  background: transparent;
+}
+
+.color-wheel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
   border-radius: 50%;
   border: 1px solid color-mix(in srgb, var(--md-outline-variant) 70%, transparent);
-  cursor: crosshair;
   background:
     radial-gradient(circle, rgba(255,255,255,0.96) 0%, rgba(255,255,255,0.24) 50%, rgba(255,255,255,0) 72%),
     conic-gradient(from 180deg, #ff2d55, #ff9500, #ffcc00, #34c759, #32ade6, #0a84ff, #bf5af2, #ff2d55);
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.42);
+  pointer-events: none;
 }
 
 .color-wheel::after {
   content: "";
   position: absolute;
   inset: 0;
+  border-radius: 50%;
   background: radial-gradient(circle, transparent 70%, rgba(255,255,255,.94) 71%);
   pointer-events: none;
 }
