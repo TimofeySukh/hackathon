@@ -19,12 +19,23 @@ Runtime boundaries:
 - Linear owns task state, status, ownership, priority, and blockers.
 - `docs/` owns durable product and repository knowledge.
 
-The visible circle graph demo does not call Supabase or any backend. The existing data layer remains in the repository for persisted product work, but this branch's prototype screen is intentionally local-only.
+The board is a live product, not a local-only demo. Signed-in users load and
+autosave their graph through Supabase; anonymous visitors get an editable board
+persisted to `localStorage`. The brand-new board starts blank (a single `You`
+circle) — there is no demo seed.
 
 ## Current Frontend Shape
 
 - `src/main.tsx` mounts the React app.
-- `src/App.tsx` contains the local circle graph demo, including seed circles, people, pan and zoom camera state, circle-center branch creation, creation menu state, circle movement, and selected-item inspector state.
+- `src/App.tsx` is the React shell and interaction host: chrome/panels, pointer
+  interaction (pan/zoom, drag, marquee selection, group drag, resize, merge),
+  camera + cursor state, the persisted-graph wiring, and the imperative paint
+  loop. The heavy canvas logic is delegated to `src/lib/board/`.
+- `src/lib/board/` is the framework-free board engine: `types.ts`, `constants.ts`,
+  `colors.ts`, `geometry.ts`, `layout.ts` (containment/collision), and
+  `render.ts` (spatial index, hit-testing, the Canvas 2D draw layer).
+- `src/lib/graphPersistence.ts` loads/saves the graph blob (Supabase for
+  signed-in users, `localStorage` for anonymous sessions).
 - `src/lib/supabase.ts` creates the browser Supabase client from Vite environment variables.
 - `src/lib/useAuth.ts` owns session loading, Google sign-in, and sign-out.
 - `src/lib/useBoardGraph.ts` owns board graph loading, frontend mutation state, and debounced AI note refresh scheduling.
@@ -41,37 +52,26 @@ The board's hot visual path is rendered on a single Canvas 2D layer: circle fill
 
 ## Current Product Boundaries
 
-The current branch is a navigable circle graph prototype, not a production persistence flow.
-
 Current scope:
 
-- central `You` circle
-- connected external circles
-- nested subset circles inside parent circles
-- people inside circles and subsets
-- branch creation through the circle context menu or Shift-drag from a circle center
-- a create menu for adding a person, nested subset circle, or connected external circle
-- circle and person selection
-- local renaming in the inspector
-- dragging people
-- dragging any circle center, including `You`
-- moving a circle subtree with all contained people and child circles
-- resizing circles by grabbing the circle edge
-- automatic parent-circle radius expansion and shrink-back as contained objects move
-- containment fitting that propagates from nested circles to their ancestors
-- in-page help text for the prototype controls
-- mouse drag navigation on empty space
-- cursor-centered mouse-wheel zoom
-- local browser-session state only
+- central `You` circle, connected external circles, nested subset circles, and
+  people inside circles and subsets
+- a create menu for adding a person, nested subset circle, or connected circle
+- circle/person selection, plus right-click marquee multi-selection
+- dragging people and circles (incl. group dragging of a mixed selection)
+- circle resizing, automatic containment fit / shrink-back through nested chains
+- merge selected people and zones into a new subset
+- pan, cursor-centered wheel/pinch zoom, and a "zones only" far-zoom view
+- Google sign-in; per-user graph persistence in Supabase with debounced autosave
+- anonymous editing persisted to `localStorage`
+- LinkedIn import (Connections.csv ZIP + single-profile Bright Data enrichment)
+- per-person notes, tags, and connections; debounced AI note generation
+- local + AI-ranked board search
 
-Out of scope for the current version:
+Out of scope (still not built):
 
-- database persistence
-- authentication
-- Supabase writes
-- LinkedIn import
-- notes and AI search
-- multiplayer collaboration
+- real-time multiplayer / presence
+- drawing tools and sticky notes
 
 ## Invariants
 

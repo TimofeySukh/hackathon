@@ -1,0 +1,732 @@
+/* Inspector form fields, custom shape controls, and select dropdowns. */
+
+/* New custom shapes & photo upload styles */
+.inspector-field {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.inspector-field label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--md-on-surface-variant);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.inspector-field input[type="text"] {
+  width: 100%;
+  box-sizing: border-box;
+  background-color: transparent;
+  color: var(--md-on-surface);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-r-sm);
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 400;
+  outline: none;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.inspector-field input[type="text"]:focus {
+  border-color: var(--md-primary);
+  background-color: var(--md-surface-container-low);
+}
+
+.inspector-field input[type="range"] {
+  width: 100%;
+  cursor: pointer;
+}
+
+/* Custom select dropdown styling */
+.m3-select-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.m3-select-wrapper select {
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  background-color: transparent;
+  color: var(--md-on-surface);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-r-sm);
+  padding: 10px 36px 10px 12px;
+  font-size: 13px;
+  font-weight: 400;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.m3-select-wrapper select:focus {
+  border-color: var(--md-primary);
+  background-color: var(--md-surface-container-low);
+}
+
+.m3-select-wrapper::after {
+  content: "";
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2343474e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
+/* Hidden file input */
+.m3-file-input-hidden {
+  display: none !important;
+}
+
+/* Custom upload button */
+.m3-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: var(--md-r-full);
+  border: 1px solid var(--md-outline);
+  background: transparent;
+  color: var(--md-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+  width: fit-content;
+}
+
+.m3-upload-btn:hover {
+  background: color-mix(in srgb, var(--md-primary) 8%, transparent);
+}
+
+.m3-upload-btn:active {
+  background: color-mix(in srgb, var(--md-primary) 12%, transparent);
+}
+
+.m3-upload-btn svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+/* Custom details/summary styles */
+.inspector details {
+  border: none;
+}
+
+.inspector details summary {
+  list-style: none; /* hide default arrow in firefox */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
+  font-size: 12.5px;
+  color: var(--md-on-surface-variant);
+  padding: 10px 0;
+  border-top: 1px solid var(--md-outline-variant);
+  outline: none;
+  cursor: pointer;
+}
+
+.inspector details summary::-webkit-details-marker {
+  display: none; /* hide default arrow in chrome/safari */
+}
+
+.inspector details summary svg.chevron-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--md-on-surface-variant);
+  transition: transform 0.2s ease;
+}
+
+.inspector details[open] summary svg.chevron-icon {
+  transform: rotate(180deg);
+}
+
+/* Compact grid layout for inspector DL metadata */
+.inspector dl.metadata-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+  margin: 0 0 14px 0;
+  padding: 4px 0;
+}
+
+.inspector dl.metadata-grid div {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: auto;
+  gap: 2px;
+}
+
+.inspector dl.metadata-grid dt {
+  color: var(--md-on-surface-variant);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.inspector dl.metadata-grid dd {
+  color: var(--md-on-surface);
+  font-size: 13px;
+  font-weight: 400;
+  text-align: left;
+}
+
+/* Trello-Style Note List and Cards */
+.trello-list {
+  background-color: var(--md-surface-container-high); /* M3 tonal elevated container */
+  border: 1px solid var(--md-outline-variant); /* Card border */
+  border-radius: var(--md-r-md); /* M3 round corners (12px) */
+  padding: 9px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.trello-list__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 4px 2px 4px;
+}
+
+.trello-list__title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--md-on-surface);
+  margin: 0;
+}
+
+.trello-list__count {
+  background-color: #091e420f;
+  border-radius: 20px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #44546f;
+}
+
+.trello-card {
+  background-color: #ffffff; /* Pure white card background */
+  border-radius: var(--md-r-sm);
+  padding: 7px 10px;
+  position: relative;
+  box-shadow: 0px 1px 1px #091e4240, 0px 0px 1px #091e424f;
+  cursor: pointer;
+  transition: background-color 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.trello-card:hover {
+  background-color: #f5f6f9; /* Subtle gray/blue tint hover */
+}
+
+.trello-card__body {
+  color: #172b4d;
+  font-size: 12.5px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding-right: 18px; /* space for delete button */
+  flex: 1;
+}
+
+.trello-card__delete-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #44546f;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s, background-color 0.15s, color 0.15s;
+  z-index: 10;
+}
+
+.trello-card:hover .trello-card__delete-btn {
+  opacity: 1;
+}
+
+.trello-card__delete-btn:hover {
+  background-color: #091e420f;
+  color: var(--md-error);
+}
+
+.trello-card__delete-btn svg {
+  width: 13px;
+  height: 13px;
+  stroke: currentColor;
+}
+
+/* Trello Card Editor */
+.trello-card__editor {
+  background-color: #ffffff; /* Pure white background when editing */
+  border-radius: var(--md-r-md);
+  padding: 8px 12px;
+  box-shadow: 0px 1px 1px #091e4240, 0px 0px 1px #091e424f;
+  box-sizing: border-box;
+}
+
+.trello-card__editor-textarea {
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  width: 100% !important;
+  padding: 0 !important;
+  font-size: 12.5px !important;
+  line-height: 1.4 !important;
+  resize: none !important;
+  color: #172b4d !important;
+  font-family: inherit !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+}
+
+/* Trello Card Composer at the bottom */
+.trello-list__add-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--md-on-surface-variant);
+  padding: 6px 10px;
+  border-radius: var(--md-r-full); /* Pill shape */
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.trello-list__add-btn:hover {
+  background-color: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+  color: var(--md-on-surface);
+}
+
+.trello-list__composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.trello-list__composer-card {
+  background-color: #ffffff;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-r-md); /* 12px */
+  padding: 8px 12px;
+  box-shadow: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.trello-list__composer-card:focus-within {
+  border-color: var(--md-primary);
+}
+
+.trello-list__composer-textarea {
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  width: 100% !important;
+  padding: 0 !important;
+  font-size: 12.5px !important;
+  line-height: 1.4 !important;
+  resize: none !important;
+  color: var(--md-on-surface) !important;
+  font-family: inherit !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+}
+
+.trello-list__composer-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 2px;
+}
+
+.trello-list__composer-add-btn {
+  background-color: var(--md-primary);
+  color: var(--md-on-primary);
+  border: none;
+  border-radius: var(--md-r-full); /* Pill shape */
+  height: 32px;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s;
+}
+
+.trello-list__composer-add-btn:hover {
+  background-color: color-mix(in srgb, var(--md-primary) 92%, var(--md-on-primary));
+}
+
+.trello-list__composer-cancel-btn {
+  background: transparent;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-r-full); /* Circle shape */
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--md-on-surface-variant);
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+  padding: 0;
+}
+
+.trello-list__composer-cancel-btn:hover {
+  background-color: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+  color: var(--md-on-surface);
+  border-color: var(--md-outline);
+}
+
+.trello-list__composer-cancel-btn svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+}
+
+/* Material 3 Switch */
+.m3-switch {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  width: 52px;
+  height: 32px;
+  border-radius: var(--md-r-full);
+  border: 2px solid var(--md-outline);
+  background: var(--md-surface-container-highest);
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+}
+
+.m3-switch::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--md-outline);
+  transition: all 0.2s;
+}
+
+.m3-switch:checked {
+  background: var(--md-primary);
+  border-color: var(--md-primary);
+}
+
+.m3-switch:checked::before {
+  left: 22px;
+  top: 2px;
+  width: 24px;
+  height: 24px;
+  background: var(--md-on-primary);
+}
+
+.m3-switch-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+
+/* Material 3 Slider style */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  height: 20px;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  background: var(--md-surface-container-highest);
+  height: 8px;
+  border-radius: var(--md-r-full);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -6px; /* center thumb on 8px track */
+  background-color: var(--md-primary);
+  height: 20px;
+  width: 20px;
+  border-radius: var(--md-r-full);
+  transition: background-color 0.15s, transform 0.1s;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  background-color: color-mix(in srgb, var(--md-primary) 92%, var(--md-on-primary));
+  transform: scale(1.1);
+}
+
+input[type="range"]::-webkit-slider-thumb:active {
+  transform: scale(1.2);
+}
+
+.m3-input-field {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  background-color: transparent;
+  color: var(--md-on-surface);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-r-sm);
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 400;
+  outline: none;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.m3-input-field:focus {
+  border-color: var(--md-primary);
+  background-color: var(--md-surface-container-low);
+}
+
+/* Color swatch picker styles */
+.m3-color-swatches-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.m3-color-swatches-container label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--md-on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.m3-color-swatches {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.m3-color-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  position: relative;
+  transition: transform 0.15s cubic-bezier(0.2, 0, 0, 1), outline 0.15s ease;
+  padding: 0;
+  background-clip: content-box;
+}
+
+.m3-color-swatch:hover {
+  transform: scale(1.15);
+}
+
+.m3-color-swatch.is-selected {
+  outline: 2px solid var(--md-primary);
+  outline-offset: 2px;
+  transform: scale(1.1);
+}
+
+.m3-color-swatch--blue { background-color: var(--md-tone-blue); }
+.m3-color-swatch--red { background-color: var(--md-tone-red); }
+.m3-color-swatch--green { background-color: var(--md-tone-green); }
+.m3-color-swatch--amber { background-color: var(--md-tone-amber); }
+.m3-color-swatch--violet { background-color: var(--md-tone-violet); }
+
+/* Visual row containing swatches and avatar */
+.inspector-visual-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 0 0 0;
+  padding-bottom: 0;
+  border-bottom: none;
+  min-width: 0;
+}
+
+.inspector-field--circle-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-top: 0;
+}
+
+/* Avatar circular picker */
+.m3-avatar-picker-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.m3-avatar-picker-container label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--md-on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.m3-avatar-picker {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: var(--md-surface-container-highest);
+  border: 1px solid var(--md-outline-variant);
+  overflow: hidden;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.2s, background-color 0.2s, transform 0.1s;
+}
+
+.m3-avatar-picker:hover {
+  border-color: var(--md-primary);
+  transform: scale(1.05);
+}
+
+.m3-avatar-picker:active {
+  transform: scale(0.98);
+}
+
+.m3-avatar-picker img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.m3-avatar-picker-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--md-on-primary);
+  opacity: 0;
+  transition: opacity 0.2s;
+  border-radius: 50%;
+}
+
+.m3-avatar-picker:hover .m3-avatar-picker-overlay {
+  opacity: 1;
+}
+
+.m3-avatar-picker-overlay svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  fill: none;
+}
+
+.m3-avatar-picker-default-icon {
+  width: 22px;
+  height: 22px;
+  color: var(--md-on-surface-variant);
+  stroke: currentColor;
+  stroke-width: 2;
+  fill: none;
+}
+
+/* Secondary full-width buttons and actions */
+.inspector-actions-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 4px;
+  border-top: none;
+}
+
+.inspector-actions-section button {
+  width: 100%;
+}
+
+/* Segmented Button for compact Material 3 choices */
+.m3-segmented-button {
+  display: flex;
+  width: 100%;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-r-full);
+  overflow: hidden;
+  background: transparent;
+  margin-top: 4px;
+}
+
+.m3-segmented-button-item {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--md-on-surface-variant);
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+  outline: none;
+  font-family: inherit;
+}
+
+.m3-segmented-button-item:not(:last-child) {
+  border-right: 1px solid var(--md-outline-variant);
+}
+
+.m3-segmented-button-item.is-selected {
+  background-color: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+.m3-segmented-button-item:hover:not(.is-selected) {
+  background-color: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+}
+
+.m3-segmented-button-item:active {
+  background-color: color-mix(in srgb, var(--md-on-surface) 12%, transparent);
+}
+
+/* Settings panel z-index overlay */

@@ -15,99 +15,58 @@ zip.configure({ useWebWorkers: false })
 import { useAuth } from './lib/useAuth'
 import { loadGraph, saveGraph, loadLocalGraph, saveLocalGraph } from './lib/graphPersistence'
 import { enrichLinkedInProfile } from './lib/linkedinEnrichment'
-import { OnboardingCoach } from './Onboarding'
-import { ONBOARDING_STEPS, ONBOARDING_DONE_STEP } from './onboardingSteps'
-import type { OnboardingAction } from './onboardingSteps'
 // STRESS TEST — dev-only performance harness. See src/lib/stressTest.ts.
 
-export type CircleTone = 'blue' | 'red' | 'green' | 'amber' | 'violet'
+import type {
+  CircleTone,
+  CircleShapeMode,
+  CircleFillMode,
+  CircleNode,
+  PersonNote,
+  PersonLinkService,
+  PersonLink,
+  PersonNode,
+  GraphState,
+  Camera,
+  DragConnector,
+  MarqueeState,
+  SelectedItem,
+  HsvColor,
+  BoardAnim,
+} from './lib/board/types'
+import {
+  MIN_SCALE,
+  MAX_SCALE,
+  CONNECT_THRESHOLD,
+  PERSON_CONTAINMENT_RADIUS,
+  CIRCLE_CONTAINMENT_PADDING,
+  MERGE_LAYOUT_LIMIT,
+  MATERIAL_TONES,
+  CIRCLE_COLOR_PRESETS,
+  LINK_SERVICE_OPTIONS,
+} from './lib/board/constants'
+import { getCircleColors, hexToHsv, hsvToHex, getReadableColor } from './lib/board/colors'
+import { clamp } from './lib/board/geometry'
+import {
+  ensureContainment,
+  resizeCircleFromPoint,
+  createFreshGraph,
+  findFreeSpaceInCircle,
+  getDescendantCircleIds,
+} from './lib/board/layout'
+import { createBoardIndex, hitTestBoard, readAnimFrame, drawBoardLayer, setBoardRepaintCallback } from './lib/board/render'
+import { makeInitials } from './lib/board/text'
 
-export type ShapeType = 'circle' | 'wavy' | 'polygon'
+export type { CircleNode, PersonNode, Connection, GraphState, CircleTone } from './lib/board/types'
 
-export type CircleNode = {
-  id: string
-  name: string
-  icon: string
-  x: number
-  y: number
-  radius: number
-  minRadius: number
-  parentId: string | null
-  connectedTo: string | null
-  tone: CircleTone
-  shapeType?: ShapeType
-  sides?: number
-  amplitude?: number
-  imageUrl?: string
-  customColor?: string
-  fillMode?: CircleFillMode
-}
+// Undo history kept at module scope (not useRef) so the mutating helpers that
+// read/write it aren't analyzed as accessing React refs during render. Single
+// mount in this app, so a plain stack is enough; one snapshot per user action.
+const MAX_UNDO_STEPS = 100
+const undoHistory: GraphState[] = []
 
-type PersonNote = {
-  id: string
-  title: string
-  body: string
-}
-
-type PersonLinkService = 'linkedin' | 'telegram' | 'instagram' | 'facebook' | 'whatsapp' | 'x' | 'website'
-
-type PersonLink = {
-  id: string
-  service: PersonLinkService
-  label: string
-  url: string
-}
-
-export type PersonNode = {
-  id: string
-  name: string
-  role: string
-  x: number
-  y: number
-  circleId: string
-  avatar: string
-  shapeType?: ShapeType
-  sides?: number
-  amplitude?: number
-  imageUrl?: string
-  isFavorite?: boolean
-  notes?: PersonNote[]
-  links?: PersonLink[]
-}
-
-export type Connection = {
-  id: string
-  fromId: string
-  toId: string
-}
-
-export type GraphState = {
-  circles: CircleNode[]
-  people: PersonNode[]
-  connections: Connection[]
-}
-
-type Camera = {
-  x: number
-  y: number
-  scale: number
-}
-
-type DragConnector = {
-  sourceId: string
-  sourceType: 'circle' | 'person'
-  startX: number
-  startY: number
-  endX: number
-  endY: number
-}
-
-type MarqueeState = {
-  startX: number
-  startY: number
-  currentX: number
-  currentY: number
-}
+const prefersReducedMotion = () =>
+  typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
 type CreateMenu = {
   sourceCircleId: string
@@ -118,21 +77,6 @@ type CreateMenu = {
   dragSourceId?: string
   dragSourceType?: 'circle' | 'person'
 }
-
-type SelectedItem =
-  | {
-      type: 'circle'
-      id: string
-    }
-  | {
-      type: 'person'
-      id: string
-    }
-  | {
-      type: 'connection'
-      id: string
-    }
-  | null
 
 type SearchResult = {
   kind: 'person' | 'circle' | 'linkedin-profile'
@@ -167,24 +111,6 @@ type LinkedInConnectionsHeaders = {
   emailIdx: number
   connectedOnIdx: number
 }
-
-type CircleShapeMode = 'circles' | 'figures'
-type CircleFillMode = 'transparent' | 'solid'
-
-type HsvColor = {
-  h: number
-  s: number
-  v: number
-}
-
-type BoardHit =
-  | { type: 'circle-center'; circle: CircleNode }
-  | { type: 'circle-edge'; circle: CircleNode }
-  | { type: 'circle-body'; circle: CircleNode }
-  | { type: 'person'; person: PersonNode }
-  | { type: 'connection'; connection: Connection }
-  | { type: 'connector-handle'; sourceId: string; sourceType: 'circle' | 'person'; x: number; y: number }
-  | null
 
 type PanState = {
   pointerId: number
@@ -221,157 +147,13 @@ type MovePersonState = {
   originX: number
   originY: number
   selectedOrigins?: Record<string, { x: number; y: number }>
+  // Mixed selection: zones (and their contents) dragged along with the people.
+  circleOrigins?: Record<string, { x: number; y: number }>
 }
 
 type ResizeCircleState = {
   pointerId: number
   circleId: string
-}
-
-const MIN_SCALE = 0.35
-const MAX_SCALE = 4.0
-
-const CONNECT_THRESHOLD = 40
-const MIN_CIRCLE_RADIUS = 72
-const EDGE_RESIZE_HIT_SIZE = 18
-const PERSON_VISUAL_RADIUS = 20
-const CIRCLE_CENTER_RADIUS = 20
-const HANDLE_HIT_RADIUS = 16
-const PERSON_CONTAINMENT_RADIUS = 28
-const CIRCLE_CONTAINMENT_PADDING = 28
-const PERSON_COLLISION_RADIUS = 21
-const PERSON_COLLISION_GAP = 4
-const CIRCLE_CENTER_COLLISION_RADIUS = 24
-const PERSON_CIRCLE_COLLISION_GAP = 8
-const CIRCLE_COLLISION_GAP = 4
-const COLLISION_PASSES = 10
-
-const DEFAULT_STATE: GraphState = createDemoGraphState()
-
-const MATERIAL_TONES: Record<CircleTone, { fill: string; border: string; text: string; centerBg: string }> = {
-  blue: { fill: '#D2E4FF', border: '#004A77', text: '#001D35', centerBg: '#00629D' },
-  red: { fill: '#FFDAD6', border: '#BA1A1A', text: '#410002', centerBg: '#C00015' },
-  green: { fill: '#D1E8D2', border: '#0F6D38', text: '#00210B', centerBg: '#1E824A' },
-  amber: { fill: '#FFE082', border: '#B06000', text: '#2A1400', centerBg: '#D87A00' },
-  violet: { fill: '#EADDFF', border: '#6750A4', text: '#21005D', centerBg: '#7F67BE' },
-}
-
-const CIRCLE_COLOR_PRESETS = [
-  '#00629D',
-  '#C00015',
-  '#1E824A',
-  '#D87A00',
-  '#7F67BE',
-  '#0B57D0',
-  '#00897B',
-  '#6D4C41',
-  '#AD1457',
-  '#546E7A',
-  '#F57C00',
-  '#2E7D32',
-  '#5E35B1',
-  '#00838F',
-  '#8D6E63',
-  '#455A64',
-  '#F4D35E',
-  '#EE964B',
-  '#F95738',
-  '#A23E48',
-  '#6A4C93',
-  '#1982C4',
-  '#8AC926',
-  '#B8C480',
-]
-
-const LINK_SERVICE_OPTIONS: { service: PersonLinkService; label: string; placeholder: string }[] = [
-  { service: 'linkedin', label: 'LinkedIn', placeholder: 'linkedin.com/in/name' },
-  { service: 'telegram', label: 'Telegram', placeholder: '@username' },
-  { service: 'instagram', label: 'Instagram', placeholder: '@username' },
-  { service: 'facebook', label: 'Facebook', placeholder: 'facebook.com/name' },
-  { service: 'whatsapp', label: 'WhatsApp', placeholder: '+45 12 34 56 78' },
-  { service: 'x', label: 'X', placeholder: '@username' },
-  { service: 'website', label: 'Custom', placeholder: 'https://example.com/profile' },
-]
-
-function getCircleColors(circle: CircleNode) {
-  if (!circle.customColor) return MATERIAL_TONES[circle.tone]
-  return {
-    fill: colorMix(circle.customColor, '#ffffff', 0.78),
-    border: colorMix(circle.customColor, '#000000', 0.28),
-    text: '#1a1c1e',
-    centerBg: circle.customColor,
-  }
-}
-
-function colorMix(hex: string, target: string, amount: number) {
-  const sourceRgb = hexToRgb(hex)
-  const targetRgb = hexToRgb(target)
-  if (!sourceRgb || !targetRgb) return hex
-  const mix = (a: number, b: number) => Math.round(a + (b - a) * amount)
-  return rgbToHex(mix(sourceRgb.r, targetRgb.r), mix(sourceRgb.g, targetRgb.g), mix(sourceRgb.b, targetRgb.b))
-}
-
-function hexToRgb(hex: string) {
-  const normalized = hex.trim().replace(/^#/, '')
-  if (!/^[\da-fA-F]{6}$/.test(normalized)) return null
-  return {
-    r: parseInt(normalized.slice(0, 2), 16),
-    g: parseInt(normalized.slice(2, 4), 16),
-    b: parseInt(normalized.slice(4, 6), 16),
-  }
-}
-
-function rgbToHex(r: number, g: number, b: number) {
-  return `#${[r, g, b].map((value) => value.toString(16).padStart(2, '0')).join('')}`
-}
-
-function hexToHsv(hex: string): HsvColor {
-  const rgb = hexToRgb(hex) ?? { r: 0, g: 98, b: 157 }
-  const r = rgb.r / 255
-  const g = rgb.g / 255
-  const b = rgb.b / 255
-  const max = Math.max(r, g, b)
-  const min = Math.min(r, g, b)
-  const delta = max - min
-  let h = 0
-  if (delta !== 0) {
-    if (max === r) h = 60 * (((g - b) / delta) % 6)
-    else if (max === g) h = 60 * ((b - r) / delta + 2)
-    else h = 60 * ((r - g) / delta + 4)
-  }
-  if (h < 0) h += 360
-  return {
-    h,
-    s: max === 0 ? 0 : delta / max,
-    v: max,
-  }
-}
-
-function hsvToHex({ h, s, v }: HsvColor) {
-  const c = v * s
-  const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
-  const m = v - c
-  let r = 0
-  let g = 0
-  let b = 0
-  if (h < 60) [r, g, b] = [c, x, 0]
-  else if (h < 120) [r, g, b] = [x, c, 0]
-  else if (h < 180) [r, g, b] = [0, c, x]
-  else if (h < 240) [r, g, b] = [0, x, c]
-  else if (h < 300) [r, g, b] = [x, 0, c]
-  else [r, g, b] = [c, 0, x]
-  return rgbToHex(
-    Math.round((r + m) * 255),
-    Math.round((g + m) * 255),
-    Math.round((b + m) * 255),
-  )
-}
-
-function getReadableColor(background: string) {
-  const rgb = hexToRgb(background)
-  if (!rgb) return '#ffffff'
-  const luminance = (0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b) / 255
-  return luminance > 0.58 ? '#1a1c1e' : '#ffffff'
 }
 
 function inferLinkService(rawValue: string): PersonLinkService {
@@ -540,95 +322,6 @@ async function buildLinkedInProfileImport(rawValue: string): Promise<LinkedInPro
   }
 }
 
-function getNodePath(
-  cx: number,
-  cy: number,
-  r: number,
-  shapeType: ShapeType,
-  sides: number,
-  amplitude: number
-) {
-  if (shapeType === 'circle') {
-    let path = ''
-    const points = Math.max(120, Math.round(r * 2))
-    for (let i = 0; i <= points; i++) {
-      const angle = (i * 2 * Math.PI) / points
-      const x = cx + r * Math.cos(angle)
-      const y = cy + r * Math.sin(angle)
-      if (i === 0) {
-        path += `M ${x.toFixed(2)} ${y.toFixed(2)}`
-      } else {
-        path += ` L ${x.toFixed(2)} ${y.toFixed(2)}`
-      }
-    }
-    path += ' Z'
-    return path
-  }
-
-  if (shapeType === 'wavy') {
-    let path = ''
-    const points = Math.max(240, Math.round(r * 2 * Math.PI))
-    const baseR = r - amplitude - 4
-    for (let i = 0; i <= points; i++) {
-      const angle = (i * 2 * Math.PI) / points
-      const currentR = baseR + amplitude * Math.cos(sides * angle)
-      const x = cx + currentR * Math.cos(angle)
-      const y = cy + currentR * Math.sin(angle)
-      if (i === 0) {
-        path += `M ${x.toFixed(2)} ${y.toFixed(2)}`
-      } else {
-        path += ` L ${x.toFixed(2)} ${y.toFixed(2)}`
-      }
-    }
-    path += ' Z'
-    return path
-  }
-
-  // shapeType === 'polygon'
-  const softness = amplitude === 0 ? 0.42 : Math.min(1.0, Math.max(0.0, amplitude / 20.0))
-  const vertices: { x: number; y: number }[] = []
-  const angleStep = (2 * Math.PI) / sides
-  for (let i = 0; i < sides; i++) {
-    const angle = i * angleStep - Math.PI / 2
-    vertices.push({
-      x: cx + r * Math.cos(angle),
-      y: cy + r * Math.sin(angle),
-    })
-  }
-
-  const midpoints: { x: number; y: number }[] = []
-  for (let i = 0; i < sides; i++) {
-    const next = (i + 1) % sides
-    midpoints.push({
-      x: (vertices[i].x + vertices[next].x) / 2,
-      y: (vertices[i].y + vertices[next].y) / 2,
-    })
-  }
-
-  let path = ''
-  for (let i = 0; i < sides; i++) {
-    const prevIdx = (i - 1 + sides) % sides
-    const p = vertices[i]
-    const mPrev = midpoints[prevIdx]
-    const mNext = midpoints[i]
-
-    const startX = p.x + (mPrev.x - p.x) * softness
-    const startY = p.y + (mPrev.y - p.y) * softness
-
-    const endX = p.x + (mNext.x - p.x) * softness
-    const endY = p.y + (mNext.y - p.y) * softness
-
-    if (i === 0) {
-      path += `M ${startX.toFixed(2)} ${startY.toFixed(2)}`
-    } else {
-      path += ` L ${startX.toFixed(2)} ${startY.toFixed(2)}`
-    }
-    path += ` Q ${p.x.toFixed(2)} ${p.y.toFixed(2)} ${endX.toFixed(2)} ${endY.toFixed(2)}`
-  }
-  path += ' Z'
-  return path
-}
-
 const authOverlayStyle: CSSProperties = {
   position: 'fixed',
   inset: 0,
@@ -651,26 +344,6 @@ const authCardStyle: CSSProperties = {
   maxWidth: '320px',
 }
 
-// First-run flag for the onboarding tour. Kept in localStorage so a returning
-// visitor (signed in or not) doesn't see it again.
-const ONBOARDING_STORAGE_KEY = 'social-onboarding-done-v1'
-
-function hasSeenOnboarding(): boolean {
-  try {
-    return window.localStorage.getItem(ONBOARDING_STORAGE_KEY) === '1'
-  } catch {
-    return true
-  }
-}
-
-function markOnboardingSeen() {
-  try {
-    window.localStorage.setItem(ONBOARDING_STORAGE_KEY, '1')
-  } catch {
-    // Ignore storage failures (private mode etc.) — worst case the tour reappears.
-  }
-}
-
 function App() {
   const surfaceRef = useRef<HTMLDivElement | null>(null)
   // Canvas 2D board renderer: circles, edges, people, labels, and interaction chrome.
@@ -688,7 +361,10 @@ function App() {
   const dragRafRef = useRef<number | null>(null)
   const pendingGraphRef = useRef<((current: GraphState) => GraphState) | null>(null)
   const pendingConnectorRef = useRef<DragConnector | null>(null)
-  const [graph, setGraph] = useState(createInitialGraph)
+  // Start from a blank board (just the "you" circle), never the old demo seed.
+  // The real graph replaces this once loaded; keeping demo data here caused it to
+  // flash for a few frames on some reloads before the loaded graph took over.
+  const [graph, setGraph] = useState(createFreshGraph)
   // True once the current drag/resize gesture has recorded its undo snapshot.
   // Only touched from pointer event handlers, never during render.
   const gestureSnapshotTakenRef = useRef(false)
@@ -702,23 +378,11 @@ function App() {
   const [emailAuthMode, setEmailAuthMode] = useState<'signin' | 'signup'>('signin')
   const [emailAuthBusy, setEmailAuthBusy] = useState(false)
   const [emailAuthNotice, setEmailAuthNotice] = useState<string | null>(null)
-  // Once set, the modal swaps to a "check your inbox" screen for this address.
-  const [pendingConfirmEmail, setPendingConfirmEmail] = useState<string | null>(null)
-  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent'>('idle')
 
   const openSignInModal = () => {
     setEmailAuthMode('signin')
     setEmailAuthNotice(null)
-    setPendingConfirmEmail(null)
     setShowSignInModal(true)
-  }
-
-  const closeSignInModal = () => {
-    setShowSignInModal(false)
-    setPendingConfirmEmail(null)
-    setEmailAuthNotice(null)
-    setResendState('idle')
-    setPasswordInput('')
   }
 
   const handleEmailAuthSubmit = async () => {
@@ -728,37 +392,21 @@ function App() {
     setEmailAuthNotice(null)
     try {
       if (emailAuthMode === 'signup') {
-        const { error, needsConfirmation, alreadyRegistered } = await auth.signUpWithEmail(email, passwordInput)
-        if (error) return
-        if (alreadyRegistered) {
-          // Supabase masks existing accounts; nudge the user to sign in instead.
-          setEmailAuthMode('signin')
-          setEmailAuthNotice('This email is already registered. Try signing in instead.')
-          return
-        }
-        if (needsConfirmation) {
-          // Confirmation required: show the dedicated "check your inbox" screen.
-          setPendingConfirmEmail(email)
-          setResendState('idle')
+        const { error, needsConfirmation } = await auth.signUpWithEmail(email, passwordInput)
+        if (!error && needsConfirmation) {
+          setEmailAuthNotice('Check your email to confirm your account, then sign in.')
           setPasswordInput('')
-        } else {
-          // Confirmation disabled — the account is active right away.
-          closeSignInModal()
         }
       } else {
         const { error } = await auth.signInWithEmail(email, passwordInput)
-        if (!error) closeSignInModal()
+        if (!error) {
+          setShowSignInModal(false)
+          setPasswordInput('')
+        }
       }
     } finally {
       setEmailAuthBusy(false)
     }
-  }
-
-  const handleResendConfirmation = async () => {
-    if (!pendingConfirmEmail || resendState === 'sending') return
-    setResendState('sending')
-    const { error } = await auth.resendConfirmation(pendingConfirmEmail)
-    setResendState(error ? 'idle' : 'sent')
   }
   // True once we've pulled this user's saved graph (or confirmed they have none).
   // The board stays hidden until then so the demo seed never flashes or gets saved.
@@ -767,9 +415,9 @@ function App() {
   const [imageEpoch, setImageEpoch] = useState(0)
 
   useEffect(() => {
-    requestBoardRepaint = () => setImageEpoch((epoch) => epoch + 1)
+    setBoardRepaintCallback(() => setImageEpoch((epoch) => epoch + 1))
     return () => {
-      requestBoardRepaint = null
+      setBoardRepaintCallback(null)
     }
   }, [])
 
@@ -868,12 +516,12 @@ function App() {
   // Person currently under the cursor — promoted to an interactive DOM node so it
   // can be clicked/dragged even inside a dense circle that's otherwise canvas-only.
   const [hoveredPersonId, setHoveredPersonId] = useState<string | null>(null)
-  const [hoveredCircleEdgeId, setHoveredCircleEdgeId] = useState<string | null>(null)
 
   // Viewport size in CSS px, used to cull off-screen nodes. Updated on resize.
   const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight })
 
   const [showSettings, setShowSettings] = useState(false)
+  const [showLinkedInGuide, setShowLinkedInGuide] = useState(false)
   const [demoMode, setDemoMode] = useState(false)
   const [showCircleLabels, setShowCircleLabels] = useState(true)
   const [showPersonLabels, setShowPersonLabels] = useState(true)
@@ -892,6 +540,7 @@ function App() {
 
   const settingsButtonRef = useRef<HTMLButtonElement>(null)
   const settingsPanelRef = useRef<HTMLDivElement>(null)
+  const linkedInGuidePanelRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Search: a pill in the top toolbar that finds people (by name/role) and
@@ -903,102 +552,6 @@ function App() {
   const searchInputRef = useRef<HTMLInputElement>(null)
   const searchPanelRef = useRef<HTMLDivElement>(null)
   const focusAnimRef = useRef<number | null>(null)
-
-  // Onboarding tour. -1 = inactive. A ref mirrors the step so board event
-  // handlers (wired once in effects) always read the live value.
-  const [onboardingStep, setOnboardingStep] = useState(-1)
-  const onboardingStepRef = useRef(onboardingStep)
-  useEffect(() => {
-    onboardingStepRef.current = onboardingStep
-  }, [onboardingStep])
-  // True during the brief "Great!" beat that plays after a gesture, before the
-  // card advances to the next step.
-  const [onboardingCelebrating, setOnboardingCelebrating] = useState(false)
-  const onboardingCelebrateRef = useRef(false)
-  const onboardingTimerRef = useRef<number | null>(null)
-  const onboardingDecidedRef = useRef(false)
-
-  // Decide once per load whether to open the tour. On the dev server it always
-  // opens for signed-out visitors (acts as the landing); in production it shows
-  // only once ever, tracked in localStorage — so it isn't a popup on every visit.
-  useEffect(() => {
-    if (onboardingDecidedRef.current) return
-    if (!graphLoaded || auth.status === 'loading') return
-    onboardingDecidedRef.current = true
-    const isSignedOut = auth.status === 'anonymous' || auth.status === 'unconfigured'
-    const devAlwaysShow = import.meta.env.DEV && isSignedOut
-    if (devAlwaysShow || !hasSeenOnboarding()) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setOnboardingStep(0)
-      // Outside the dev "always show" path, count this as the one-and-only
-      // showing right away — so a reload or abandon doesn't re-pop it in prod.
-      if (!devAlwaysShow) markOnboardingSeen()
-    }
-  }, [graphLoaded, auth.status])
-
-  function clearOnboardingTimer() {
-    if (onboardingTimerRef.current != null) {
-      window.clearTimeout(onboardingTimerRef.current)
-      onboardingTimerRef.current = null
-    }
-    onboardingCelebrateRef.current = false
-    setOnboardingCelebrating(false)
-  }
-
-  function finishOnboarding() {
-    clearOnboardingTimer()
-    setOnboardingStep(-1)
-    markOnboardingSeen()
-  }
-
-  function onboardingNext() {
-    clearOnboardingTimer()
-    setOnboardingStep((step) => {
-      if (step < 0) return step
-      if (step >= ONBOARDING_DONE_STEP) {
-        markOnboardingSeen()
-        return -1
-      }
-      const next = step + 1
-      if (next === ONBOARDING_DONE_STEP) markOnboardingSeen()
-      return next
-    })
-  }
-
-  function onboardingBack() {
-    clearOnboardingTimer()
-    setOnboardingStep((step) => (step > 0 ? step - 1 : step))
-  }
-
-  // Called from board interaction handlers. When the action matches the step the
-  // tour is waiting for, play a one-second "Great!" beat, then advance.
-  function notifyOnboarding(action: OnboardingAction) {
-    const step = onboardingStepRef.current
-    if (step < 0 || step >= ONBOARDING_DONE_STEP) return
-    if (ONBOARDING_STEPS[step].trigger !== action) return
-    if (onboardingCelebrateRef.current) return
-    onboardingCelebrateRef.current = true
-    setOnboardingCelebrating(true)
-    onboardingTimerRef.current = window.setTimeout(() => {
-      onboardingTimerRef.current = null
-      onboardingCelebrateRef.current = false
-      setOnboardingCelebrating(false)
-      setOnboardingStep((s) => {
-        if (s < 0 || s >= ONBOARDING_DONE_STEP) return s
-        const next = s + 1
-        if (next === ONBOARDING_DONE_STEP) markOnboardingSeen()
-        return next
-      })
-    }, 1100)
-  }
-
-  // The closing "you're ready" card dismisses itself after a beat so it never
-  // lingers in the way; the Done button still closes it instantly.
-  useEffect(() => {
-    if (onboardingStep !== ONBOARDING_DONE_STEP) return
-    const timer = window.setTimeout(() => setOnboardingStep(-1), 3600)
-    return () => window.clearTimeout(timer)
-  }, [onboardingStep])
 
   function selectItem(item: SelectedItem) {
     setShowCircleStylePanel(false)
@@ -1058,7 +611,6 @@ function App() {
         : addLinkedInProfileToGraph(graph, profile)
       pushHistory()
       setGraph(next.graph)
-      notifyOnboarding('import')
       selectItem({ type: 'person', id: next.person.id })
       focusCameraOnWorld(next.person.x, next.person.y, 1.5)
       closeSearch()
@@ -1169,7 +721,6 @@ function App() {
       const result = await buildLinkedInConnectionsGraph(graph, csvText)
       pushHistory()
       setGraph(result.graph)
-      notifyOnboarding('import')
 
       alert(`LinkedIn data imported successfully: ${result.importedPeople} people across ${result.importedCompanies} companies.`)
     } catch (err) {
@@ -1517,12 +1068,19 @@ function App() {
       ) {
         closeSearch()
       }
+      if (
+        showLinkedInGuide &&
+        linkedInGuidePanelRef.current &&
+        !linkedInGuidePanelRef.current.contains(event.target as Node)
+      ) {
+        setShowLinkedInGuide(false)
+      }
     }
     document.addEventListener('pointerdown', handleOutsideClick)
     return () => {
       document.removeEventListener('pointerdown', handleOutsideClick)
     }
-  }, [showSettings, searchOpen])
+  }, [showSettings, searchOpen, showLinkedInGuide])
 
   useEffect(() => {
     if (!showCircleStylePanel) return
@@ -1688,7 +1246,6 @@ function App() {
         selectedPeopleIds,
         marqueeRef.current,
         selectedCircleIds,
-        hoveredCircleEdgeId,
       )
     }
   }
@@ -1781,7 +1338,6 @@ function App() {
       selectedPeopleIds,
       marquee,
       selectedCircleIds,
-      hoveredCircleEdgeId,
       frame,
     )
   }
@@ -1848,7 +1404,6 @@ function App() {
     imageEpoch,
     marquee,
     selectedCircleIds,
-    hoveredCircleEdgeId,
   ])
 
   useEffect(() => {
@@ -1884,7 +1439,6 @@ function App() {
           y: currentCamera.y - event.deltaY,
         })
       }
-      notifyOnboarding('move')
     }
 
     surface.addEventListener('wheel', handleWheel, { passive: false })
@@ -1927,6 +1481,14 @@ function App() {
     const update = pendingGraphRef.current
     pendingGraphRef.current = null
     return update
+  }
+
+  // Set the board cursor imperatively (avoids a re-render). The hand only shows
+  // while a real pan/drag is happening; resting and clicking keep the arrow, and
+  // anything interactive under the pointer shows the pointer cursor.
+  function setSurfaceCursor(value: string) {
+    const surface = surfaceRef.current
+    if (surface && surface.style.cursor !== value) surface.style.cursor = value
   }
 
   function handleSurfacePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
@@ -2070,7 +1632,12 @@ function App() {
             setSelectedCircleIds([])
             selectItem({ type: 'circle', id: hit.circle.id })
           }
-          if (centerBehavior === 'connect') {
+          // When this zone is part of a multi/mixed selection, grabbing its center
+          // drags the whole group instead of starting a connector.
+          const isGroupDrag =
+            selectedCircleIds.includes(hit.circle.id) &&
+            selectedCircleIds.length + selectedPeopleIds.length > 1
+          if (centerBehavior === 'connect' && !isGroupDrag) {
             startConnector(event, hit.circle.id, 'circle', hit.circle.x, hit.circle.y)
           } else {
             startCircleMove(event, hit.circle)
@@ -2158,6 +1725,7 @@ function App() {
       marqueeRef.current.currentX = event.clientX
       marqueeRef.current.currentY = event.clientY
       setMarquee({ ...marqueeRef.current })
+      setSurfaceCursor('crosshair')
       return
     }
 
@@ -2253,11 +1821,16 @@ function App() {
       ensureGestureSnapshot()
       const deltaX = (event.clientX - movingPerson.startX) / camera.scale
       const deltaY = (event.clientY - movingPerson.startY) / camera.scale
-      const { selectedOrigins } = movingPerson
+      const { selectedOrigins, circleOrigins } = movingPerson
       pendingGraphRef.current = (current) =>
         ensureContainment(
           {
             ...current,
+            circles: current.circles.map((c) =>
+              circleOrigins && c.id in circleOrigins
+                ? { ...c, x: circleOrigins[c.id].x + deltaX, y: circleOrigins[c.id].y + deltaY }
+                : c
+            ),
             people: current.people.map((person) => {
               if (selectedOrigins && person.id in selectedOrigins) {
                 const origin = selectedOrigins[person.id]
@@ -2285,31 +1858,8 @@ function App() {
       const world = screenToWorld({ x: event.clientX, y: event.clientY })
       pendingConnectorRef.current = { ...connector, endX: world.x, endY: world.y }
       scheduleDrag()
+      setSurfaceCursor('grabbing')
       return
-    }
-
-    // Cursor handling based on active state / hover
-    if (pan || moving || movingPerson) {
-      if (surfaceRef.current) surfaceRef.current.style.cursor = 'grabbing'
-    } else if (resizing) {
-      const circle = graph.circles.find((c) => c.id === resizing.circleId)
-      if (circle) {
-        const world = screenToWorld({ x: event.clientX, y: event.clientY })
-        if (surfaceRef.current) surfaceRef.current.style.cursor = getResizeCursor(world, circle)
-      }
-    } else {
-      const hit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
-        x: event.clientX,
-        y: event.clientY,
-      })
-      if (hit?.type === 'circle-edge') {
-        const world = screenToWorld({ x: event.clientX, y: event.clientY })
-        if (surfaceRef.current) surfaceRef.current.style.cursor = getResizeCursor(world, hit.circle)
-      } else if (hit?.type === 'person' || hit?.type === 'circle-center' || hit?.type === 'connection' || hit?.type === 'connector-handle') {
-        if (surfaceRef.current) surfaceRef.current.style.cursor = 'pointer'
-      } else {
-        if (surfaceRef.current) surfaceRef.current.style.cursor = ''
-      }
     }
 
     // Idle hover is canvas hit-testing now; React only stores the hovered ids.
@@ -2322,23 +1872,29 @@ function App() {
       if (id !== hoveredPersonId) setHoveredPersonId(id)
       const connId = hit?.type === 'connection' ? hit.connection.id : null
       if (connId !== hoveredConnId) setHoveredConnId(connId)
-      const edgeId = hit?.type === 'circle-edge' ? hit.circle.id : null
-      if (edgeId !== hoveredCircleEdgeId) setHoveredCircleEdgeId(edgeId)
+      // Pointer over anything interactive, plain arrow over the empty board.
+      setSurfaceCursor(hit ? 'pointer' : 'default')
     } else {
       if (hoveredPersonId) setHoveredPersonId(null)
       if (hoveredConnId) setHoveredConnId(null)
-      if (hoveredCircleEdgeId) setHoveredCircleEdgeId(null)
+      // A real pan or drag is in progress → closed hand.
+      setSurfaceCursor('grabbing')
     }
   }
 
   function handleSurfacePointerUp(event: ReactPointerEvent<HTMLDivElement>) {
-    if (surfaceRef.current) {
-      surfaceRef.current.style.cursor = ''
-    }
     activePointersRef.current = activePointersRef.current.filter((p) => p.pointerId !== event.pointerId)
     if (activePointersRef.current.length < 2) {
       pinchRef.current = null
     }
+
+    // Gesture is ending: drop the hand and restore the idle cursor based on what's
+    // under the pointer now.
+    const upHit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
+      x: event.clientX,
+      y: event.clientY,
+    })
+    setSurfaceCursor(upHit ? 'pointer' : 'default')
 
     if (marqueeRef.current) {
       const startX = marqueeRef.current.startX
@@ -2375,7 +1931,6 @@ function App() {
     if (panRef.current?.pointerId === event.pointerId) {
       panRef.current = null
       settleGesture()
-      notifyOnboarding('move')
     }
 
     const movingPersonId = movePersonRef.current?.pointerId === event.pointerId ? movePersonRef.current.personId : null
@@ -2384,21 +1939,14 @@ function App() {
     const disconnectedCircleIds = moveCircleRef.current?.pointerId === event.pointerId ? moveCircleRef.current.disconnectedCircleIds : null
     const wasRightClickDrag = isRightClickDragRef.current
 
-    const wasResize = resizeCircleRef.current?.pointerId === event.pointerId
-    const wasNodeMove =
+    const endingMove =
       moveCircleRef.current?.pointerId === event.pointerId ||
-      movePersonRef.current?.pointerId === event.pointerId
-
-    const endingMove = wasNodeMove || wasResize
+      movePersonRef.current?.pointerId === event.pointerId ||
+      resizeCircleRef.current?.pointerId === event.pointerId
 
     if (moveCircleRef.current?.pointerId === event.pointerId) moveCircleRef.current = null
     if (movePersonRef.current?.pointerId === event.pointerId) movePersonRef.current = null
     if (resizeCircleRef.current?.pointerId === event.pointerId) resizeCircleRef.current = null
-
-    // Resizing a circle (dragging its edge) and moving a node are distinct
-    // onboarding milestones; a resize shouldn't satisfy the "move" step.
-    if (wasResize) notifyOnboarding('resize')
-    else if (wasNodeMove) notifyOnboarding('move')
 
     if (endingMove) {
       // Apply the final dragged position immediately, including any queued layout pass.
@@ -2586,7 +2134,8 @@ function App() {
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
 
-    const targets = selectedCircleIds.includes(circle.id) ? selectedCircleIds : [circle.id]
+    const draggingSelection = selectedCircleIds.includes(circle.id)
+    const targets = draggingSelection ? selectedCircleIds : [circle.id]
     const subtreeIds = new Set<string>()
     for (const cid of targets) {
       subtreeIds.add(cid)
@@ -2602,6 +2151,14 @@ function App() {
     }
     for (const p of graph.people) {
       if (subtreeIds.has(p.circleId)) personOrigins[p.id] = { x: p.x, y: p.y }
+    }
+
+    // Mixed selection: drag any loosely-selected people along with the zones.
+    if (draggingSelection) {
+      for (const pid of selectedPeopleIds) {
+        const p = boardIndex.peopleById.get(pid)
+        if (p && !(p.id in personOrigins)) personOrigins[p.id] = { x: p.x, y: p.y }
+      }
     }
 
     moveCircleRef.current = {
@@ -2625,11 +2182,33 @@ function App() {
     selectItem({ type: 'person', id: person.id })
 
     const selectedOrigins: Record<string, { x: number; y: number }> = {}
-    const targets = selectedPeopleIds.includes(person.id) ? selectedPeopleIds : [person.id]
+    const draggingSelection = selectedPeopleIds.includes(person.id)
+    const targets = draggingSelection ? selectedPeopleIds : [person.id]
     for (const pid of targets) {
       const p = boardIndex.peopleById.get(pid)
       if (p) {
         selectedOrigins[pid] = { x: p.x, y: p.y }
+      }
+    }
+
+    // Mixed selection: when the grabbed person is part of the selection and zones
+    // are selected too, drag those zones (and everything inside them) along.
+    const circleOrigins: Record<string, { x: number; y: number }> = {}
+    if (draggingSelection && selectedCircleIds.length > 0) {
+      const subtreeIds = new Set<string>()
+      for (const cid of selectedCircleIds) {
+        subtreeIds.add(cid)
+        for (const descId of getDescendantCircleIds(graph.circles, cid)) {
+          subtreeIds.add(descId)
+        }
+      }
+      for (const c of graph.circles) {
+        if (subtreeIds.has(c.id)) circleOrigins[c.id] = { x: c.x, y: c.y }
+      }
+      for (const p of graph.people) {
+        if (subtreeIds.has(p.circleId) && !(p.id in selectedOrigins)) {
+          selectedOrigins[p.id] = { x: p.x, y: p.y }
+        }
       }
     }
 
@@ -2641,6 +2220,7 @@ function App() {
       originX: person.x,
       originY: person.y,
       selectedOrigins,
+      circleOrigins,
     }
   }
 
@@ -2705,7 +2285,6 @@ function App() {
     setSelectedItem({ type: 'person', id })
     // Grow the new person in so it feels placed, not blinked into existence.
     startBoardAnim('pop:' + id, 360)
-    notifyOnboarding('create')
   }
 
   function handleMergeSelected() {
@@ -2720,14 +2299,44 @@ function App() {
     const avgX = sumX / totalCount
     const avgY = sumY / totalCount
 
-    let parentCircleId = 'you'
-    if (selectedPeople.length > 0) {
-      parentCircleId = selectedPeople[0].circleId || 'you'
-    } else if (selectedCircles.length > 0) {
-      parentCircleId = selectedCircles[0].parentId || 'you'
+    // The new subset must be parented OUTSIDE everything it absorbs, otherwise the
+    // tree gets a cycle (subset -> child -> subset) and the layout recursion hangs
+    // the tab. Walk up from the natural parent, skipping any circle being merged
+    // (or a descendant of one). A null result means a top-level, independent
+    // subset — we never silently force it under "you".
+    const absorbed = new Set<string>(selectedCircleIds)
+    for (const cid of selectedCircleIds) {
+      for (const descId of getDescendantCircleIds(graph.circles, cid)) absorbed.add(descId)
     }
-    const parentCircle = circlesById.get(parentCircleId)
-    const parentName = parentCircle ? parentCircle.name : 'subset'
+    let parentCircleId: string | null = null
+    if (selectedPeople.length > 0) {
+      parentCircleId = selectedPeople[0].circleId || null
+    } else if (selectedCircles.length > 0) {
+      parentCircleId = selectedCircles[0].parentId ?? null
+    }
+    const walked = new Set<string>()
+    while (parentCircleId && absorbed.has(parentCircleId)) {
+      if (walked.has(parentCircleId)) {
+        parentCircleId = null
+        break
+      }
+      walked.add(parentCircleId)
+      parentCircleId = circlesById.get(parentCircleId)?.parentId ?? null
+    }
+
+    const parentCircle = parentCircleId ? circlesById.get(parentCircleId) : null
+    const newName = parentCircle ? `${parentCircle.name} subset` : 'Group'
+
+    // Pre-size the subset to contain everything it absorbs, so we don't rely on
+    // the heavy containment pass to grow it (and can skip that pass for big merges).
+    let radius = 82
+    for (const p of selectedPeople) {
+      radius = Math.max(radius, Math.hypot(p.x - avgX, p.y - avgY) + PERSON_CONTAINMENT_RADIUS)
+    }
+    for (const c of selectedCircles) {
+      radius = Math.max(radius, Math.hypot(c.x - avgX, c.y - avgY) + c.radius + CIRCLE_CONTAINMENT_PADDING)
+    }
+    radius = Math.ceil(radius)
 
     const newCircleId = `circle-${Date.now()}`
 
@@ -2735,11 +2344,11 @@ function App() {
     setGraph((current) => {
       const newCircle = {
         id: newCircleId,
-        name: `${parentName} subset`,
+        name: newName,
         icon: 'SUB',
         x: avgX,
         y: avgY,
-        radius: 82,
+        radius,
         minRadius: 82,
         parentId: parentCircleId,
         connectedTo: parentCircleId,
@@ -2749,31 +2358,18 @@ function App() {
         amplitude: 0,
       }
 
-      const nextCircles = current.circles.map((c) => {
-        if (selectedCircleIds.includes(c.id)) {
-          return {
-            ...c,
-            parentId: newCircleId,
-          }
-        }
-        return c
-      })
+      const nextCircles = current.circles.map((c) =>
+        selectedCircleIds.includes(c.id) ? { ...c, parentId: newCircleId } : c
+      )
 
-      const nextPeople = current.people.map((person) => {
-        if (selectedPeopleIds.includes(person.id)) {
-          return {
-            ...person,
-            circleId: newCircleId,
-          }
-        }
-        return person
-      })
+      const nextPeople = current.people.map((person) =>
+        selectedPeopleIds.includes(person.id) ? { ...person, circleId: newCircleId } : person
+      )
 
-      return ensureContainment({
-        ...current,
-        circles: [...nextCircles, newCircle],
-        people: nextPeople,
-      })
+      const merged = { ...current, circles: [...nextCircles, newCircle], people: nextPeople }
+      // The subset is already sized to hold its contents, so for very large merges
+      // skip the O(n^2) collision relax that would otherwise freeze the tab.
+      return totalCount > MERGE_LAYOUT_LIMIT ? merged : ensureContainment(merged)
     })
 
     selectItem({ type: 'circle', id: newCircleId })
@@ -2843,7 +2439,6 @@ function App() {
     // Grow the new person in so it feels placed, not blinked into existence.
     startBoardAnim('pop:' + id, 360)
     setCreateMenu(null)
-    notifyOnboarding('create')
   }
 
   // "Add circle" in the create menu auto-detects containment the same way the
@@ -2905,7 +2500,6 @@ function App() {
     })
     selectItem({ type: 'circle', id })
     setCreateMenu(null)
-    notifyOnboarding('create')
   }
 
   /* Commented out to hide from menu, keeping in code for future use
@@ -3124,9 +2718,23 @@ function App() {
           </strong>
           <div style={{ marginTop: '12px', display: 'grid', gap: '16px' }}>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 500, color: 'rgba(28, 37, 40, 0.64)', display: 'block', marginBottom: '8px' }}>
-                LinkedIn Data Import
-              </label>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 500, color: 'rgba(28, 37, 40, 0.64)' }}>
+                  LinkedIn Data Import
+                </label>
+                <button
+                  type="button"
+                  className="linkedin-guide-help"
+                  aria-label="How to sync your LinkedIn"
+                  title="How to sync your LinkedIn"
+                  onClick={() => {
+                    setShowSettings(false)
+                    setShowLinkedInGuide(true)
+                  }}
+                >
+                  ?
+                </button>
+              </div>
               <button
                 type="button"
                 className="m3-primary-button"
@@ -3202,7 +2810,67 @@ function App() {
         </div>
       )}
 
-
+      {showLinkedInGuide && (
+        <div ref={linkedInGuidePanelRef} className="linkedin-guide-panel">
+          <div className="linkedin-guide-panel__header">
+            <button
+              type="button"
+              className="linkedin-guide-panel__back"
+              aria-label="Back to settings"
+              onClick={() => {
+                setShowLinkedInGuide(false)
+                setShowSettings(true)
+              }}
+            >
+              <BackArrowIcon />
+            </button>
+            <strong className="linkedin-guide-panel__title">How to sync your LinkedIn</strong>
+          </div>
+          <div className="linkedin-guide-panel__steps">
+            {[
+              {
+                n: 1,
+                title: 'Open Settings & Privacy',
+                body: 'Open your LinkedIn profile menu (top-right "Me" icon) and click Settings & Privacy.',
+                img: '/linkedin-sync/settings-privacy.png',
+              },
+              {
+                n: 2,
+                title: 'Open Data privacy',
+                body: 'In Settings, select Data privacy from the left sidebar.',
+                img: '/linkedin-sync/data-privacy.png',
+              },
+              {
+                n: 3,
+                title: 'Open Download my data',
+                body: 'In the data section, press Download your data.',
+                img: '/linkedin-sync/download-data.png',
+              },
+              {
+                n: 4,
+                title: 'Request the larger archive',
+                body: 'Select the larger data archive, then press Request archive.',
+                img: '/linkedin-sync/request-archive.png',
+              },
+            ].map((step) => (
+              <div key={step.n} className="linkedin-guide-step">
+                <div className="linkedin-guide-step__copy">
+                  <span className="linkedin-guide-step__index">{step.n}</span>
+                  <div>
+                    <h3 className="linkedin-guide-step__title">{step.title}</h3>
+                    <p className="linkedin-guide-step__body">{step.body}</p>
+                  </div>
+                </div>
+                <img className="linkedin-guide-step__image" src={step.img} alt={step.title} />
+              </div>
+            ))}
+          </div>
+          <p className="linkedin-guide-panel__note">
+            Wait up to 24 hours. LinkedIn will email you when the archive is ready. After you
+            receive it, return here and press <strong>Import LinkedIn ZIP</strong>.
+          </p>
+        </div>
+      )}
 
       <div
         ref={surfaceRef}
@@ -3226,8 +2894,6 @@ function App() {
         onPointerLeave={() => {
           if (hoveredPersonId) setHoveredPersonId(null)
           if (hoveredConnId) setHoveredConnId(null)
-          if (hoveredCircleEdgeId) setHoveredCircleEdgeId(null)
-          if (surfaceRef.current) surfaceRef.current.style.cursor = ''
         }}
       >
         <canvas ref={peopleCanvasRef} className="board-canvas-layer" aria-label="Relationship board" />
@@ -4050,7 +3716,7 @@ function App() {
       {showSignInModal && auth.status === 'anonymous' && (
         <div
           style={{ ...authOverlayStyle, background: 'rgba(0, 0, 0, 0.4)' }}
-          onClick={() => closeSignInModal()}
+          onClick={() => setShowSignInModal(false)}
         >
           <div
             style={{ ...authCardStyle, alignItems: 'stretch', gap: '0', width: '320px', position: 'relative' }}
@@ -4059,7 +3725,7 @@ function App() {
             <button
               type="button"
               aria-label="Close"
-              onClick={() => closeSignInModal()}
+              onClick={() => setShowSignInModal(false)}
               style={{
                 position: 'absolute',
                 top: '12px',
@@ -4074,166 +3740,104 @@ function App() {
             >
               ×
             </button>
-            {pendingConfirmEmail ? (
-              <>
-                <div style={{ fontSize: '40px', lineHeight: 1, marginBottom: '8px', textAlign: 'center' }}>📬</div>
-                <h2 style={{ margin: '0 0 8px', fontSize: '18px', fontWeight: 600, color: 'var(--md-on-surface)', textAlign: 'center' }}>
-                  Confirm your email
-                </h2>
-                <p style={{ margin: '0 0 4px', fontSize: '13px', color: 'var(--md-on-surface-variant)', textAlign: 'center' }}>
-                  We sent a confirmation link to
-                </p>
-                <p style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 600, color: 'var(--md-on-surface)', textAlign: 'center', wordBreak: 'break-all' }}>
-                  {pendingConfirmEmail}
-                </p>
-                <p style={{ margin: '0 0 20px', fontSize: '13px', color: 'var(--md-on-surface-variant)', textAlign: 'center' }}>
-                  Click the link in that email to activate your account, then come back here to sign in. Check your spam folder if it doesn't arrive within a minute.
-                </p>
-                <button
-                  type="button"
-                  className="m3-primary-button"
-                  onClick={() => {
-                    setPendingConfirmEmail(null)
-                    setEmailAuthMode('signin')
-                    setResendState('idle')
-                  }}
-                >
-                  Back to sign in
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleResendConfirmation()}
-                  disabled={resendState !== 'idle'}
-                  style={{
-                    marginTop: '12px',
-                    background: 'none',
-                    border: 'none',
-                    padding: 0,
-                    cursor: resendState === 'idle' ? 'pointer' : 'default',
-                    fontSize: '13px',
-                    color: resendState === 'idle' ? 'var(--md-primary, #00696e)' : 'var(--md-on-surface-variant)',
-                    alignSelf: 'center',
-                  }}
-                >
-                  {resendState === 'sending'
-                    ? 'Sending…'
-                    : resendState === 'sent'
-                      ? 'Confirmation email resent ✓'
-                      : "Didn't get it? Resend email"}
-                </button>
-                {auth.error && (
-                  <p style={{ margin: '12px 0 0', color: 'var(--md-error, #b3261e)', fontSize: '13px', textAlign: 'center' }}>{auth.error}</p>
-                )}
-              </>
-            ) : (
-              <>
-                <h2 style={{ margin: '0 0 4px', fontSize: '18px', fontWeight: 600, color: 'var(--md-on-surface)' }}>
-                  {emailAuthMode === 'signup' ? 'Create account' : 'Sign in'}
-                </h2>
-                <p style={{ margin: '0 0 16px', fontSize: '13px', color: 'var(--md-on-surface-variant)' }}>
-                  {emailAuthMode === 'signup'
-                    ? 'Create an account to save your board across devices.'
-                    : 'Save your board across devices.'}
-                </p>
-                <button
-                  type="button"
-                  className="m3-primary-button"
-                  onClick={() => void auth.signInWithGoogle()}
-                >
-                  <GoogleIcon />
-                  Continue with Google
-                </button>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '16px 0' }}>
-                  <span style={{ flex: 1, height: '1px', background: 'var(--md-outline-variant)' }} />
-                  <span style={{ fontSize: '12px', color: 'var(--md-on-surface-variant)' }}>or</span>
-                  <span style={{ flex: 1, height: '1px', background: 'var(--md-outline-variant)' }} />
-                </div>
-                <form
-                  onSubmit={(event) => {
-                    event.preventDefault()
-                    void handleEmailAuthSubmit()
-                  }}
-                  style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
-                >
-                  <input
-                    type="email"
-                    autoComplete="email"
-                    placeholder="Email"
-                    value={emailInput}
-                    onChange={(event) => setEmailInput(event.target.value)}
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid var(--md-outline, rgba(28, 37, 40, 0.24))',
-                      fontSize: '14px',
-                      background: 'var(--md-surface, #fff)',
-                      color: 'var(--md-on-surface, #1c2528)',
-                    }}
-                  />
-                  <input
-                    type="password"
-                    autoComplete={emailAuthMode === 'signup' ? 'new-password' : 'current-password'}
-                    placeholder={emailAuthMode === 'signup' ? 'Password (at least 6 characters)' : 'Password'}
-                    value={passwordInput}
-                    onChange={(event) => setPasswordInput(event.target.value)}
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid var(--md-outline, rgba(28, 37, 40, 0.24))',
-                      fontSize: '14px',
-                      background: 'var(--md-surface, #fff)',
-                      color: 'var(--md-on-surface, #1c2528)',
-                    }}
-                  />
-                  <button
-                    type="submit"
-                    className="m3-primary-button"
-                    disabled={emailAuthBusy || !emailInput.trim() || !passwordInput}
-                  >
-                    {emailAuthBusy
-                      ? 'Please wait…'
-                      : emailAuthMode === 'signup'
-                        ? 'Create account'
-                        : 'Sign in with email'}
-                  </button>
-                </form>
-                {emailAuthMode === 'signup' && (
-                  <p style={{ margin: '10px 0 0', fontSize: '12px', color: 'var(--md-on-surface-variant)', textAlign: 'center' }}>
-                    We'll email you a link to confirm your address before your account is active.
-                  </p>
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmailAuthMode((mode) => (mode === 'signup' ? 'signin' : 'signup'))
-                    setEmailAuthNotice(null)
-                  }}
-                  style={{
-                    marginTop: '12px',
-                    background: 'none',
-                    border: 'none',
-                    padding: 0,
-                    cursor: 'pointer',
-                    fontSize: '13px',
-                    color: 'var(--md-primary, #00696e)',
-                    alignSelf: 'center',
-                  }}
-                >
-                  {emailAuthMode === 'signup'
-                    ? 'Already have an account? Sign in'
-                    : "Don't have an account? Sign up"}
-                </button>
-                {emailAuthNotice && (
-                  <p style={{ margin: '12px 0 0', color: 'var(--md-on-surface-variant)', fontSize: '13px', textAlign: 'center' }}>{emailAuthNotice}</p>
-                )}
-                {auth.error && (
-                  <p style={{ margin: '12px 0 0', color: 'var(--md-error, #b3261e)', fontSize: '13px', textAlign: 'center' }}>{auth.error}</p>
-                )}
-              </>
+            <h2 style={{ margin: '0 0 4px', fontSize: '18px', fontWeight: 600, color: 'var(--md-on-surface)' }}>
+              {emailAuthMode === 'signup' ? 'Create account' : 'Sign in'}
+            </h2>
+            <p style={{ margin: '0 0 16px', fontSize: '13px', color: 'var(--md-on-surface-variant)' }}>
+              Save your board across devices.
+            </p>
+            <button
+              type="button"
+              className="m3-primary-button"
+              onClick={() => void auth.signInWithGoogle()}
+            >
+              <GoogleIcon />
+              Continue with Google
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '16px 0' }}>
+              <span style={{ flex: 1, height: '1px', background: 'var(--md-outline-variant)' }} />
+              <span style={{ fontSize: '12px', color: 'var(--md-on-surface-variant)' }}>or</span>
+              <span style={{ flex: 1, height: '1px', background: 'var(--md-outline-variant)' }} />
+            </div>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault()
+                void handleEmailAuthSubmit()
+              }}
+              style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
+            >
+              <input
+                type="email"
+                autoComplete="email"
+                placeholder="Email"
+                value={emailInput}
+                onChange={(event) => setEmailInput(event.target.value)}
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--md-outline, rgba(28, 37, 40, 0.24))',
+                  fontSize: '14px',
+                  background: 'var(--md-surface, #fff)',
+                  color: 'var(--md-on-surface, #1c2528)',
+                }}
+              />
+              <input
+                type="password"
+                autoComplete={emailAuthMode === 'signup' ? 'new-password' : 'current-password'}
+                placeholder="Password"
+                value={passwordInput}
+                onChange={(event) => setPasswordInput(event.target.value)}
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--md-outline, rgba(28, 37, 40, 0.24))',
+                  fontSize: '14px',
+                  background: 'var(--md-surface, #fff)',
+                  color: 'var(--md-on-surface, #1c2528)',
+                }}
+              />
+              <button
+                type="submit"
+                className="m3-primary-button"
+                disabled={emailAuthBusy || !emailInput.trim() || !passwordInput}
+              >
+                {emailAuthBusy
+                  ? 'Please wait…'
+                  : emailAuthMode === 'signup'
+                    ? 'Create account'
+                    : 'Sign in with email'}
+              </button>
+            </form>
+            <button
+              type="button"
+              onClick={() => {
+                setEmailAuthMode((mode) => (mode === 'signup' ? 'signin' : 'signup'))
+                setEmailAuthNotice(null)
+              }}
+              style={{
+                marginTop: '12px',
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+                fontSize: '13px',
+                color: 'var(--md-primary, #00696e)',
+                alignSelf: 'center',
+              }}
+            >
+              {emailAuthMode === 'signup'
+                ? 'Already have an account? Sign in'
+                : "Don't have an account? Sign up"}
+            </button>
+            {emailAuthNotice && (
+              <p style={{ margin: '12px 0 0', color: 'var(--md-on-surface-variant)', fontSize: '13px', textAlign: 'center' }}>{emailAuthNotice}</p>
+            )}
+            {auth.error && (
+              <p style={{ margin: '12px 0 0', color: 'var(--md-error, #b3261e)', fontSize: '13px', textAlign: 'center' }}>{auth.error}</p>
             )}
           </div>
         </div>
@@ -4251,939 +3855,14 @@ function App() {
           </button>
         </div>
       )}
-
-      {graphLoaded && !demoMode && onboardingStep >= 0 && (
-        <OnboardingCoach
-          step={onboardingStep}
-          celebrating={onboardingCelebrating}
-          onNext={onboardingNext}
-          onBack={onboardingBack}
-          onSkip={finishOnboarding}
-          onOpenSearch={() => {
-            setShowSettings(false)
-            setSearchOpen(true)
-            window.requestAnimationFrame(() => searchInputRef.current?.focus())
-          }}
-        />
-      )}
     </main>
   )
 }
 
 
 
-// ---- Canvas board renderer ---------------------------------------------------
-// The relationship board is canvas-first: React owns chrome/inspector/menu UI,
-// while this renderer owns every hot-path board pixel and hit target.
-
-type WorldRect = { left: number; right: number; top: number; bottom: number }
-
-type BoardIndex = {
-  circles: CircleNode[]
-  people: PersonNode[]
-  connections: Connection[]
-  circlesById: Map<string, CircleNode>
-  peopleById: Map<string, PersonNode>
-  peopleByCell: Map<string, PersonNode[]>
-  circlesByCell: Map<string, CircleNode[]>
-  connectionsByEndpoint: Map<string, Connection[]>
-  // Reverse adjacency: a parent circle -> the circles that hang off it
-  // (circle.connectedTo) and the people attached to it (person.circleId). Lets
-  // edge rendering find edges whose *other* endpoint is off-screen, so a line
-  // stays drawn as long as either endpoint is visible.
-  circleChildren: Map<string, CircleNode[]>
-  peopleByCircle: Map<string, PersonNode[]>
-}
-
-const BOARD_GRID_SIZE = 360
-const personSpriteCache = new Map<string, HTMLCanvasElement>()
-const imageCache = new Map<string, HTMLImageElement>()
-const SPRITE_TIERS = [64, 128, 256]
-
-function pickSpriteTier(screenPx: number): number {
-  for (const tier of SPRITE_TIERS) {
-    if (tier >= screenPx) return tier
-  }
-  return SPRITE_TIERS[SPRITE_TIERS.length - 1]
-}
-
-function cellRange(min: number, max: number) {
-  return {
-    from: Math.floor(min / BOARD_GRID_SIZE),
-    to: Math.floor(max / BOARD_GRID_SIZE),
-  }
-}
-
-function cellKey(x: number, y: number) {
-  return `${x},${y}`
-}
-
-function pushCell<T>(map: Map<string, T[]>, x: number, y: number, item: T) {
-  const key = cellKey(x, y)
-  const existing = map.get(key)
-  if (existing) existing.push(item)
-  else map.set(key, [item])
-}
-
-function createBoardIndex(circles: CircleNode[], people: PersonNode[], connections: Connection[]): BoardIndex {
-  const peopleByCell = new Map<string, PersonNode[]>()
-  const circlesByCell = new Map<string, CircleNode[]>()
-  const connectionsByEndpoint = new Map<string, Connection[]>()
-  const circleChildren = new Map<string, CircleNode[]>()
-  const peopleByCircle = new Map<string, PersonNode[]>()
-
-  for (const person of people) {
-    const x = Math.floor(person.x / BOARD_GRID_SIZE)
-    const y = Math.floor(person.y / BOARD_GRID_SIZE)
-    pushCell(peopleByCell, x, y, person)
-    const peers = peopleByCircle.get(person.circleId)
-    if (peers) peers.push(person)
-    else peopleByCircle.set(person.circleId, [person])
-  }
-
-  for (const circle of circles) {
-    const xs = cellRange(circle.x - circle.radius, circle.x + circle.radius)
-    const ys = cellRange(circle.y - circle.radius, circle.y + circle.radius)
-    for (let x = xs.from; x <= xs.to; x += 1) {
-      for (let y = ys.from; y <= ys.to; y += 1) {
-        pushCell(circlesByCell, x, y, circle)
-      }
-    }
-    if (circle.connectedTo) {
-      const siblings = circleChildren.get(circle.connectedTo)
-      if (siblings) siblings.push(circle)
-      else circleChildren.set(circle.connectedTo, [circle])
-    }
-  }
-
-  for (const connection of connections) {
-    const a = connectionsByEndpoint.get(connection.fromId)
-    if (a) a.push(connection)
-    else connectionsByEndpoint.set(connection.fromId, [connection])
-    const b = connectionsByEndpoint.get(connection.toId)
-    if (b) b.push(connection)
-    else connectionsByEndpoint.set(connection.toId, [connection])
-  }
-
-  return {
-    circles,
-    people,
-    connections,
-    circlesById: new Map(circles.map((circle) => [circle.id, circle])),
-    peopleById: new Map(people.map((person) => [person.id, person])),
-    peopleByCell,
-    circlesByCell,
-    connectionsByEndpoint,
-    circleChildren,
-    peopleByCircle,
-  }
-}
-
-function queryGrid<T extends { id: string }>(map: Map<string, T[]>, rect: WorldRect) {
-  const found = new Map<string, T>()
-  const xs = cellRange(rect.left, rect.right)
-  const ys = cellRange(rect.top, rect.bottom)
-  for (let x = xs.from; x <= xs.to; x += 1) {
-    for (let y = ys.from; y <= ys.to; y += 1) {
-      const bucket = map.get(cellKey(x, y))
-      if (!bucket) continue
-      for (const item of bucket) found.set(item.id, item)
-    }
-  }
-  return [...found.values()]
-}
-
-function queryPeople(index: BoardIndex, rect: WorldRect) {
-  return queryGrid(index.peopleByCell, rect).filter(
-    (person) => person.x >= rect.left && person.x <= rect.right && person.y >= rect.top && person.y <= rect.bottom,
-  )
-}
-
-function queryCircles(index: BoardIndex, rect: WorldRect) {
-  return queryGrid(index.circlesByCell, rect).filter(
-    (circle) =>
-      circle.x + circle.radius >= rect.left &&
-      circle.x - circle.radius <= rect.right &&
-      circle.y + circle.radius >= rect.top &&
-      circle.y - circle.radius <= rect.bottom,
-  )
-}
-
-function cameraWorldRect(surface: HTMLElement, camera: Camera, padPx = 120): WorldRect {
-  const width = Math.max(1, surface.clientWidth)
-  const height = Math.max(1, surface.clientHeight)
-  const pad = padPx / camera.scale
-  return {
-    left: -camera.x / camera.scale - pad,
-    right: (width - camera.x) / camera.scale + pad,
-    top: -camera.y / camera.scale - pad,
-    bottom: (height - camera.y) / camera.scale + pad,
-  }
-}
-
-// Set by the board so freshly-decoded images can trigger a repaint (otherwise an
-// avatar only appears after the next interaction-driven redraw).
-let requestBoardRepaint: (() => void) | null = null
-
-// Undo history kept at module scope (not useRef) so the mutating helpers that
-// read/write it aren't analyzed as accessing React refs during render. Single
-// mount in this app, so a plain stack is enough; one snapshot per user action.
-const MAX_UNDO_STEPS = 100
-const undoHistory: GraphState[] = []
-
-function getCanvasImage(src: string): HTMLImageElement | null {
-  const cached = imageCache.get(src)
-  if (cached) return cached.complete && cached.naturalWidth > 0 ? cached : null
-  const image = new Image()
-  image.onload = () => {
-    // Cached person sprites were baked without the image; drop them so they redraw.
-    personSpriteCache.clear()
-    requestBoardRepaint?.()
-  }
-  image.src = src
-  imageCache.set(src, image)
-  return image.complete && image.naturalWidth > 0 ? image : null
-}
-
-// Draw `image` filling the dest box while preserving aspect ratio (CSS object-fit:
-// cover) — centred crop. Avoids the squashed look of stretching to a square.
-function drawImageCover(
-  ctx: CanvasRenderingContext2D,
-  image: HTMLImageElement,
-  dx: number,
-  dy: number,
-  dWidth: number,
-  dHeight: number,
-) {
-  const iw = image.naturalWidth || image.width
-  const ih = image.naturalHeight || image.height
-  if (!iw || !ih) return
-  const scale = Math.max(dWidth / iw, dHeight / ih)
-  const sw = dWidth / scale
-  const sh = dHeight / scale
-  const sx = (iw - sw) / 2
-  const sy = (ih - sh) / 2
-  ctx.drawImage(image, sx, sy, sw, sh, dx, dy, dWidth, dHeight)
-}
-
-function getPersonSprite(person: PersonNode, fillColor: string, size: number, stroke: string, strokeWidth: number): HTMLCanvasElement {
-  // Always derive the letters from the current name so they stay in sync with any rename.
-  const avatar = makeInitials(person.name)
-  const imageKey = person.imageUrl ? `img:${person.imageUrl.length}` : avatar
-  const key = `${fillColor}|${imageKey}|${person.shapeType ?? 'wavy'}|${person.sides ?? 8}|${person.amplitude ?? 1}|${stroke}|${strokeWidth}|${size}`
-  const cached = personSpriteCache.get(key)
-  if (cached) return cached
-
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return canvas
-
-  const scale = size / 40
-  const path = new Path2D(getNodePath(20 * scale, 20 * scale, 18 * scale, person.shapeType ?? 'wavy', person.sides ?? 8, (person.amplitude ?? 1) * scale))
-  ctx.save()
-  ctx.fillStyle = fillColor
-  ctx.strokeStyle = stroke
-  ctx.lineWidth = strokeWidth * scale
-  ctx.stroke(path)
-  ctx.fill(path)
-
-  if (person.imageUrl) {
-    const image = getCanvasImage(person.imageUrl)
-    if (image) {
-      ctx.clip(path)
-      drawImageCover(ctx, image, 0, 0, size, size)
-    }
-  } else {
-    ctx.fillStyle = '#ffffff'
-    ctx.font = `500 ${(11 * scale).toFixed(1)}px Inter, system-ui, sans-serif`
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(avatar, size / 2, size / 2 + scale)
-  }
-  ctx.restore()
-
-  personSpriteCache.set(key, canvas)
-  return canvas
-}
-
-function drawFavoritePersonOutline(ctx: CanvasRenderingContext2D, person: PersonNode, color: string, scale: number) {
-  const radius = PERSON_VISUAL_RADIUS + 7 / scale
-  const dotCount = 18
-  const haloRadius = Math.max(2.5 / scale, 1.6)
-  ctx.save()
-  for (let i = 0; i < dotCount; i += 1) {
-    const angle = (Math.PI * 2 * i) / dotCount - Math.PI / 2
-    const x = person.x + Math.cos(angle) * radius
-    const y = person.y + Math.sin(angle) * radius
-    ctx.beginPath()
-    ctx.arc(x, y, haloRadius, 0, Math.PI * 2)
-    ctx.fillStyle = color
-    ctx.fill()
-  }
-  ctx.restore()
-}
-
-function resizeCanvas(canvas: HTMLCanvasElement, surface: HTMLElement) {
-  const dpr = Math.min(window.devicePixelRatio || 1, 1.75)
-  const width = Math.max(1, surface.clientWidth)
-  const height = Math.max(1, surface.clientHeight)
-  const nextWidth = Math.round(width * dpr)
-  const nextHeight = Math.round(height * dpr)
-  if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
-    canvas.width = nextWidth
-    canvas.height = nextHeight
-    canvas.style.width = `${width}px`
-    canvas.style.height = `${height}px`
-  }
-  return { dpr, width, height }
-}
-
-// ---- Board animation frame -------------------------------------------------
-// The board normally repaints only when state changes. While a pulse/pop is in
-// flight a transient rAF loop drives extra repaints and hands each draw an
-// AnimFrame describing the current progress of every effect. An empty frame
-// means fully settled — that's the default for ordinary static repaints, so the
-// gesture/drag paths can keep calling drawBoardLayer without passing anything.
-type BoardAnim = { start: number; duration: number }
-
-type AnimFrame = {
-  // nodeId -> current draw-scale multiplier (1 = at rest). Drives the press
-  // bounce on selection and the grow-in pop for freshly created nodes.
-  scales: Map<string, number>
-}
-
-const EMPTY_ANIM_FRAME: AnimFrame = { scales: new Map() }
-
-const prefersReducedMotion = () =>
-  typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-
-// Slight overshoot so a freshly created node grows past full size then settles.
-const easeOutBack = (t: number) => {
-  const c1 = 1.70158
-  const c3 = c1 + 1
-  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2)
-}
-
-function readAnimFrame(anims: Map<string, BoardAnim>, now: number): AnimFrame {
-  if (anims.size === 0) return EMPTY_ANIM_FRAME
-  const scales = new Map<string, number>()
-  for (const [key, a] of anims) {
-    // start < 0 means "not yet anchored to the rAF clock" → treat as just begun.
-    const t = a.start < 0 ? 0 : Math.min(1, Math.max(0, (now - a.start) / a.duration))
-    if (key.startsWith('pop:')) {
-      // Grow-in for freshly created nodes: 0 -> slight overshoot -> 1.
-      scales.set(key.slice(4), Math.max(0, easeOutBack(t)))
-    }
-  }
-  return { scales }
-}
-
-function drawBoardLayer(
-  canvas: HTMLCanvasElement,
-  surface: HTMLElement,
-  camera: Camera,
-  index: BoardIndex,
-  selectedItem: SelectedItem,
-  hoveredPersonId: string | null,
-  hoveredConnId: string | null,
-  connector: DragConnector | null,
-  showCircleLabels: boolean,
-  showPersonLabels: boolean,
-  circleShapeMode: CircleShapeMode,
-  circleFillMode: CircleFillMode,
-  selectedPeopleIds: string[] = [],
-  marquee: MarqueeState | null = null,
-  selectedCircleIds: string[] = [],
-  hoveredCircleEdgeId: string | null = null,
-  anim: AnimFrame = EMPTY_ANIM_FRAME,
-) {
-  const { dpr, width, height } = resizeCanvas(canvas, surface)
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return
-
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-  ctx.clearRect(0, 0, width, height)
-
-  const worldRect = cameraWorldRect(surface, camera)
-  const visibleCircles = queryCircles(index, worldRect)
-  const visiblePeople = queryPeople(index, worldRect)
-  const visibleCircleIds = new Set(visibleCircles.map((circle) => circle.id))
-  const visiblePeopleIds = new Set(visiblePeople.map((person) => person.id))
-
-  ctx.save()
-  ctx.translate(camera.x, camera.y)
-  ctx.scale(camera.scale, camera.scale)
-
-  drawCircleFills(ctx, visibleCircles, selectedItem, camera.scale, circleShapeMode, circleFillMode, selectedCircleIds, hoveredCircleEdgeId)
-  drawCircleEdges(ctx, visibleCircles, index, camera.scale)
-  drawPersonEdges(ctx, visiblePeople, visibleCircles, index, camera.scale)
-  drawCustomConnections(ctx, visiblePeopleIds, visibleCircleIds, index, selectedItem, hoveredConnId, camera.scale)
-  drawCircleDetails(ctx, visibleCircles, camera.scale, circleFillMode, showCircleLabels, anim.scales)
-  drawPeople(ctx, visiblePeople, index, selectedItem, hoveredPersonId, camera.scale, dpr, showPersonLabels, selectedPeopleIds, anim.scales)
-  if (connector) drawConnector(ctx, connector, camera.scale)
-  drawSelectionHandles(ctx, selectedItem, index, camera.scale)
-
-  ctx.restore()
-
-  if (marquee) {
-    ctx.save()
-    ctx.strokeStyle = '#00629d'
-    ctx.lineWidth = 1.5
-    ctx.fillStyle = 'rgba(0, 98, 157, 0.08)'
-    const rect = canvas.getBoundingClientRect()
-    const x = Math.min(marquee.startX, marquee.currentX) - rect.left
-    const y = Math.min(marquee.startY, marquee.currentY) - rect.top
-    const w = Math.abs(marquee.startX - marquee.currentX)
-    const h = Math.abs(marquee.startY - marquee.currentY)
-    ctx.strokeRect(x, y, w, h)
-    ctx.fillRect(x, y, w, h)
-    ctx.restore()
-  }
-}
-
-function drawCircleEdges(ctx: CanvasRenderingContext2D, circles: CircleNode[], index: BoardIndex, scale: number) {
-  ctx.beginPath()
-  ctx.strokeStyle = 'rgba(71, 85, 105, 0.24)'
-  ctx.lineWidth = Math.max(1.6 / scale, 0.8)
-  // An edge is drawn if EITHER endpoint is on-screen: walk each visible circle
-  // both as the child (its connectedTo source may be off-screen) and as the
-  // parent (its children may be off-screen). The `drawn` set dedupes edges
-  // whose two endpoints are both visible. Edge identity == the child circle id.
-  const drawn = new Set<string>()
-  const addEdge = (child: CircleNode) => {
-    if (drawn.has(child.id)) return
-    const source = child.connectedTo ? index.circlesById.get(child.connectedTo) : null
-    if (!source) return
-    drawn.add(child.id)
-    drawCurvePath(ctx, source, child)
-  }
-  for (const circle of circles) {
-    addEdge(circle)
-    const children = index.circleChildren.get(circle.id)
-    if (children) for (const child of children) addEdge(child)
-  }
-  ctx.stroke()
-}
-
-function drawPersonEdges(ctx: CanvasRenderingContext2D, people: PersonNode[], circles: CircleNode[], index: BoardIndex, scale: number) {
-  ctx.beginPath()
-  ctx.strokeStyle = 'rgba(71, 85, 105, 0.16)'
-  ctx.lineWidth = Math.max(1.15 / scale, 0.7)
-  // Draw a person<->circle edge if either endpoint is visible: walk visible
-  // people (circle may be off-screen) and visible circles (people may be
-  // off-screen). Edge identity == the person id, so `drawn` dedupes overlaps.
-  const drawn = new Set<string>()
-  const addEdge = (person: PersonNode) => {
-    if (drawn.has(person.id)) return
-    const circle = index.circlesById.get(person.circleId)
-    if (!circle) return
-    drawn.add(person.id)
-    ctx.moveTo(circle.x, circle.y)
-    ctx.lineTo(person.x, person.y)
-  }
-  for (const person of people) addEdge(person)
-  for (const circle of circles) {
-    const peers = index.peopleByCircle.get(circle.id)
-    if (peers) for (const person of peers) addEdge(person)
-  }
-  ctx.stroke()
-}
-
-function drawCustomConnections(
-  ctx: CanvasRenderingContext2D,
-  visiblePeopleIds: Set<string>,
-  visibleCircleIds: Set<string>,
-  index: BoardIndex,
-  selectedItem: SelectedItem,
-  hoveredConnId: string | null,
-  scale: number,
-) {
-  const candidates = new Map<string, Connection>()
-  for (const id of visiblePeopleIds) {
-    const bucket = index.connectionsByEndpoint.get(id)
-    if (bucket) for (const conn of bucket) candidates.set(conn.id, conn)
-  }
-  for (const id of visibleCircleIds) {
-    const bucket = index.connectionsByEndpoint.get(id)
-    if (bucket) for (const conn of bucket) candidates.set(conn.id, conn)
-  }
-
-  for (const conn of candidates.values()) {
-    const source = index.peopleById.get(conn.fromId) || index.circlesById.get(conn.fromId)
-    const target = index.peopleById.get(conn.toId) || index.circlesById.get(conn.toId)
-    if (!source || !target) continue
-    const isSelected = selectedItem?.type === 'connection' && selectedItem.id === conn.id
-    const isHovered = hoveredConnId === conn.id
-    ctx.beginPath()
-    ctx.strokeStyle = isSelected ? '#00629d' : isHovered ? '#64748b' : conn.id.startsWith('stress-link-') ? 'rgba(148, 163, 184, 0.30)' : 'rgba(148, 163, 184, 0.45)'
-    ctx.lineWidth = isSelected ? Math.max(4 / scale, 2) : isHovered ? Math.max(3 / scale, 1.5) : Math.max(1.6 / scale, 0.55)
-    drawCurvePath(ctx, source, target)
-    ctx.stroke()
-  }
-}
-
-function drawCircleFills(
-  ctx: CanvasRenderingContext2D,
-  circles: CircleNode[],
-  selectedItem: SelectedItem,
-  scale: number,
-  circleShapeMode: CircleShapeMode,
-  circleFillMode: CircleFillMode,
-  selectedCircleIds: string[] = [],
-  hoveredCircleEdgeId: string | null = null,
-) {
-  for (const circle of circles) {
-    const tone = getCircleColors(circle)
-    const isTransparent = (circle.fillMode ?? circleFillMode) === 'transparent'
-    const path = new Path2D(getCircleRenderPath(circle, circleShapeMode))
-    ctx.save()
-    if (!isTransparent) {
-      ctx.shadowColor = 'rgba(0,0,0,0.06)'
-      ctx.shadowBlur = 16 / scale
-      ctx.shadowOffsetY = 8 / scale
-    }
-    ctx.globalAlpha = isTransparent ? 0.34 : 1
-    ctx.fillStyle = tone.fill
-    ctx.fill(path)
-    ctx.restore()
-
-    const isSelected = (selectedItem?.type === 'circle' && selectedItem.id === circle.id) || selectedCircleIds.includes(circle.id)
-    const isEdgeHovered = hoveredCircleEdgeId === circle.id
-
-    if (isEdgeHovered) {
-      ctx.save()
-      ctx.strokeStyle = isSelected ? tone.border : '#64748b'
-      ctx.globalAlpha = isSelected ? 0.24 : 0.18
-      ctx.lineWidth = isSelected ? Math.max(9 / scale, 6) : Math.max(8 / scale, 5)
-      if (isTransparent) ctx.setLineDash([8 / scale, 7 / scale])
-      ctx.stroke(path)
-      ctx.restore()
-    }
-
-    ctx.save()
-    ctx.strokeStyle = isSelected ? tone.border : isEdgeHovered ? '#64748b' : tone.border
-    ctx.lineWidth =
-      isSelected
-        ? (isEdgeHovered ? Math.max(4.5 / scale, 3) : Math.max(3.5 / scale, 2))
-        : isEdgeHovered
-          ? Math.max(2.8 / scale, 1.8)
-          : Math.max((isTransparent ? 2.2 : 1.4) / scale, isTransparent ? 1.4 : 0.9)
-    if (isTransparent) ctx.setLineDash([8 / scale, 7 / scale])
-    ctx.stroke(path)
-    ctx.restore()
-  }
-}
-
-function drawCircleDetails(
-  ctx: CanvasRenderingContext2D,
-  circles: CircleNode[],
-  scale: number,
-  circleFillMode: CircleFillMode,
-  showCircleLabels: boolean,
-  scales: Map<string, number> = EMPTY_ANIM_FRAME.scales,
-) {
-  for (const circle of circles) {
-    if (showCircleLabels) drawCircleLabel(ctx, circle, scale)
-    drawCircleCenter(ctx, circle, scale, circleFillMode, scales.get(circle.id) ?? 1)
-  }
-}
-
-function getCircleRenderPath(circle: CircleNode, circleShapeMode: CircleShapeMode) {
-  // In "circles" mode (the default) every circle renders as a clean circle,
-  // regardless of any wavy/polygon shape baked into its data — otherwise the
-  // demo seed shows flower shapes on a fresh device. Only "figures" mode honors
-  // the authored shape.
-  if (circleShapeMode === 'circles') {
-    return getNodePath(circle.x, circle.y, circle.radius, 'circle', circle.sides ?? 25, 0)
-  }
-  const amplitude = circle.amplitude ?? 0
-  const sides = circle.sides ?? 25
-  const shapeType: ShapeType = amplitude > 0 ? 'wavy' : sides >= 25 ? 'circle' : 'polygon'
-  return getNodePath(
-    circle.x,
-    circle.y,
-    circle.radius,
-    shapeType,
-    sides,
-    amplitude,
-  )
-}
-
-function drawCircleCenter(ctx: CanvasRenderingContext2D, circle: CircleNode, scale: number, circleFillMode: CircleFillMode, nodeScale = 1) {
-  const tone = getCircleColors(circle)
-  const radius = CIRCLE_CENTER_RADIUS * nodeScale
-  ctx.save()
-  ctx.beginPath()
-  ctx.arc(circle.x, circle.y, radius, 0, Math.PI * 2)
-  ctx.fillStyle = tone.centerBg
-  ctx.globalAlpha = (circle.fillMode ?? circleFillMode) === 'transparent' ? 0.92 : 1
-  ctx.fill()
-  ctx.lineWidth = Math.max(3 / scale, 2)
-  ctx.strokeStyle = '#ffffff'
-  ctx.stroke()
-
-  const image = circle.imageUrl ? getCanvasImage(circle.imageUrl) : null
-  if (image) {
-    ctx.globalAlpha = 1
-    ctx.clip()
-    drawImageCover(ctx, image, circle.x - radius, circle.y - radius, radius * 2, radius * 2)
-  } else {
-    ctx.fillStyle = '#ffffff'
-    // Keep a deliberately-set emoji icon (e.g. flags), otherwise derive letters from the current name.
-    const hasEmojiIcon = Array.from(circle.icon).some((char) => (char.codePointAt(0) ?? 0) > 127)
-    const icon = hasEmojiIcon ? circle.icon : makeInitials(circle.name)
-    ctx.font = hasEmojiIcon
-      ? '18px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif'
-      : '500 10px Inter, system-ui, sans-serif'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(icon, circle.x, circle.y + (hasEmojiIcon ? 1.5 : 0.5))
-  }
-  ctx.restore()
-}
-
-function drawCircleLabel(ctx: CanvasRenderingContext2D, circle: CircleNode, scale: number) {
-  if (scale < 0.42) return
-  const fontSize = 13 / scale
-  ctx.save()
-  ctx.font = `500 ${fontSize}px Inter, system-ui, sans-serif`
-  const maxWidth = 170 / scale
-  const text = ellipsize(ctx, circle.name, maxWidth)
-  const metrics = ctx.measureText(text)
-  const width = Math.min(maxWidth, metrics.width) + 18 / scale
-  const height = 24 / scale
-  const x = circle.x - width / 2
-  const y = circle.y + circle.radius - 41 / scale
-  roundedRect(ctx, x, y, width, height, 7 / scale)
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.86)'
-  ctx.fill()
-  ctx.strokeStyle = '#d7dcde'
-  ctx.lineWidth = 1 / scale
-  ctx.stroke()
-  ctx.fillStyle = '#1c2528'
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText(text, circle.x, y + height / 2 + 0.5 / scale)
-  ctx.restore()
-}
-
-function drawPeople(
-  ctx: CanvasRenderingContext2D,
-  people: PersonNode[],
-  index: BoardIndex,
-  selectedItem: SelectedItem,
-  hoveredPersonId: string | null,
-  scale: number,
-  dpr: number,
-  showPersonLabels: boolean,
-  selectedPeopleIds: string[] = [],
-  scales: Map<string, number> = EMPTY_ANIM_FRAME.scales,
-) {
-  const spriteRes = pickSpriteTier(PERSON_VISUAL_RADIUS * 2 * scale * dpr)
-  ctx.imageSmoothingEnabled = true
-  ctx.imageSmoothingQuality = 'high'
-  for (const person of people) {
-    const circle = index.circlesById.get(person.circleId)
-    const circleColor = circle ? getCircleColors(circle).centerBg : MATERIAL_TONES.blue.centerBg
-    const isSelected = (selectedItem?.type === 'person' && selectedItem.id === person.id) || selectedPeopleIds.includes(person.id)
-    const isHovered = hoveredPersonId === person.id
-    const stroke = isSelected ? '#00629d' : isHovered ? '#64748b' : circleColor
-    const strokeWidth = isSelected || isHovered ? 2.5 : 1.5
-    // Press bounce on selection + grow-in pop for new people (1 = at rest).
-    const drawRadius = PERSON_VISUAL_RADIUS * (scales.get(person.id) ?? 1)
-    ctx.drawImage(
-      getPersonSprite(person, circleColor, spriteRes, stroke, strokeWidth),
-      person.x - drawRadius,
-      person.y - drawRadius,
-      drawRadius * 2,
-      drawRadius * 2,
-    )
-    if (person.isFavorite) drawFavoritePersonOutline(ctx, person, '#ffd600', scale)
-    if (showPersonLabels && (scale >= 0.62 || isSelected || isHovered)) drawPersonLabel(ctx, person, scale)
-  }
-}
-
-function drawPersonLabel(ctx: CanvasRenderingContext2D, person: PersonNode, scale: number) {
-  const fontSize = 11 / scale
-  ctx.save()
-  ctx.font = `500 ${fontSize}px Inter, system-ui, sans-serif`
-  const maxWidth = 90 / scale
-  const text = ellipsize(ctx, person.name, maxWidth)
-  const metrics = ctx.measureText(text)
-  const width = Math.min(maxWidth, metrics.width) + 14 / scale
-  const height = 20 / scale
-  const x = person.x - width / 2
-  const y = person.y + 26 / scale
-  roundedRect(ctx, x, y, width, height, 6 / scale)
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.88)'
-  ctx.fill()
-  ctx.strokeStyle = '#d7dcde'
-  ctx.lineWidth = 1 / scale
-  ctx.stroke()
-  ctx.fillStyle = '#1c2528'
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText(text, person.x, y + height / 2 + 0.5 / scale)
-  ctx.restore()
-}
-
-function drawSelectionHandles(ctx: CanvasRenderingContext2D, selectedItem: SelectedItem, index: BoardIndex, scale: number) {
-  const selected = selectedItem?.type === 'person'
-    ? index.peopleById.get(selectedItem.id)
-    : selectedItem?.type === 'circle'
-      ? index.circlesById.get(selectedItem.id)
-      : null
-  if (!selected) return
-
-  let color = MATERIAL_TONES.blue.centerBg
-  if (selectedItem?.type === 'circle') {
-    color = getCircleColors(selected as CircleNode).centerBg
-  } else if (selectedItem?.type === 'person') {
-    const person = selected as PersonNode
-    const circle = person.circleId ? index.circlesById.get(person.circleId) : null
-    color = circle ? getCircleColors(circle).centerBg : MATERIAL_TONES.blue.centerBg
-  }
-
-  const screenRadius = 3.5 + 2.5 * Math.sqrt(scale)
-  const worldRadius = screenRadius / scale
-
-  for (const handle of connectorHandlesFor(selected)) {
-    ctx.beginPath()
-    ctx.arc(handle.x, handle.y, worldRadius, 0, Math.PI * 2)
-    ctx.fillStyle = color
-    ctx.fill()
-    ctx.lineWidth = 2 / scale
-    ctx.strokeStyle = '#ffffff'
-    ctx.stroke()
-  }
-}
-
-function drawConnector(ctx: CanvasRenderingContext2D, connector: DragConnector, scale: number) {
-  ctx.save()
-  ctx.beginPath()
-  ctx.strokeStyle = '#00629d'
-  ctx.lineWidth = Math.max(2 / scale, 1)
-  ctx.setLineDash([7 / scale, 7 / scale])
-  drawCurvePath(ctx, { x: connector.startX, y: connector.startY }, { x: connector.endX, y: connector.endY })
-  ctx.stroke()
-  ctx.restore()
-}
-
-function connectorHandlesFor(node: CircleNode | PersonNode) {
-  const isCircle = 'radius' in node
-  const radius = isCircle ? CIRCLE_CENTER_RADIUS : PERSON_VISUAL_RADIUS
-  return [
-    { x: node.x, y: node.y - radius - 14 },
-    { x: node.x, y: node.y + radius + 14 },
-    { x: node.x - radius - 14, y: node.y },
-    { x: node.x + radius + 14, y: node.y },
-  ]
-}
-
-function hitTestBoard(index: BoardIndex, camera: Camera, selectedItem: SelectedItem, screen: { x: number; y: number }): BoardHit {
-  const point = {
-    x: (screen.x - camera.x) / camera.scale,
-    y: (screen.y - camera.y) / camera.scale,
-  }
-  const scale = camera.scale
-  const handleHit = HANDLE_HIT_RADIUS / scale
-
-  if (selectedItem?.type === 'person') {
-    const person = index.peopleById.get(selectedItem.id)
-    if (person) {
-      for (const handle of connectorHandlesFor(person)) {
-        if (Math.hypot(point.x - handle.x, point.y - handle.y) <= handleHit) {
-          return { type: 'connector-handle', sourceId: person.id, sourceType: 'person', x: person.x, y: person.y }
-        }
-      }
-    }
-  } else if (selectedItem?.type === 'circle') {
-    const circle = index.circlesById.get(selectedItem.id)
-    if (circle) {
-      for (const handle of connectorHandlesFor(circle)) {
-        if (Math.hypot(point.x - handle.x, point.y - handle.y) <= handleHit) {
-          return { type: 'connector-handle', sourceId: circle.id, sourceType: 'circle', x: circle.x, y: circle.y }
-        }
-      }
-    }
-  }
-
-  const hitRect = {
-    left: point.x - 28 / scale,
-    right: point.x + 28 / scale,
-    top: point.y - 28 / scale,
-    bottom: point.y + 28 / scale,
-  }
-  const people = queryPeople(index, hitRect)
-  let bestPerson: PersonNode | null = null
-  let bestDist = (PERSON_VISUAL_RADIUS + 8 / scale) ** 2
-  for (const person of people) {
-    const d = (person.x - point.x) ** 2 + (person.y - point.y) ** 2
-    if (d < bestDist) {
-      bestDist = d
-      bestPerson = person
-    }
-  }
-  if (bestPerson) return { type: 'person', person: bestPerson }
-
-  const connection = findConnectionNearPoint(index, point, 10 / scale)
-  if (connection) return { type: 'connection', connection }
-
-  const circles = queryCircles(index, hitRect).reverse()
-  for (const circle of circles) {
-    const d = Math.hypot(point.x - circle.x, point.y - circle.y)
-    if (d <= CIRCLE_CENTER_RADIUS + 6 / scale) return { type: 'circle-center', circle }
-    if (Math.abs(d - circle.radius) <= EDGE_RESIZE_HIT_SIZE / scale) return { type: 'circle-edge', circle }
-    if (d <= circle.radius) return { type: 'circle-body', circle }
-  }
-
-  return null
-}
-
-function findConnectionNearPoint(index: BoardIndex, point: { x: number; y: number }, tolerance: number) {
-  let best: Connection | null = null
-  let bestDist = tolerance
-  for (const conn of index.connections) {
-    if (conn.id.startsWith('stress-link-')) continue
-    const source = index.peopleById.get(conn.fromId) || index.circlesById.get(conn.fromId)
-    const target = index.peopleById.get(conn.toId) || index.circlesById.get(conn.toId)
-    if (!source || !target) continue
-    const dist = distanceToSegment(point, source, target)
-    if (dist < bestDist) {
-      bestDist = dist
-      best = conn
-    }
-  }
-  return best
-}
-
-function distanceToSegment(point: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }) {
-  const vx = b.x - a.x
-  const vy = b.y - a.y
-  const wx = point.x - a.x
-  const wy = point.y - a.y
-  const len = vx * vx + vy * vy
-  const t = len === 0 ? 0 : clamp((wx * vx + wy * vy) / len, 0, 1)
-  const x = a.x + vx * t
-  const y = a.y + vy * t
-  return Math.hypot(point.x - x, point.y - y)
-}
-
-function drawCurvePath(ctx: CanvasRenderingContext2D, from: { x: number; y: number }, to: { x: number; y: number }) {
-  const mx = (from.x + to.x) / 2
-  const my = (from.y + to.y) / 2 - 40
-  ctx.moveTo(from.x, from.y)
-  ctx.quadraticCurveTo(mx, my, to.x, to.y)
-}
-
-function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
-  ctx.beginPath()
-  ctx.moveTo(x + radius, y)
-  ctx.lineTo(x + width - radius, y)
-  ctx.quadraticCurveTo(x + width, y, x + width, y + radius)
-  ctx.lineTo(x + width, y + height - radius)
-  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height)
-  ctx.lineTo(x + radius, y + height)
-  ctx.quadraticCurveTo(x, y + height, x, y + height - radius)
-  ctx.lineTo(x, y + radius)
-  ctx.quadraticCurveTo(x, y, x + radius, y)
-}
-
-function ellipsize(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) {
-  if (ctx.measureText(text).width <= maxWidth) return text
-  let lo = 0
-  let hi = text.length
-  while (lo < hi) {
-    const mid = Math.ceil((lo + hi) / 2)
-    if (ctx.measureText(`${text.slice(0, mid)}...`).width <= maxWidth) lo = mid
-    else hi = mid - 1
-  }
-  return `${text.slice(0, lo)}...`
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value))
-}
-
-function createDemoGraphState(): GraphState {
-  const circles: CircleNode[] = [
-    makeCircle('you', 'You', 'YOU', 0, 0, 104, null, null, 'blue'),
-    makeCircle('eu', 'EU', '🇪🇺', 0, -600, 286, null, 'you', 'blue'),
-    makeCircle('denmark', 'Denmark', '🇩🇰', -30, 650, 276, null, 'you', 'red'),
-    makeCircle('russia', 'Russia', '🇷🇺', 720, 20, 286, null, 'you', 'blue'),
-    makeCircle('other', 'Other', '🌐', -720, 20, 268, null, 'you', 'red'),
-
-    makeCircle('sweden', 'Sweden', '🇸🇪', -92, -720, 62, 'eu', 'eu', 'blue'),
-    makeCircle('france', 'France', '🇫🇷', 112, -655, 64, 'eu', 'eu', 'blue'),
-    makeCircle('germany', 'Germany', '🇩🇪', 40, -462, 68, 'eu', 'eu', 'amber'),
-    makeCircle('netherlands', 'Netherlands', '🇳🇱', -160, -510, 62, 'eu', 'eu', 'red'),
-
-    makeCircle('pandora', 'Pandora', 'P', -26, 800, 78, 'denmark', 'denmark', 'red'),
-    makeCircle('lego', 'LEGO', 'LG', -190, 565, 62, 'denmark', 'denmark', 'amber'),
-    makeCircle('maersk', 'Maersk', 'MA', 150, 560, 62, 'denmark', 'denmark', 'blue'),
-    makeCircle('copenhagen', 'Copenhagen', 'CPH', -230, 770, 66, 'denmark', 'denmark', 'green'),
-
-    makeCircle('yandex', 'Yandex', 'YA', 840, -130, 68, 'russia', 'russia', 'amber'),
-    makeCircle('avito', 'Avito', 'AV', 858, 150, 68, 'russia', 'russia', 'green'),
-    makeCircle('media-ru', 'Media', 'TV', 600, 170, 62, 'russia', 'russia', 'violet'),
-    makeCircle('moscow', 'Moscow', '🏙️', 600, -170, 66, 'russia', 'russia', 'blue'),
-
-    makeCircle('usa-canada', 'US / Canada', '🌎', -890, -40, 72, 'other', 'other', 'blue'),
-    makeCircle('israel', 'Israel', '🇮🇱', -650, -150, 62, 'other', 'other', 'blue'),
-    makeCircle('japan', 'Japan', '🇯🇵', -595, 150, 62, 'other', 'other', 'red'),
-    makeCircle('singapore', 'Singapore', '🇸🇬', -780, 200, 62, 'other', 'other', 'green'),
-  ]
-
-  const people: PersonNode[] = [
-    makePerson('me-a', 'Artem', 'Founder', -46, -28, 'you', 'AR', true),
-    makePerson('me-b', 'Mira', 'Research', 38, -10, 'you', 'MI'),
-    makePerson('me-c', 'Noah', 'Advisor', 8, 60, 'you', 'NO'),
-
-    makePerson('se-1', 'Elin', 'IKEA growth', -126, -740, 'sweden', 'EL'),
-    makePerson('se-2', 'Jonas', 'Fintech', -58, -698, 'sweden', 'JO'),
-    makePerson('fr-1', 'Camille', 'Policy', 78, -682, 'france', 'CA'),
-    makePerson('fr-2', 'Louis', 'Climate tech', 146, -636, 'france', 'LO'),
-    makePerson('de-1', 'Hanna', 'Operations', 6, -486, 'germany', 'HA'),
-    makePerson('de-2', 'Felix', 'Investor', 74, -440, 'germany', 'FE'),
-    makePerson('nl-1', 'Sanne', 'Marketplace', -192, -532, 'netherlands', 'SA'),
-    makePerson('nl-2', 'Milan', 'Logistics', -126, -488, 'netherlands', 'MI'),
-
-    makePerson('pan-1', 'Freja', 'Product', -70, 784, 'pandora', 'FR', true),
-    makePerson('pan-2', 'Sofie', 'Brand', -26, 752, 'pandora', 'SO'),
-    makePerson('pan-3', 'Mads', 'Retail', 22, 792, 'pandora', 'MA'),
-    makePerson('pan-4', 'Nikolaj', 'Data', -4, 846, 'pandora', 'NI'),
-    makePerson('lego-1', 'Liva', 'Partnerships', -220, 545, 'lego', 'LI'),
-    makePerson('lego-2', 'Oscar', 'Design lead', -162, 590, 'lego', 'OC'),
-    makePerson('maersk-1', 'Aksel', 'Shipping', 120, 540, 'maersk', 'AK'),
-    makePerson('maersk-2', 'Ida', 'Strategy', 178, 584, 'maersk', 'ID'),
-    makePerson('cph-1', 'Nora', 'Community', -260, 748, 'copenhagen', 'NO'),
-    makePerson('cph-2', 'Viktor', 'AI builder', -202, 792, 'copenhagen', 'VI'),
-
-    makePerson('yan-1', 'Dmitry', 'Search', 812, -154, 'yandex', 'DM'),
-    makePerson('yan-2', 'Irina', 'Maps', 874, -110, 'yandex', 'IR'),
-    makePerson('avi-1', 'Oleg', 'Marketplace', 830, 128, 'avito', 'OL', true),
-    makePerson('avi-2', 'Anya', 'Trust', 892, 174, 'avito', 'AN'),
-    makePerson('med-1', 'Vera', 'Journalist', 572, 148, 'media-ru', 'VE'),
-    makePerson('med-2', 'Pavel', 'Analyst', 632, 192, 'media-ru', 'PA'),
-    makePerson('msk-1', 'Katya', 'VC', 570, -194, 'moscow', 'KA'),
-    makePerson('msk-2', 'Sergey', 'Founder', 632, -150, 'moscow', 'SE'),
-
-    makePerson('na-1', 'Grace', 'Canada', -924, -62, 'usa-canada', 'GR'),
-    makePerson('na-2', 'Ethan', 'US sales', -858, -18, 'usa-canada', 'ET'),
-    makePerson('il-1', 'Yael', 'Cybersecurity', -680, -174, 'israel', 'YA'),
-    makePerson('il-2', 'Ari', 'Investor', -622, -130, 'israel', 'AR'),
-    makePerson('jp-1', 'Ren', 'Robotics', -622, 126, 'japan', 'RE'),
-    makePerson('jp-2', 'Yuki', 'Enterprise', -566, 172, 'japan', 'YU'),
-    makePerson('sg-1', 'Mei', 'APAC ops', -808, 178, 'singapore', 'ME'),
-    makePerson('sg-2', 'Kai', 'Fintech', -750, 222, 'singapore', 'KA'),
-  ]
-
-  const connections: Connection[] = []
-
-  return { circles, people, connections }
-}
+// The canvas board engine (spatial index, hit-testing, rendering) lives in
+// lib/board/render.ts; App owns chrome/inspector/menu UI and calls into it.
 
 function parseCSV(text: string): string[][] {
   const lines: string[][] = []
@@ -5425,14 +4104,6 @@ function makeUniqueId(baseId: string, existingIds: Set<string>) {
   return `${baseId}-${index}`
 }
 
-function makeInitials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  const initials = parts.length >= 2
-    ? `${parts[0].slice(0, 1)}${parts[parts.length - 1].slice(0, 1)}`
-    : parts[0]?.slice(0, 2) ?? ''
-  return initials.toUpperCase() || 'IN'
-}
-
 function findPersonByLinkedInProfileUrl(people: PersonNode[], profileUrl: string) {
   return people.find((person) =>
     (person.links ?? []).some((link) => link.service === 'linkedin' && normalizeLinkedInProfileUrl(link.url) === profileUrl)
@@ -5587,89 +4258,6 @@ function addLinkedInProfileToGraph(
   }
 }
 
-function makeCircle(
-  id: string,
-  name: string,
-  icon: string,
-  x: number,
-  y: number,
-  radius: number,
-  parentId: string | null,
-  connectedTo: string | null,
-  tone: CircleTone,
-): CircleNode {
-  return {
-    id,
-    name,
-    icon,
-    x,
-    y,
-    radius,
-    minRadius: radius,
-    parentId,
-    connectedTo,
-    tone,
-    shapeType: 'wavy',
-    sides: Math.max(8, Math.round(radius / 10)),
-    amplitude: Math.max(4, Math.round(radius * 0.055)),
-  }
-}
-
-function makePerson(
-  id: string,
-  name: string,
-  role: string,
-  x: number,
-  y: number,
-  circleId: string,
-  avatar: string,
-  isFavorite = false,
-): PersonNode {
-  return {
-    id,
-    name,
-    role,
-    x,
-    y,
-    circleId,
-    avatar,
-    shapeType: 'circle',
-    sides: 10,
-    amplitude: 0,
-    isFavorite,
-  }
-}
-
-function createInitialGraph() {
-  return ensureContainment({
-    circles: DEFAULT_STATE.circles.map((circle) => ({
-      ...circle,
-      shapeType: circle.shapeType ?? 'wavy',
-      sides: circle.sides ?? Math.max(8, Math.round(circle.radius / 10)),
-      amplitude: circle.amplitude ?? Math.max(4, circle.radius * 0.06),
-    })),
-    people: DEFAULT_STATE.people.map((person) => {
-      const sides = Math.floor(Math.random() * 5) + 8
-      return {
-        ...person,
-        shapeType: person.shapeType ?? 'polygon',
-        sides: person.sides ?? sides,
-        amplitude: person.amplitude ?? 2,
-      }
-    }),
-    connections: DEFAULT_STATE.connections.map((connection) => ({ ...connection })),
-  })
-}
-
-// A blank canvas for a brand-new account: just the central "you" circle.
-function createFreshGraph(): GraphState {
-  return ensureContainment({
-    circles: [makeCircle('you', 'You', 'YOU', 0, 0, 104, null, null, 'blue')],
-    people: [],
-    connections: [],
-  })
-}
-
 // Put the signed-in user's Google avatar + name on the "you" circle. Only fills
 // the avatar when none is set, so a custom upload from a previous session wins.
 function stampYouIdentity(graph: GraphState, user: User): GraphState {
@@ -5699,425 +4287,6 @@ function stampYouIdentity(graph: GraphState, user: User): GraphState {
         : circle,
     ),
   }
-}
-
-function findFreeSpaceInCircle(
-  circles: CircleNode[],
-  people: PersonNode[],
-  circleId: string
-): { x: number; y: number } {
-  const circle = circles.find((c) => c.id === circleId)
-  if (!circle) return { x: 0, y: 0 }
-
-  const candidateRadii = [circle.radius * 0.3, circle.radius * 0.6]
-  const numAngles = 12
-  let bestPoint = { x: circle.x, y: circle.y }
-  let maxMinDist = -1
-
-  const elements = [
-    ...people.map((p) => ({ x: p.x, y: p.y, r: 24 })),
-    ...circles.filter((c) => c.id !== circleId).map((c) => ({ x: c.x, y: c.y, r: c.radius })),
-  ]
-
-  for (const r of candidateRadii) {
-    for (let i = 0; i < numAngles; i++) {
-      const angle = (i * 2 * Math.PI) / numAngles
-      const px = circle.x + r * Math.cos(angle)
-      const py = circle.y + r * Math.sin(angle)
-
-      let minDist = Infinity
-      for (const el of elements) {
-        const dist = Math.hypot(px - el.x, py - el.y) - el.r
-        if (dist < minDist) {
-          minDist = dist
-        }
-      }
-
-      if (minDist > maxMinDist) {
-        maxMinDist = minDist
-        bestPoint = { x: px, y: py }
-      }
-    }
-  }
-
-  if (maxMinDist === Infinity || maxMinDist < 5) {
-    const randomAngle = Math.random() * 2 * Math.PI
-    const randomRadius = circle.radius * 0.4
-    return {
-      x: circle.x + randomRadius * Math.cos(randomAngle),
-      y: circle.y + randomRadius * Math.sin(randomAngle),
-    }
-  }
-
-  return bestPoint
-}
-
-function resizeCircleFromPoint(state: GraphState, circleId: string, point: { x: number; y: number }): GraphState {
-  const circle = state.circles.find((candidate) => candidate.id === circleId)
-  if (!circle) return state
-
-  const requestedRadius = Math.max(MIN_CIRCLE_RADIUS, Math.hypot(point.x - circle.x, point.y - circle.y))
-  const radiusRatio = requestedRadius < circle.radius ? requestedRadius / circle.radius : 1
-  const resizedState = radiusRatio < 1 ? pullCircleContentsTowardCenter(state, circleId, circle, radiusRatio) : state
-
-  return ensureContainment({
-    ...resizedState,
-    circles: resizedState.circles.map((candidate) =>
-      candidate.id === circleId ? { ...candidate, minRadius: requestedRadius, radius: requestedRadius } : candidate,
-    ),
-  }, { activeCircleId: circleId })
-}
-
-type LayoutContext = {
-  activeCircleId?: string
-  activePersonId?: string
-}
-
-function ensureContainment(state: GraphState, context: LayoutContext = {}): GraphState {
-  return fitContainment(resolveCollisions(fitContainment(resolveCollisions(state, context)), context))
-}
-
-function fitContainment(state: GraphState): GraphState {
-  let circles = state.circles
-
-  for (let pass = 0; pass < circles.length + 2; pass += 1) {
-    const circlesById = new Map(circles.map((circle) => [circle.id, circle]))
-    let changed = false
-
-    const nextCircles = circles.map((circle) => {
-      const requiredRadius = getRequiredCircleRadius(circle, circles, circlesById, state.people)
-      if (requiredRadius === circle.radius) return circle
-
-      changed = true
-      return { ...circle, radius: requiredRadius }
-    })
-
-    circles = nextCircles
-    if (!changed) break
-  }
-
-  return { ...state, circles }
-}
-
-function pullCircleContentsTowardCenter(
-  state: GraphState,
-  circleId: string,
-  circle: CircleNode,
-  radiusRatio: number,
-): GraphState {
-  const requestedRadius = circle.radius * radiusRatio
-
-  const circles = state.circles.map((c) => ({ ...c }))
-  const people = state.people.map((p) => ({ ...p }))
-
-  const circlesById = new Map(circles.map((c) => [c.id, c]))
-  const descendantCircleIds = getDescendantCircleIds(circles, circleId)
-
-  // Temporarily update root circle's radius for nested containment check
-  const rootCircle = circlesById.get(circleId)
-  if (rootCircle) {
-    rootCircle.radius = requestedRadius
-  }
-
-  // Process descendant circles in tree order starting from circleId
-  const queue = [circleId]
-  while (queue.length > 0) {
-    const parentId = queue.shift()!
-    const parent = circlesById.get(parentId)!
-
-    const children = circles.filter((c) => c.parentId === parentId)
-    for (const child of children) {
-      const dx = child.x - parent.x
-      const dy = child.y - parent.y
-      const d = Math.hypot(dx, dy)
-
-      const maxAllowed = parent.radius - child.radius - CIRCLE_CONTAINMENT_PADDING
-      if (d > maxAllowed) {
-        if (maxAllowed < 0) {
-          const newRadius = Math.max(MIN_CIRCLE_RADIUS, parent.radius - CIRCLE_CONTAINMENT_PADDING)
-          child.radius = newRadius
-          child.minRadius = Math.max(MIN_CIRCLE_RADIUS, child.minRadius * radiusRatio)
-          child.x = parent.x
-          child.y = parent.y
-        } else {
-          if (d > 0.0001) {
-            child.x = parent.x + (dx / d) * maxAllowed
-            child.y = parent.y + (dy / d) * maxAllowed
-          } else {
-            child.x = parent.x
-            child.y = parent.y
-          }
-        }
-      }
-      queue.push(child.id)
-    }
-  }
-
-  circles.forEach((c) => {
-    circlesById.set(c.id, c)
-  })
-
-  const containedCircleIds = new Set(descendantCircleIds)
-  containedCircleIds.add(circleId)
-
-  const updatedPeople = people.map((person) => {
-    if (containedCircleIds.has(person.circleId)) {
-      const parent = circlesById.get(person.circleId)
-      if (!parent) return person
-
-      const dx = person.x - parent.x
-      const dy = person.y - parent.y
-      const d = Math.hypot(dx, dy)
-
-      const maxAllowed = parent.radius - PERSON_CONTAINMENT_RADIUS
-      if (d > maxAllowed) {
-        const targetD = Math.max(0, maxAllowed)
-        if (d > 0.0001) {
-          return {
-            ...person,
-            x: parent.x + (dx / d) * targetD,
-            y: parent.y + (dy / d) * targetD,
-          }
-        } else {
-          return {
-            ...person,
-            x: parent.x,
-            y: parent.y,
-          }
-        }
-      }
-    }
-    return person
-  })
-
-  return {
-    ...state,
-    circles: state.circles.map((c) => {
-      if (c.id === circleId) return c
-      const updated = circlesById.get(c.id)
-      return updated ? updated : c
-    }),
-    people: updatedPeople,
-  }
-}
-
-function resolveCollisions(state: GraphState, context: LayoutContext): GraphState {
-  let circles = state.circles.map((circle) => ({ ...circle }))
-  let people = state.people.map((person) => ({ ...person }))
-
-  for (let pass = 0; pass < COLLISION_PASSES; pass += 1) {
-    let changed = false
-    const circleIndexById = new Map(circles.map((circle, index) => [circle.id, index]))
-    const personIndexById = new Map(people.map((person, index) => [person.id, index]))
-
-    for (let i = 0; i < circles.length; i += 1) {
-      for (let j = i + 1; j < circles.length; j += 1) {
-        const a = circles[i]
-        const b = circles[j]
-        if (a.parentId !== b.parentId) continue
-
-        const separation = getSeparation(a, b, a.radius + b.radius + CIRCLE_COLLISION_GAP)
-        if (!separation) continue
-
-        const activeSide = context.activeCircleId === a.id ? 'a' : context.activeCircleId === b.id ? 'b' : null
-        let moveA = activeSide === 'a' ? 0 : activeSide === 'b' ? 1 : 0.5
-        let moveB = activeSide === 'b' ? 0 : activeSide === 'a' ? 1 : 0.5
-
-        if (a.id === 'you') {
-          moveA = 0
-          moveB = 1
-        } else if (b.id === 'you') {
-          moveA = 1
-          moveB = 0
-        }
-
-        if (moveA > 0) {
-          const translated = translateCircleSubtree(circles, people, a.id, -separation.x * moveA, -separation.y * moveA)
-          circles = translated.circles
-          people = translated.people
-        }
-        if (moveB > 0) {
-          const translated = translateCircleSubtree(circles, people, b.id, separation.x * moveB, separation.y * moveB)
-          circles = translated.circles
-          people = translated.people
-        }
-        changed = true
-      }
-    }
-
-    for (let i = 0; i < people.length; i += 1) {
-      for (let j = i + 1; j < people.length; j += 1) {
-        const a = people[i]
-        const b = people[j]
-        if (a.circleId !== b.circleId) continue
-
-        const separation = getSeparation(a, b, PERSON_COLLISION_RADIUS * 2 + PERSON_COLLISION_GAP)
-        if (!separation) continue
-
-        const activeSide = context.activePersonId === a.id ? 'a' : context.activePersonId === b.id ? 'b' : null
-        const moveA = activeSide === 'a' ? 0 : activeSide === 'b' ? 1 : 0.5
-        const moveB = activeSide === 'b' ? 0 : activeSide === 'a' ? 1 : 0.5
-
-        people[i] = { ...a, x: a.x - separation.x * moveA, y: a.y - separation.y * moveA }
-        people[j] = { ...b, x: b.x + separation.x * moveB, y: b.y + separation.y * moveB }
-        changed = true
-      }
-    }
-
-    for (const childCircle of circles) {
-      if (!childCircle.parentId) continue
-      for (const person of people) {
-        if (person.circleId !== childCircle.parentId) continue
-
-        const separation = getSeparation(
-          childCircle,
-          person,
-          childCircle.radius + PERSON_COLLISION_RADIUS + PERSON_CIRCLE_COLLISION_GAP,
-        )
-        if (!separation) continue
-
-        const personIndex = personIndexById.get(person.id)
-        if (personIndex == null) continue
-        people[personIndex] = {
-          ...people[personIndex],
-          x: people[personIndex].x + separation.x,
-          y: people[personIndex].y + separation.y,
-        }
-        changed = true
-      }
-    }
-
-    for (const person of people) {
-      const parentIndex = circleIndexById.get(person.circleId)
-      const personIndex = personIndexById.get(person.id)
-      if (parentIndex == null || personIndex == null) continue
-
-      const parentCircle = circles[parentIndex]
-      const separation = getSeparation(
-        parentCircle,
-        people[personIndex],
-        CIRCLE_CENTER_COLLISION_RADIUS + PERSON_COLLISION_RADIUS + PERSON_COLLISION_GAP,
-      )
-      if (!separation) continue
-
-      people[personIndex] = {
-        ...people[personIndex],
-        x: people[personIndex].x + separation.x,
-        y: people[personIndex].y + separation.y,
-      }
-      changed = true
-    }
-
-    for (const person of people) {
-      const parentIndex = circleIndexById.get(person.circleId)
-      const personIndex = personIndexById.get(person.id)
-      if (parentIndex == null || personIndex == null) continue
-      people[personIndex] = clampPersonInsideCircle(people[personIndex], circles[parentIndex])
-    }
-
-    if (!changed) break
-  }
-
-  return { ...state, circles, people }
-}
-
-function getSeparation(
-  a: { x: number; y: number },
-  b: { x: number; y: number },
-  minDistance: number,
-) {
-  let dx = b.x - a.x
-  let dy = b.y - a.y
-  let distance = Math.hypot(dx, dy)
-
-  if (distance >= minDistance) return null
-  if (distance < 0.0001) {
-    dx = 1
-    dy = 0
-    distance = 1
-  }
-
-  const overlap = minDistance - distance
-  return {
-    x: (dx / distance) * overlap,
-    y: (dy / distance) * overlap,
-  }
-}
-
-function translateCircleSubtree(
-  circles: CircleNode[],
-  people: PersonNode[],
-  circleId: string,
-  deltaX: number,
-  deltaY: number,
-) {
-  const subtreeIds = getDescendantCircleIds(circles, circleId)
-  subtreeIds.add(circleId)
-
-  return {
-    circles: circles.map((circle) =>
-      subtreeIds.has(circle.id) ? { ...circle, x: circle.x + deltaX, y: circle.y + deltaY } : circle,
-    ),
-    people: people.map((person) =>
-      subtreeIds.has(person.circleId) ? { ...person, x: person.x + deltaX, y: person.y + deltaY } : person,
-    ),
-  }
-}
-
-function clampPersonInsideCircle(person: PersonNode, circle: CircleNode) {
-  const maxDistance = Math.max(0, circle.radius - PERSON_COLLISION_RADIUS)
-  const dx = person.x - circle.x
-  const dy = person.y - circle.y
-  const distance = Math.hypot(dx, dy)
-  if (distance <= maxDistance || distance < 0.0001) return person
-
-  return {
-    ...person,
-    x: circle.x + (dx / distance) * maxDistance,
-    y: circle.y + (dy / distance) * maxDistance,
-  }
-}
-
-function getRequiredCircleRadius(
-  circle: CircleNode,
-  circles: CircleNode[],
-  circlesById: Map<string, CircleNode>,
-  people: PersonNode[],
-) {
-  let requiredRadius = Math.max(MIN_CIRCLE_RADIUS, circle.minRadius)
-
-  for (const person of people) {
-    if (person.circleId !== circle.id) continue
-    requiredRadius = Math.max(requiredRadius, Math.hypot(person.x - circle.x, person.y - circle.y) + PERSON_CONTAINMENT_RADIUS)
-  }
-
-  for (const childCircle of circles) {
-    if (childCircle.parentId !== circle.id) continue
-
-    const latestChild = circlesById.get(childCircle.id) ?? childCircle
-    requiredRadius = Math.max(
-      requiredRadius,
-      Math.hypot(latestChild.x - circle.x, latestChild.y - circle.y) + latestChild.radius + CIRCLE_CONTAINMENT_PADDING,
-    )
-  }
-
-  return Math.ceil(requiredRadius)
-}
-
-function getDescendantCircleIds(circles: CircleNode[], circleId: string) {
-  const descendants = new Set<string>()
-  const pending = [circleId]
-
-  while (pending.length > 0) {
-    const parentId = pending.pop()
-    for (const circle of circles) {
-      if (circle.parentId !== parentId || descendants.has(circle.id)) continue
-      descendants.add(circle.id)
-      pending.push(circle.id)
-    }
-  }
-
-  return descendants
 }
 
 function menuPosition(menu: CreateMenu) {
@@ -6229,6 +4398,27 @@ function UploadIcon() {
   )
 }
 
+function BackArrowIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      style={{
+        width: '18px',
+        height: '18px',
+        fill: 'none',
+        stroke: 'currentColor',
+        strokeWidth: 2,
+        strokeLinecap: 'round',
+        strokeLinejoin: 'round',
+      }}
+    >
+      <line x1="19" y1="12" x2="5" y2="12" />
+      <polyline points="12 19 5 12 12 5" />
+    </svg>
+  )
+}
+
 function PaletteIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -6292,21 +4482,4 @@ function GoogleIcon() {
   return <img className="google-icon" src={googleIcon} alt="" aria-hidden="true" />
 }
 
-function getResizeCursor(point: { x: number; y: number }, circle: { x: number; y: number }): string {
-  const dx = point.x - circle.x
-  const dy = point.y - circle.y
-  let deg = (Math.atan2(dy, dx) * 180) / Math.PI
-  if (deg < 0) deg += 360
-
-  if (deg >= 337.5 || deg < 22.5) return 'ew-resize'
-  if (deg >= 22.5 && deg < 67.5) return 'nwse-resize'
-  if (deg >= 67.5 && deg < 112.5) return 'ns-resize'
-  if (deg >= 112.5 && deg < 157.5) return 'nesw-resize'
-  if (deg >= 157.5 && deg < 202.5) return 'ew-resize'
-  if (deg >= 202.5 && deg < 247.5) return 'nwse-resize'
-  if (deg >= 247.5 && deg < 292.5) return 'ns-resize'
-  return 'nesw-resize'
-}
-
 export default App
-

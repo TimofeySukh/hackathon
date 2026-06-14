@@ -66,35 +66,69 @@ The React entry point. It mounts the app into the root DOM node.
 
 ### `src/App.tsx`
 
-Contains the board experience:
+The React shell and interaction host for the board. It is large but now delegates
+the heavy canvas work to `src/lib/board/` (see below). App.tsx owns:
 
-- local seed graph state for circles and people
-- a central `You` circle
-- external connected circles and nested subset circles
-- branch creation from a circle context menu or Shift-dragging a circle center
-- a creation menu for people, nested subset circles, and external connected circles
-- people as endpoint nodes that cannot create outgoing branches
-- selected-circle and selected-person inspector state
-- local renaming of selected objects
-- demo-person insertion into the selected circle
-- person dragging
-- circle-center dragging for every circle, including `You`
-- subtree movement for contained people and child circles
-- circle resizing by dragging the circle edge
-- automatic containment fit, including shrink-back, when people or child circles cross a parent boundary
-- pan and zoom camera state
-- curved Canvas 2D links between circle centers, circles, and people
+- chrome and panels: toolbar, brand, board search, settings panel, LinkedIn sync
+  guide, create menu, and the selected-item inspector (name, tags, notes,
+  connections)
+- graph state and persistence wiring: starts from a blank `createFreshGraph`
+  (the old demo seed is gone), then loads the signed-in user's graph from
+  Supabase or the anonymous board from `localStorage`, with debounced autosave
+- all pointer interaction: pan/zoom (wheel + pinch), node/zone dragging,
+  marquee (right-click) selection, group dragging of mixed selections, circle
+  resizing, connector drag, and the merge-into-subset action
+- camera state and the cursor model (hand while panning/dragging, pointer over
+  nodes, arrow at rest)
+- the imperative paint loop that drives `drawBoardLayer` per animation frame
+- LinkedIn ZIP / single-profile import flows and undo history
+
+> Note: App.tsx is still the biggest file. When adding board-engine logic
+> (rendering, hit-testing, layout math, colors, geometry), put it in the
+> matching `src/lib/board/` module, not here.
+
+### `src/lib/board/`
+
+Pure, framework-free board engine extracted from App.tsx. No React, no DOM
+ownership — these take plain data and return data (or draw to a passed canvas
+context). This is where the bulk of the canvas logic now lives.
+
+- `types.ts` — shared board domain + interaction types (`CircleNode`,
+  `PersonNode`, `GraphState`, `Camera`, `BoardIndex`, `BoardHit`, etc.).
+- `constants.ts` — camera limits, hit-test sizes, collision/layout tuning, the
+  Material tone palette, color presets, link-service options.
+- `colors.ts` — tone resolution and hex/rgb/hsv conversion + mixing.
+- `geometry.ts` — node-shape path building, canvas path helpers, `clamp`,
+  segment distance, collision separation.
+- `layout.ts` — containment fitting and collision relaxation
+  (`ensureContainment`), circle resize, `makeCircle`, `createFreshGraph`,
+  descendant/subtree helpers.
+- `render.ts` — the canvas engine: spatial index (`createBoardIndex`, queries),
+  pointer hit-testing (`hitTestBoard`), and the full Canvas 2D draw layer
+  (`drawBoardLayer` and all `draw*` helpers, sprites, image cache).
 
 ### `src/lib/`
 
-Shared low-level helpers.
+Shared low-level helpers and the Supabase data layer.
 
 - `supabase.ts` creates the browser Supabase client from Vite environment variables.
 - `useAuth.ts` owns session loading, Google OAuth sign-in, and sign-out.
 - `useBoardGraph.ts` owns board graph loading, mutation state, and debounced AI note refresh scheduling per person.
 - `graphStorage.ts` owns Supabase CRUD calls for persisted graph data, `person_ai_notes`, and AI Edge Function invocation.
+- `graphPersistence.ts` owns the load/save of the whole graph blob (`loadGraph`/`saveGraph` for signed-in users, `loadLocalGraph`/`saveLocalGraph` for anonymous browser sessions).
+- `linkedinEnrichment.ts` calls the Bright Data enrichment Edge Function for single-profile LinkedIn imports.
+- `tagPalette.ts` holds the shared tag color palette.
+- `stressTest.ts` is the dev-only performance harness that generates large synthetic graphs.
 - `graphTypes.ts` defines shared profile, board, person, note, AI note, tag, and connection interfaces, including the structured AI summary shape.
 - `userWorkspace.ts` upserts profile data and ensures one personal board plus root person for the signed-in user.
+
+### `src/styles/`
+
+`src/index.css` is now just an ordered list of `@import`s; the actual rules live
+in logical partials under `src/styles/` (`base`, `theme`, `chrome`, `board`,
+`inspector`, `inspector-fields`, `panels`, `widgets`). The import order in
+`index.css` is the cascade order — keep it; later files override earlier ones at
+equal specificity.
 
 ### `mcp/server.mjs`
 
@@ -124,18 +158,10 @@ Supabase browser configuration reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBL
 
 ### `src/index.css`
 
-Contains the complete visual system for:
-
-- the light grid board surface
-- dashed relationship circle boundaries
-- circle center nodes and branch handles
-- compact person tiles
-- curved graph edge styling and draft connection styling
-- top toolbar controls
-- in-page help panel
-- creation menu
-- selected-item inspector
-- responsive layout behavior
+Entry stylesheet — now just an ordered list of `@import`s pulling in the
+partials under `src/styles/` (see the `src/styles/` section above). The visual
+system (board surface, chrome, inspector, panels, widgets) lives in those
+partials; the import order is the cascade order.
 
 ## Current Technical Shape
 

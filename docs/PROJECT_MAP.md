@@ -2,29 +2,26 @@
 
 ## Current State
 
-This repository contains a React, Vite, and TypeScript social graph board app. (Note: The Flutter circle graph prototype has been removed on this branch to isolate the React wavy prototype).
+This repository is a React, Vite, and TypeScript social graph board app. (A Flutter
+circle-graph prototype existed earlier and was removed.)
 
-The current visible prototype is intentionally narrow:
+It is a live product, not a local-only prototype:
 
-- a full-window relationship circle graph
-- a central `You` circle
-- seeded connected region circles and nested country/company circles
-- people placed inside parent region, country, or company circles
-- curved Canvas 2D links from circle centers to people and circles
-- settings controls for demo mode, circle labels, person names, global circle shape, and global circle fill style
-- a settings-driven demo mode that hides chrome, stress controls, help text, and the inspector while keeping the canvas and settings button; canvas selection, deletion, connector handles, link creation, and drag-to-empty create menus remain available
-- branch creation from a circle context menu, or a double-tap that creates a person at the tapped point (free-floating unless tapped inside a circle)
-- a create menu offering two actions: add person or add circle (containment auto-detected)
-- direct dragging for people and circle centers
-- circle subtree movement for contained people and nested circles
-- circle resizing by dragging the circle edge
-- automatic containment fit, including shrink-back, through nested parent chains
-- in-page help text for the prototype controls
-- selection and renaming through a right-side inspector
-- local pan and zoom
-- Canvas 2D board rendering with canvas hit testing; React owns chrome, menus, and inspector UI
-- browser-session-only state
-- no visible Supabase, auth, LinkedIn import, persistence, notes, AI search, or collaboration in this prototype screen
+- a full-window relationship circle graph: a central `You` circle, connected
+  circles, nested subset circles, and people inside them
+- Canvas 2D rendering with canvas hit testing; React owns chrome, menus, and the
+  inspector. The hot canvas path (index, hit-test, draw) lives in
+  `src/lib/board/`; `src/App.tsx` is the shell + interaction host
+- create menu (person / nested circle / connected circle), double-tap to create,
+  direct dragging, right-click marquee multi-select, group dragging, circle
+  resize, containment fit, and merge-into-subset
+- pan, cursor-centered wheel/pinch zoom, and a simplified far-zoom "zones only" view
+- Google sign-in with per-user graph persistence in Supabase (debounced autosave);
+  anonymous editing persisted to `localStorage`. A new board starts blank (no demo seed)
+- LinkedIn import (Connections.csv ZIP + single-profile Bright Data enrichment),
+  per-person notes/tags/connections, debounced AI note generation, and
+  local + AI-ranked board search
+- settings controls for demo mode, labels, global circle shape, and fill style
 
 ## Active Work
 
@@ -70,14 +67,16 @@ Completed tasks can remain listed here when they explain repository history. Liv
 - `scripts/test-database-load.mjs`: dry-run by default synthetic `user_graphs` payload generator, with guarded staging write/read/cleanup support.
 - `scripts/test-ui-import-responsiveness.mjs`: Playwright-driven large LinkedIn ZIP import check that measures browser event-loop lag.
 - `src/main.tsx`: React entry point.
-- `src/App.tsx`: current local circle graph prototype behavior.
+- `src/App.tsx`: React shell + interaction host for the board (chrome, panels, pointer interaction, persisted-graph wiring, paint loop). Delegates canvas logic to `src/lib/board/`.
+- `src/lib/board/`: framework-free board engine — `types`, `constants`, `colors`, `geometry`, `layout` (containment/collision), `render` (spatial index, hit-test, Canvas 2D draw layer).
 - `src/lib/supabase.ts`: browser Supabase client configuration.
 - `src/lib/useAuth.ts`: session and Google sign-in state.
 - `src/lib/useBoardGraph.ts`: board graph loading and mutation state.
+- `src/lib/graphPersistence.ts`: load/save the graph blob (Supabase signed-in, `localStorage` anonymous).
 - `src/lib/graphStorage.ts`: Supabase CRUD layer for people, tags, notes, `person_ai_notes`, and AI Edge Functions.
 - `src/lib/graphTypes.ts`: shared graph interfaces, including the structured AI summary contract.
 - `src/lib/userWorkspace.ts`: profile, board, and root-person bootstrap.
-- `src/index.css`: current circle graph prototype visual system.
+- `src/index.css` + `src/styles/`: visual system, split into `@import`ed partials (cascade order = import order).
 - `skills-lock.json`: lockfile for installed project agent skills.
 - `supabase/migrations/`: database schema and row-level security migrations.
 - `supabase/functions/`: server-side Supabase Edge Functions for Gemini/OpenRouter AI note sync and AI people search.

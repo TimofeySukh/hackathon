@@ -1,0 +1,152 @@
+/* Top chrome: toolbar, brand mark, create menu, help panel, switches. */
+
+.toolbar {
+  position: absolute;
+  z-index: 10;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  pointer-events: none;
+}
+
+.brand,
+.toolbar__group,
+.help-panel,
+.create-menu {
+  border: none;
+  background: var(--md-surface-container);
+  box-shadow: var(--md-elev-2);
+}
+
+.inspector {
+  border: none;
+  background: var(--md-surface-container-low);
+  box-shadow: var(--md-elev-1);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  height: 48px;
+  border-radius: var(--md-r-full);
+  padding: 8px 16px 8px 8px;
+  color: var(--md-on-surface);
+  font-size: 14px;
+  font-weight: 500;
+  pointer-events: auto;
+}
+
+.brand__mark {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.toolbar__group {
+  display: inline-flex;
+  align-items: center;
+  height: 48px;
+  gap: 4px;
+  border-radius: var(--md-r-full);
+  padding: 4px;
+  pointer-events: auto;
+}
+
+.toolbar__group button {
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--md-r-full);
+  background: transparent;
+  color: var(--md-on-surface-variant);
+  transition: background-color 0.2s, color 0.2s, transform var(--md-dur-short) var(--md-ease-standard);
+}
+
+.toolbar__group button:hover {
+  background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+}
+
+.toolbar__group button:active {
+  transform: scale(0.9);
+}
+
+.app-shell.is-demo-mode .toolbar {
+  left: auto;
+  right: 16px;
+  width: auto;
+}
+
+.toolbar__group--demo {
+  border-radius: var(--md-r-full);
+}
+
+.m3-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 40px;
+  color: var(--md-on-surface);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.m3-switch-row input {
+  width: 44px;
+  height: 24px;
+  accent-color: var(--md-primary);
+  cursor: pointer;
+}
+
+.help-panel {
+  position: absolute;
+  z-index: 9;
+  left: 16px;
+  bottom: 16px;
+  display: grid;
+  width: min(330px, calc(100vw - 32px));
+  gap: 6px;
+  border-radius: 14px;
+  padding: 14px 16px;
+  color: var(--md-on-surface);
+  pointer-events: none;
+}
+
+.help-panel strong {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.help-panel span {
+  color: rgba(28, 37, 40, 0.68);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.toolbar svg,
+.create-menu svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

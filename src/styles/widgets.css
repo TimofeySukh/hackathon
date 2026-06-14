@@ -1,0 +1,708 @@
+/* Merge prompt, local-save hint, circle-style popover, color wheel, connections. */
+
+.merge-prompt-panel {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  background: var(--md-surface-container-high);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-r-lg);
+  padding: 12px 20px;
+  box-shadow: var(--md-elev-3);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  animation: slideUp var(--md-dur-medium) var(--md-ease-decelerate);
+  pointer-events: auto;
+}
+
+.merge-prompt-text {
+  font-size: 14px;
+  color: var(--md-on-surface);
+}
+
+.merge-prompt-text strong {
+  font-weight: 600;
+  color: var(--md-primary);
+}
+
+.merge-prompt-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translate(-50%, 20px);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+
+/* Material 3 Primary Button Style for LinkedIn Import */
+.m3-primary-button {
+  border: none;
+  border-radius: var(--md-r-full);
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+.m3-primary-button:hover {
+  background: color-mix(in srgb, var(--md-primary) 92%, black);
+  box-shadow: var(--md-elev-1);
+}
+
+.m3-primary-button:active {
+  background: color-mix(in srgb, var(--md-primary) 85%, black);
+}
+
+/* Bottom-left hint shown to signed-out visitors: their work is saved locally
+   until they sign in. */
+.local-save-hint {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 320px;
+  padding: 8px 12px 8px 16px;
+  border-radius: var(--md-r-full);
+  border: 1px solid var(--md-outline-variant);
+  background: var(--md-surface-container-high);
+  box-shadow: var(--md-elev-2);
+  font-size: 13px;
+  color: var(--md-on-surface-variant);
+  pointer-events: auto;
+}
+
+.local-save-hint__action {
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--md-r-full);
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+.local-save-hint__action:hover {
+  background: color-mix(in srgb, var(--md-primary) 92%, black);
+  box-shadow: var(--md-elev-1);
+}
+
+.is-demo-mode .local-save-hint {
+  display: none;
+}
+
+/* Custom Color-Coded Select Dropdown & Rounded Menu */
+.custom-select-trigger {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  text-align: left;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 9999px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--md-surface-container-highest);
+  color: var(--md-on-surface);
+  box-sizing: border-box;
+  transition: filter 0.15s, background-color 0.15s;
+}
+
+.custom-select-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.custom-select-trigger:hover {
+  filter: brightness(1.08);
+}
+
+.custom-select-dropdown {
+  position: absolute;
+  z-index: 1000;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid rgba(9, 30, 66, 0.08);
+  border-radius: 14px;
+  box-shadow: 0px 8px 16px -4px rgba(9, 30, 66, 0.25), 0px 0px 1px rgba(9, 30, 66, 0.31);
+  max-height: 200px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 6px;
+  display: grid;
+  gap: 2px;
+  transform-origin: top center;
+  animation: dropdownIn var(--md-dur-short) var(--md-ease-decelerate);
+}
+
+@keyframes dropdownIn {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.custom-select-option {
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+  border: none;
+  border-radius: var(--md-r-sm);
+  padding: 7px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  color: var(--md-on-surface);
+  box-sizing: border-box;
+  transition: filter 0.15s, background-color 0.15s;
+}
+
+.custom-select-option:hover {
+  filter: none;
+  background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+}
+
+.custom-select-option:active {
+  filter: brightness(0.95);
+}
+
+.circle-color-dot {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--md-on-surface) 18%, transparent);
+}
+
+.custom-select-trigger > span:nth-child(2),
+.custom-select-option > span:nth-child(2) {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.custom-select-trigger > svg,
+.custom-select-option > svg {
+  flex: 0 0 auto;
+}
+
+.circle-style-control {
+  position: relative;
+}
+
+.quick-circle-colors {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.quick-circle-color {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  cursor: pointer;
+  padding: 0;
+}
+
+.quick-circle-color.is-selected {
+  outline: 2px solid var(--md-primary);
+  outline-offset: 2px;
+}
+
+.circle-style-button {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--md-surface-container-highest);
+  color: var(--md-on-surface-variant);
+  border: 1px solid var(--md-outline-variant);
+  cursor: pointer;
+  transition: background-color 0.18s, color 0.18s, transform 0.18s, box-shadow 0.18s, outline-color 0.18s;
+}
+
+.circle-style-button:hover {
+  background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+}
+
+.circle-style-button.is-custom-color,
+.circle-style-button.is-open {
+  outline: 3px solid color-mix(in srgb, currentColor 24%, transparent);
+  outline-offset: 3px;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,.16);
+}
+
+.circle-style-button svg,
+.circle-fill-toggle svg,
+.connection-item svg,
+.connection-service-picker svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.circle-fill-toggle {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: 1px solid var(--md-outline-variant);
+  background: var(--md-surface-container-highest);
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  transition: background-color 0.18s, color 0.18s, transform 0.18s, box-shadow 0.18s;
+}
+
+.circle-fill-toggle:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0,0,0,.12);
+}
+
+.circle-fill-toggle.is-transparent {
+  background:
+    linear-gradient(45deg, rgba(67, 71, 78, 0.16) 25%, transparent 25% 75%, rgba(67, 71, 78, 0.16) 75%),
+    linear-gradient(45deg, rgba(67, 71, 78, 0.16) 25%, transparent 25% 75%, rgba(67, 71, 78, 0.16) 75%),
+    var(--md-surface);
+  background-position: 0 0, 5px 5px, 0 0;
+  background-size: 10px 10px, 10px 10px, auto;
+  color: var(--md-primary);
+}
+
+.circle-fill-toggle.is-solid {
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  border-color: var(--md-primary);
+}
+
+.circle-style-popover {
+  position: fixed;
+  z-index: 1200;
+  right: 24px;
+  bottom: 124px;
+  width: min(344px, calc(100vw - 48px));
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.72)),
+    var(--md-surface-container);
+  box-shadow: var(--md-elev-3);
+  border: 1px solid var(--md-outline-variant);
+  backdrop-filter: blur(18px);
+  animation: circleStyleIn 0.16s cubic-bezier(.2, 0, 0, 1);
+}
+
+.circle-style-theme-tabs {
+  justify-self: center;
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: var(--md-r-full);
+  background: color-mix(in srgb, var(--md-surface-container-highest) 80%, transparent);
+}
+
+.circle-style-theme-tabs button {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--md-r-full);
+  background: transparent;
+  color: var(--md-on-surface-variant);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.18s, color 0.18s, box-shadow 0.18s, transform 0.18s;
+}
+
+.circle-style-theme-tabs button.is-selected {
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--md-on-surface);
+  box-shadow: 0 1px 2px rgba(0,0,0,.12);
+  transform: scale(1.03);
+}
+
+.color-wheel {
+  position: relative;
+  justify-self: center;
+  display: block;
+  width: min(248px, 76vw);
+  aspect-ratio: 1;
+  overflow: visible;
+  border-radius: 50%;
+  border: 0;
+  cursor: crosshair;
+  background: transparent;
+  touch-action: none;
+}
+
+.color-wheel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--md-outline-variant) 70%, transparent);
+  background:
+    radial-gradient(circle, rgba(255,255,255,0.96) 0%, rgba(255,255,255,0.24) 50%, rgba(255,255,255,0) 72%),
+    conic-gradient(from -90deg, hsl(0, 100%, 50%), hsl(60, 100%, 50%), hsl(120, 100%, 50%), hsl(180, 100%, 50%), hsl(240, 100%, 50%), hsl(300, 100%, 50%), hsl(360, 100%, 50%));
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.42);
+  pointer-events: none;
+}
+
+.color-wheel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, transparent 70%, rgba(255,255,255,.94) 71%);
+  pointer-events: none;
+}
+
+.color-wheel__thumb {
+  position: absolute;
+  left: var(--wheel-x);
+  top: var(--wheel-y);
+  width: 34px;
+  height: 34px;
+  border: 6px solid #ffffff;
+  border-radius: 50%;
+  background: var(--wheel-color);
+  box-shadow: 0 2px 7px rgba(0,0,0,.26);
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  transition: transform 0.1s cubic-bezier(.2, 0, 0, 1), box-shadow 0.1s;
+  animation: pickerThumbPop 0.16s cubic-bezier(.2, 0, 0, 1);
+}
+
+.color-wheel:active .color-wheel__thumb {
+  transform: translate(-50%, -50%) scale(1.12);
+  box-shadow: 0 4px 12px rgba(0,0,0,.3);
+}
+
+.brightness-slider {
+  position: relative;
+  width: 100%;
+  height: 18px;
+  border-radius: var(--md-r-full);
+  background: linear-gradient(90deg, #050505, var(--brightness-color));
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.08);
+  touch-action: none;
+}
+
+.brightness-slider__thumb {
+  position: absolute;
+  left: var(--brightness-pos);
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  border: 5px solid #ffffff;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: 0 1px 5px rgba(0,0,0,.24);
+  transform: translate(-50%, -50%);
+  transition: transform 0.1s cubic-bezier(.2, 0, 0, 1);
+}
+
+.brightness-slider:active .brightness-slider__thumb {
+  transform: translate(-50%, -50%) scale(1.12);
+}
+
+.circle-style-presets {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 8px;
+}
+
+.circle-style-preset {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  cursor: pointer;
+}
+
+.circle-style-preset.is-selected {
+  outline: 2px solid var(--md-primary);
+  outline-offset: 2px;
+}
+
+.circle-style-control-row {
+  display: grid;
+  gap: 6px;
+  color: var(--md-on-surface-variant);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.circle-style-shape-controls {
+  display: none;
+}
+
+@keyframes circleStyleIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes pickerThumbPop {
+  0% {
+    transform: translate(-50%, -50%) scale(.82);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.circle-style-segmented {
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-r-full);
+}
+
+.circle-style-segmented button {
+  flex: 1;
+  min-height: 30px;
+  padding: 0 10px;
+  background: transparent;
+  color: var(--md-on-surface-variant);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.circle-style-segmented button.is-selected {
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+.connections-list {
+  display: grid;
+  gap: 7px;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-r-md);
+  background: var(--md-surface-container-high);
+}
+
+.connections-list__header {
+  display: flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 0 3px;
+}
+
+.connections-list__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--md-on-surface);
+}
+
+.connections-list__items {
+  display: grid;
+  gap: 4px;
+}
+
+.connection-item {
+  display: grid;
+  grid-template-columns: 1fr 28px;
+  align-items: center;
+  gap: 4px;
+}
+
+.connection-item__main {
+  display: grid;
+  grid-template-columns: 28px 1fr 16px;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 34px;
+  padding: 4px 8px 4px 4px;
+  border-radius: var(--md-r-sm);
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+  cursor: pointer;
+  text-align: left;
+}
+
+.connection-item__main span:not(.service-icon) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connection-item__main:hover {
+  background: color-mix(in srgb, var(--md-on-surface) 8%, var(--md-surface));
+}
+
+.connection-item__delete {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+}
+
+.connection-item__delete:hover {
+  background: color-mix(in srgb, var(--md-error) 10%, transparent);
+  color: var(--md-error);
+}
+
+.service-icon {
+  width: 24px;
+  height: 24px;
+  display: block;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.google-icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.connection-composer {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+}
+
+.connection-composer input {
+  min-width: 0;
+  height: 34px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-r-full);
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+  padding: 0 12px;
+  font-size: 12.5px;
+  outline: none;
+}
+
+.connection-composer input:focus {
+  border-color: var(--md-primary);
+}
+
+.connection-composer button {
+  height: 34px;
+  border-radius: var(--md-r-full);
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  padding: 0 12px;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.connection-service-picker {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.connection-service-picker button {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  border-radius: var(--md-r-sm);
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+  padding: 4px;
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+}
+
+.connection-service-picker button:hover,
+.connection-service-picker button.is-selected {
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+@media (max-width: 720px) {
+  .circle-style-popover {
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    bottom: 96px;
+    width: auto;
+    max-height: calc(100vh - 128px);
+    overflow-y: auto;
+  }
+}
+
+/* Respect users who ask for reduced motion: keep the UI functional, drop the
+   movement. Animations collapse to an instant final frame. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

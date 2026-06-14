@@ -1,0 +1,77 @@
+/* App shell + Material 3 design-token palette (light/dark theme variables). */
+
+.app-shell {
+  /* Primary (matches the canvas blue tone) */
+  --md-primary: #00629d;
+  --md-on-primary: #ffffff;
+  --md-primary-container: #d2e4ff;
+  --md-on-primary-container: #001d35;
+
+  /* Secondary — used for selected/active state layers */
+  --md-secondary-container: #d6e3f7;
+  --md-on-secondary-container: #0f1d2a;
+
+  /* Error — destructive actions (delete) */
+  --md-error: #ba1a1a;
+  --md-on-error: #ffffff;
+  --md-error-container: #ffdad6;
+  --md-on-error-container: #410002;
+
+  /* Neutral surfaces — elevation is expressed by container tone, not just shadow */
+  --md-surface: #f8f9fc;
+  --md-surface-container-low: #f1f3f8;
+  --md-surface-container: #ecedf2;
+  --md-surface-container-high: #e6e8ed;
+  --md-surface-container-highest: #e0e2e8;
+  --md-on-surface: #1a1c1e;          /* primary text */
+  --md-on-surface-variant: #43474e;  /* muted text, icons, labels */
+
+  /* Outline — only for outlined components and dividers */
+  --md-outline: #73777f;
+  --md-outline-variant: #c3c7cf;
+
+  /* Shape (corner radius scale) */
+  --md-r-xs: 4px;    /* nested chips, small accents          */
+  --md-r-sm: 8px;    /* menu items, inputs, small buttons     */
+  --md-r-md: 12px;   /* cards, menus, panels (default)        */
+  --md-r-lg: 16px;   /* large sheets                          */
+  --md-r-xl: 28px;   /* side sheets, dialogs, bottom sheets   */
+  --md-r-full: 999px;/* pills: buttons, chips, FAB, brand     */
+
+  /* Elevation */
+  --md-elev-1: 0 1px 2px rgba(0,0,0,.30), 0 1px 3px 1px rgba(0,0,0,.15);
+  --md-elev-2: 0 1px 2px rgba(0,0,0,.30), 0 2px 6px 2px rgba(0,0,0,.15);
+  --md-elev-3: 0 4px 8px 3px rgba(0,0,0,.15), 0 1px 3px rgba(0,0,0,.30);
+
+  /* Motion — Material 3 emphasized/standard easing + durations */
+  --md-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --md-ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --md-ease-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --md-ease-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --md-dur-short: 0.12s;
+  --md-dur-medium: 0.22s;
+  --md-dur-long: 0.32s;
+
+  /* Swatch colors */
+  --md-tone-blue: #00629d;
+  --md-tone-red: #c00015;
+  --md-tone-green: #1e824a;
+  --md-tone-amber: #d87a00;
+  --md-tone-violet: #7f67be;
+
+  /* Favorite star colors */
+  --md-favorite-fill: #ffd600;
+  --md-favorite-stroke: #d97706;
+
+  /* Legacy references */
+  --panel-bg: var(--md-surface-container);
+  --panel-border: var(--md-outline-variant);
+  --panel-shadow: var(--md-elev-2);
+
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+}
