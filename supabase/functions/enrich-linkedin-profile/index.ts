@@ -104,16 +104,59 @@ function normalizeBrightDataProfile(payload: unknown, url: string): EnrichedProf
   const record = Array.isArray(payload) ? payload[0] : payload
   if (!record || typeof record !== 'object' || Array.isArray(record)) return null
   const candidate = record as Record<string, unknown>
+  const name = pickString(candidate.name, candidate.full_name)
+  const company = pickCompanyName(candidate)
+  const headline = pickString(candidate.position, candidate.headline, candidate.title)
+  const description = pickDescription(candidate)
+  const avatarUrl = pickAvatarUrl(candidate)
+
+  if (!name && !company && !headline && !description && !avatarUrl) return null
 
   return {
     url,
-    name: pickString(candidate.name, candidate.full_name),
-    company: pickCompanyName(candidate),
-    headline: pickString(candidate.position, candidate.headline, candidate.title),
-    description: pickDescription(candidate),
-    avatarUrl: pickAvatarUrl(candidate),
+    name,
+    company,
+    headline,
+    description,
+    avatarUrl,
     source: 'brightdata',
   }
+}
+
+function pickSnapshotId(payload: unknown) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return undefined
+  return pickString((payload as Record<string, unknown>).snapshot_id)
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function downloadSnapshot(apiKey: string, snapshotId: string) {
+  const snapshotUrl = new URL(`https://api.brightdata.com/datasets/v3/snapshot/${snapshotId}`)
+  snapshotUrl.searchParams.set('format', 'json')
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const response = await fetch(snapshotUrl, {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+      },
+    })
+
+    if (response.status === 202 || response.status === 409) {
+      await delay(3000)
+      continue
+    }
+
+    if (!response.ok) {
+      const message = await response.text()
+      throw new Error(message || `Bright Data snapshot returned ${response.status}.`)
+    }
+
+    return await response.json()
+  }
+
+  throw new Error('Bright Data profile scrape is still running. Try again in a few seconds.')
 }
 
 async function requireUser(authHeader: string) {
@@ -179,12 +222,17 @@ Deno.serve(async (req) => {
       body: JSON.stringify([{ url }]),
     })
 
-    if (!response.ok) {
+    if (!response.ok && response.status !== 202) {
       const message = await response.text()
       return jsonResponse({ error: message || `Bright Data returned ${response.status}.` }, 502)
     }
 
-    const payload = await response.json()
+    let payload = await response.json()
+    const snapshotId = pickSnapshotId(payload)
+    if (snapshotId) {
+      payload = await downloadSnapshot(apiKey, snapshotId)
+    }
+
     const profile = normalizeBrightDataProfile(payload, url)
     if (!profile) {
       return jsonResponse({ error: 'Bright Data did not return profile data.' }, 502)

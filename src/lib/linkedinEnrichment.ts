@@ -66,8 +66,8 @@ function pickString(value: unknown) {
 function normalizeEnrichment(value: unknown, fallbackUrl: string): LinkedInProfileEnrichment | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const candidate = value as Record<string, unknown>
-  const source = candidate.source === 'cache' ? 'cache' : 'brightdata'
-  return {
+  const source: LinkedInProfileEnrichment['source'] = candidate.source === 'cache' ? 'cache' : 'brightdata'
+  const profile: LinkedInProfileEnrichment = {
     url: pickString(candidate.url) ?? fallbackUrl,
     name: pickString(candidate.name),
     company: pickString(candidate.company),
@@ -76,6 +76,10 @@ function normalizeEnrichment(value: unknown, fallbackUrl: string): LinkedInProfi
     avatarUrl: pickString(candidate.avatarUrl),
     source,
   }
+  if (!profile.name && !profile.company && !profile.headline && !profile.description && !profile.avatarUrl) {
+    return null
+  }
+  return profile
 }
 
 export async function enrichLinkedInProfile(url: string): Promise<LinkedInProfileEnrichment | null> {

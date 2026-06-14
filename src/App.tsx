@@ -138,6 +138,7 @@ type LinkedInProfileImport = {
   headline: string
   description?: string
   avatarUrl?: string
+  source: 'brightdata' | 'cache' | 'preview' | 'fallback'
 }
 
 type LinkedInConnectionsImportResult = {
@@ -409,19 +410,26 @@ function normalizeLinkInput(rawValue: string, service: PersonLinkService): { lab
 }
 
 function normalizeLinkedInProfileUrl(rawValue: string): string | null {
-  const value = rawValue.trim()
+  const value = extractLinkedInProfileUrlCandidate(rawValue)
   if (!value) return null
   const withProtocol = /^https?:\/\//i.test(value) ? value : `https://${value}`
   try {
     const url = new URL(withProtocol)
     const host = url.hostname.toLowerCase().replace(/^www\./, '')
-    if (host !== 'linkedin.com') return null
+    if (host !== 'linkedin.com' && !host.endsWith('.linkedin.com')) return null
     const pathParts = url.pathname.split('/').filter(Boolean)
     if (!['in', 'pub'].includes(pathParts[0] ?? '') || !pathParts[1]) return null
     return `https://www.linkedin.com/${pathParts[0]}/${pathParts[1]}/`
   } catch {
     return null
   }
+}
+
+function extractLinkedInProfileUrlCandidate(rawValue: string) {
+  const value = rawValue.trim()
+  if (!value) return ''
+  const match = value.match(/(?:https?:\/\/)?(?:[\w-]+\.)?linkedin\.com\/(?:in|pub)\/[^\s"'<>]+/i)
+  return (match?.[0] ?? value).replace(/[),.;]+$/, '')
 }
 
 function getLinkedInSlug(profileUrl: string) {
@@ -494,6 +502,7 @@ async function buildLinkedInProfileImport(rawValue: string): Promise<LinkedInPro
   const company = (enrichment?.company || metadata.company || 'Unknown Company').trim()
   const headline = (enrichment?.headline || metadata.headline || company || 'LinkedIn connection').trim()
   const description = enrichment?.description?.trim()
+  const source = enrichment?.source ?? (metadata.name || metadata.company || metadata.headline || metadata.avatarUrl ? 'preview' : 'fallback')
   return {
     url,
     slug,
@@ -502,6 +511,7 @@ async function buildLinkedInProfileImport(rawValue: string): Promise<LinkedInPro
     headline,
     description,
     avatarUrl: enrichment?.avatarUrl || metadata.avatarUrl,
+    source,
   }
 }
 
@@ -4996,6 +5006,13 @@ function addLinkedInProfileToGraph(
         body: profile.description,
       }]
     : []
+  if (profile.source === 'brightdata') {
+    notes.push({
+      id: `note-enriched-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+      title: 'Enrichment',
+      body: 'Imported with Bright Data LinkedIn enrichment.',
+    })
+  }
 
   const person: PersonNode = {
     id: personId,
