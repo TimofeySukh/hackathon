@@ -127,6 +127,71 @@ npm run seed:demo-user -- --email <user-email>
 
 The demo seed is idempotent for the fixed contact set. Re-running it updates the seeded people, rebuilds their notes, and keeps the graph ready for search and live demos.
 
+## Import Load Testing
+
+Large import testing must stay out of production user accounts and production data.
+
+Use a separate Supabase project for staging or load tests. Keep that project on the same
+migration set as production, but do not require it to mirror production data or capacity
+one-for-one. The goal is to verify import shape, batching, RLS assumptions, persistence
+size, and browser responsiveness without polluting real accounts.
+
+Default local load checks:
+
+```bash
+npm run test:load
+```
+
+This runs:
+
+- `npm run test:db-load -- --people 3000 --connections 3000`
+- `npm run test:ui-import -- --people 3000`
+
+`test:db-load` is dry-run by default. It builds a synthetic graph with 3,000 people and
+3,000 connections, serializes it in the same shape stored in `user_graphs.graph`, and
+prints payload size without writing to Supabase.
+
+To write against a staging Supabase project, configure `.env.mcp.local` with the staging
+URL and service-role key, then opt in explicitly:
+
+```bash
+HACKATHON_ALLOW_DATABASE_LOAD_TEST=true npm run test:db-load -- --write --cleanup
+```
+
+Safety rules for database load writes:
+
+- The script refuses to write to the URL in `.env.production`.
+- The script requires `HACKATHON_ALLOW_DATABASE_LOAD_TEST=true`.
+- The script creates an isolated Supabase Auth user for the run.
+- The script writes one `user_graphs` row for that user and reads it back.
+- Pass `--cleanup` to delete the test user after the read-back check; the
+  `user_graphs` row is removed by `on delete cascade`.
+
+Useful database load overrides:
+
+```bash
+npm run test:db-load -- --people 5000 --connections 5000
+HACKATHON_ALLOW_DATABASE_LOAD_TEST=true npm run test:db-load -- --people 5000 --connections 5000 --write --cleanup
+```
+
+`test:ui-import` starts Vite on an isolated local port, opens Chromium through Playwright,
+uploads a generated LinkedIn ZIP through the real settings-panel file input, and measures
+event-loop lag while the import runs. The test fails when the browser is blocked longer
+than the configured threshold.
+
+Useful UI responsiveness overrides:
+
+```bash
+npm run test:ui-import -- --people 5000 --max-lag-ms 1500
+npm run test:ui-import -- --url http://127.0.0.1:5173
+```
+
+If Playwright's Chromium is not installed on the machine:
+
+```bash
+npx playwright install chromium
+```
+
 ## Production Auto-Deploy
 
 The `social.datanode.live` deployment can run a lightweight user-level auto-deploy loop on the server.
@@ -430,5 +495,6 @@ Supabase verification:
 
 - `npm run build`
 - `npm run lint`
+- `npm run test:load`
 - Manual browser check of drag navigation, wheel and trackpad navigation, theme persistence, persisted graph editing, debounced AI note sync, and AI people search
 - Manual Supabase auth check when credentials and Google OAuth are configured

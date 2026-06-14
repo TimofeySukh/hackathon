@@ -138,6 +138,22 @@ type LinkedInProfileImport = {
   avatarUrl?: string
 }
 
+type LinkedInConnectionsImportResult = {
+  graph: GraphState
+  importedPeople: number
+  importedCompanies: number
+}
+
+type LinkedInConnectionsHeaders = {
+  firstNameIdx: number
+  lastNameIdx: number
+  companyIdx: number
+  positionIdx: number
+  urlIdx: number
+  emailIdx: number
+  connectedOnIdx: number
+}
+
 type CircleShapeMode = 'circles' | 'figures'
 type CircleFillMode = 'transparent' | 'solid'
 
@@ -755,6 +771,7 @@ function App() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [isImportingLinkedInProfile, setIsImportingLinkedInProfile] = useState(false)
+  const [isImportingLinkedInZip, setIsImportingLinkedInZip] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const searchPanelRef = useRef<HTMLDivElement>(null)
   const focusAnimRef = useRef<number | null>(null)
@@ -774,6 +791,7 @@ function App() {
     const cy = window.innerHeight * 0.44
     const end = { x: cx - wx * targetScale, y: cy - wy * targetScale, scale: targetScale }
     if (focusAnimRef.current != null) window.cancelAnimationFrame(focusAnimRef.current)
+    // eslint-disable-next-line react-hooks/purity -- animation start time is read from an event handler, not render.
     const t0 = performance.now()
     const duration = 520
     const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
@@ -892,6 +910,8 @@ function App() {
   async function handleLinkedInImport(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file) return
+    if (isImportingLinkedInZip) return
+    setIsImportingLinkedInZip(true)
 
     try {
       const zipReader = new zip.ZipReader(new zip.BlobReader(file))
@@ -912,176 +932,18 @@ function App() {
       const csvText = await (connectionsEntry as any).getData(new zip.TextWriter())
       await zipReader.close()
 
-      const rows = parseCSV(csvText)
-      if (rows.length === 0) {
-        alert('Connections.csv is empty or invalid.')
-        return
-      }
-
-      let headerIdx = -1
-      for (let i = 0; i < rows.length; i++) {
-        const row = rows[i]
-        const lowerRow = row.map(cell => cell.toLowerCase().replace(/\s+/g, ''))
-        if (lowerRow.includes('firstname') && lowerRow.includes('lastname') && lowerRow.includes('company')) {
-          headerIdx = i
-          break
-        }
-      }
-
-      if (headerIdx === -1) {
-        alert('Could not find standard headers in Connections.csv.')
-        return
-      }
-
-      const headers = rows[headerIdx].map(cell => cell.toLowerCase().replace(/\s+/g, ''))
-      const firstNameIdx = headers.indexOf('firstname')
-      const lastNameIdx = headers.indexOf('lastname')
-      const companyIdx = headers.indexOf('company')
-      const positionIdx = headers.indexOf('position')
-      const urlIdx = headers.indexOf('url')
-      const emailIdx = headers.indexOf('emailaddress')
-      const connectedOnIdx = headers.indexOf('connectedon')
-
-      const dataRows = rows.slice(headerIdx + 1)
-
-      const companyGroups: Record<string, typeof dataRows> = {}
-      for (const row of dataRows) {
-        if (row.length <= Math.max(firstNameIdx, lastNameIdx, companyIdx)) continue
-        const company = row[companyIdx]?.trim() || ''
-        if (!companyGroups[company]) {
-          companyGroups[company] = []
-        }
-        companyGroups[company].push(row)
-      }
-
+      const result = await buildLinkedInConnectionsGraph(graph, csvText)
       pushHistory()
-      setGraph((current) => {
-        const nextCircles = [...current.circles]
-        const nextPeople = [...current.people]
+      setGraph(result.graph)
 
-        const youCircle = nextCircles.find((c) => c.id === 'you')
-        const youX = youCircle ? youCircle.x : 0
-        const youY = youCircle ? youCircle.y : 0
-
-        let companyIndex = 0
-        const totalCompanies = Object.keys(companyGroups).length
-
-        for (const [companyName, members] of Object.entries(companyGroups)) {
-          const cleanCompName = companyName ? companyName : 'No Company'
-          const companyId = `linkedin-company-${cleanCompName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`
-
-          let companyCircle = nextCircles.find((c) => c.id === companyId)
-          if (!companyCircle) {
-            const angle = (companyIndex / totalCompanies) * 2 * Math.PI
-            const placementRadius = 680
-            const x = youX + Math.cos(angle) * placementRadius
-            const y = youY + Math.sin(angle) * placementRadius
-            const icon = cleanCompName.slice(0, 2).toUpperCase()
-
-            companyCircle = {
-              id: companyId,
-              name: cleanCompName,
-              icon,
-              x,
-              y,
-              radius: 90,
-              minRadius: 90,
-              parentId: null,
-              connectedTo: 'you',
-              tone: nextTone(nextCircles.length),
-              shapeType: 'wavy',
-              sides: 12,
-              amplitude: 8
-            }
-            nextCircles.push(companyCircle)
-            companyIndex++
-          }
-
-          let personIndex = 0
-          for (const memberRow of members) {
-            const firstName = memberRow[firstNameIdx] || ''
-            const lastName = memberRow[lastNameIdx] || ''
-            const name = `${firstName} ${lastName}`.trim()
-            if (!name) continue
-
-            const personId = `linkedin-person-${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`
-
-            if (nextPeople.some(p => p.id === personId)) {
-              continue
-            }
-
-            const position = positionIdx !== -1 ? memberRow[positionIdx] || '' : ''
-            const url = urlIdx !== -1 ? memberRow[urlIdx] || '' : ''
-            const email = emailIdx !== -1 ? memberRow[emailIdx] || '' : ''
-            const connectedOn = connectedOnIdx !== -1 ? memberRow[connectedOnIdx] || '' : ''
-
-            const avatar = (firstName.slice(0, 1) + lastName.slice(0, 1)).toUpperCase() || 'IN'
-
-            const pAngle = (personIndex / members.length) * 2 * Math.PI
-            const px = companyCircle.x + Math.cos(pAngle) * 35
-            const py = companyCircle.y + Math.sin(pAngle) * 35
-
-            const notesList: PersonNote[] = []
-            if (position) {
-              notesList.push({
-                id: `note-pos-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                title: 'Position',
-                body: position
-              })
-            }
-            if (connectedOn) {
-              notesList.push({
-                id: `note-conn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                title: 'Connected On',
-                body: connectedOn
-              })
-            }
-            if (email) {
-              notesList.push({
-                id: `note-email-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                title: 'Email',
-                body: email
-              })
-            }
-            const linksList: PersonLink[] = url
-              ? [{
-                  id: `link-linkedin-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                  service: 'linkedin',
-                  label: 'LinkedIn',
-                  url,
-                }]
-              : []
-
-            nextPeople.push({
-              id: personId,
-              name,
-              role: position || 'Connection',
-              x: px,
-              y: py,
-              circleId: companyCircle.id,
-              avatar,
-              shapeType: 'circle',
-              sides: 10,
-              amplitude: 0,
-              notes: notesList,
-              links: linksList,
-            })
-            personIndex++
-          }
-        }
-
-        return ensureContainment({
-          ...current,
-          circles: nextCircles,
-          people: nextPeople
-        })
-      })
-
-      alert('LinkedIn data imported successfully!')
+      alert(`LinkedIn data imported successfully: ${result.importedPeople} people across ${result.importedCompanies} companies.`)
     } catch (err) {
       console.error(err)
       const errorMessage = err instanceof Error ? err.message : String(err)
       alert(`Failed to import LinkedIn ZIP: ${errorMessage}`)
+    } finally {
+      setIsImportingLinkedInZip(false)
+      event.target.value = ''
     }
   }
 
@@ -2539,7 +2401,9 @@ function App() {
     }
 
     const world = screenToWorld({ x: event.clientX, y: event.clientY })
+    // eslint-disable-next-line react-hooks/purity -- created from a pointer event, not during render.
     const id = `person-${Date.now()}`
+    // eslint-disable-next-line react-hooks/purity -- randomizes a newly created person's shape in an event handler.
     const sides = Math.floor(Math.random() * 5) + 8
     pushHistory()
     setGraph((current) => ({
@@ -2658,7 +2522,9 @@ function App() {
       circleId = hit.person.circleId ?? ''
     }
 
+    // eslint-disable-next-line react-hooks/purity -- created from a pointer event, not during render.
     const id = `person-${Date.now()}`
+    // eslint-disable-next-line react-hooks/purity -- randomizes a newly created person's shape in an event handler.
     const sides = Math.floor(Math.random() * 5) + 8
     pushHistory()
     setGraph((current) => {
@@ -2980,10 +2846,11 @@ function App() {
               <button
                 type="button"
                 className="m3-primary-button"
+                disabled={isImportingLinkedInZip}
                 onClick={() => fileInputRef.current?.click()}
               >
                 <UploadIcon />
-                <span>Import LinkedIn ZIP</span>
+                <span>{isImportingLinkedInZip ? 'Importing...' : 'Import LinkedIn ZIP'}</span>
               </button>
               <input
                 ref={fileInputRef}
@@ -4854,6 +4721,192 @@ function parseCSV(text: string): string[][] {
     }
   }
   return lines
+}
+
+function yieldToBrowser(): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, 0))
+}
+
+function findLinkedInConnectionsHeader(rows: string[][]) {
+  for (let index = 0; index < rows.length; index += 1) {
+    const normalized = rows[index].map((cell) => cell.toLowerCase().replace(/\s+/g, ''))
+    if (normalized.includes('firstname') && normalized.includes('lastname') && normalized.includes('company')) {
+      return index
+    }
+  }
+  return -1
+}
+
+async function buildLinkedInConnectionsGraph(
+  current: GraphState,
+  csvText: string,
+): Promise<LinkedInConnectionsImportResult> {
+  const rows = parseCSV(csvText)
+  if (rows.length === 0) {
+    throw new Error('Connections.csv is empty or invalid.')
+  }
+
+  await yieldToBrowser()
+
+  const headerIdx = findLinkedInConnectionsHeader(rows)
+  if (headerIdx === -1) {
+    throw new Error('Could not find standard headers in Connections.csv.')
+  }
+
+  const headers = rows[headerIdx].map((cell) => cell.toLowerCase().replace(/\s+/g, ''))
+  const importHeaders: LinkedInConnectionsHeaders = {
+    firstNameIdx: headers.indexOf('firstname'),
+    lastNameIdx: headers.indexOf('lastname'),
+    companyIdx: headers.indexOf('company'),
+    positionIdx: headers.indexOf('position'),
+    urlIdx: headers.indexOf('url'),
+    emailIdx: headers.indexOf('emailaddress'),
+    connectedOnIdx: headers.indexOf('connectedon'),
+  }
+  const dataRows = rows.slice(headerIdx + 1)
+  const companyGroups = new Map<string, string[][]>()
+  const requiredWidth = Math.max(importHeaders.firstNameIdx, importHeaders.lastNameIdx, importHeaders.companyIdx)
+
+  for (let index = 0; index < dataRows.length; index += 1) {
+    const row = dataRows[index]
+    if (row.length <= requiredWidth) continue
+    const company = row[importHeaders.companyIdx]?.trim() || ''
+    const members = companyGroups.get(company) ?? []
+    members.push(row)
+    companyGroups.set(company, members)
+    if (index > 0 && index % 250 === 0) {
+      await yieldToBrowser()
+    }
+  }
+
+  const nextCircles = [...current.circles]
+  const nextPeople = [...current.people]
+  const existingPersonIds = new Set(nextPeople.map((person) => person.id))
+  const youCircle = nextCircles.find((circle) => circle.id === 'you')
+  const youX = youCircle ? youCircle.x : 0
+  const youY = youCircle ? youCircle.y : 0
+  const totalCompanies = Math.max(1, companyGroups.size)
+  let companyIndex = 0
+  let importedPeople = 0
+  let importedCompanies = 0
+
+  for (const [companyName, members] of companyGroups) {
+    const cleanCompName = companyName ? companyName : 'No Company'
+    const companyId = `linkedin-company-${slugifyId(cleanCompName)}`
+
+    let companyCircle = nextCircles.find((circle) => circle.id === companyId)
+    if (!companyCircle) {
+      const angle = (companyIndex / totalCompanies) * 2 * Math.PI
+      const placementRadius = 680
+      const icon = makeInitials(cleanCompName)
+
+      companyCircle = {
+        id: companyId,
+        name: cleanCompName,
+        icon,
+        x: youX + Math.cos(angle) * placementRadius,
+        y: youY + Math.sin(angle) * placementRadius,
+        radius: 90,
+        minRadius: 90,
+        parentId: null,
+        connectedTo: 'you',
+        tone: nextTone(nextCircles.length),
+        shapeType: 'wavy',
+        sides: 12,
+        amplitude: 8,
+      }
+      nextCircles.push(companyCircle)
+      importedCompanies += 1
+    }
+    companyIndex += 1
+
+    let personIndex = 0
+    for (const memberRow of members) {
+      const firstName = memberRow[importHeaders.firstNameIdx] || ''
+      const lastName = memberRow[importHeaders.lastNameIdx] || ''
+      const name = `${firstName} ${lastName}`.trim()
+      if (!name) continue
+
+      const personId = `linkedin-person-${slugifyId(name)}`
+      if (existingPersonIds.has(personId)) {
+        personIndex += 1
+        continue
+      }
+
+      const position = importHeaders.positionIdx !== -1 ? memberRow[importHeaders.positionIdx] || '' : ''
+      const url = importHeaders.urlIdx !== -1 ? memberRow[importHeaders.urlIdx] || '' : ''
+      const email = importHeaders.emailIdx !== -1 ? memberRow[importHeaders.emailIdx] || '' : ''
+      const connectedOn = importHeaders.connectedOnIdx !== -1 ? memberRow[importHeaders.connectedOnIdx] || '' : ''
+      const pAngle = (personIndex / members.length) * 2 * Math.PI
+      const notesList: PersonNote[] = []
+
+      if (position) {
+        notesList.push({
+          id: `note-pos-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+          title: 'Position',
+          body: position,
+        })
+      }
+      if (connectedOn) {
+        notesList.push({
+          id: `note-conn-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+          title: 'Connected On',
+          body: connectedOn,
+        })
+      }
+      if (email) {
+        notesList.push({
+          id: `note-email-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+          title: 'Email',
+          body: email,
+        })
+      }
+
+      const linksList: PersonLink[] = url
+        ? [{
+            id: `link-linkedin-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+            service: 'linkedin',
+            label: 'LinkedIn',
+            url,
+          }]
+        : []
+
+      nextPeople.push({
+        id: personId,
+        name,
+        role: position || 'Connection',
+        x: companyCircle.x + Math.cos(pAngle) * 35,
+        y: companyCircle.y + Math.sin(pAngle) * 35,
+        circleId: companyCircle.id,
+        avatar: makeInitials(name),
+        shapeType: 'circle',
+        sides: 10,
+        amplitude: 0,
+        notes: notesList,
+        links: linksList,
+      })
+
+      existingPersonIds.add(personId)
+      importedPeople += 1
+      personIndex += 1
+
+      if (importedPeople > 0 && importedPeople % 250 === 0) {
+        await yieldToBrowser()
+      }
+    }
+  }
+
+  await yieldToBrowser()
+
+  return {
+    graph: ensureContainment({
+      ...current,
+      circles: nextCircles,
+      people: nextPeople,
+    }),
+    importedPeople,
+    importedCompanies,
+  }
 }
 
 function slugifyId(value: string) {

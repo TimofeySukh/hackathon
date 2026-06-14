@@ -112,6 +112,14 @@ Bulk seed utility for local or MCP-enabled environments. It reads `.env.mcp.loca
 
 Demo data seed utility for local or MCP-enabled environments. It targets one user by email, ensures the required tags exist, upserts a fixed demo contact set, recreates their notes and AI summaries, and connects the cluster to the root person.
 
+### `scripts/test-database-load.mjs`
+
+Synthetic persistence load test for the current `user_graphs.graph` blob model. It is dry-run by default and can only write to staging-like Supabase environments after explicit opt-in with `HACKATHON_ALLOW_DATABASE_LOAD_TEST=true`; it refuses the `.env.production` Supabase URL.
+
+### `scripts/test-ui-import-responsiveness.mjs`
+
+Playwright-based browser responsiveness check for large LinkedIn ZIP imports. It starts or targets a local Vite server, uploads a generated `Connections.csv` ZIP through the real UI, and fails when measured event-loop lag exceeds the threshold.
+
 Supabase browser configuration reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`. The older `VITE_SUPABASE_ANON_KEY` variable remains supported for compatibility.
 
 ### `src/index.css`

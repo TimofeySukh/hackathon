@@ -17,6 +17,23 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-14 — Isolated load tests for large imports
+
+- Decision: large import testing now has two automated checks: a dry-run-first database
+  payload test for the `user_graphs.graph` blob and a Playwright browser responsiveness
+  test that imports a generated LinkedIn ZIP through the real UI.
+- Why: testing a 3,000-contact import through a real production account would pollute
+  user data and make cleanup risky. The database test writes only after explicit staging
+  opt-in, refuses the `.env.production` Supabase URL, creates an isolated auth user, and
+  can delete that user after verification.
+- Browser behavior: LinkedIn ZIP import now yields to the event loop while grouping and
+  creating imported entities, and the import button shows an `Importing...` disabled state
+  while work is running. The responsiveness test fails if event-loop lag exceeds the
+  configured threshold.
+- Rejected: adding hidden dev-only import controls to production UI. The test uses the
+  existing settings-panel file input; database writes are isolated in scripts and staging
+  credentials instead.
+
 ### 2026-06-14 — LinkedIn profile URLs import from board search
 
 - Decision: board search now treats a pasted LinkedIn profile URL as an import action,

@@ -67,6 +67,8 @@ Completed tasks can remain listed here when they explain repository history. Liv
 - `.mcp.json`: project MCP configuration for the local Hackathon board stdio server.
 - `mcp/server.mjs`: local MCP server that exposes project docs and board graph tooling.
 - `scripts/seed-demo-user.mjs`: idempotent demo-data seed for one user's board with reusable people, notes, AI summaries, and connections.
+- `scripts/test-database-load.mjs`: dry-run by default synthetic `user_graphs` payload generator, with guarded staging write/read/cleanup support.
+- `scripts/test-ui-import-responsiveness.mjs`: Playwright-driven large LinkedIn ZIP import check that measures browser event-loop lag.
 - `src/main.tsx`: React entry point.
 - `src/App.tsx`: current local circle graph prototype behavior.
 - `src/lib/supabase.ts`: browser Supabase client configuration.
