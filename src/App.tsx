@@ -210,6 +210,8 @@ type MovePersonState = {
   originX: number
   originY: number
   selectedOrigins?: Record<string, { x: number; y: number }>
+  // Mixed selection: zones (and their contents) dragged along with the people.
+  circleOrigins?: Record<string, { x: number; y: number }>
 }
 
 type ResizeCircleState = {
@@ -217,8 +219,11 @@ type ResizeCircleState = {
   circleId: string
 }
 
-const MIN_SCALE = 0.35
+const MIN_SCALE = 0.1
 const MAX_SCALE = 4.0
+// Below this zoom the board switches to a simplified "zones only" view: just the
+// colored zone fills and their labels, with people, connections and centers hidden.
+const ZONE_ONLY_SCALE = 0.3
 
 const CONNECT_THRESHOLD = 40
 const MIN_CIRCLE_RADIUS = 72
@@ -228,14 +233,15 @@ const CIRCLE_CENTER_RADIUS = 20
 const HANDLE_HIT_RADIUS = 16
 const PERSON_CONTAINMENT_RADIUS = 28
 const CIRCLE_CONTAINMENT_PADDING = 28
+// Above this many merged items, skip the O(n^2) containment relax so a huge merge
+// can't freeze the tab. The new subset is pre-sized to contain everything instead.
+const MERGE_LAYOUT_LIMIT = 1000
 const PERSON_COLLISION_RADIUS = 21
 const PERSON_COLLISION_GAP = 4
 const CIRCLE_CENTER_COLLISION_RADIUS = 24
 const PERSON_CIRCLE_COLLISION_GAP = 8
 const CIRCLE_COLLISION_GAP = 4
 const COLLISION_PASSES = 10
-
-const DEFAULT_STATE: GraphState = createDemoGraphState()
 
 const MATERIAL_TONES: Record<CircleTone, { fill: string; border: string; text: string; centerBg: string }> = {
   blue: { fill: '#D2E4FF', border: '#004A77', text: '#001D35', centerBg: '#00629D' },
@@ -657,7 +663,10 @@ function App() {
   const dragRafRef = useRef<number | null>(null)
   const pendingGraphRef = useRef<((current: GraphState) => GraphState) | null>(null)
   const pendingConnectorRef = useRef<DragConnector | null>(null)
-  const [graph, setGraph] = useState(createInitialGraph)
+  // Start from a blank board (just the "you" circle), never the old demo seed.
+  // The real graph replaces this once loaded; keeping demo data here caused it to
+  // flash for a few frames on some reloads before the loaded graph took over.
+  const [graph, setGraph] = useState(createFreshGraph)
   // True once the current drag/resize gesture has recorded its undo snapshot.
   // Only touched from pointer event handlers, never during render.
   const gestureSnapshotTakenRef = useRef(false)
@@ -776,6 +785,7 @@ function App() {
   const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight })
 
   const [showSettings, setShowSettings] = useState(false)
+  const [showLinkedInGuide, setShowLinkedInGuide] = useState(false)
   const [demoMode, setDemoMode] = useState(false)
   const [showCircleLabels, setShowCircleLabels] = useState(true)
   const [showPersonLabels, setShowPersonLabels] = useState(true)
@@ -794,6 +804,7 @@ function App() {
 
   const settingsButtonRef = useRef<HTMLButtonElement>(null)
   const settingsPanelRef = useRef<HTMLDivElement>(null)
+  const linkedInGuidePanelRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Search: a pill in the top toolbar that finds people (by name/role) and
@@ -1321,12 +1332,19 @@ function App() {
       ) {
         closeSearch()
       }
+      if (
+        showLinkedInGuide &&
+        linkedInGuidePanelRef.current &&
+        !linkedInGuidePanelRef.current.contains(event.target as Node)
+      ) {
+        setShowLinkedInGuide(false)
+      }
     }
     document.addEventListener('pointerdown', handleOutsideClick)
     return () => {
       document.removeEventListener('pointerdown', handleOutsideClick)
     }
-  }, [showSettings, searchOpen])
+  }, [showSettings, searchOpen, showLinkedInGuide])
 
   useEffect(() => {
     if (!showCircleStylePanel) return
@@ -1729,6 +1747,14 @@ function App() {
     return update
   }
 
+  // Set the board cursor imperatively (avoids a re-render). The hand only shows
+  // while a real pan/drag is happening; resting and clicking keep the arrow, and
+  // anything interactive under the pointer shows the pointer cursor.
+  function setSurfaceCursor(value: string) {
+    const surface = surfaceRef.current
+    if (surface && surface.style.cursor !== value) surface.style.cursor = value
+  }
+
   function handleSurfacePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     if (event.pointerType !== 'touch' && event.button !== 0 && event.button !== 2) return
     const isRightClick = event.pointerType !== 'touch' && event.button === 2
@@ -1870,7 +1896,12 @@ function App() {
             setSelectedCircleIds([])
             selectItem({ type: 'circle', id: hit.circle.id })
           }
-          if (centerBehavior === 'connect') {
+          // When this zone is part of a multi/mixed selection, grabbing its center
+          // drags the whole group instead of starting a connector.
+          const isGroupDrag =
+            selectedCircleIds.includes(hit.circle.id) &&
+            selectedCircleIds.length + selectedPeopleIds.length > 1
+          if (centerBehavior === 'connect' && !isGroupDrag) {
             startConnector(event, hit.circle.id, 'circle', hit.circle.x, hit.circle.y)
           } else {
             startCircleMove(event, hit.circle)
@@ -1958,6 +1989,7 @@ function App() {
       marqueeRef.current.currentX = event.clientX
       marqueeRef.current.currentY = event.clientY
       setMarquee({ ...marqueeRef.current })
+      setSurfaceCursor('crosshair')
       return
     }
 
@@ -2053,11 +2085,16 @@ function App() {
       ensureGestureSnapshot()
       const deltaX = (event.clientX - movingPerson.startX) / camera.scale
       const deltaY = (event.clientY - movingPerson.startY) / camera.scale
-      const { selectedOrigins } = movingPerson
+      const { selectedOrigins, circleOrigins } = movingPerson
       pendingGraphRef.current = (current) =>
         ensureContainment(
           {
             ...current,
+            circles: current.circles.map((c) =>
+              circleOrigins && c.id in circleOrigins
+                ? { ...c, x: circleOrigins[c.id].x + deltaX, y: circleOrigins[c.id].y + deltaY }
+                : c
+            ),
             people: current.people.map((person) => {
               if (selectedOrigins && person.id in selectedOrigins) {
                 const origin = selectedOrigins[person.id]
@@ -2085,6 +2122,7 @@ function App() {
       const world = screenToWorld({ x: event.clientX, y: event.clientY })
       pendingConnectorRef.current = { ...connector, endX: world.x, endY: world.y }
       scheduleDrag()
+      setSurfaceCursor('grabbing')
       return
     }
 
@@ -2098,9 +2136,13 @@ function App() {
       if (id !== hoveredPersonId) setHoveredPersonId(id)
       const connId = hit?.type === 'connection' ? hit.connection.id : null
       if (connId !== hoveredConnId) setHoveredConnId(connId)
+      // Pointer over anything interactive, plain arrow over the empty board.
+      setSurfaceCursor(hit ? 'pointer' : 'default')
     } else {
       if (hoveredPersonId) setHoveredPersonId(null)
       if (hoveredConnId) setHoveredConnId(null)
+      // A real pan or drag is in progress → closed hand.
+      setSurfaceCursor('grabbing')
     }
   }
 
@@ -2109,6 +2151,14 @@ function App() {
     if (activePointersRef.current.length < 2) {
       pinchRef.current = null
     }
+
+    // Gesture is ending: drop the hand and restore the idle cursor based on what's
+    // under the pointer now.
+    const upHit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
+      x: event.clientX,
+      y: event.clientY,
+    })
+    setSurfaceCursor(upHit ? 'pointer' : 'default')
 
     if (marqueeRef.current) {
       const startX = marqueeRef.current.startX
@@ -2348,7 +2398,8 @@ function App() {
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
 
-    const targets = selectedCircleIds.includes(circle.id) ? selectedCircleIds : [circle.id]
+    const draggingSelection = selectedCircleIds.includes(circle.id)
+    const targets = draggingSelection ? selectedCircleIds : [circle.id]
     const subtreeIds = new Set<string>()
     for (const cid of targets) {
       subtreeIds.add(cid)
@@ -2364,6 +2415,14 @@ function App() {
     }
     for (const p of graph.people) {
       if (subtreeIds.has(p.circleId)) personOrigins[p.id] = { x: p.x, y: p.y }
+    }
+
+    // Mixed selection: drag any loosely-selected people along with the zones.
+    if (draggingSelection) {
+      for (const pid of selectedPeopleIds) {
+        const p = boardIndex.peopleById.get(pid)
+        if (p && !(p.id in personOrigins)) personOrigins[p.id] = { x: p.x, y: p.y }
+      }
     }
 
     moveCircleRef.current = {
@@ -2387,11 +2446,33 @@ function App() {
     selectItem({ type: 'person', id: person.id })
 
     const selectedOrigins: Record<string, { x: number; y: number }> = {}
-    const targets = selectedPeopleIds.includes(person.id) ? selectedPeopleIds : [person.id]
+    const draggingSelection = selectedPeopleIds.includes(person.id)
+    const targets = draggingSelection ? selectedPeopleIds : [person.id]
     for (const pid of targets) {
       const p = boardIndex.peopleById.get(pid)
       if (p) {
         selectedOrigins[pid] = { x: p.x, y: p.y }
+      }
+    }
+
+    // Mixed selection: when the grabbed person is part of the selection and zones
+    // are selected too, drag those zones (and everything inside them) along.
+    const circleOrigins: Record<string, { x: number; y: number }> = {}
+    if (draggingSelection && selectedCircleIds.length > 0) {
+      const subtreeIds = new Set<string>()
+      for (const cid of selectedCircleIds) {
+        subtreeIds.add(cid)
+        for (const descId of getDescendantCircleIds(graph.circles, cid)) {
+          subtreeIds.add(descId)
+        }
+      }
+      for (const c of graph.circles) {
+        if (subtreeIds.has(c.id)) circleOrigins[c.id] = { x: c.x, y: c.y }
+      }
+      for (const p of graph.people) {
+        if (subtreeIds.has(p.circleId) && !(p.id in selectedOrigins)) {
+          selectedOrigins[p.id] = { x: p.x, y: p.y }
+        }
       }
     }
 
@@ -2403,6 +2484,7 @@ function App() {
       originX: person.x,
       originY: person.y,
       selectedOrigins,
+      circleOrigins,
     }
   }
 
@@ -2481,14 +2563,44 @@ function App() {
     const avgX = sumX / totalCount
     const avgY = sumY / totalCount
 
-    let parentCircleId = 'you'
-    if (selectedPeople.length > 0) {
-      parentCircleId = selectedPeople[0].circleId || 'you'
-    } else if (selectedCircles.length > 0) {
-      parentCircleId = selectedCircles[0].parentId || 'you'
+    // The new subset must be parented OUTSIDE everything it absorbs, otherwise the
+    // tree gets a cycle (subset -> child -> subset) and the layout recursion hangs
+    // the tab. Walk up from the natural parent, skipping any circle being merged
+    // (or a descendant of one). A null result means a top-level, independent
+    // subset — we never silently force it under "you".
+    const absorbed = new Set<string>(selectedCircleIds)
+    for (const cid of selectedCircleIds) {
+      for (const descId of getDescendantCircleIds(graph.circles, cid)) absorbed.add(descId)
     }
-    const parentCircle = circlesById.get(parentCircleId)
-    const parentName = parentCircle ? parentCircle.name : 'subset'
+    let parentCircleId: string | null = null
+    if (selectedPeople.length > 0) {
+      parentCircleId = selectedPeople[0].circleId || null
+    } else if (selectedCircles.length > 0) {
+      parentCircleId = selectedCircles[0].parentId ?? null
+    }
+    const walked = new Set<string>()
+    while (parentCircleId && absorbed.has(parentCircleId)) {
+      if (walked.has(parentCircleId)) {
+        parentCircleId = null
+        break
+      }
+      walked.add(parentCircleId)
+      parentCircleId = circlesById.get(parentCircleId)?.parentId ?? null
+    }
+
+    const parentCircle = parentCircleId ? circlesById.get(parentCircleId) : null
+    const newName = parentCircle ? `${parentCircle.name} subset` : 'Group'
+
+    // Pre-size the subset to contain everything it absorbs, so we don't rely on
+    // the heavy containment pass to grow it (and can skip that pass for big merges).
+    let radius = 82
+    for (const p of selectedPeople) {
+      radius = Math.max(radius, Math.hypot(p.x - avgX, p.y - avgY) + PERSON_CONTAINMENT_RADIUS)
+    }
+    for (const c of selectedCircles) {
+      radius = Math.max(radius, Math.hypot(c.x - avgX, c.y - avgY) + c.radius + CIRCLE_CONTAINMENT_PADDING)
+    }
+    radius = Math.ceil(radius)
 
     const newCircleId = `circle-${Date.now()}`
 
@@ -2496,11 +2608,11 @@ function App() {
     setGraph((current) => {
       const newCircle = {
         id: newCircleId,
-        name: `${parentName} subset`,
+        name: newName,
         icon: 'SUB',
         x: avgX,
         y: avgY,
-        radius: 82,
+        radius,
         minRadius: 82,
         parentId: parentCircleId,
         connectedTo: parentCircleId,
@@ -2510,31 +2622,18 @@ function App() {
         amplitude: 0,
       }
 
-      const nextCircles = current.circles.map((c) => {
-        if (selectedCircleIds.includes(c.id)) {
-          return {
-            ...c,
-            parentId: newCircleId,
-          }
-        }
-        return c
-      })
+      const nextCircles = current.circles.map((c) =>
+        selectedCircleIds.includes(c.id) ? { ...c, parentId: newCircleId } : c
+      )
 
-      const nextPeople = current.people.map((person) => {
-        if (selectedPeopleIds.includes(person.id)) {
-          return {
-            ...person,
-            circleId: newCircleId,
-          }
-        }
-        return person
-      })
+      const nextPeople = current.people.map((person) =>
+        selectedPeopleIds.includes(person.id) ? { ...person, circleId: newCircleId } : person
+      )
 
-      return ensureContainment({
-        ...current,
-        circles: [...nextCircles, newCircle],
-        people: nextPeople,
-      })
+      const merged = { ...current, circles: [...nextCircles, newCircle], people: nextPeople }
+      // The subset is already sized to hold its contents, so for very large merges
+      // skip the O(n^2) collision relax that would otherwise freeze the tab.
+      return totalCount > MERGE_LAYOUT_LIMIT ? merged : ensureContainment(merged)
     })
 
     selectItem({ type: 'circle', id: newCircleId })
@@ -2879,9 +2978,23 @@ function App() {
           </strong>
           <div style={{ marginTop: '12px', display: 'grid', gap: '16px' }}>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 500, color: 'rgba(28, 37, 40, 0.64)', display: 'block', marginBottom: '8px' }}>
-                LinkedIn Data Import
-              </label>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 500, color: 'rgba(28, 37, 40, 0.64)' }}>
+                  LinkedIn Data Import
+                </label>
+                <button
+                  type="button"
+                  className="linkedin-guide-help"
+                  aria-label="How to sync your LinkedIn"
+                  title="How to sync your LinkedIn"
+                  onClick={() => {
+                    setShowSettings(false)
+                    setShowLinkedInGuide(true)
+                  }}
+                >
+                  ?
+                </button>
+              </div>
               <button
                 type="button"
                 className="m3-primary-button"
@@ -2960,7 +3073,67 @@ function App() {
         </div>
       )}
 
-
+      {showLinkedInGuide && (
+        <div ref={linkedInGuidePanelRef} className="linkedin-guide-panel">
+          <div className="linkedin-guide-panel__header">
+            <button
+              type="button"
+              className="linkedin-guide-panel__back"
+              aria-label="Back to settings"
+              onClick={() => {
+                setShowLinkedInGuide(false)
+                setShowSettings(true)
+              }}
+            >
+              <BackArrowIcon />
+            </button>
+            <strong className="linkedin-guide-panel__title">How to sync your LinkedIn</strong>
+          </div>
+          <div className="linkedin-guide-panel__steps">
+            {[
+              {
+                n: 1,
+                title: 'Open Settings & Privacy',
+                body: 'Open your LinkedIn profile menu (top-right "Me" icon) and click Settings & Privacy.',
+                img: '/linkedin-sync/settings-privacy.png',
+              },
+              {
+                n: 2,
+                title: 'Open Data privacy',
+                body: 'In Settings, select Data privacy from the left sidebar.',
+                img: '/linkedin-sync/data-privacy.png',
+              },
+              {
+                n: 3,
+                title: 'Open Download my data',
+                body: 'In the data section, press Download your data.',
+                img: '/linkedin-sync/download-data.png',
+              },
+              {
+                n: 4,
+                title: 'Request the larger archive',
+                body: 'Select the larger data archive, then press Request archive.',
+                img: '/linkedin-sync/request-archive.png',
+              },
+            ].map((step) => (
+              <div key={step.n} className="linkedin-guide-step">
+                <div className="linkedin-guide-step__copy">
+                  <span className="linkedin-guide-step__index">{step.n}</span>
+                  <div>
+                    <h3 className="linkedin-guide-step__title">{step.title}</h3>
+                    <p className="linkedin-guide-step__body">{step.body}</p>
+                  </div>
+                </div>
+                <img className="linkedin-guide-step__image" src={step.img} alt={step.title} />
+              </div>
+            ))}
+          </div>
+          <p className="linkedin-guide-panel__note">
+            Wait up to 24 hours. LinkedIn will email you when the archive is ready. After you
+            receive it, return here and press <strong>Import LinkedIn ZIP</strong>.
+          </p>
+        </div>
+      )}
 
       <div
         ref={surfaceRef}
@@ -4168,13 +4341,24 @@ function drawBoardLayer(
   ctx.scale(camera.scale, camera.scale)
 
   drawCircleFills(ctx, visibleCircles, selectedItem, camera.scale, circleShapeMode, circleFillMode, selectedCircleIds)
-  drawCircleEdges(ctx, visibleCircles, index, camera.scale)
-  drawPersonEdges(ctx, visiblePeople, visibleCircles, index, camera.scale)
-  drawCustomConnections(ctx, visiblePeopleIds, visibleCircleIds, index, selectedItem, hoveredConnId, camera.scale)
-  drawCircleDetails(ctx, visibleCircles, camera.scale, circleFillMode, showCircleLabels, anim.scales)
-  drawPeople(ctx, visiblePeople, index, selectedItem, hoveredPersonId, camera.scale, dpr, showPersonLabels, selectedPeopleIds, anim.scales)
-  if (connector) drawConnector(ctx, connector, camera.scale)
-  drawSelectionHandles(ctx, selectedItem, index, camera.scale)
+
+  if (camera.scale < ZONE_ONLY_SCALE) {
+    // Far-zoom simplified view: only the colored zones and the labels of the
+    // ones still large enough on screen to read. Everything else is hidden.
+    if (showCircleLabels) {
+      for (const circle of visibleCircles) {
+        if (circle.radius * camera.scale >= 26) drawCircleLabel(ctx, circle, camera.scale, true)
+      }
+    }
+  } else {
+    drawCircleEdges(ctx, visibleCircles, index, camera.scale)
+    drawPersonEdges(ctx, visiblePeople, visibleCircles, index, camera.scale)
+    drawCustomConnections(ctx, visiblePeopleIds, visibleCircleIds, index, selectedItem, hoveredConnId, camera.scale)
+    drawCircleDetails(ctx, visibleCircles, camera.scale, circleFillMode, showCircleLabels, anim.scales)
+    drawPeople(ctx, visiblePeople, index, selectedItem, hoveredPersonId, camera.scale, dpr, showPersonLabels, selectedPeopleIds, anim.scales)
+    if (connector) drawConnector(ctx, connector, camera.scale)
+    drawSelectionHandles(ctx, selectedItem, index, camera.scale)
+  }
 
   ctx.restore()
 
@@ -4306,7 +4490,9 @@ function drawCircleFills(
       isSelected
         ? Math.max(3.5 / scale, 2)
         : Math.max((isTransparent ? 2.2 : 1.4) / scale, isTransparent ? 1.4 : 0.9)
-    if (isTransparent) ctx.setLineDash([8 / scale, 7 / scale])
+    // Transparent zones use a dashed outline, but a selected zone draws solid
+    // so the selection reads as a continuous ring without gaps.
+    if (isTransparent && !isSelected) ctx.setLineDash([8 / scale, 7 / scale])
     ctx.stroke(path)
     ctx.restore()
   }
@@ -4378,8 +4564,8 @@ function drawCircleCenter(ctx: CanvasRenderingContext2D, circle: CircleNode, sca
   ctx.restore()
 }
 
-function drawCircleLabel(ctx: CanvasRenderingContext2D, circle: CircleNode, scale: number) {
-  if (scale < 0.42) return
+function drawCircleLabel(ctx: CanvasRenderingContext2D, circle: CircleNode, scale: number, force = false) {
+  if (!force && scale < 0.42) return
   const fontSize = 13 / scale
   ctx.save()
   ctx.font = `500 ${fontSize}px Inter, system-ui, sans-serif`
@@ -4421,9 +4607,11 @@ function drawPeople(
   for (const person of people) {
     const circle = index.circlesById.get(person.circleId)
     const circleColor = circle ? getCircleColors(circle).centerBg : MATERIAL_TONES.blue.centerBg
-    const isSelected = (selectedItem?.type === 'person' && selectedItem.id === person.id) || selectedPeopleIds.includes(person.id)
+    const isSingleSelected = selectedItem?.type === 'person' && selectedItem.id === person.id
+    const isMarqueeSelected = selectedPeopleIds.includes(person.id)
+    const isSelected = isSingleSelected || isMarqueeSelected
     const isHovered = hoveredPersonId === person.id
-    const stroke = isSelected ? '#00629d' : isHovered ? '#64748b' : circleColor
+    const stroke = isSingleSelected ? '#00629d' : isHovered ? '#64748b' : circleColor
     const strokeWidth = isSelected || isHovered ? 2.5 : 1.5
     // Press bounce on selection + grow-in pop for new people (1 = at rest).
     const drawRadius = PERSON_VISUAL_RADIUS * (scales.get(person.id) ?? 1)
@@ -4434,6 +4622,21 @@ function drawPeople(
       drawRadius * 2,
       drawRadius * 2,
     )
+    // Marquee (right-click) selection: a clear ring just outside the disc, in a
+    // darker shade of the person's zone color so it reads on same-color fills.
+    if (isMarqueeSelected) {
+      // Small clear gap between the disc edge and the ring's *inner* edge, so the
+      // ring reads as a separate selection halo rather than a border on the disc.
+      const ringWidth = 2.5 / scale
+      const ringGap = 1.5 / scale
+      ctx.save()
+      ctx.beginPath()
+      ctx.arc(person.x, person.y, drawRadius + ringGap + ringWidth / 2, 0, Math.PI * 2)
+      ctx.strokeStyle = colorMix(circleColor, '#000000', 0.5)
+      ctx.lineWidth = ringWidth
+      ctx.stroke()
+      ctx.restore()
+    }
     if (person.isFavorite) drawFavoritePersonOutline(ctx, person, circleColor, scale)
     if (showPersonLabels && (scale >= 0.62 || isSelected || isHovered)) drawPersonLabel(ctx, person, scale)
   }
@@ -4639,84 +4842,6 @@ function ellipsize(ctx: CanvasRenderingContext2D, text: string, maxWidth: number
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value))
-}
-
-function createDemoGraphState(): GraphState {
-  const circles: CircleNode[] = [
-    makeCircle('you', 'You', 'YOU', 0, 0, 104, null, null, 'blue'),
-    makeCircle('eu', 'EU', '🇪🇺', 0, -600, 286, null, 'you', 'blue'),
-    makeCircle('denmark', 'Denmark', '🇩🇰', -30, 650, 276, null, 'you', 'red'),
-    makeCircle('russia', 'Russia', '🇷🇺', 720, 20, 286, null, 'you', 'blue'),
-    makeCircle('other', 'Other', '🌐', -720, 20, 268, null, 'you', 'red'),
-
-    makeCircle('sweden', 'Sweden', '🇸🇪', -92, -720, 62, 'eu', 'eu', 'blue'),
-    makeCircle('france', 'France', '🇫🇷', 112, -655, 64, 'eu', 'eu', 'blue'),
-    makeCircle('germany', 'Germany', '🇩🇪', 40, -462, 68, 'eu', 'eu', 'amber'),
-    makeCircle('netherlands', 'Netherlands', '🇳🇱', -160, -510, 62, 'eu', 'eu', 'red'),
-
-    makeCircle('pandora', 'Pandora', 'P', -26, 800, 78, 'denmark', 'denmark', 'red'),
-    makeCircle('lego', 'LEGO', 'LG', -190, 565, 62, 'denmark', 'denmark', 'amber'),
-    makeCircle('maersk', 'Maersk', 'MA', 150, 560, 62, 'denmark', 'denmark', 'blue'),
-    makeCircle('copenhagen', 'Copenhagen', 'CPH', -230, 770, 66, 'denmark', 'denmark', 'green'),
-
-    makeCircle('yandex', 'Yandex', 'YA', 840, -130, 68, 'russia', 'russia', 'amber'),
-    makeCircle('avito', 'Avito', 'AV', 858, 150, 68, 'russia', 'russia', 'green'),
-    makeCircle('media-ru', 'Media', 'TV', 600, 170, 62, 'russia', 'russia', 'violet'),
-    makeCircle('moscow', 'Moscow', '🏙️', 600, -170, 66, 'russia', 'russia', 'blue'),
-
-    makeCircle('usa-canada', 'US / Canada', '🌎', -890, -40, 72, 'other', 'other', 'blue'),
-    makeCircle('israel', 'Israel', '🇮🇱', -650, -150, 62, 'other', 'other', 'blue'),
-    makeCircle('japan', 'Japan', '🇯🇵', -595, 150, 62, 'other', 'other', 'red'),
-    makeCircle('singapore', 'Singapore', '🇸🇬', -780, 200, 62, 'other', 'other', 'green'),
-  ]
-
-  const people: PersonNode[] = [
-    makePerson('me-a', 'Artem', 'Founder', -46, -28, 'you', 'AR', true),
-    makePerson('me-b', 'Mira', 'Research', 38, -10, 'you', 'MI'),
-    makePerson('me-c', 'Noah', 'Advisor', 8, 60, 'you', 'NO'),
-
-    makePerson('se-1', 'Elin', 'IKEA growth', -126, -740, 'sweden', 'EL'),
-    makePerson('se-2', 'Jonas', 'Fintech', -58, -698, 'sweden', 'JO'),
-    makePerson('fr-1', 'Camille', 'Policy', 78, -682, 'france', 'CA'),
-    makePerson('fr-2', 'Louis', 'Climate tech', 146, -636, 'france', 'LO'),
-    makePerson('de-1', 'Hanna', 'Operations', 6, -486, 'germany', 'HA'),
-    makePerson('de-2', 'Felix', 'Investor', 74, -440, 'germany', 'FE'),
-    makePerson('nl-1', 'Sanne', 'Marketplace', -192, -532, 'netherlands', 'SA'),
-    makePerson('nl-2', 'Milan', 'Logistics', -126, -488, 'netherlands', 'MI'),
-
-    makePerson('pan-1', 'Freja', 'Product', -70, 784, 'pandora', 'FR', true),
-    makePerson('pan-2', 'Sofie', 'Brand', -26, 752, 'pandora', 'SO'),
-    makePerson('pan-3', 'Mads', 'Retail', 22, 792, 'pandora', 'MA'),
-    makePerson('pan-4', 'Nikolaj', 'Data', -4, 846, 'pandora', 'NI'),
-    makePerson('lego-1', 'Liva', 'Partnerships', -220, 545, 'lego', 'LI'),
-    makePerson('lego-2', 'Oscar', 'Design lead', -162, 590, 'lego', 'OC'),
-    makePerson('maersk-1', 'Aksel', 'Shipping', 120, 540, 'maersk', 'AK'),
-    makePerson('maersk-2', 'Ida', 'Strategy', 178, 584, 'maersk', 'ID'),
-    makePerson('cph-1', 'Nora', 'Community', -260, 748, 'copenhagen', 'NO'),
-    makePerson('cph-2', 'Viktor', 'AI builder', -202, 792, 'copenhagen', 'VI'),
-
-    makePerson('yan-1', 'Dmitry', 'Search', 812, -154, 'yandex', 'DM'),
-    makePerson('yan-2', 'Irina', 'Maps', 874, -110, 'yandex', 'IR'),
-    makePerson('avi-1', 'Oleg', 'Marketplace', 830, 128, 'avito', 'OL', true),
-    makePerson('avi-2', 'Anya', 'Trust', 892, 174, 'avito', 'AN'),
-    makePerson('med-1', 'Vera', 'Journalist', 572, 148, 'media-ru', 'VE'),
-    makePerson('med-2', 'Pavel', 'Analyst', 632, 192, 'media-ru', 'PA'),
-    makePerson('msk-1', 'Katya', 'VC', 570, -194, 'moscow', 'KA'),
-    makePerson('msk-2', 'Sergey', 'Founder', 632, -150, 'moscow', 'SE'),
-
-    makePerson('na-1', 'Grace', 'Canada', -924, -62, 'usa-canada', 'GR'),
-    makePerson('na-2', 'Ethan', 'US sales', -858, -18, 'usa-canada', 'ET'),
-    makePerson('il-1', 'Yael', 'Cybersecurity', -680, -174, 'israel', 'YA'),
-    makePerson('il-2', 'Ari', 'Investor', -622, -130, 'israel', 'AR'),
-    makePerson('jp-1', 'Ren', 'Robotics', -622, 126, 'japan', 'RE'),
-    makePerson('jp-2', 'Yuki', 'Enterprise', -566, 172, 'japan', 'YU'),
-    makePerson('sg-1', 'Mei', 'APAC ops', -808, 178, 'singapore', 'ME'),
-    makePerson('sg-2', 'Kai', 'Fintech', -750, 222, 'singapore', 'KA'),
-  ]
-
-  const connections: Connection[] = []
-
-  return { circles, people, connections }
 }
 
 function parseCSV(text: string): string[][] {
@@ -5147,52 +5272,6 @@ function makeCircle(
     sides: Math.max(8, Math.round(radius / 10)),
     amplitude: Math.max(4, Math.round(radius * 0.055)),
   }
-}
-
-function makePerson(
-  id: string,
-  name: string,
-  role: string,
-  x: number,
-  y: number,
-  circleId: string,
-  avatar: string,
-  isFavorite = false,
-): PersonNode {
-  return {
-    id,
-    name,
-    role,
-    x,
-    y,
-    circleId,
-    avatar,
-    shapeType: 'circle',
-    sides: 10,
-    amplitude: 0,
-    isFavorite,
-  }
-}
-
-function createInitialGraph() {
-  return ensureContainment({
-    circles: DEFAULT_STATE.circles.map((circle) => ({
-      ...circle,
-      shapeType: circle.shapeType ?? 'wavy',
-      sides: circle.sides ?? Math.max(8, Math.round(circle.radius / 10)),
-      amplitude: circle.amplitude ?? Math.max(4, circle.radius * 0.06),
-    })),
-    people: DEFAULT_STATE.people.map((person) => {
-      const sides = Math.floor(Math.random() * 5) + 8
-      return {
-        ...person,
-        shapeType: person.shapeType ?? 'polygon',
-        sides: person.sides ?? sides,
-        amplitude: person.amplitude ?? 2,
-      }
-    }),
-    connections: DEFAULT_STATE.connections.map((connection) => ({ ...connection })),
-  })
 }
 
 // A blank canvas for a brand-new account: just the central "you" circle.
@@ -5693,6 +5772,27 @@ function UploadIcon() {
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
       <polyline points="17 8 12 3 7 8" />
       <line x1="12" y1="3" x2="12" y2="15" />
+    </svg>
+  )
+}
+
+function BackArrowIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      style={{
+        width: '18px',
+        height: '18px',
+        fill: 'none',
+        stroke: 'currentColor',
+        strokeWidth: 2,
+        strokeLinecap: 'round',
+        strokeLinejoin: 'round',
+      }}
+    >
+      <line x1="19" y1="12" x2="5" y2="12" />
+      <polyline points="12 19 5 12 12 5" />
     </svg>
   )
 }
