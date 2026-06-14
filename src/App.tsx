@@ -868,6 +868,7 @@ function App() {
   // Person currently under the cursor — promoted to an interactive DOM node so it
   // can be clicked/dragged even inside a dense circle that's otherwise canvas-only.
   const [hoveredPersonId, setHoveredPersonId] = useState<string | null>(null)
+  const [hoveredCircleEdgeId, setHoveredCircleEdgeId] = useState<string | null>(null)
 
   // Viewport size in CSS px, used to cull off-screen nodes. Updated on resize.
   const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight })
@@ -903,25 +904,92 @@ function App() {
   const searchPanelRef = useRef<HTMLDivElement>(null)
   const focusAnimRef = useRef<number | null>(null)
 
-  // Onboarding tour: -1 means inactive/finished. Brand-new visitors start at the
-  // welcome card; each instructional step auto-advances when its gesture happens.
-  const [onboardingStep, setOnboardingStep] = useState(() => (hasSeenOnboarding() ? -1 : 0))
+  // Onboarding tour. -1 = inactive. A ref mirrors the step so board event
+  // handlers (wired once in effects) always read the live value.
+  const [onboardingStep, setOnboardingStep] = useState(-1)
+  const onboardingStepRef = useRef(onboardingStep)
+  useEffect(() => {
+    onboardingStepRef.current = onboardingStep
+  }, [onboardingStep])
+  // True during the brief "Great!" beat that plays after a gesture, before the
+  // card advances to the next step.
+  const [onboardingCelebrating, setOnboardingCelebrating] = useState(false)
+  const onboardingCelebrateRef = useRef(false)
+  const onboardingTimerRef = useRef<number | null>(null)
+  const onboardingDecidedRef = useRef(false)
+
+  // Decide once per load whether to open the tour. On the dev server it always
+  // opens for signed-out visitors (acts as the landing); in production it shows
+  // only once ever, tracked in localStorage — so it isn't a popup on every visit.
+  useEffect(() => {
+    if (onboardingDecidedRef.current) return
+    if (!graphLoaded || auth.status === 'loading') return
+    onboardingDecidedRef.current = true
+    const isSignedOut = auth.status === 'anonymous' || auth.status === 'unconfigured'
+    const devAlwaysShow = import.meta.env.DEV && isSignedOut
+    if (devAlwaysShow || !hasSeenOnboarding()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setOnboardingStep(0)
+      // Outside the dev "always show" path, count this as the one-and-only
+      // showing right away — so a reload or abandon doesn't re-pop it in prod.
+      if (!devAlwaysShow) markOnboardingSeen()
+    }
+  }, [graphLoaded, auth.status])
+
+  function clearOnboardingTimer() {
+    if (onboardingTimerRef.current != null) {
+      window.clearTimeout(onboardingTimerRef.current)
+      onboardingTimerRef.current = null
+    }
+    onboardingCelebrateRef.current = false
+    setOnboardingCelebrating(false)
+  }
 
   function finishOnboarding() {
+    clearOnboardingTimer()
     setOnboardingStep(-1)
     markOnboardingSeen()
   }
 
-  // Called from board interaction handlers. If the current tour step is waiting
-  // for this exact action, advance; reaching the closing card persists the flag.
-  function notifyOnboarding(action: OnboardingAction) {
+  function onboardingNext() {
+    clearOnboardingTimer()
     setOnboardingStep((step) => {
-      if (step < 0 || step >= ONBOARDING_DONE_STEP) return step
-      if (ONBOARDING_STEPS[step].trigger !== action) return step
+      if (step < 0) return step
+      if (step >= ONBOARDING_DONE_STEP) {
+        markOnboardingSeen()
+        return -1
+      }
       const next = step + 1
       if (next === ONBOARDING_DONE_STEP) markOnboardingSeen()
       return next
     })
+  }
+
+  function onboardingBack() {
+    clearOnboardingTimer()
+    setOnboardingStep((step) => (step > 0 ? step - 1 : step))
+  }
+
+  // Called from board interaction handlers. When the action matches the step the
+  // tour is waiting for, play a one-second "Great!" beat, then advance.
+  function notifyOnboarding(action: OnboardingAction) {
+    const step = onboardingStepRef.current
+    if (step < 0 || step >= ONBOARDING_DONE_STEP) return
+    if (ONBOARDING_STEPS[step].trigger !== action) return
+    if (onboardingCelebrateRef.current) return
+    onboardingCelebrateRef.current = true
+    setOnboardingCelebrating(true)
+    onboardingTimerRef.current = window.setTimeout(() => {
+      onboardingTimerRef.current = null
+      onboardingCelebrateRef.current = false
+      setOnboardingCelebrating(false)
+      setOnboardingStep((s) => {
+        if (s < 0 || s >= ONBOARDING_DONE_STEP) return s
+        const next = s + 1
+        if (next === ONBOARDING_DONE_STEP) markOnboardingSeen()
+        return next
+      })
+    }, 1100)
   }
 
   // The closing "you're ready" card dismisses itself after a beat so it never
@@ -1620,6 +1688,7 @@ function App() {
         selectedPeopleIds,
         marqueeRef.current,
         selectedCircleIds,
+        hoveredCircleEdgeId,
       )
     }
   }
@@ -1712,6 +1781,7 @@ function App() {
       selectedPeopleIds,
       marquee,
       selectedCircleIds,
+      hoveredCircleEdgeId,
       frame,
     )
   }
@@ -1778,6 +1848,7 @@ function App() {
     imageEpoch,
     marquee,
     selectedCircleIds,
+    hoveredCircleEdgeId,
   ])
 
   useEffect(() => {
@@ -2217,6 +2288,30 @@ function App() {
       return
     }
 
+    // Cursor handling based on active state / hover
+    if (pan || moving || movingPerson) {
+      if (surfaceRef.current) surfaceRef.current.style.cursor = 'grabbing'
+    } else if (resizing) {
+      const circle = graph.circles.find((c) => c.id === resizing.circleId)
+      if (circle) {
+        const world = screenToWorld({ x: event.clientX, y: event.clientY })
+        if (surfaceRef.current) surfaceRef.current.style.cursor = getResizeCursor(world, circle)
+      }
+    } else {
+      const hit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
+        x: event.clientX,
+        y: event.clientY,
+      })
+      if (hit?.type === 'circle-edge') {
+        const world = screenToWorld({ x: event.clientX, y: event.clientY })
+        if (surfaceRef.current) surfaceRef.current.style.cursor = getResizeCursor(world, hit.circle)
+      } else if (hit?.type === 'person' || hit?.type === 'circle-center' || hit?.type === 'connection' || hit?.type === 'connector-handle') {
+        if (surfaceRef.current) surfaceRef.current.style.cursor = 'pointer'
+      } else {
+        if (surfaceRef.current) surfaceRef.current.style.cursor = ''
+      }
+    }
+
     // Idle hover is canvas hit-testing now; React only stores the hovered ids.
     if (!pan && !moving && !movingPerson && !resizing) {
       const hit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
@@ -2227,13 +2322,19 @@ function App() {
       if (id !== hoveredPersonId) setHoveredPersonId(id)
       const connId = hit?.type === 'connection' ? hit.connection.id : null
       if (connId !== hoveredConnId) setHoveredConnId(connId)
+      const edgeId = hit?.type === 'circle-edge' ? hit.circle.id : null
+      if (edgeId !== hoveredCircleEdgeId) setHoveredCircleEdgeId(edgeId)
     } else {
       if (hoveredPersonId) setHoveredPersonId(null)
       if (hoveredConnId) setHoveredConnId(null)
+      if (hoveredCircleEdgeId) setHoveredCircleEdgeId(null)
     }
   }
 
   function handleSurfacePointerUp(event: ReactPointerEvent<HTMLDivElement>) {
+    if (surfaceRef.current) {
+      surfaceRef.current.style.cursor = ''
+    }
     activePointersRef.current = activePointersRef.current.filter((p) => p.pointerId !== event.pointerId)
     if (activePointersRef.current.length < 2) {
       pinchRef.current = null
@@ -3125,6 +3226,8 @@ function App() {
         onPointerLeave={() => {
           if (hoveredPersonId) setHoveredPersonId(null)
           if (hoveredConnId) setHoveredConnId(null)
+          if (hoveredCircleEdgeId) setHoveredCircleEdgeId(null)
+          if (surfaceRef.current) surfaceRef.current.style.cursor = ''
         }}
       >
         <canvas ref={peopleCanvasRef} className="board-canvas-layer" aria-label="Relationship board" />
@@ -4152,10 +4255,9 @@ function App() {
       {graphLoaded && !demoMode && onboardingStep >= 0 && (
         <OnboardingCoach
           step={onboardingStep}
-          onNext={() => {
-            if (onboardingStep >= ONBOARDING_DONE_STEP) finishOnboarding()
-            else setOnboardingStep((s) => (s < 0 ? s : s + 1))
-          }}
+          celebrating={onboardingCelebrating}
+          onNext={onboardingNext}
+          onBack={onboardingBack}
           onSkip={finishOnboarding}
           onOpenSearch={() => {
             setShowSettings(false)
@@ -4494,6 +4596,7 @@ function drawBoardLayer(
   selectedPeopleIds: string[] = [],
   marquee: MarqueeState | null = null,
   selectedCircleIds: string[] = [],
+  hoveredCircleEdgeId: string | null = null,
   anim: AnimFrame = EMPTY_ANIM_FRAME,
 ) {
   const { dpr, width, height } = resizeCanvas(canvas, surface)
@@ -4513,7 +4616,7 @@ function drawBoardLayer(
   ctx.translate(camera.x, camera.y)
   ctx.scale(camera.scale, camera.scale)
 
-  drawCircleFills(ctx, visibleCircles, selectedItem, camera.scale, circleShapeMode, circleFillMode, selectedCircleIds)
+  drawCircleFills(ctx, visibleCircles, selectedItem, camera.scale, circleShapeMode, circleFillMode, selectedCircleIds, hoveredCircleEdgeId)
   drawCircleEdges(ctx, visibleCircles, index, camera.scale)
   drawPersonEdges(ctx, visiblePeople, visibleCircles, index, camera.scale)
   drawCustomConnections(ctx, visiblePeopleIds, visibleCircleIds, index, selectedItem, hoveredConnId, camera.scale)
@@ -4629,6 +4732,7 @@ function drawCircleFills(
   circleShapeMode: CircleShapeMode,
   circleFillMode: CircleFillMode,
   selectedCircleIds: string[] = [],
+  hoveredCircleEdgeId: string | null = null,
 ) {
   for (const circle of circles) {
     const tone = getCircleColors(circle)
@@ -4645,13 +4749,27 @@ function drawCircleFills(
     ctx.fill(path)
     ctx.restore()
 
-    ctx.save()
-    ctx.strokeStyle = tone.border
     const isSelected = (selectedItem?.type === 'circle' && selectedItem.id === circle.id) || selectedCircleIds.includes(circle.id)
+    const isEdgeHovered = hoveredCircleEdgeId === circle.id
+
+    if (isEdgeHovered && !isSelected) {
+      ctx.save()
+      ctx.strokeStyle = '#64748b'
+      ctx.globalAlpha = 0.18
+      ctx.lineWidth = Math.max(8 / scale, 5)
+      if (isTransparent) ctx.setLineDash([8 / scale, 7 / scale])
+      ctx.stroke(path)
+      ctx.restore()
+    }
+
+    ctx.save()
+    ctx.strokeStyle = isSelected ? tone.border : isEdgeHovered ? '#64748b' : tone.border
     ctx.lineWidth =
       isSelected
         ? Math.max(3.5 / scale, 2)
-        : Math.max((isTransparent ? 2.2 : 1.4) / scale, isTransparent ? 1.4 : 0.9)
+        : isEdgeHovered
+          ? Math.max(2.8 / scale, 1.8)
+          : Math.max((isTransparent ? 2.2 : 1.4) / scale, isTransparent ? 1.4 : 0.9)
     if (isTransparent) ctx.setLineDash([8 / scale, 7 / scale])
     ctx.stroke(path)
     ctx.restore()
@@ -5687,33 +5805,99 @@ function pullCircleContentsTowardCenter(
   circle: CircleNode,
   radiusRatio: number,
 ): GraphState {
-  const descendantCircleIds = getDescendantCircleIds(state.circles, circleId)
-  const containedCircleIds = new Set(descendantCircleIds)
-  containedCircleIds.add(circleId)
-  const scale = clamp(radiusRatio, 0.12, 1)
+  const requestedRadius = circle.radius * radiusRatio
 
-  function pullPoint(point: { x: number; y: number }) {
-    return {
-      x: circle.x + (point.x - circle.x) * scale,
-      y: circle.y + (point.y - circle.y) * scale,
+  const circles = state.circles.map((c) => ({ ...c }))
+  const people = state.people.map((p) => ({ ...p }))
+
+  const circlesById = new Map(circles.map((c) => [c.id, c]))
+  const descendantCircleIds = getDescendantCircleIds(circles, circleId)
+
+  // Temporarily update root circle's radius for nested containment check
+  const rootCircle = circlesById.get(circleId)
+  if (rootCircle) {
+    rootCircle.radius = requestedRadius
+  }
+
+  // Process descendant circles in tree order starting from circleId
+  const queue = [circleId]
+  while (queue.length > 0) {
+    const parentId = queue.shift()!
+    const parent = circlesById.get(parentId)!
+
+    const children = circles.filter((c) => c.parentId === parentId)
+    for (const child of children) {
+      const dx = child.x - parent.x
+      const dy = child.y - parent.y
+      const d = Math.hypot(dx, dy)
+
+      const maxAllowed = parent.radius - child.radius - CIRCLE_CONTAINMENT_PADDING
+      if (d > maxAllowed) {
+        if (maxAllowed < 0) {
+          const newRadius = Math.max(MIN_CIRCLE_RADIUS, parent.radius - CIRCLE_CONTAINMENT_PADDING)
+          child.radius = newRadius
+          child.minRadius = Math.max(MIN_CIRCLE_RADIUS, child.minRadius * radiusRatio)
+          child.x = parent.x
+          child.y = parent.y
+        } else {
+          if (d > 0.0001) {
+            child.x = parent.x + (dx / d) * maxAllowed
+            child.y = parent.y + (dy / d) * maxAllowed
+          } else {
+            child.x = parent.x
+            child.y = parent.y
+          }
+        }
+      }
+      queue.push(child.id)
     }
   }
 
+  circles.forEach((c) => {
+    circlesById.set(c.id, c)
+  })
+
+  const containedCircleIds = new Set(descendantCircleIds)
+  containedCircleIds.add(circleId)
+
+  const updatedPeople = people.map((person) => {
+    if (containedCircleIds.has(person.circleId)) {
+      const parent = circlesById.get(person.circleId)
+      if (!parent) return person
+
+      const dx = person.x - parent.x
+      const dy = person.y - parent.y
+      const d = Math.hypot(dx, dy)
+
+      const maxAllowed = parent.radius - PERSON_CONTAINMENT_RADIUS
+      if (d > maxAllowed) {
+        const targetD = Math.max(0, maxAllowed)
+        if (d > 0.0001) {
+          return {
+            ...person,
+            x: parent.x + (dx / d) * targetD,
+            y: parent.y + (dy / d) * targetD,
+          }
+        } else {
+          return {
+            ...person,
+            x: parent.x,
+            y: parent.y,
+          }
+        }
+      }
+    }
+    return person
+  })
+
   return {
     ...state,
-    circles: state.circles.map((candidate) =>
-      descendantCircleIds.has(candidate.id)
-        ? {
-            ...candidate,
-            ...pullPoint(candidate),
-            radius: Math.max(MIN_CIRCLE_RADIUS, candidate.radius * scale),
-            minRadius: Math.max(MIN_CIRCLE_RADIUS, candidate.minRadius * scale),
-          }
-        : candidate,
-    ),
-    people: state.people.map((person) =>
-      containedCircleIds.has(person.circleId) ? { ...person, ...pullPoint(person) } : person,
-    ),
+    circles: state.circles.map((c) => {
+      if (c.id === circleId) return c
+      const updated = circlesById.get(c.id)
+      return updated ? updated : c
+    }),
+    people: updatedPeople,
   }
 }
 
@@ -6108,4 +6292,21 @@ function GoogleIcon() {
   return <img className="google-icon" src={googleIcon} alt="" aria-hidden="true" />
 }
 
+function getResizeCursor(point: { x: number; y: number }, circle: { x: number; y: number }): string {
+  const dx = point.x - circle.x
+  const dy = point.y - circle.y
+  let deg = (Math.atan2(dy, dx) * 180) / Math.PI
+  if (deg < 0) deg += 360
+
+  if (deg >= 337.5 || deg < 22.5) return 'ew-resize'
+  if (deg >= 22.5 && deg < 67.5) return 'nwse-resize'
+  if (deg >= 67.5 && deg < 112.5) return 'ns-resize'
+  if (deg >= 112.5 && deg < 157.5) return 'nesw-resize'
+  if (deg >= 157.5 && deg < 202.5) return 'ew-resize'
+  if (deg >= 202.5 && deg < 247.5) return 'nwse-resize'
+  if (deg >= 247.5 && deg < 292.5) return 'ns-resize'
+  return 'nesw-resize'
+}
+
 export default App
+
