@@ -123,10 +123,19 @@ type SelectedItem =
   | null
 
 type SearchResult = {
-  kind: 'person' | 'circle'
+  kind: 'person' | 'circle' | 'linkedin-profile'
   id: string
   name: string
   sub: string
+}
+
+type LinkedInProfileImport = {
+  url: string
+  slug: string
+  name: string
+  company: string
+  headline: string
+  avatarUrl?: string
 }
 
 type CircleShapeMode = 'circles' | 'figures'
@@ -378,6 +387,99 @@ function normalizeLinkInput(rawValue: string, service: PersonLinkService): { lab
   return {
     label: cleanHandle || value,
     url: /^https?:\/\//i.test(value) ? value : `https://${value}`,
+  }
+}
+
+function normalizeLinkedInProfileUrl(rawValue: string): string | null {
+  const value = rawValue.trim()
+  if (!value) return null
+  const withProtocol = /^https?:\/\//i.test(value) ? value : `https://${value}`
+  try {
+    const url = new URL(withProtocol)
+    const host = url.hostname.toLowerCase().replace(/^www\./, '')
+    if (host !== 'linkedin.com') return null
+    const pathParts = url.pathname.split('/').filter(Boolean)
+    if (!['in', 'pub'].includes(pathParts[0] ?? '') || !pathParts[1]) return null
+    return `https://www.linkedin.com/${pathParts[0]}/${pathParts[1]}/`
+  } catch {
+    return null
+  }
+}
+
+function getLinkedInSlug(profileUrl: string) {
+  try {
+    const url = new URL(profileUrl)
+    return url.pathname.split('/').filter(Boolean)[1] ?? 'profile'
+  } catch {
+    return 'profile'
+  }
+}
+
+function titleCaseSlug(slug: string) {
+  return slug
+    .replace(/[._-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+function parseLinkedInTitle(title: string) {
+  const cleanTitle = title.replace(/\s*\|\s*LinkedIn\s*$/i, '').trim()
+  const parts = cleanTitle.split(/\s+-\s+/).map((part) => part.trim()).filter(Boolean)
+  return {
+    name: parts[0] ?? '',
+    headline: parts.slice(1).join(' - '),
+    company: parts.length >= 3 ? parts[parts.length - 1] : '',
+  }
+}
+
+function getMetaContent(document: Document, property: string) {
+  return (
+    document.querySelector(`meta[property="${property}"]`)?.getAttribute('content') ??
+    document.querySelector(`meta[name="${property}"]`)?.getAttribute('content') ??
+    ''
+  ).trim()
+}
+
+async function fetchLinkedInProfileMetadata(profileUrl: string): Promise<Partial<LinkedInProfileImport>> {
+  try {
+    const response = await fetch(profileUrl, { credentials: 'omit' })
+    if (!response.ok) return {}
+    const html = await response.text()
+    const document = new DOMParser().parseFromString(html, 'text/html')
+    const title = getMetaContent(document, 'og:title') || document.title
+    const description = getMetaContent(document, 'og:description')
+    const parsedTitle = parseLinkedInTitle(title)
+    return {
+      name: parsedTitle.name,
+      headline: parsedTitle.headline || description,
+      company: parsedTitle.company,
+      avatarUrl: getMetaContent(document, 'og:image') || undefined,
+    }
+  } catch {
+    return {}
+  }
+}
+
+async function buildLinkedInProfileImport(rawValue: string): Promise<LinkedInProfileImport | null> {
+  const url = normalizeLinkedInProfileUrl(rawValue)
+  if (!url) return null
+  const slug = getLinkedInSlug(url)
+  const metadata = await fetchLinkedInProfileMetadata(url)
+  const fallbackName = titleCaseSlug(slug)
+  const name = (metadata.name || fallbackName || 'LinkedIn Connection').trim()
+  const company = (metadata.company || 'Unknown Company').trim()
+  const headline = (metadata.headline || company || 'LinkedIn connection').trim()
+  return {
+    url,
+    slug,
+    name,
+    company,
+    headline,
+    avatarUrl: metadata.avatarUrl,
   }
 }
 
@@ -652,6 +754,7 @@ function App() {
   // circles (the "tags"), then flies the camera to the picked node.
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [isImportingLinkedInProfile, setIsImportingLinkedInProfile] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const searchPanelRef = useRef<HTMLDivElement>(null)
   const focusAnimRef = useRef<number | null>(null)
@@ -692,7 +795,35 @@ function App() {
     setSearchQuery('')
   }
 
+  async function handleImportLinkedInProfileFromSearch() {
+    if (isImportingLinkedInProfile) return
+    const profileUrl = normalizeLinkedInProfileUrl(searchQuery)
+    if (!profileUrl) return
+    setIsImportingLinkedInProfile(true)
+    try {
+      const profile = await buildLinkedInProfileImport(profileUrl)
+      if (!profile) return
+
+      const next = addLinkedInProfileToGraph(graph, profile)
+      pushHistory()
+      setGraph(next.graph)
+      selectItem({ type: 'person', id: next.person.id })
+      focusCameraOnWorld(next.person.x, next.person.y, 1.5)
+      closeSearch()
+    } catch (err) {
+      console.error(err)
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      alert(`Failed to import LinkedIn profile: ${errorMessage}`)
+    } finally {
+      setIsImportingLinkedInProfile(false)
+    }
+  }
+
   function handleSelectSearchResult(result: SearchResult) {
+    if (result.kind === 'linkedin-profile') {
+      void handleImportLinkedInProfileFromSearch()
+      return
+    }
     if (result.kind === 'person') {
       const person = graph.people.find((p) => p.id === result.id)
       if (!person) return
@@ -1381,14 +1512,23 @@ function App() {
   const searchResults = useMemo<SearchResult[]>(() => {
     const q = searchQuery.trim().toLowerCase()
     if (!q) return []
+    const linkedInUrl = normalizeLinkedInProfileUrl(searchQuery)
+    const linkedInImport: SearchResult[] = linkedInUrl
+      ? [{
+          kind: 'linkedin-profile',
+          id: linkedInUrl,
+          name: isImportingLinkedInProfile ? 'Adding LinkedIn profile...' : 'Add LinkedIn profile',
+          sub: linkedInUrl,
+        }]
+      : []
     const people: SearchResult[] = displayPeople
       .filter((p) => p.name.toLowerCase().includes(q) || (p.role || '').toLowerCase().includes(q))
       .map((p) => ({ kind: 'person', id: p.id, name: p.name, sub: p.role || '' }))
     const circles: SearchResult[] = displayCircles
       .filter((c) => c.name.toLowerCase().includes(q))
       .map((c) => ({ kind: 'circle', id: c.id, name: c.name, sub: 'Circle' }))
-    return [...people, ...circles].slice(0, 8)
-  }, [searchQuery, displayPeople, displayCircles])
+    return [...linkedInImport, ...people, ...circles].slice(0, 8)
+  }, [searchQuery, isImportingLinkedInProfile, displayPeople, displayCircles])
   const sortedCircles = useMemo(() => {
     function getDepth(circleId: string | null): number {
       let depth = 0
@@ -2788,10 +2928,12 @@ function App() {
                     role="option"
                     aria-selected={false}
                     className="search-results__item"
+                    disabled={result.kind === 'linkedin-profile' && isImportingLinkedInProfile}
+                    // eslint-disable-next-line react-hooks/refs
                     onClick={() => handleSelectSearchResult(result)}
                   >
                     <span className={`search-results__icon search-results__icon--${result.kind}`}>
-                      {result.kind === 'person' ? <PersonIcon /> : <CircleIcon />}
+                      {result.kind === 'person' ? <PersonIcon /> : result.kind === 'linkedin-profile' ? <LinkedInIcon /> : <CircleIcon />}
                     </span>
                     <span className="search-results__text">
                       <span className="search-results__name">{result.name || 'Untitled'}</span>
@@ -4714,6 +4856,108 @@ function parseCSV(text: string): string[][] {
   return lines
 }
 
+function slugifyId(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'item'
+}
+
+function makeUniqueId(baseId: string, existingIds: Set<string>) {
+  if (!existingIds.has(baseId)) return baseId
+  let index = 2
+  while (existingIds.has(`${baseId}-${index}`)) index += 1
+  return `${baseId}-${index}`
+}
+
+function makeInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  const initials = parts.length >= 2
+    ? `${parts[0].slice(0, 1)}${parts[parts.length - 1].slice(0, 1)}`
+    : parts[0]?.slice(0, 2) ?? ''
+  return initials.toUpperCase() || 'IN'
+}
+
+function addLinkedInProfileToGraph(
+  current: GraphState,
+  profile: LinkedInProfileImport,
+): { graph: GraphState; person: PersonNode } {
+  const existingPerson = current.people.find((person) =>
+    (person.links ?? []).some((link) => link.service === 'linkedin' && normalizeLinkedInProfileUrl(link.url) === profile.url)
+  )
+  if (existingPerson) return { graph: current, person: existingPerson }
+
+  const nextCircles = [...current.circles]
+  const nextPeople = [...current.people]
+  const companyName = profile.company || 'Unknown Company'
+  const companyId = `linkedin-company-${slugifyId(companyName)}`
+  let companyCircle = nextCircles.find((circle) => circle.id === companyId)
+
+  if (!companyCircle) {
+    const youCircle = nextCircles.find((circle) => circle.id === 'you')
+    const youX = youCircle ? youCircle.x : 0
+    const youY = youCircle ? youCircle.y : 0
+    const linkedInCompanyCount = nextCircles.filter((circle) => circle.id.startsWith('linkedin-company-')).length
+    const angle = (linkedInCompanyCount / Math.max(6, linkedInCompanyCount + 1)) * 2 * Math.PI
+    const placementRadius = 680
+    companyCircle = {
+      id: companyId,
+      name: companyName,
+      icon: makeInitials(companyName),
+      x: youX + Math.cos(angle) * placementRadius,
+      y: youY + Math.sin(angle) * placementRadius,
+      radius: 90,
+      minRadius: 90,
+      parentId: null,
+      connectedTo: 'you',
+      tone: nextTone(nextCircles.length),
+      shapeType: 'wavy',
+      sides: 12,
+      amplitude: 8,
+    }
+    nextCircles.push(companyCircle)
+  }
+
+  const companyMembers = nextPeople.filter((person) => person.circleId === companyCircle.id)
+  const pAngle = (companyMembers.length / Math.max(6, companyMembers.length + 1)) * 2 * Math.PI
+  const existingIds = new Set(nextPeople.map((person) => person.id))
+  const personId = makeUniqueId(`linkedin-person-${slugifyId(profile.slug || profile.name)}`, existingIds)
+  const person: PersonNode = {
+    id: personId,
+    name: profile.name,
+    role: profile.headline || 'LinkedIn connection',
+    x: companyCircle.x + Math.cos(pAngle) * 35,
+    y: companyCircle.y + Math.sin(pAngle) * 35,
+    circleId: companyCircle.id,
+    avatar: makeInitials(profile.name),
+    shapeType: 'circle',
+    sides: 10,
+    amplitude: 0,
+    imageUrl: profile.avatarUrl,
+    notes: profile.company === 'Unknown Company'
+      ? [{
+          id: `note-company-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+          title: 'Company',
+          body: 'Company was not available from the LinkedIn profile preview. Update the company circle or role after import.',
+        }]
+      : [],
+    links: [{
+      id: `link-linkedin-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+      service: 'linkedin',
+      label: 'LinkedIn',
+      url: profile.url,
+    }],
+  }
+
+  nextPeople.push(person)
+
+  return {
+    graph: ensureContainment({
+      ...current,
+      circles: nextCircles,
+      people: nextPeople,
+    }),
+    person,
+  }
+}
+
 function makeCircle(
   id: string,
   name: string,
@@ -5223,6 +5467,10 @@ function CircleIcon() {
       <path d="M4 12h16" />
     </svg>
   )
+}
+
+function LinkedInIcon() {
+  return <span aria-hidden="true">in</span>
 }
 
 function SearchIcon() {

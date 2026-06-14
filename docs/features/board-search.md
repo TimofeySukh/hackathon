@@ -12,6 +12,12 @@ selects the node and flies the camera to it at a comfortable zoom.
   Collapsed it is an icon button; tapping it expands an inline text field and focuses it.
 - Typing filters live: people match on name **and** role; circles match on name. People
   are listed first, then circles (labelled "Circle"); results are capped at 8.
+- Pasting a LinkedIn profile URL (`linkedin.com/in/...` or `linkedin.com/pub/...`)
+  shows an "Add LinkedIn profile" action at the top of results. Clicking it, or
+  pressing Enter while it is first, imports the profile into the board.
+- LinkedIn profile import normalizes the URL, tries to read public Open Graph metadata
+  for name, headline/company, and avatar, then falls back to the URL slug when LinkedIn
+  blocks metadata access from the browser.
 - Picking a result (click or Enter on the first match) selects the node — opening the
   inspector — and animates the camera so the node sits slightly above screen centre
   (clear of the bottom inspector). Zoom is a fixed 1.5× for a person and fit-to-circle
@@ -42,8 +48,9 @@ Reuses the Material 3 chrome language (see [`../DESIGN_SYSTEM.md`](../DESIGN_SYS
 - Main file(s): [`../../src/App.tsx`](../../src/App.tsx),
   [`../../src/index.css`](../../src/index.css) (`.search-box`, `.search-results`).
 - Key functions / components: `focusCameraOnWorld` (eased camera fly reusing
-  `driveCamera`), `handleSelectSearchResult`, `closeSearch`, `SearchIcon`; the
-  `searchResults` memo builds the matches.
+  `driveCamera`), `handleSelectSearchResult`, `handleImportLinkedInProfileFromSearch`,
+  `closeSearch`, `SearchIcon`; the `searchResults` memo builds the matches and injects
+  the LinkedIn import action when the query is a profile URL.
 - Related state / hooks: `searchOpen`, `searchQuery`, `searchInputRef`,
   `searchPanelRef`, `focusAnimRef`; the shared outside-click effect handles dismissal.
 

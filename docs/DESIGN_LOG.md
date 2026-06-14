@@ -17,6 +17,18 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-14 — LinkedIn profile URLs import from board search
+
+- Decision: board search now treats a pasted LinkedIn profile URL as an import action,
+  not just a text query. The action creates or reuses a LinkedIn company circle, adds one
+  person with the normalized LinkedIn connection link, selects that person, and flies the
+  camera to the new node.
+- Metadata: the browser makes a best-effort Open Graph read for profile name, headline,
+  company, and avatar. LinkedIn commonly blocks cross-origin reads or logged-out profile
+  HTML, so the durable fallback is URL-slug-derived name plus `Unknown Company`.
+- Why: this keeps the single-profile path structurally aligned with the existing LinkedIn
+  ZIP import while avoiding a backend dependency for the prototype.
+
 ### 2026-06-14 — Board search: find a person or circle, fly the camera to it
 
 - Decision: a search pill sits in the top toolbar immediately left of the settings
