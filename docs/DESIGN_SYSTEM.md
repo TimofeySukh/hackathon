@@ -167,6 +167,38 @@ Example hover: `background: color-mix(in srgb, var(--md-on-surface) 8%, transpar
 
 ---
 
+## 5b. Motion
+
+Interactions must give feedback, not flip state instantly. Material 3 uses short,
+decelerating motion. Use the tokens (defined on `.app-shell`); never hardcode ad-hoc
+durations or beziers.
+
+```css
+--md-ease-standard:   cubic-bezier(0.2, 0, 0, 1);
+--md-ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+--md-ease-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1); /* enters */
+--md-ease-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15); /* exits  */
+--md-dur-short:  0.12s;  /* press feedback, small state changes */
+--md-dur-medium: 0.22s;  /* panel / menu entrances              */
+--md-dur-long:   0.32s;  /* larger sheets                       */
+```
+
+Rules of thumb:
+
+- **Surfaces that appear** (inspector, menus, dropdowns, prompts) enter with a fade plus a
+  small translate/scale toward their resting position, `--md-dur-medium` + `--md-ease-decelerate`.
+- **Press feedback**: interactive controls get a subtle `:active { transform: scale(...) }`
+  at `--md-dur-short`. Pills ~0.96, icon buttons ~0.9.
+- **Canvas nodes**: feedback is rendered in the draw loop, not CSS. Newly created nodes
+  **grow in** through the transient board-animation loop (`startBoardAnim` / `AnimFrame` in
+  `src/App.tsx`) — repaint only while an animation is live, then settle. Note: a selection
+  *bounce* was tried and removed (looked bad); selection feedback comes from the inspector
+  entrance and the existing selection emphasis, not from animating the node.
+- **Always honor `prefers-reduced-motion: reduce`**: a global CSS guard collapses animations
+  and transitions to ~0; the canvas loop is skipped via `prefersReducedMotion()`.
+- Don't add decorative motion that isn't feedback (e.g. a separate pulse ring) — animate the
+  element the user acted on.
+
 ## 6. Component recipes
 
 These are the canonical patterns. Reach for one of these before writing a new control.
@@ -241,6 +273,8 @@ Before merging any UI, confirm:
 - [ ] Radii come from the shape scale; buttons are pills.
 - [ ] Surfaces use tone + `--md-elev-*`, not `1.5px` hard borders.
 - [ ] Interactive elements have hover/focus/press state layers.
+- [ ] Interactions give motion feedback (entrance for new surfaces, press feedback for
+      controls) using the motion tokens, and honor `prefers-reduced-motion`.
 - [ ] Controls use the recipe components (filled/tonal button, switch, segmented button,
       M3 slider, M3 menu) — not browser defaults or the old chrome style.
 - [ ] Labels are sentence case.

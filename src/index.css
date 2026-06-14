@@ -86,6 +86,15 @@ svg {
   --md-elev-2: 0 1px 2px rgba(0,0,0,.30), 0 2px 6px 2px rgba(0,0,0,.15);
   --md-elev-3: 0 4px 8px 3px rgba(0,0,0,.15), 0 1px 3px rgba(0,0,0,.30);
 
+  /* Motion — Material 3 emphasized/standard easing + durations */
+  --md-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --md-ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --md-ease-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --md-ease-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --md-dur-short: 0.12s;
+  --md-dur-medium: 0.22s;
+  --md-dur-long: 0.32s;
+
   /* Swatch colors */
   --md-tone-blue: #00629d;
   --md-tone-red: #c00015;
@@ -183,11 +192,15 @@ svg {
   border-radius: var(--md-r-full);
   background: transparent;
   color: var(--md-on-surface-variant);
-  transition: background-color 0.2s, color 0.2s;
+  transition: background-color 0.2s, color 0.2s, transform var(--md-dur-short) var(--md-ease-standard);
 }
 
 .toolbar__group button:hover {
   background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+}
+
+.toolbar__group button:active {
+  transform: scale(0.9);
 }
 
 .app-shell.is-demo-mode .toolbar {
@@ -451,6 +464,33 @@ svg {
   gap: 4px;
   border-radius: var(--md-r-md);
   padding: 8px;
+  transform-origin: top left;
+  animation: menuIn var(--md-dur-medium) var(--md-ease-decelerate);
+  will-change: transform, opacity;
+}
+
+@keyframes menuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Stagger the menu items so the list "unfolds" */
+.create-menu button {
+  animation: menuItemIn var(--md-dur-medium) var(--md-ease-decelerate) backwards;
+}
+.create-menu button:nth-child(1) { animation-delay: 0.02s; }
+.create-menu button:nth-child(2) { animation-delay: 0.06s; }
+.create-menu button:nth-child(3) { animation-delay: 0.10s; }
+
+@keyframes menuItemIn {
+  from { opacity: 0; transform: translateX(-6px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 .create-menu button {
@@ -467,7 +507,11 @@ svg {
   font-size: 14px;
   font-weight: 500;
   text-align: left;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s, transform var(--md-dur-short) var(--md-ease-standard);
+}
+
+.create-menu button:active {
+  transform: scale(0.98);
 }
 
 .create-menu button:hover {
@@ -488,6 +532,20 @@ svg {
   gap: 8px;
   border-radius: 16px;
   padding: 14px;
+  transform-origin: bottom right;
+  animation: inspectorIn var(--md-dur-medium) var(--md-ease-decelerate);
+  will-change: transform, opacity;
+}
+
+@keyframes inspectorIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .inspector__eyebrow {
@@ -566,11 +624,15 @@ svg {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.2s, box-shadow 0.2s;
+  transition: background-color 0.2s, box-shadow 0.2s, transform var(--md-dur-short) var(--md-ease-standard);
 }
 
 .primary-action:hover {
   background: color-mix(in srgb, var(--md-primary) 92%, var(--md-on-primary));
+}
+
+.primary-action:active {
+  transform: scale(0.96);
 }
 
 .inspector p {
@@ -1375,7 +1437,7 @@ input[type="range"]::-webkit-slider-thumb:active {
   display: flex;
   align-items: center;
   gap: 16px;
-  animation: slideUp 0.2s ease-out;
+  animation: slideUp var(--md-dur-medium) var(--md-ease-decelerate);
   pointer-events: auto;
 }
 
@@ -1472,6 +1534,13 @@ input[type="range"]::-webkit-slider-thumb:active {
   padding: 6px;
   display: grid;
   gap: 2px;
+  transform-origin: top center;
+  animation: dropdownIn var(--md-dur-short) var(--md-ease-decelerate);
+}
+
+@keyframes dropdownIn {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .custom-select-option {
@@ -1990,5 +2059,17 @@ input[type="range"]::-webkit-slider-thumb:active {
     width: auto;
     max-height: calc(100vh - 128px);
     overflow-y: auto;
+  }
+}
+
+/* Respect users who ask for reduced motion: keep the UI functional, drop the
+   movement. Animations collapse to an instant final frame. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.001ms !important;
   }
 }

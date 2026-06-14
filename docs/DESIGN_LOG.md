@@ -17,6 +17,32 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-14 — Motion: interaction feedback for chrome and canvas
+
+- Decision: every interaction now gives motion feedback instead of an instant state flip.
+  Two layers, two mechanisms:
+  - **Chrome (DOM/CSS):** the inspector, create menu (with staggered items), custom-select
+    dropdown, and merge prompt all animate in with a fade + small translate/scale using the
+    new motion tokens. Buttons (filled primary, toolbar icon, menu items) get a `:active`
+    press-scale. The inspector re-plays its entrance on each new selection via a React
+    `key` on the `<aside>`.
+  - **Canvas (transient rAF loop):** the board normally repaints only on state change. A
+    small animation registry (`boardAnimsRef`) + a self-pruning `requestAnimationFrame` loop
+    (`tickBoardAnims`) drives extra repaints while an effect is in flight, handing each draw
+    an `AnimFrame` of per-node scale multipliers. Used for the **grow-in pop** of newly
+    created people (`pop:<id>`, easeOutBack from 0).
+- Rejected (selection feedback on canvas): both tried and removed.
+  - An expanding "pulse ring" overlay — read as an extra decorative element.
+  - A **press bounce** of the selected node (scale up then settle) — looked bad in practice.
+  Conclusion: a click on a node currently relies on the inspector entrance + the existing
+  selection emphasis (thicker stroke / handles) for feedback; no extra canvas motion on
+  selection. The rAF infrastructure stays, used only for the creation pop-in.
+- Motion tokens live on `.app-shell` (`--md-ease-*`, `--md-dur-*`). All animations collapse
+  to an instant final frame under `prefers-reduced-motion: reduce` (CSS guard + a
+  `prefersReducedMotion()` check that short-circuits `startBoardAnim`).
+- Why: the board looked good at rest but gave no feedback on click. Motion makes interaction
+  legible without changing layout or information.
+
 ### 2026-06-13 — Circle Picker Affordances and Favorite Treatment
 
 - Decision: new circles always spawn as clean circles (`sides: 25`, `amplitude: 0`) even

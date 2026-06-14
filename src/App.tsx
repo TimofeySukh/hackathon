@@ -566,6 +566,17 @@ function App() {
   const driveCameraRef = useRef<(next: Camera) => void>(() => {})
   const settleGestureRef = useRef<() => void>(() => {})
 
+  // Transient board animations (node pop-in). Each entry runs a short rAF loop
+  // that repaints the canvas with interpolated progress, then self-prunes.
+  // paintBoardRef always points at the latest paint closure so the loop repaints
+  // with current state. animNowRef holds the most recent rAF timestamp so a
+  // state-driven repaint mid-animation can compute progress without reading the
+  // clock during render. See readAnimFrame / drawBoardLayer.
+  const boardAnimsRef = useRef<Map<string, BoardAnim>>(new Map())
+  const boardAnimRafRef = useRef<number | null>(null)
+  const animNowRef = useRef(0)
+  const paintBoardRef = useRef<(now?: number) => void>(() => {})
+
   const [connector, setConnector] = useState<DragConnector | null>(null)
   const [marquee, setMarquee] = useState<MarqueeState | null>(null)
   const [createMenu, setCreateMenu] = useState<CreateMenu | null>(null)
@@ -1317,6 +1328,7 @@ function App() {
     if (gestureRafRef.current != null) window.cancelAnimationFrame(gestureRafRef.current)
     if (settleTimerRef.current != null) window.clearTimeout(settleTimerRef.current)
     if (dragRafRef.current != null) window.cancelAnimationFrame(dragRafRef.current)
+    if (boardAnimRafRef.current != null) window.cancelAnimationFrame(boardAnimRafRef.current)
   }, [])
 
   // Track viewport size so culling has the current visible rectangle.
@@ -1328,12 +1340,14 @@ function App() {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Repaint the people canvas whenever the settled camera, people, viewport or
-  // interactive set changes. (Gesture frames are handled imperatively above.)
-  useEffect(() => {
+  // Single canonical board paint. Reads the live animation frame, so an ordinary
+  // state-driven repaint composes cleanly with any in-flight pulse/pop, and the
+  // rAF loop below reuses the exact same draw through paintBoardRef.
+  const paintBoard = (now?: number) => {
     const canvas = peopleCanvasRef.current
     const surface = surfaceRef.current
     if (!canvas || !surface) return
+    const frame = readAnimFrame(boardAnimsRef.current, now ?? animNowRef.current)
     drawBoardLayer(
       canvas,
       surface,
@@ -1350,7 +1364,56 @@ function App() {
       selectedPeopleIds,
       marquee,
       selectedCircleIds,
+      frame,
     )
+  }
+
+  // Keep paintBoardRef pointing at the latest closure so the animation loop
+  // (registered once per run) always repaints with current board state.
+  useLayoutEffect(() => {
+    paintBoardRef.current = paintBoard
+  })
+
+  // Drives one repaint per frame while any board animation is in flight, then
+  // self-prunes finished animations and settles to a static frame. `now` is the
+  // rAF timestamp (same clock origin as the lazily-anchored anim start times).
+  function tickBoardAnims(now: number) {
+    animNowRef.current = now
+    let active = false
+    for (const [key, a] of boardAnimsRef.current) {
+      const start = a.start < 0 ? now : a.start // anchor on first frame
+      if (now - start >= a.duration) {
+        boardAnimsRef.current.delete(key)
+      } else {
+        if (a.start < 0) boardAnimsRef.current.set(key, { start, duration: a.duration })
+        active = true
+      }
+    }
+    paintBoardRef.current(now)
+    if (active) {
+      boardAnimRafRef.current = window.requestAnimationFrame(tickBoardAnims)
+    } else {
+      boardAnimRafRef.current = null
+    }
+  }
+
+  // Register (or restart) a transient board animation and ensure the loop runs.
+  // start = -1 anchors to the rAF clock on the first frame (keeps clock reads
+  // out of render-reachable code).
+  function startBoardAnim(key: string, duration: number) {
+    if (prefersReducedMotion()) return
+    boardAnimsRef.current.set(key, { start: -1, duration })
+    if (boardAnimRafRef.current == null) {
+      boardAnimRafRef.current = window.requestAnimationFrame(tickBoardAnims)
+    }
+  }
+
+  // Repaint the people canvas whenever the settled camera, people, viewport or
+  // interactive set changes. (Gesture frames are handled imperatively above.)
+  useEffect(() => {
+    paintBoard()
+    // paintBoard reads all of these from the current render closure.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     camera,
     viewport,
@@ -2283,6 +2346,8 @@ function App() {
       return nextGraph
     })
     selectItem({ type: 'person', id })
+    // Grow the new person in so it feels placed, not blinked into existence.
+    startBoardAnim('pop:' + id, 360)
     setCreateMenu(null)
   }
 
@@ -2624,7 +2689,7 @@ function App() {
       )}
 
       {!demoMode && selectedItem && (
-      <aside className="inspector" aria-label="Selection details" style={{ overflow: 'visible', maxHeight: 'calc(100vh - 120px)' }}>
+      <aside key={`${selectedItem.type}:${selectedItem.id}`} className="inspector" aria-label="Selection details" style={{ overflow: 'visible', maxHeight: 'calc(100vh - 120px)' }}>
 
             {selectedItem.type !== 'connection' ? (
               <input
@@ -3664,6 +3729,46 @@ function resizeCanvas(canvas: HTMLCanvasElement, surface: HTMLElement) {
   return { dpr, width, height }
 }
 
+// ---- Board animation frame -------------------------------------------------
+// The board normally repaints only when state changes. While a pulse/pop is in
+// flight a transient rAF loop drives extra repaints and hands each draw an
+// AnimFrame describing the current progress of every effect. An empty frame
+// means fully settled — that's the default for ordinary static repaints, so the
+// gesture/drag paths can keep calling drawBoardLayer without passing anything.
+type BoardAnim = { start: number; duration: number }
+
+type AnimFrame = {
+  // nodeId -> current draw-scale multiplier (1 = at rest). Drives the press
+  // bounce on selection and the grow-in pop for freshly created nodes.
+  scales: Map<string, number>
+}
+
+const EMPTY_ANIM_FRAME: AnimFrame = { scales: new Map() }
+
+const prefersReducedMotion = () =>
+  typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+// Slight overshoot so a freshly created node grows past full size then settles.
+const easeOutBack = (t: number) => {
+  const c1 = 1.70158
+  const c3 = c1 + 1
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2)
+}
+
+function readAnimFrame(anims: Map<string, BoardAnim>, now: number): AnimFrame {
+  if (anims.size === 0) return EMPTY_ANIM_FRAME
+  const scales = new Map<string, number>()
+  for (const [key, a] of anims) {
+    // start < 0 means "not yet anchored to the rAF clock" → treat as just begun.
+    const t = a.start < 0 ? 0 : Math.min(1, Math.max(0, (now - a.start) / a.duration))
+    if (key.startsWith('pop:')) {
+      // Grow-in for freshly created nodes: 0 -> slight overshoot -> 1.
+      scales.set(key.slice(4), Math.max(0, easeOutBack(t)))
+    }
+  }
+  return { scales }
+}
+
 function drawBoardLayer(
   canvas: HTMLCanvasElement,
   surface: HTMLElement,
@@ -3680,6 +3785,7 @@ function drawBoardLayer(
   selectedPeopleIds: string[] = [],
   marquee: MarqueeState | null = null,
   selectedCircleIds: string[] = [],
+  anim: AnimFrame = EMPTY_ANIM_FRAME,
 ) {
   const { dpr, width, height } = resizeCanvas(canvas, surface)
   const ctx = canvas.getContext('2d')
@@ -3702,8 +3808,8 @@ function drawBoardLayer(
   drawCircleEdges(ctx, visibleCircles, index, camera.scale)
   drawPersonEdges(ctx, visiblePeople, index, camera.scale)
   drawCustomConnections(ctx, visiblePeopleIds, visibleCircleIds, index, selectedItem, hoveredConnId, camera.scale)
-  drawCircleDetails(ctx, visibleCircles, camera.scale, circleFillMode, showCircleLabels)
-  drawPeople(ctx, visiblePeople, index, selectedItem, hoveredPersonId, camera.scale, dpr, showPersonLabels, selectedPeopleIds)
+  drawCircleDetails(ctx, visibleCircles, camera.scale, circleFillMode, showCircleLabels, anim.scales)
+  drawPeople(ctx, visiblePeople, index, selectedItem, hoveredPersonId, camera.scale, dpr, showPersonLabels, selectedPeopleIds, anim.scales)
   if (connector) drawConnector(ctx, connector, camera.scale)
   drawSelectionHandles(ctx, selectedItem, index, camera.scale)
 
@@ -3826,10 +3932,11 @@ function drawCircleDetails(
   scale: number,
   circleFillMode: CircleFillMode,
   showCircleLabels: boolean,
+  scales: Map<string, number> = EMPTY_ANIM_FRAME.scales,
 ) {
   for (const circle of circles) {
     if (showCircleLabels) drawCircleLabel(ctx, circle, scale)
-    drawCircleCenter(ctx, circle, scale, circleFillMode)
+    drawCircleCenter(ctx, circle, scale, circleFillMode, scales.get(circle.id) ?? 1)
   }
 }
 
@@ -3848,9 +3955,9 @@ function getCircleRenderPath(circle: CircleNode, circleShapeMode: CircleShapeMod
   )
 }
 
-function drawCircleCenter(ctx: CanvasRenderingContext2D, circle: CircleNode, scale: number, circleFillMode: CircleFillMode) {
+function drawCircleCenter(ctx: CanvasRenderingContext2D, circle: CircleNode, scale: number, circleFillMode: CircleFillMode, nodeScale = 1) {
   const tone = getCircleColors(circle)
-  const radius = CIRCLE_CENTER_RADIUS
+  const radius = CIRCLE_CENTER_RADIUS * nodeScale
   ctx.save()
   ctx.beginPath()
   ctx.arc(circle.x, circle.y, radius, 0, Math.PI * 2)
@@ -3914,6 +4021,7 @@ function drawPeople(
   dpr: number,
   showPersonLabels: boolean,
   selectedPeopleIds: string[] = [],
+  scales: Map<string, number> = EMPTY_ANIM_FRAME.scales,
 ) {
   const spriteRes = pickSpriteTier(PERSON_VISUAL_RADIUS * 2 * scale * dpr)
   ctx.imageSmoothingEnabled = true
@@ -3925,12 +4033,14 @@ function drawPeople(
     const isHovered = hoveredPersonId === person.id
     const stroke = isSelected ? '#00629d' : isHovered ? '#64748b' : circleColor
     const strokeWidth = isSelected || isHovered ? 2.5 : 1.5
+    // Press bounce on selection + grow-in pop for new people (1 = at rest).
+    const drawRadius = PERSON_VISUAL_RADIUS * (scales.get(person.id) ?? 1)
     ctx.drawImage(
       getPersonSprite(person, circleColor, spriteRes, stroke, strokeWidth),
-      person.x - PERSON_VISUAL_RADIUS,
-      person.y - PERSON_VISUAL_RADIUS,
-      PERSON_VISUAL_RADIUS * 2,
-      PERSON_VISUAL_RADIUS * 2,
+      person.x - drawRadius,
+      person.y - drawRadius,
+      drawRadius * 2,
+      drawRadius * 2,
     )
     if (person.isFavorite) drawFavoritePersonOutline(ctx, person, circleColor, scale)
     if (showPersonLabels && (scale >= 0.62 || isSelected || isHovered)) drawPersonLabel(ctx, person, scale)
@@ -3977,6 +4087,7 @@ function drawSelectionHandles(ctx: CanvasRenderingContext2D, selectedItem: Selec
     const circle = person.circleId ? index.circlesById.get(person.circleId) : null
     color = circle ? getCircleColors(circle).centerBg : MATERIAL_TONES.blue.centerBg
   }
+
   const screenRadius = 3.5 + 2.5 * Math.sqrt(scale)
   const worldRadius = screenRadius / scale
 
