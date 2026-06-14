@@ -15,7 +15,7 @@ export default function LandingPage({ onLaunchApp }: LandingPageProps) {
     <div className="landing-container">
       {/* Background Flowers peaking from edges */}
       <div className="landing-bg-flowers" aria-hidden="true">
-        {/* Flower 1: Top Right */}
+        {/* Shape 1: Top Right - Rounded Octagon */}
         <div className="landing-flower-wrap flower-top-right">
           <svg viewBox="0 0 200 200" width="100%" height="100%">
             <defs>
@@ -25,14 +25,14 @@ export default function LandingPage({ onLaunchApp }: LandingPageProps) {
               </linearGradient>
             </defs>
             <path
-              d={getNodePath(100, 100, 80, 'wavy', 8, 15)}
+              d={getNodePath(100, 100, 80, 'polygon', 8, 14)}
               fill="url(#shape-grad-1)"
-              opacity="0.3"
+              opacity="0.25"
             />
           </svg>
         </div>
 
-        {/* Flower 2: Bottom Left */}
+        {/* Shape 2: Bottom Left - Rounded Pentagon */}
         <div className="landing-flower-wrap flower-bottom-left">
           <svg viewBox="0 0 200 200" width="100%" height="100%">
             <defs>
@@ -42,14 +42,14 @@ export default function LandingPage({ onLaunchApp }: LandingPageProps) {
               </linearGradient>
             </defs>
             <path
-              d={getNodePath(100, 100, 80, 'polygon', 6, 12)}
+              d={getNodePath(100, 100, 80, 'polygon', 5, 12)}
               fill="url(#shape-grad-2)"
-              opacity="0.25"
+              opacity="0.22"
             />
           </svg>
         </div>
 
-        {/* Flower 3: Right Center */}
+        {/* Shape 3: Right Center - Rounded Hexagon */}
         <div className="landing-flower-wrap flower-right-center">
           <svg viewBox="0 0 200 200" width="100%" height="100%">
             <defs>
@@ -59,9 +59,9 @@ export default function LandingPage({ onLaunchApp }: LandingPageProps) {
               </linearGradient>
             </defs>
             <path
-              d={getNodePath(100, 100, 75, 'wavy', 5, 14)}
+              d={getNodePath(100, 100, 75, 'polygon', 6, 10)}
               fill="url(#shape-grad-3)"
-              opacity="0.2"
+              opacity="0.18"
             />
           </svg>
         </div>

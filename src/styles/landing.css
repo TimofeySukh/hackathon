@@ -38,26 +38,26 @@
 }
 
 .flower-top-right {
-  top: -120px;
-  right: -120px;
-  width: 380px;
-  height: 380px;
+  top: -80px;
+  right: -80px;
+  width: 280px;
+  height: 280px;
   animation: rotate-clockwise 140s linear infinite;
 }
 
 .flower-bottom-left {
-  bottom: -150px;
-  left: -150px;
-  width: 480px;
-  height: 480px;
+  bottom: -90px;
+  left: -90px;
+  width: 340px;
+  height: 340px;
   animation: rotate-counter-clockwise 180s linear infinite;
 }
 
 .flower-right-center {
   top: 35%;
-  right: -100px;
-  width: 280px;
-  height: 280px;
+  right: -50px;
+  width: 200px;
+  height: 200px;
   animation: rotate-clockwise 220s linear infinite;
 }
 
