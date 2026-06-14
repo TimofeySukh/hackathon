@@ -834,7 +834,7 @@ function App() {
     const profileUrl = normalizeLinkedInProfileUrl(searchQuery)
     if (!profileUrl) return
     const existingPerson = findPersonByLinkedInProfileUrl(graph.people, profileUrl)
-    if (existingPerson) {
+    if (existingPerson && !personNeedsLinkedInEnrichment(existingPerson, graph.circles)) {
       selectItem({ type: 'person', id: existingPerson.id })
       focusCameraOnWorld(existingPerson.x, existingPerson.y, 1.5)
       closeSearch()
@@ -845,7 +845,9 @@ function App() {
       const profile = await buildLinkedInProfileImport(profileUrl)
       if (!profile) return
 
-      const next = addLinkedInProfileToGraph(graph, profile)
+      const next = existingPerson
+        ? updateLinkedInProfileInGraph(graph, existingPerson.id, profile)
+        : addLinkedInProfileToGraph(graph, profile)
       pushHistory()
       setGraph(next.graph)
       selectItem({ type: 'person', id: next.person.id })
@@ -4957,15 +4959,14 @@ function findPersonByLinkedInProfileUrl(people: PersonNode[], profileUrl: string
   )
 }
 
-function addLinkedInProfileToGraph(
-  current: GraphState,
-  profile: LinkedInProfileImport,
-): { graph: GraphState; person: PersonNode } {
-  const existingPerson = findPersonByLinkedInProfileUrl(current.people, profile.url)
-  if (existingPerson) return { graph: current, person: existingPerson }
+function personNeedsLinkedInEnrichment(person: PersonNode, circles: CircleNode[]) {
+  const circle = circles.find((candidate) => candidate.id === person.circleId)
+  const hasProfileNote = (person.notes ?? []).some((note) => note.title === 'Profile' || note.title === 'Enrichment')
+  return !person.imageUrl || !hasProfileNote || !circle || circle.name === 'Unknown Company' || circle.name === 'No Company'
+}
 
+function ensureLinkedInCompanyCircle(current: GraphState, profile: LinkedInProfileImport) {
   const nextCircles = [...current.circles]
-  const nextPeople = [...current.people]
   const companyName = profile.company || 'Unknown Company'
   const companyId = `linkedin-company-${slugifyId(companyName)}`
   let companyCircle = nextCircles.find((circle) => circle.id === companyId)
@@ -4995,17 +4996,18 @@ function addLinkedInProfileToGraph(
     nextCircles.push(companyCircle)
   }
 
-  const companyMembers = nextPeople.filter((person) => person.circleId === companyCircle.id)
-  const pAngle = (companyMembers.length / Math.max(6, companyMembers.length + 1)) * 2 * Math.PI
-  const existingIds = new Set(nextPeople.map((person) => person.id))
-  const personId = makeUniqueId(`linkedin-person-${slugifyId(profile.slug || profile.name)}`, existingIds)
-  const notes: PersonNote[] = profile.description
-    ? [{
-        id: `note-profile-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
-        title: 'Profile',
-        body: profile.description,
-      }]
-    : []
+  return { nextCircles, companyCircle }
+}
+
+function buildLinkedInProfileNotes(profile: LinkedInProfileImport, existingNotes: PersonNote[] = []) {
+  const notes = existingNotes.filter((note) => note.title !== 'Profile' && note.title !== 'Enrichment')
+  if (profile.description) {
+    notes.push({
+      id: `note-profile-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+      title: 'Profile',
+      body: profile.description,
+    })
+  }
   if (profile.source === 'brightdata') {
     notes.push({
       id: `note-enriched-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
@@ -5013,6 +5015,64 @@ function addLinkedInProfileToGraph(
       body: 'Imported with Bright Data LinkedIn enrichment.',
     })
   }
+  return notes
+}
+
+function updateLinkedInProfileInGraph(
+  current: GraphState,
+  personId: string,
+  profile: LinkedInProfileImport,
+): { graph: GraphState; person: PersonNode } {
+  const existingPerson = current.people.find((person) => person.id === personId)
+  if (!existingPerson) return addLinkedInProfileToGraph(current, profile)
+
+  const { nextCircles, companyCircle } = ensureLinkedInCompanyCircle(current, profile)
+  const updatedPerson: PersonNode = {
+    ...existingPerson,
+    name: profile.name || existingPerson.name,
+    role: profile.headline || existingPerson.role,
+    circleId: companyCircle.id,
+    avatar: makeInitials(profile.name || existingPerson.name),
+    imageUrl: profile.avatarUrl || existingPerson.imageUrl,
+    notes: buildLinkedInProfileNotes(profile, existingPerson.notes),
+    links: existingPerson.links?.length
+      ? existingPerson.links.map((link) =>
+          link.service === 'linkedin' && normalizeLinkedInProfileUrl(link.url) === profile.url
+            ? { ...link, url: profile.url, label: 'LinkedIn' }
+            : link
+        )
+      : [{
+          id: `link-linkedin-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+          service: 'linkedin',
+          label: 'LinkedIn',
+          url: profile.url,
+        }],
+  }
+
+  return {
+    graph: ensureContainment({
+      ...current,
+      circles: nextCircles,
+      people: current.people.map((person) => (person.id === personId ? updatedPerson : person)),
+    }),
+    person: updatedPerson,
+  }
+}
+
+function addLinkedInProfileToGraph(
+  current: GraphState,
+  profile: LinkedInProfileImport,
+): { graph: GraphState; person: PersonNode } {
+  const existingPerson = findPersonByLinkedInProfileUrl(current.people, profile.url)
+  if (existingPerson) return updateLinkedInProfileInGraph(current, existingPerson.id, profile)
+
+  const { nextCircles, companyCircle } = ensureLinkedInCompanyCircle(current, profile)
+  const nextPeople = [...current.people]
+  const companyMembers = nextPeople.filter((person) => person.circleId === companyCircle.id)
+  const pAngle = (companyMembers.length / Math.max(6, companyMembers.length + 1)) * 2 * Math.PI
+  const existingIds = new Set(nextPeople.map((person) => person.id))
+  const personId = makeUniqueId(`linkedin-person-${slugifyId(profile.slug || profile.name)}`, existingIds)
+  const notes = buildLinkedInProfileNotes(profile)
 
   const person: PersonNode = {
     id: personId,
