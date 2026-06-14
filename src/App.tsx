@@ -370,29 +370,19 @@ function markOnboardingSeen() {
 
 function App() {
   const [viewMode, setViewMode] = useState<'landing' | 'board'>(() => {
-    const hasAppQuery = window.location.search.includes('app=true') || window.location.hash === '#board';
-    if (hasAppQuery) return 'board';
-    const stored = localStorage.getItem('viewMode');
-    if (stored === 'board') return 'board';
-    return 'landing';
+    // Show landing page only if #landing is explicitly requested in the URL
+    return window.location.hash === '#landing' ? 'landing' : 'board';
   });
 
   const handleLaunchApp = () => {
     setViewMode('board');
-    localStorage.setItem('viewMode', 'board');
-    window.location.hash = 'board';
+    window.location.hash = ''; // clear hash to load the board workspace
   };
 
   useEffect(() => {
     const handleHashChange = () => {
-      const hasAppQuery = window.location.search.includes('app=true') || window.location.hash === '#board';
-      if (hasAppQuery) {
-        setViewMode('board');
-        localStorage.setItem('viewMode', 'board');
-      } else {
-        setViewMode('landing');
-        localStorage.setItem('viewMode', 'landing');
-      }
+      const isLanding = window.location.hash === '#landing';
+      setViewMode(isLanding ? 'landing' : 'board');
     };
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
@@ -3007,8 +2997,7 @@ function App() {
                 onClick={() => {
                   setShowSettings(false)
                   setViewMode('landing')
-                  localStorage.setItem('viewMode', 'landing')
-                  window.location.hash = ''
+                  window.location.hash = 'landing'
                 }}
               >
                 ← Back to Landing Page
