@@ -2989,20 +2989,7 @@ function App() {
                 </button>
               </div>
             )}
-            <div style={{ borderTop: '1px solid var(--md-outline-variant)', paddingTop: '16px' }}>
-              <button
-                type="button"
-                className="m3-btn m3-btn-text"
-                style={{ width: '100%', justifyContent: 'flex-start', padding: 0, height: 'auto', color: 'var(--md-primary)' }}
-                onClick={() => {
-                  setShowSettings(false)
-                  setViewMode('landing')
-                  window.location.hash = 'landing'
-                }}
-              >
-                ← Back to Landing Page
-              </button>
-            </div>
+
           </div>
         </div>
       )}
