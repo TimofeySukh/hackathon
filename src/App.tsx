@@ -1418,8 +1418,8 @@ function App() {
       ? [{
           kind: 'linkedin-profile',
           id: linkedInUrl,
-          name: isImportingLinkedInProfile ? 'Adding LinkedIn profile...' : 'Add LinkedIn profile',
-          sub: linkedInUrl,
+          name: isImportingLinkedInProfile ? 'Enriching with Bright Data...' : 'Add LinkedIn profile',
+          sub: isImportingLinkedInProfile ? linkedInUrl : linkedInUrl,
         }]
       : []
     const people: SearchResult[] = displayPeople
@@ -2838,7 +2838,11 @@ function App() {
                     onClick={() => handleSelectSearchResult(result)}
                   >
                     <span className={`search-results__icon search-results__icon--${result.kind}`}>
-                      {result.kind === 'person' ? <PersonIcon /> : result.kind === 'linkedin-profile' ? <LinkedInIcon /> : <CircleIcon />}
+                      {result.kind === 'person'
+                        ? <PersonIcon />
+                        : result.kind === 'linkedin-profile'
+                          ? isImportingLinkedInProfile ? <span className="search-results__spinner" aria-hidden="true" /> : <LinkedInIcon />
+                          : <CircleIcon />}
                     </span>
                     <span className="search-results__text">
                       <span className="search-results__name">{result.name || 'Untitled'}</span>

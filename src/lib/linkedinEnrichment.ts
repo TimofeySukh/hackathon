@@ -43,10 +43,19 @@ function isFresh(entry: CacheEntry | undefined) {
   return Boolean(entry && Date.now() - entry.fetchedAt < CACHE_MAX_AGE_MS)
 }
 
+function hasProfileFields(profile: LinkedInProfileEnrichment | undefined) {
+  return Boolean(profile?.company || profile?.headline || profile?.description || profile?.avatarUrl)
+}
+
 export function getCachedLinkedInProfile(url: string): LinkedInProfileEnrichment | null {
   const cache = readCache()
   const entry = cache[url]
   if (!isFresh(entry)) return null
+  if (!hasProfileFields(entry?.profile)) {
+    delete cache[url]
+    writeCache(cache)
+    return null
+  }
   return { ...entry.profile, source: 'cache' }
 }
 
