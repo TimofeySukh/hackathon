@@ -15,8 +15,9 @@ zip.configure({ useWebWorkers: false })
 import { useAuth } from './lib/useAuth'
 import { loadGraph, saveGraph, loadLocalGraph, saveLocalGraph } from './lib/graphPersistence'
 import { enrichLinkedInProfile } from './lib/linkedinEnrichment'
-import { OnboardingCoach, ONBOARDING_STEPS, ONBOARDING_DONE_STEP } from './Onboarding'
-import type { OnboardingAction } from './Onboarding'
+import { OnboardingCoach } from './Onboarding'
+import { ONBOARDING_STEPS, ONBOARDING_DONE_STEP } from './onboardingSteps'
+import type { OnboardingAction } from './onboardingSteps'
 // STRESS TEST — dev-only performance harness. See src/lib/stressTest.ts.
 
 export type CircleTone = 'blue' | 'red' | 'green' | 'amber' | 'violet'
@@ -4786,7 +4787,7 @@ function drawPeople(
       drawRadius * 2,
       drawRadius * 2,
     )
-    if (person.isFavorite) drawFavoritePersonOutline(ctx, person, circleColor, scale)
+    if (person.isFavorite) drawFavoritePersonOutline(ctx, person, '#d97706', scale)
     if (showPersonLabels && (scale >= 0.62 || isSelected || isHovered)) drawPersonLabel(ctx, person, scale)
   }
 }
