@@ -4752,11 +4752,11 @@ function drawCircleFills(
     const isSelected = (selectedItem?.type === 'circle' && selectedItem.id === circle.id) || selectedCircleIds.includes(circle.id)
     const isEdgeHovered = hoveredCircleEdgeId === circle.id
 
-    if (isEdgeHovered && !isSelected) {
+    if (isEdgeHovered) {
       ctx.save()
-      ctx.strokeStyle = '#64748b'
-      ctx.globalAlpha = 0.18
-      ctx.lineWidth = Math.max(8 / scale, 5)
+      ctx.strokeStyle = isSelected ? tone.border : '#64748b'
+      ctx.globalAlpha = isSelected ? 0.24 : 0.18
+      ctx.lineWidth = isSelected ? Math.max(9 / scale, 6) : Math.max(8 / scale, 5)
       if (isTransparent) ctx.setLineDash([8 / scale, 7 / scale])
       ctx.stroke(path)
       ctx.restore()
@@ -4766,7 +4766,7 @@ function drawCircleFills(
     ctx.strokeStyle = isSelected ? tone.border : isEdgeHovered ? '#64748b' : tone.border
     ctx.lineWidth =
       isSelected
-        ? Math.max(3.5 / scale, 2)
+        ? (isEdgeHovered ? Math.max(4.5 / scale, 3) : Math.max(3.5 / scale, 2))
         : isEdgeHovered
           ? Math.max(2.8 / scale, 1.8)
           : Math.max((isTransparent ? 2.2 : 1.4) / scale, isTransparent ? 1.4 : 0.9)
