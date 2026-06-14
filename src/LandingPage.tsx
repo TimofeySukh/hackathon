@@ -62,93 +62,135 @@ export default function LandingPage({ onLaunchApp }: LandingPageProps) {
           <div className="hero-illustration">
             {/* Custom Interactive SVG Social Graph */}
             <svg className="social-graph-svg" viewBox="0 0 500 500" width="500" height="500">
+              <defs>
+                {/* 3D-like glassmorphic radial gradients */}
+                <radialGradient id="center-grad" cx="35%" cy="35%" r="65%">
+                  <stop offset="0%" stopColor="#ffffff" />
+                  <stop offset="20%" stopColor="#d2e4ff" />
+                  <stop offset="100%" stopColor="#00629d" />
+                </radialGradient>
+                <radialGradient id="blue-grad" cx="35%" cy="35%" r="65%">
+                  <stop offset="0%" stopColor="#ffffff" />
+                  <stop offset="30%" stopColor="#d2e4ff" />
+                  <stop offset="100%" stopColor="#00629d" />
+                </radialGradient>
+                <radialGradient id="green-grad" cx="35%" cy="35%" r="65%">
+                  <stop offset="0%" stopColor="#ffffff" />
+                  <stop offset="30%" stopColor="#d1e8d2" />
+                  <stop offset="100%" stopColor="#1e824a" />
+                </radialGradient>
+                <radialGradient id="amber-grad" cx="35%" cy="35%" r="65%">
+                  <stop offset="0%" stopColor="#ffffff" />
+                  <stop offset="30%" stopColor="#ffe082" />
+                  <stop offset="100%" stopColor="#d87a00" />
+                </radialGradient>
+                <radialGradient id="violet-grad" cx="35%" cy="35%" r="65%">
+                  <stop offset="0%" stopColor="#ffffff" />
+                  <stop offset="30%" stopColor="#eaddff" />
+                  <stop offset="100%" stopColor="#7f67be" />
+                </radialGradient>
+                <radialGradient id="red-grad" cx="35%" cy="35%" r="65%">
+                  <stop offset="0%" stopColor="#ffffff" />
+                  <stop offset="30%" stopColor="#ffdad6" />
+                  <stop offset="100%" stopColor="#c00015" />
+                </radialGradient>
+              </defs>
+
               {/* Orbits */}
-              <circle className="orbit-line orbit-1" cx="250" cy="250" r="80" />
-              <circle className="orbit-line orbit-2" cx="250" cy="250" r="150" />
-              <circle className="orbit-line orbit-3" cx="250" cy="250" r="210" />
+              <circle className="orbit-line orbit-1" cx="250" cy="250" r="85" />
+              <circle className="orbit-line orbit-2" cx="250" cy="250" r="160" />
+              <circle className="orbit-line orbit-3" cx="250" cy="250" r="220" />
 
               {/* Orbiting Groups/Nodes - Grouped in rotating SVG elements */}
               
-              {/* Inner Orbit (80px radius) */}
+              {/* Inner Orbit (85px radius) */}
               <g className="orbit-1" style={{ transformOrigin: '250px 250px' }}>
                 {/* Node 1: Blue */}
-                <line className="connection-line" x1="250" y1="250" x2="250" y2="170" stroke="var(--md-tone-blue)" />
-                <g className="social-node" style={{ transform: 'translate(250px, 170px)' }}>
-                  <circle className="social-node-pulse" r="22" fill="var(--md-primary-container)" opacity="0.4" />
-                  <circle r="16" fill="var(--md-primary-container)" stroke="var(--md-primary)" strokeWidth="1.5" />
-                  <text className="social-node-label" y="4" fontSize="10">ME</text>
+                <line className="connection-line" x1="250" y1="250" x2="250" y2="165" stroke="var(--md-tone-blue)" />
+                <g className="social-node" style={{ transform: 'translate(250px, 165px)' }}>
+                  <circle className="social-node-pulse" r="38" fill="var(--md-primary-container)" opacity="0.3" />
+                  <circle r="26" fill="url(#blue-grad)" stroke="var(--md-primary)" strokeWidth="1" />
+                  <circle cx="-5" cy="-5" r="4" fill="#ffffff" opacity="0.4" />
                 </g>
 
                 {/* Node 2: Green */}
-                <line className="connection-line" x1="250" y1="250" x2="330" y2="250" stroke="var(--md-tone-green)" />
-                <g className="social-node" style={{ transform: 'translate(330px, 250px)' }}>
-                  <circle r="14" fill="#d1e8d2" stroke="var(--md-tone-green)" strokeWidth="1.5" />
-                  <text className="social-node-label" y="4" fontSize="10">Dev</text>
+                <line className="connection-line" x1="250" y1="250" x2="335" y2="250" stroke="var(--md-tone-green)" />
+                <g className="social-node" style={{ transform: 'translate(335px, 250px)' }}>
+                  <circle className="social-node-pulse" r="34" fill="#d1e8d2" opacity="0.3" />
+                  <circle r="22" fill="url(#green-grad)" stroke="var(--md-tone-green)" strokeWidth="1" />
+                  <circle cx="-4" cy="-4" r="3" fill="#ffffff" opacity="0.4" />
                 </g>
               </g>
 
-              {/* Middle Orbit (150px radius) */}
+              {/* Middle Orbit (160px radius) */}
               <g className="orbit-2" style={{ transformOrigin: '250px 250px' }}>
                 {/* Node 3: Amber */}
-                <line className="connection-line" x1="250" y1="250" x2="144" y2="144" stroke="var(--md-tone-amber)" />
-                <g className="social-node" style={{ transform: 'translate(144px, 144px)' }}>
-                  <circle r="16" fill="#ffe082" stroke="var(--md-tone-amber)" strokeWidth="1.5" />
-                  <text className="social-node-label" y="4" fontSize="10">PM</text>
+                <line className="connection-line" x1="250" y1="250" x2="137" y2="137" stroke="var(--md-tone-amber)" />
+                <g className="social-node" style={{ transform: 'translate(137px, 137px)' }}>
+                  <circle className="social-node-pulse" r="36" fill="#ffe082" opacity="0.25" />
+                  <circle r="25" fill="url(#amber-grad)" stroke="var(--md-tone-amber)" strokeWidth="1" />
+                  <circle cx="-5" cy="-5" r="4" fill="#ffffff" opacity="0.4" />
                 </g>
 
                 {/* Node 4: Violet */}
-                <line className="connection-line" x1="250" y1="250" x2="356" y2="356" stroke="var(--md-tone-violet)" />
-                <g className="social-node" style={{ transform: 'translate(356px, 356px)' }}>
-                  <circle r="18" fill="#eaddff" stroke="var(--md-tone-violet)" strokeWidth="1.5" />
-                  <text className="social-node-label" y="4" fontSize="10">Design</text>
+                <line className="connection-line" x1="250" y1="250" x2="363" y2="363" stroke="var(--md-tone-violet)" />
+                <g className="social-node" style={{ transform: 'translate(363px, 363px)' }}>
+                  <circle className="social-node-pulse" r="40" fill="#eaddff" opacity="0.25" />
+                  <circle r="28" fill="url(#violet-grad)" stroke="var(--md-tone-violet)" strokeWidth="1" />
+                  <circle cx="-6" cy="-6" r="4" fill="#ffffff" opacity="0.4" />
                 </g>
 
                 {/* Node 5: Red */}
-                <line className="connection-line" x1="250" y1="250" x2="100" y2="250" stroke="var(--md-tone-red)" />
-                <g className="social-node" style={{ transform: 'translate(100px, 250px)' }}>
-                  <circle r="14" fill="#ffdad6" stroke="var(--md-tone-red)" strokeWidth="1.5" />
-                  <text className="social-node-label" y="4" fontSize="10">HR</text>
+                <line className="connection-line" x1="250" y1="250" x2="90" y2="250" stroke="var(--md-tone-red)" />
+                <g className="social-node" style={{ transform: 'translate(90px, 250px)' }}>
+                  <circle className="social-node-pulse" r="34" fill="#ffdad6" opacity="0.25" />
+                  <circle r="23" fill="url(#red-grad)" stroke="var(--md-tone-red)" strokeWidth="1" />
+                  <circle cx="-4" cy="-4" r="3" fill="#ffffff" opacity="0.4" />
                 </g>
               </g>
 
-              {/* Outer Orbit (210px radius) */}
+              {/* Outer Orbit (220px radius) */}
               <g className="orbit-3" style={{ transformOrigin: '250px 250px' }}>
-                {/* Connections between nodes on outer and middle orbits to simulate a network */}
-                <line className="connection-line" x1="250" y1="40" x2="250" y2="250" stroke="var(--md-outline-variant)" />
-                <line className="connection-line" x1="432" y1="145" x2="330" y2="250" stroke="var(--md-outline-variant)" />
-                <line className="connection-line" x1="68" y1="355" x2="100" y2="250" stroke="var(--md-outline-variant)" />
+                {/* Connections to simulate a network */}
+                <line className="connection-line" x1="250" y1="30" x2="250" y2="250" stroke="var(--md-outline-variant)" />
+                <line className="connection-line" x1="440" y1="140" x2="330" y2="250" stroke="var(--md-outline-variant)" />
+                <line className="connection-line" x1="60" y1="360" x2="100" y2="250" stroke="var(--md-outline-variant)" />
 
                 {/* Node 6: Blue */}
-                <g className="social-node" style={{ transform: 'translate(250px, 40px)' }}>
-                  <circle className="social-node-glow" r="18" fill="var(--md-primary-container)" />
-                  <circle r="16" fill="var(--md-primary-container)" stroke="var(--md-primary)" strokeWidth="1.5" />
-                  <text className="social-node-label" y="4" fontSize="9">Partner</text>
+                <g className="social-node" style={{ transform: 'translate(250px, 30px)' }}>
+                  <circle className="social-node-pulse" r="42" fill="var(--md-primary-container)" opacity="0.2" />
+                  <circle r="30" fill="url(#blue-grad)" stroke="var(--md-primary)" strokeWidth="1" />
+                  <circle cx="-6" cy="-6" r="5" fill="#ffffff" opacity="0.4" />
                 </g>
 
                 {/* Node 7: Violet */}
-                <g className="social-node" style={{ transform: 'translate(432px, 145px)' }}>
-                  <circle r="15" fill="#eaddff" stroke="var(--md-tone-violet)" strokeWidth="1.5" />
-                  <text className="social-node-label" y="4" fontSize="9">User</text>
+                <g className="social-node" style={{ transform: 'translate(440px, 140px)' }}>
+                  <circle className="social-node-pulse" r="36" fill="#eaddff" opacity="0.2" />
+                  <circle r="25" fill="url(#violet-grad)" stroke="var(--md-tone-violet)" strokeWidth="1" />
+                  <circle cx="-5" cy="-5" r="4" fill="#ffffff" opacity="0.4" />
                 </g>
 
                 {/* Node 8: Green */}
-                <g className="social-node" style={{ transform: 'translate(68px, 355px)' }}>
-                  <circle r="15" fill="#d1e8d2" stroke="var(--md-tone-green)" strokeWidth="1.5" />
-                  <text className="social-node-label" y="4" fontSize="9">QA</text>
+                <g className="social-node" style={{ transform: 'translate(60px, 360px)' }}>
+                  <circle className="social-node-pulse" r="36" fill="#d1e8d2" opacity="0.2" />
+                  <circle r="25" fill="url(#green-grad)" stroke="var(--md-tone-green)" strokeWidth="1" />
+                  <circle cx="-5" cy="-5" r="4" fill="#ffffff" opacity="0.4" />
                 </g>
 
                 {/* Node 9: Amber */}
                 <g className="social-node" style={{ transform: 'translate(398px, 398px)' }}>
-                  <circle r="14" fill="#ffe082" stroke="var(--md-tone-amber)" strokeWidth="1.5" />
-                  <text className="social-node-label" y="4" fontSize="9">Sales</text>
+                  <circle className="social-node-pulse" r="34" fill="#ffe082" opacity="0.2" />
+                  <circle r="23" fill="url(#amber-grad)" stroke="var(--md-tone-amber)" strokeWidth="1" />
+                  <circle cx="-4" cy="-4" r="3" fill="#ffffff" opacity="0.4" />
                 </g>
               </g>
 
               {/* Central Active Node */}
               <g className="social-node" style={{ transform: 'translate(250px, 250px)' }}>
-                <circle className="social-node-pulse" r="42" fill="var(--md-primary-container)" opacity="0.3" />
-                <circle r="26" fill="var(--md-primary)" />
-                <circle r="10" fill="var(--md-on-primary)" />
+                <circle className="social-node-pulse" r="70" fill="var(--md-primary-container)" opacity="0.2" />
+                <circle className="social-node-pulse" style={{ animationDuration: '4s' }} r="50" fill="var(--md-primary-container)" opacity="0.3" />
+                <circle r="34" fill="url(#center-grad)" stroke="var(--md-primary)" strokeWidth="1.5" />
+                <circle cx="-7" cy="-7" r="6" fill="#ffffff" opacity="0.4" />
               </g>
             </svg>
           </div>
