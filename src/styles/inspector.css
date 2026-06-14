@@ -1,0 +1,359 @@
+/* Stress panel, create menu animation, and the selected-item inspector. */
+
+.stress-panel {
+  position: absolute;
+  z-index: 10;
+  top: 72px;
+  left: 16px;
+  display: grid;
+  width: min(360px, calc(100vw - 32px));
+  gap: 12px;
+  border: none;
+  border-radius: var(--md-r-md);
+  background: var(--md-surface-container);
+  box-shadow: var(--md-elev-2);
+  padding: 14px;
+  pointer-events: auto;
+}
+
+.stress-panel__header,
+.stress-panel dl,
+.stress-toggles {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.stress-panel__header strong {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stress-panel__header span {
+  border-radius: var(--md-r-full);
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+  padding: 5px 9px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.stress-slider {
+  display: grid;
+  gap: 8px;
+}
+
+.stress-slider span,
+.stress-toggles span,
+.stress-panel dt {
+  color: rgba(28, 37, 40, 0.64);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.stress-slider input {
+  width: 100%;
+  accent-color: var(--md-primary);
+}
+
+.stress-toggles {
+  justify-content: flex-start;
+}
+
+.stress-toggles label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.stress-toggles input {
+  accent-color: var(--md-primary);
+}
+
+.m3-text-button {
+  border: none;
+  border-radius: var(--md-r-full);
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.m3-text-button:hover {
+  filter: brightness(0.96);
+}
+
+.stress-panel dl {
+  margin: 0;
+}
+
+.stress-panel dl div {
+  display: grid;
+  gap: 3px;
+}
+
+.stress-panel dd {
+  margin: 0;
+  color: var(--md-on-surface);
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.create-menu {
+  position: absolute;
+  z-index: 30;
+  display: grid;
+  width: 292px;
+  gap: 4px;
+  border-radius: var(--md-r-md);
+  padding: 8px;
+  transform-origin: top left;
+  animation: menuIn var(--md-dur-medium) var(--md-ease-decelerate);
+  will-change: transform, opacity;
+}
+
+@keyframes menuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Stagger the menu items so the list "unfolds" */
+.create-menu button {
+  animation: menuItemIn var(--md-dur-medium) var(--md-ease-decelerate) backwards;
+}
+.create-menu button:nth-child(1) { animation-delay: 0.02s; }
+.create-menu button:nth-child(2) { animation-delay: 0.06s; }
+.create-menu button:nth-child(3) { animation-delay: 0.10s; }
+
+@keyframes menuItemIn {
+  from { opacity: 0; transform: translateX(-6px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.create-menu button {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 8px 12px;
+  border-radius: var(--md-r-sm);
+  background: transparent;
+  color: var(--md-on-surface);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  transition: background-color 0.2s, transform var(--md-dur-short) var(--md-ease-standard);
+}
+
+.create-menu button:active {
+  transform: scale(0.98);
+}
+
+.create-menu button:hover {
+  background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+}
+
+.create-menu svg {
+  color: var(--md-primary);
+}
+
+.inspector {
+  position: absolute;
+  z-index: 15;
+  right: 16px;
+  bottom: 16px;
+  display: grid;
+  width: min(342px, calc(100vw - 32px));
+  gap: 8px;
+  border-radius: 16px;
+  padding: 14px;
+  transform-origin: bottom right;
+  animation: inspectorIn var(--md-dur-medium) var(--md-ease-decelerate);
+  will-change: transform, opacity;
+}
+
+@keyframes inspectorIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.inspector__eyebrow {
+  color: var(--md-on-surface-variant);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.inspector .inspector__name-input {
+  width: 100%;
+  box-sizing: border-box;
+  background-color: transparent;
+  color: var(--md-on-surface);
+  border: 1px solid transparent;
+  border-radius: var(--md-r-sm);
+  padding: 6px 42px 6px 8px;
+  font-size: 21px;
+  font-weight: 400;
+  outline: none;
+  transition: border-color 0.2s, background-color 0.2s;
+  line-height: 1.2;
+  margin-bottom: 2px;
+}
+
+.inspector .inspector__name-input:hover {
+  border-color: var(--md-outline-variant);
+  background-color: var(--md-surface-container-highest);
+}
+
+.inspector .inspector__name-input:focus {
+  border-color: var(--md-primary);
+  background-color: var(--md-surface-container-highest);
+}
+
+.inspector dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.inspector dl div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 28px;
+}
+
+.inspector dt {
+  color: var(--md-on-surface-variant);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.inspector dd {
+  margin: 0;
+  color: var(--md-on-surface);
+  font-size: 13px;
+  font-weight: 400;
+  text-align: right;
+}
+
+.primary-action {
+  height: 40px;
+  min-height: 40px;
+  border-radius: var(--md-r-full);
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  padding: 0 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s, box-shadow 0.2s, transform var(--md-dur-short) var(--md-ease-standard);
+}
+
+.primary-action:hover {
+  background: color-mix(in srgb, var(--md-primary) 92%, var(--md-on-primary));
+}
+
+.primary-action:active {
+  transform: scale(0.96);
+}
+
+.inspector p {
+  margin: 0;
+  color: var(--md-on-surface-variant);
+  font-size: 13px;
+  line-height: 1.48;
+}
+
+@media (max-width: 720px) {
+  .toolbar {
+    align-items: flex-start;
+  }
+
+  .brand {
+    max-width: calc(100vw - 168px);
+  }
+
+  .brand span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .inspector {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    width: auto;
+  }
+
+  .help-panel {
+    display: none;
+  }
+
+  .inspector input {
+    font-size: 22px;
+  }
+
+  .create-menu {
+    width: min(292px, calc(100vw - 28px));
+  }
+
+  /* Let the open search field use the full row left of the settings button, and
+     keep the settings/sign-in panel inside the viewport on narrow screens. */
+  .search-box.is-open {
+    max-width: none;
+  }
+
+  .settings-panel {
+    width: min(280px, calc(100vw - 32px));
+  }
+
+  /* Keep the "sign in to save" banner clear of the top-right toolbar buttons,
+     and get it out of the way entirely while a chrome panel is open. The
+     .app-shell prefix lifts specificity above the base .local-save-hint rule,
+     which is declared later in the file. */
+  .app-shell .local-save-hint {
+    max-width: calc(100vw - 132px);
+  }
+
+  .app-shell.is-search-open .local-save-hint,
+  .app-shell.is-settings-open .local-save-hint {
+    display: none;
+  }
+
+  .circle-style-popover {
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    bottom: 96px;
+    width: auto;
+    max-height: calc(100vh - 128px);
+    overflow-y: auto;
+  }
+}
