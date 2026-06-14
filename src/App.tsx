@@ -13,6 +13,7 @@ import googleIcon from './assets/brands/google.svg'
 
 zip.configure({ useWebWorkers: false })
 import { useAuth } from './lib/useAuth'
+import LandingPage from './LandingPage'
 import { loadGraph, saveGraph, loadLocalGraph, saveLocalGraph } from './lib/graphPersistence'
 import { enrichLinkedInProfile } from './lib/linkedinEnrichment'
 import { OnboardingCoach } from './Onboarding'
@@ -368,6 +369,20 @@ function markOnboardingSeen() {
 }
 
 function App() {
+  const [viewMode, setViewMode] = useState<'landing' | 'board'>(() => {
+    const hasAppQuery = window.location.search.includes('app=true') || window.location.hash === '#board';
+    if (hasAppQuery) return 'board';
+    const stored = localStorage.getItem('viewMode');
+    if (stored === 'board') return 'board';
+    return 'landing';
+  });
+
+  const handleLaunchApp = () => {
+    setViewMode('board');
+    localStorage.setItem('viewMode', 'board');
+    window.location.hash = 'board';
+  };
+
   const surfaceRef = useRef<HTMLDivElement | null>(null)
   // Canvas 2D board renderer: circles, edges, people, labels, and interaction chrome.
   const peopleCanvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -2761,6 +2776,14 @@ function App() {
     console.log(setDemoMode, setShowCircleLabels, setShowPersonLabels, setCircleFillMode, setCenterBehavior, applyCircleShapeMode, CheckIcon, SubsetIcon)
   }
 
+  if (viewMode === 'landing') {
+    return (
+      <div className="app-shell">
+        <LandingPage onLaunchApp={handleLaunchApp} />
+      </div>
+    )
+  }
+
   return (
     <main className={`app-shell ${demoMode ? 'is-demo-mode' : ''} ${searchOpen ? 'is-search-open' : ''} ${showSettings ? 'is-settings-open' : ''}`}>
       <div className="toolbar" aria-label="Graph controls" style={{ justifyContent: 'flex-end' }}>
@@ -2961,6 +2984,21 @@ function App() {
                 </button>
               </div>
             )}
+            <div style={{ borderTop: '1px solid var(--md-outline-variant)', paddingTop: '16px' }}>
+              <button
+                type="button"
+                className="m3-btn m3-btn-text"
+                style={{ width: '100%', justifyContent: 'flex-start', padding: 0, height: 'auto', color: 'var(--md-primary)' }}
+                onClick={() => {
+                  setShowSettings(false)
+                  setViewMode('landing')
+                  localStorage.setItem('viewMode', 'landing')
+                  window.location.hash = ''
+                }}
+              >
+                ← Back to Landing Page
+              </button>
+            </div>
           </div>
         </div>
       )}

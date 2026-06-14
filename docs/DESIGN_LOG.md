@@ -17,6 +17,11 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-14 — Landing Page with Animated Orbits and Hash-based Routing
+
+- Decision: Introduced a Google Material 3-style landing page with gently rotating SVG orbits for social nodes and ambient color-mix gradient blobs. Implemented a simple, hash-based view router (`#board` / `?app=true`) coupled with `localStorage` persistence to manage transition between the landing page and the interactive workspace.
+- Why: First-time users need a clear, professional visual hook that explains the product's value proposition and features. Using slowly rotating orbits simulates a dynamic network graph that matches the visual language. Hash-based routing prevents screen flashing on refresh and allows returning to the landing page via settings without introducing a heavy router library.
+
 ### 2026-06-14 — Circle resize hover state and contact-based element movement
 
 - Decision: when hovering over a circle's edge (resize handle area), render a subtle highlighted stroke even if the circle is selected. When resizing a circle, child elements (sub-circles or people) only move inward if they are touching the boundary being shrunk, rather than scaling uniformly.
