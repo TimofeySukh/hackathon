@@ -88,6 +88,40 @@ export function useAuth() {
     }
   }
 
+  const signInWithEmail = async (email: string, password: string) => {
+    if (!supabase) return { error: 'Auth is not configured.' as string | null }
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+
+    if (error) {
+      setAuthState((currentState) => ({ ...currentState, error: error.message }))
+      return { error: error.message }
+    }
+
+    return { error: null }
+  }
+
+  const signUpWithEmail = async (email: string, password: string) => {
+    if (!supabase) return { error: 'Auth is not configured.' as string | null, needsConfirmation: false }
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: window.location.origin,
+      },
+    })
+
+    if (error) {
+      setAuthState((currentState) => ({ ...currentState, error: error.message }))
+      return { error: error.message, needsConfirmation: false }
+    }
+
+    // When email confirmation is required, Supabase returns a user but no session.
+    const needsConfirmation = Boolean(data.user && !data.session)
+    return { error: null, needsConfirmation }
+  }
+
   const signOut = async () => {
     if (!supabase) return
 
@@ -101,6 +135,8 @@ export function useAuth() {
   return {
     ...authState,
     signInWithGoogle,
+    signInWithEmail,
+    signUpWithEmail,
     signOut,
   }
 }

@@ -17,6 +17,25 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-14 — Real brand logos for connections and Google sign-in
+
+- Decision: connection chips in the person inspector and the "Continue with Google" button
+  use official full-color brand logos instead of monochrome letter/abbreviation glyphs.
+  Logos are stored as SVG assets in [`src/assets/brands/`](../src/assets/brands/) and
+  imported as URLs (Vite inlines small ones as data URIs), rendered via `<img>` —
+  `ConnectionServiceIcon` and `GoogleIcon` in `src/App.tsx`.
+- Source: [gilbarbara/logos](https://github.com/gilbarbara/logos) (CC0) for LinkedIn,
+  Telegram, Facebook, WhatsApp, X, and the Google "G"; Instagram's gradient badge comes
+  from [SuperTinyIcons](https://github.com/edent/SuperTinyIcons) (MIT) because gilbarbara
+  only ships a monochrome Instagram glyph. `website.svg` is a hand-made neutral globe
+  (no brand exists for "Custom" links).
+- Why: the abbreviation chips ("in", "tg", "ig", …) and hand-rolled monochrome SVG paths
+  read as placeholder text and looked muddy at 24px. Pre-made, full-color vector logos are
+  instantly recognizable and stay crisp at any size.
+- Rejected: `simple-icons` (npm) — single-color glyphs only, so no gradient/multi-color
+  badges; the package was added then removed. Also rejected hand-authoring brand paths,
+  which produced thick, off-color results.
+
 ### 2026-06-14 — Manual LinkedIn enrichment uses Bright Data behind Supabase
 
 - Decision: single-profile LinkedIn imports from board search call a Supabase Edge
