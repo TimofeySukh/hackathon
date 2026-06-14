@@ -15,6 +15,9 @@ zip.configure({ useWebWorkers: false })
 import { useAuth } from './lib/useAuth'
 import { loadGraph, saveGraph, loadLocalGraph, saveLocalGraph } from './lib/graphPersistence'
 import { enrichLinkedInProfile } from './lib/linkedinEnrichment'
+import { OnboardingCoach } from './Onboarding'
+import { ONBOARDING_STEPS, ONBOARDING_DONE_STEP } from './onboardingSteps'
+import type { OnboardingAction } from './onboardingSteps'
 // STRESS TEST — dev-only performance harness. See src/lib/stressTest.ts.
 
 import type {
@@ -344,6 +347,26 @@ const authCardStyle: CSSProperties = {
   maxWidth: '320px',
 }
 
+// First-run flag for the onboarding tour. Kept in localStorage so a returning
+// visitor isn't shown the card on every load.
+const ONBOARDING_STORAGE_KEY = 'social-onboarding-done-v1'
+
+function hasSeenOnboarding(): boolean {
+  try {
+    return window.localStorage.getItem(ONBOARDING_STORAGE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function markOnboardingSeen() {
+  try {
+    window.localStorage.setItem(ONBOARDING_STORAGE_KEY, '1')
+  } catch {
+    // ignore
+  }
+}
+
 function App() {
   const surfaceRef = useRef<HTMLDivElement | null>(null)
   // Canvas 2D board renderer: circles, edges, people, labels, and interaction chrome.
@@ -515,6 +538,101 @@ function App() {
   const [selectedCircleIds, setSelectedCircleIds] = useState<string[]>([])
   const [hoveredPersonId, setHoveredPersonId] = useState<string | null>(null)
   const [hoveredCircleEdgeId, setHoveredCircleEdgeId] = useState<string | null>(null)
+ 
+  // Onboarding tour. -1 = inactive. A ref mirrors the step so board event
+  // handlers (wired once in effects) always read the live value.
+  const [onboardingStep, setOnboardingStep] = useState(-1)
+  const onboardingStepRef = useRef(onboardingStep)
+  useEffect(() => {
+    onboardingStepRef.current = onboardingStep
+  }, [onboardingStep])
+
+  // True during the brief "Great!" beat that plays after a gesture, before the
+  // card advances to the next step.
+  const [onboardingCelebrating, setOnboardingCelebrating] = useState(false)
+  const onboardingCelebrateRef = useRef(false)
+  const onboardingTimerRef = useRef<number | null>(null)
+  const onboardingDecidedRef = useRef(false)
+
+  // Decide once per load whether to open the tour. On the dev server it always
+  // opens for signed-out visitors (acts as the landing); in production it shows
+  // only once ever, tracked in localStorage — so it isn't a popup on every visit.
+  useEffect(() => {
+    if (onboardingDecidedRef.current) return
+    if (!graphLoaded || auth.status === 'loading') return
+    onboardingDecidedRef.current = true
+    const isSignedOut = auth.status === 'anonymous' || auth.status === 'unconfigured'
+    const devAlwaysShow = import.meta.env.DEV && isSignedOut
+    if (devAlwaysShow || !hasSeenOnboarding()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setOnboardingStep(0)
+      if (!devAlwaysShow) markOnboardingSeen()
+    }
+  }, [graphLoaded, auth.status])
+
+  function clearOnboardingTimer() {
+    if (onboardingTimerRef.current != null) {
+      window.clearTimeout(onboardingTimerRef.current)
+      onboardingTimerRef.current = null
+    }
+    onboardingCelebrateRef.current = false
+    setOnboardingCelebrating(false)
+  }
+
+  function finishOnboarding() {
+    clearOnboardingTimer()
+    setOnboardingStep(-1)
+    markOnboardingSeen()
+  }
+
+  function onboardingNext() {
+    clearOnboardingTimer()
+    setOnboardingStep((step) => {
+      if (step < 0) return step
+      if (step >= ONBOARDING_DONE_STEP) {
+        markOnboardingSeen()
+        return -1
+      }
+      const next = step + 1
+      if (next === ONBOARDING_DONE_STEP) markOnboardingSeen()
+      return next
+    })
+  }
+
+  function onboardingBack() {
+    clearOnboardingTimer()
+    setOnboardingStep((step) => (step > 0 ? step - 1 : step))
+  }
+
+  // Called from board interaction handlers. When the action matches the step the
+  // tour is waiting for, play a one-second "Great!" beat, then advance.
+  function notifyOnboarding(action: OnboardingAction) {
+    const step = onboardingStepRef.current
+    if (step < 0 || step >= ONBOARDING_DONE_STEP) return
+    if (ONBOARDING_STEPS[step].trigger !== action) return
+    if (onboardingCelebrateRef.current) return
+    onboardingCelebrateRef.current = true
+    setOnboardingCelebrating(true)
+    onboardingTimerRef.current = window.setTimeout(() => {
+      onboardingTimerRef.current = null
+      onboardingCelebrateRef.current = false
+      setOnboardingCelebrating(false)
+      setOnboardingStep((s) => {
+        if (s < 0 || s >= ONBOARDING_DONE_STEP) return s
+        const next = s + 1
+        if (next === ONBOARDING_DONE_STEP) markOnboardingSeen()
+        return next
+      })
+    }, 1100)
+  }
+
+  // The closing "you're ready" card dismisses itself after a beat so it never
+  // lingers in the way; the Done button still closes it instantly.
+  useEffect(() => {
+    if (onboardingStep !== ONBOARDING_DONE_STEP) return
+    const timer = window.setTimeout(() => setOnboardingStep(-1), 3600)
+    return () => window.clearTimeout(timer)
+  }, [onboardingStep])
 
   // Viewport size in CSS px, used to cull off-screen nodes. Updated on resize.
   const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight })
@@ -610,6 +728,7 @@ function App() {
         : addLinkedInProfileToGraph(graph, profile)
       pushHistory()
       setGraph(next.graph)
+      notifyOnboarding('import')
       selectItem({ type: 'person', id: next.person.id })
       focusCameraOnWorld(next.person.x, next.person.y, 1.5)
       closeSearch()
@@ -720,6 +839,7 @@ function App() {
       const result = await buildLinkedInConnectionsGraph(graph, csvText)
       pushHistory()
       setGraph(result.graph)
+      notifyOnboarding('import')
 
       alert(`LinkedIn data imported successfully: ${result.importedPeople} people across ${result.importedCompanies} companies.`)
     } catch (err) {
@@ -1441,6 +1561,7 @@ function App() {
           y: currentCamera.y - event.deltaY,
         })
       }
+      notifyOnboarding('move')
     }
 
     surface.addEventListener('wheel', handleWheel, { passive: false })
@@ -1956,6 +2077,7 @@ function App() {
     if (panRef.current?.pointerId === event.pointerId) {
       panRef.current = null
       settleGesture()
+      notifyOnboarding('move')
     }
 
     const movingPersonId = movePersonRef.current?.pointerId === event.pointerId ? movePersonRef.current.personId : null
@@ -1964,16 +2086,21 @@ function App() {
     const disconnectedCircleIds = moveCircleRef.current?.pointerId === event.pointerId ? moveCircleRef.current.disconnectedCircleIds : null
     const wasRightClickDrag = isRightClickDragRef.current
 
-    const endingMove =
+    const wasResize = resizeCircleRef.current?.pointerId === event.pointerId
+    const wasNodeMove =
       moveCircleRef.current?.pointerId === event.pointerId ||
-      movePersonRef.current?.pointerId === event.pointerId ||
-      resizeCircleRef.current?.pointerId === event.pointerId
+      movePersonRef.current?.pointerId === event.pointerId
+
+    const endingMove = wasNodeMove || wasResize
 
     if (moveCircleRef.current?.pointerId === event.pointerId) moveCircleRef.current = null
     if (movePersonRef.current?.pointerId === event.pointerId) movePersonRef.current = null
     if (resizeCircleRef.current?.pointerId === event.pointerId) resizeCircleRef.current = null
 
     if (endingMove) {
+      if (wasResize) notifyOnboarding('resize')
+      else if (wasNodeMove) notifyOnboarding('move')
+
       // Apply the final dragged position immediately, including any queued layout pass.
       const pending = takePendingGraphUpdate()
       setGraph((prev) => {
@@ -2310,6 +2437,7 @@ function App() {
     setSelectedItem({ type: 'person', id })
     // Grow the new person in so it feels placed, not blinked into existence.
     startBoardAnim('pop:' + id, 360)
+    notifyOnboarding('create')
   }
 
   function handleMergeSelected() {
@@ -2464,6 +2592,7 @@ function App() {
     // Grow the new person in so it feels placed, not blinked into existence.
     startBoardAnim('pop:' + id, 360)
     setCreateMenu(null)
+    notifyOnboarding('create')
   }
 
   // "Add circle" in the create menu auto-detects containment the same way the
@@ -2525,6 +2654,7 @@ function App() {
     })
     selectItem({ type: 'circle', id })
     setCreateMenu(null)
+    notifyOnboarding('create')
   }
 
   /* Commented out to hide from menu, keeping in code for future use
@@ -3881,6 +4011,21 @@ function App() {
             Sign in
           </button>
         </div>
+      )}
+ 
+      {graphLoaded && !demoMode && onboardingStep >= 0 && (
+        <OnboardingCoach
+          step={onboardingStep}
+          celebrating={onboardingCelebrating}
+          onNext={onboardingNext}
+          onBack={onboardingBack}
+          onSkip={finishOnboarding}
+          onOpenSearch={() => {
+            setShowSettings(false)
+            setSearchOpen(true)
+            window.requestAnimationFrame(() => searchInputRef.current?.focus())
+          }}
+        />
       )}
     </main>
   )
