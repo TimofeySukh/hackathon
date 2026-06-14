@@ -4410,7 +4410,6 @@ function drawFavoritePersonOutline(ctx: CanvasRenderingContext2D, person: Person
   const radius = PERSON_VISUAL_RADIUS + 7 / scale
   const dotCount = 18
   const haloRadius = Math.max(2.5 / scale, 1.6)
-  const dotRadius = Math.max(1.45 / scale, 0.95)
   ctx.save()
   for (let i = 0; i < dotCount; i += 1) {
     const angle = (Math.PI * 2 * i) / dotCount - Math.PI / 2
@@ -4418,10 +4417,6 @@ function drawFavoritePersonOutline(ctx: CanvasRenderingContext2D, person: Person
     const y = person.y + Math.sin(angle) * radius
     ctx.beginPath()
     ctx.arc(x, y, haloRadius, 0, Math.PI * 2)
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.92)'
-    ctx.fill()
-    ctx.beginPath()
-    ctx.arc(x, y, dotRadius, 0, Math.PI * 2)
     ctx.fillStyle = color
     ctx.fill()
   }
@@ -4787,7 +4782,7 @@ function drawPeople(
       drawRadius * 2,
       drawRadius * 2,
     )
-    if (person.isFavorite) drawFavoritePersonOutline(ctx, person, '#d97706', scale)
+    if (person.isFavorite) drawFavoritePersonOutline(ctx, person, '#ffd600', scale)
     if (showPersonLabels && (scale >= 0.62 || isSelected || isHovered)) drawPersonLabel(ctx, person, scale)
   }
 }
