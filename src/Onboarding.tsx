@@ -94,9 +94,9 @@ export function OnboardingCoach({ step, celebrating, onNext, onBack, onSkip, onO
               ← Back
             </button>
           )}
-          {!isDone && (
-            <button type="button" className="onboarding-coach__skip" onClick={onSkip}>
-              Skip tour
+          {!isDone && step > 0 && (
+            <button type="button" className="onboarding-coach__skip" onClick={onNext}>
+              Next
             </button>
           )}
           {renderPrimary()}
