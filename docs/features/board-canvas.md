@@ -18,20 +18,31 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   minimum) as their contents move. Shrinking a circle pulls its contained people and subset
   circles toward the center, and nested subset circles shrink with the parent when position
   packing alone cannot fit them.
-- **Create**: right-click a circle, or Shift-drag from a circle center, to open the
-  create menu (add person / nested subset circle / connected external circle). People are
-  endpoints; only circle centers spawn new branches.
+- **Create**: right-click a circle to open the create menu, which now offers two actions —
+  add person and add circle. "Add circle" auto-detects containment from the target point:
+  inside the source circle it nests a subset blob, outside it spawns a connected circle.
+- **Double-tap create**: double-click (double-tap) anywhere to drop a person exactly at the
+  tapped point. It adopts a circle only when the tap lands inside one (or on someone already
+  in a circle); tapping empty space leaves the person free-floating with no owning circle.
+  The creation deliberately skips containment fitting so the rest of the board never reflows
+  or jumps. This replaces the older Shift-drag-from-center shortcut.
 - **Connect**: with the "Draw Connection" center behavior, drag from a circle center to
   another node to draw a relationship link. A dashed draft edge previews the connection.
 - **Select**: click a circle, person, or connection to load it into the inspector for
   rename / styling / notes / delete.
+- **Undo**: Ctrl/Cmd+Z reverts the last graph-mutating action — create, delete, move,
+  resize, connect, merge, change-circle, favorite, add/delete note, and LinkedIn import.
+  A whole drag or resize gesture is a single undo step, and the shortcut is ignored while
+  typing in a field so it never fights an input's native undo. History is in-memory only
+  (lost on reload) and structural; rename and style tweaks are intentionally excluded so
+  undo stays at meaningful boundaries.
 - **Demo mode**: the Settings panel includes a demo mode switch. When enabled, chrome,
   stress controls, help text, and the inspector disappear; only the board canvas and
   settings button remain. People and circles can still be moved, and circle edges can
   still be resized. Existing items can still be selected on the canvas and deleted with
   Backspace/Delete. Connector handles stay visible. Dragging a circle/person connector to
   an existing node creates a link; dragging to empty space opens the create menu so users
-  can add a person, subset circle, or external connected circle without leaving demo mode.
+  can add a person or a circle without leaving demo mode.
 - **Labels**: Settings includes separate toggles for circle labels and person names.
   Circle-center icon text scales with the world transform like people avatars; labels use
   the same screen-readable label treatment as person names.

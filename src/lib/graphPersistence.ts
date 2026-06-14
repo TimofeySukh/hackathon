@@ -46,3 +46,33 @@ export async function saveGraph(userId: string, graph: GraphState): Promise<void
 
   if (error) throw error
 }
+
+// ---- Local (signed-out) persistence ----------------------------------------
+// Visitors who aren't signed in still get their work saved — just in this
+// browser via localStorage instead of Supabase. Signing in switches over to the
+// cloud-backed graph above.
+
+const LOCAL_GRAPH_KEY = 'hackathon-board:local-graph'
+
+/** Returns the locally saved graph, or null when nothing is stored yet. */
+export function loadLocalGraph(): GraphState | null {
+  try {
+    const raw = window.localStorage.getItem(LOCAL_GRAPH_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as unknown
+    if (!isGraphState(parsed)) return null
+    return parsed
+  } catch (error) {
+    console.error('Failed to load local graph', error)
+    return null
+  }
+}
+
+/** Persists the graph to localStorage for signed-out visitors. */
+export function saveLocalGraph(graph: GraphState): void {
+  try {
+    window.localStorage.setItem(LOCAL_GRAPH_KEY, JSON.stringify(graph))
+  } catch (error) {
+    console.error('Failed to save local graph', error)
+  }
+}

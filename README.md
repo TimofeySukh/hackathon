@@ -9,8 +9,8 @@ A local social circle graph prototype built with React, Vite, and TypeScript.
 - Nested subset circles inside a parent circle, including a product-team subset inside Pandora
 - People placed either directly inside a circle or inside a nested subset
 - Curved visual links from circle centers to connected circles and people
-- Right-click a circle to create a person, a nested subset circle, or a connected external circle
-- Shift-drag from a circle center to create from that center without using the context menu
+- Right-click a circle to open the create menu with two actions: add person or add circle
+- Double-tap anywhere to create a person at that exact point; it joins a circle only if tapped inside one, otherwise it stays free-floating
 - People are endpoints; only circle centers can create new outgoing branches
 - Drag people to reposition them inside their owning circle
 - Drag any circle center, including `You`, to move that circle and all contained people and subset circles together
@@ -18,6 +18,7 @@ A local social circle graph prototype built with React, Vite, and TypeScript.
 - Parent circles automatically expand or shrink back toward their minimum size as contained objects move
 - The visible help panel explains the prototype controls on the page
 - Select circles or people to inspect and rename them
+- Undo the last structural change (create, delete, move, resize, connect, merge) with Ctrl/Cmd+Z
 - Add three demo people to the selected circle from the inspector
 - Drag non-root circle centers to reposition circles
 - Pan the board by dragging empty space and zoom with the mouse wheel or toolbar

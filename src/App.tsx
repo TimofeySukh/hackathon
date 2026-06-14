@@ -5,7 +5,7 @@ import * as zip from '@zip.js/zip.js'
 
 zip.configure({ useWebWorkers: false })
 import { useAuth } from './lib/useAuth'
-import { loadGraph, saveGraph } from './lib/graphPersistence'
+import { loadGraph, saveGraph, loadLocalGraph, saveLocalGraph } from './lib/graphPersistence'
 // STRESS TEST — dev-only performance harness. See src/lib/stressTest.ts.
 
 export type CircleTone = 'blue' | 'red' | 'green' | 'amber' | 'violet'
@@ -503,6 +503,9 @@ function App() {
   const pendingGraphRef = useRef<((current: GraphState) => GraphState) | null>(null)
   const pendingConnectorRef = useRef<DragConnector | null>(null)
   const [graph, setGraph] = useState(createInitialGraph)
+  // True once the current drag/resize gesture has recorded its undo snapshot.
+  // Only touched from pointer event handlers, never during render.
+  const gestureSnapshotTakenRef = useRef(false)
   const auth = useAuth()
   const userId = auth.session?.user?.id ?? null
   // True once we've pulled this user's saved graph (or confirmed they have none).
@@ -553,6 +556,31 @@ function App() {
     }, 800)
     return () => window.clearTimeout(timer)
   }, [graph, graphLoaded, auth.status, userId])
+
+  // Signed-out visitors aren't blocked: their board is restored from (and saved
+  // to) localStorage so work survives a reload without an account. Signing in
+  // takes over with the Supabase-backed graph via the effects above.
+  const isLocalMode = auth.status === 'anonymous' || auth.status === 'unconfigured'
+
+  useEffect(() => {
+    if (!isLocalMode) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setGraphLoaded(false)
+    const saved = loadLocalGraph()
+    if (saved) {
+      setGraph(saved)
+    }
+    setGraphLoaded(true)
+  }, [isLocalMode])
+
+  // Debounced local autosave for signed-out visitors.
+  useEffect(() => {
+    if (!graphLoaded || !isLocalMode) return
+    const timer = window.setTimeout(() => {
+      saveLocalGraph(graph)
+    }, 800)
+    return () => window.clearTimeout(timer)
+  }, [graph, graphLoaded, isLocalMode])
 
   const [camera, setCamera] = useState<Camera>({ x: window.innerWidth / 2, y: window.innerHeight / 2, scale: 0.82 })
   // cameraRef holds the *live* camera during a pan/zoom gesture. `camera` state
@@ -617,6 +645,55 @@ function App() {
     setShowCircleStylePanel(false)
     setSelectedItem(item)
   }
+
+  // Snapshot the current graph before a mutating action so Ctrl+Z can restore
+  // it. History lives in module-level state (see undoHistory) rather than a
+  // useRef so these helpers don't read React refs — that keeps the React
+  // Compiler from treating every mutating action as ref access during render.
+  // `graph` is the latest committed value in each render's closure, which for a
+  // drag's first move is still the pre-drag state, so one snapshot per gesture.
+  function pushHistory() {
+    undoHistory.push(graph)
+    if (undoHistory.length > MAX_UNDO_STEPS) undoHistory.shift()
+  }
+
+  // Record one snapshot per drag/resize gesture, on its first actual move.
+  function ensureGestureSnapshot() {
+    if (gestureSnapshotTakenRef.current) return
+    gestureSnapshotTakenRef.current = true
+    pushHistory()
+  }
+
+  function undo() {
+    const previous = undoHistory.pop()
+    if (!previous) return
+    // Drop any in-flight drag frame so it can't clobber the restored state.
+    if (dragRafRef.current != null) {
+      window.cancelAnimationFrame(dragRafRef.current)
+      dragRafRef.current = null
+    }
+    pendingGraphRef.current = null
+    setGraph(previous)
+    setSelectedItem(null)
+    setSelectedPeopleIds([])
+    setCreateMenu(null)
+  }
+
+  // Global Ctrl/Cmd+Z, so undo works regardless of board focus. Ignored while
+  // typing in a field so it doesn't fight the input's own native undo.
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (!(event.key === 'z' || event.key === 'Z') || !(event.metaKey || event.ctrlKey)) return
+      if (event.shiftKey) return
+      const target = event.target as HTMLElement | null
+      const tag = target?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return
+      event.preventDefault()
+      undo()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   async function handleLinkedInImport(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -683,6 +760,7 @@ function App() {
         companyGroups[company].push(row)
       }
 
+      pushHistory()
       setGraph((current) => {
         const nextCircles = [...current.circles]
         const nextPeople = [...current.people]
@@ -814,6 +892,7 @@ function App() {
   }
 
   function deletePerson(personId: string) {
+    pushHistory()
     setGraph((current) => ({
       ...current,
       people: current.people.filter((p) => p.id !== personId),
@@ -825,6 +904,7 @@ function App() {
   }
 
   function togglePersonFavorite(personId: string) {
+    pushHistory()
     setGraph((current) => ({
       ...current,
       people: current.people.map((p) =>
@@ -834,6 +914,7 @@ function App() {
   }
 
   function addPersonNote(personId: string, title: string, body: string) {
+    pushHistory()
     setGraph((current) => ({
       ...current,
       people: current.people.map((p) => {
@@ -881,6 +962,7 @@ function App() {
   }
 
   function deletePersonNote(personId: string, noteId: string) {
+    pushHistory()
     setGraph((current) => ({
       ...current,
       people: current.people.map((p) => {
@@ -996,6 +1078,7 @@ function App() {
   function deleteCircle(circleId: string) {
     if (circleId === 'you') return
 
+    pushHistory()
     setGraph((current) => {
       // 1. Gather all descendant circle IDs recursively
       const deletedCircleIds = new Set<string>([circleId])
@@ -1052,6 +1135,7 @@ function App() {
   }
 
   function deleteConnection(connId: string) {
+    pushHistory()
     setGraph((current) => ({
       ...current,
       connections: (current.connections || []).filter((conn) => conn.id !== connId),
@@ -1061,6 +1145,7 @@ function App() {
 
   function deleteSelectedItem() {
     if (selectedPeopleIds.length > 0 || selectedCircleIds.length > 0) {
+      pushHistory()
       setGraph((current) => {
         const deletedCircleIds = new Set<string>(selectedCircleIds)
         let expanded = true
@@ -1169,27 +1254,35 @@ function App() {
     }
   }, [openNotesPersonId])
 
+  // Keep the latest delete-selection logic in a ref so the global keydown
+  // listener can subscribe once yet always call the current selection/actions.
+  // (The delete helpers are unstable now that they snapshot undo history, so
+  // listing them as deps would re-subscribe every render.)
+  const deleteSelectionRef = useRef<() => void>(() => {})
+  useEffect(() => {
+    // deleteSelectedItem covers every case: marquee multi-select of people and
+    // circles, plus single person/circle/connection.
+    deleteSelectionRef.current = () => deleteSelectedItem()
+  })
+
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Delete' || event.key === 'Backspace') {
-        const activeEl = document.activeElement
-        if (
-          activeEl &&
-          (activeEl.tagName === 'INPUT' ||
-            activeEl.tagName === 'TEXTAREA' ||
-            activeEl.getAttribute('contenteditable') === 'true')
-        ) {
-          return
-        }
-
-        deleteSelectedItem()
+      if (event.key !== 'Delete' && event.key !== 'Backspace') return
+      const activeEl = document.activeElement
+      if (
+        activeEl &&
+        (activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          activeEl.getAttribute('contenteditable') === 'true')
+      ) {
+        return
       }
+      deleteSelectionRef.current()
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedItem, selectedPeopleIds, selectedCircleIds])
+  }, [])
 
   useEffect(() => {
     if (!showCircleDropdown) return
@@ -1560,6 +1653,8 @@ function App() {
 
     if (!demoMode) setCreateMenu(null)
     setOpenNotesPersonId(null)
+    // A fresh gesture hasn't recorded its undo snapshot yet.
+    gestureSnapshotTakenRef.current = false
 
     const hit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
       x: event.clientX,
@@ -1802,6 +1897,7 @@ function App() {
     // active item stays under the pointer while collision layout pushes blockers.
     const moving = moveCircleRef.current
     if (moving?.pointerId === event.pointerId) {
+      ensureGestureSnapshot()
       const deltaX = (event.clientX - moving.startX) / camera.scale
       const deltaY = (event.clientY - moving.startY) / camera.scale
       const { circleOrigins, personOrigins } = moving
@@ -1827,6 +1923,7 @@ function App() {
 
     const movingPerson = movePersonRef.current
     if (movingPerson?.pointerId === event.pointerId) {
+      ensureGestureSnapshot()
       const deltaX = (event.clientX - movingPerson.startX) / camera.scale
       const deltaY = (event.clientY - movingPerson.startY) / camera.scale
       const { selectedOrigins } = movingPerson
@@ -1851,6 +1948,7 @@ function App() {
 
     const resizing = resizeCircleRef.current
     if (resizing?.pointerId === event.pointerId) {
+      ensureGestureSnapshot()
       const world = screenToWorld({ x: event.clientX, y: event.clientY })
       pendingGraphRef.current = (current) => resizeCircleFromPoint(current, resizing.circleId, world)
       scheduleDrag()
@@ -2004,6 +2102,7 @@ function App() {
       const targetCircle = graph.circles.find((c) => Math.hypot(c.x - conn.endX, c.y - conn.endY) < 30)
 
       if (targetPerson && targetPerson.id !== conn.sourceId) {
+        pushHistory()
         setGraph((current) => ({
           ...current,
           connections: [
@@ -2016,6 +2115,7 @@ function App() {
           ],
         }))
       } else if (targetCircle && targetCircle.id !== conn.sourceId) {
+        pushHistory()
         if (conn.sourceType === 'circle') {
           setGraph((current) => {
             const srcCircle = current.circles.find((c) => c.id === conn.sourceId)
@@ -2191,44 +2291,53 @@ function App() {
     }
   }
 
+  // Double-tap creates a person exactly where you tapped. It only adopts a
+  // circle when the tap lands inside one (or on someone already in a circle);
+  // tapping empty space leaves the person free-floating instead of dragging it
+  // into the "you" blob. We deliberately skip ensureContainment so the rest of
+  // the board never reflows or visibly jumps around the new person.
   function handleSurfaceDoubleClick(event: React.MouseEvent<HTMLDivElement>) {
     if (event.button !== 0) return
+    if (demoMode) return
     const hit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
       x: event.clientX,
       y: event.clientY,
     })
 
+    // An empty-space tap yields no owning circle (''), so the person stays put.
+    let circleId = ''
     if (hit && (hit.type === 'circle-body' || hit.type === 'circle-center' || hit.type === 'circle-edge')) {
-      const circleId = hit.circle.id
-      const world = screenToWorld({ x: event.clientX, y: event.clientY })
-      const source = circlesById.get(circleId)
-      if (!source) return
-
-      const id = `person-${Date.now()}`
-      const sides = Math.floor(Math.random() * 5) + 8
-      setGraph((current) => {
-        return ensureContainment({
-          ...current,
-          people: [
-            ...current.people,
-            {
-              id,
-              name: `New person ${current.people.length + 1}`,
-              role: `Inside ${source.name}`,
-              x: world.x,
-              y: world.y,
-              circleId: source.id,
-              avatar: makeAvatar(current.people.length + 1),
-              shapeType: 'circle',
-              sides,
-              amplitude: 0,
-            },
-          ],
-        })
-      })
-      setSelectedPeopleIds([])
-      selectItem({ type: 'person', id: id })
+      circleId = hit.circle.id
+    } else if (hit && hit.type === 'person') {
+      circleId = hit.person.circleId ?? ''
     }
+
+    const world = screenToWorld({ x: event.clientX, y: event.clientY })
+    const id = `person-${Date.now()}`
+    const sides = Math.floor(Math.random() * 5) + 8
+    pushHistory()
+    setGraph((current) => ({
+      ...current,
+      people: [
+        ...current.people,
+        {
+          id,
+          name: `New person ${current.people.length + 1}`,
+          role: circleId ? `Inside ${circlesById.get(circleId)?.name ?? ''}` : '',
+          x: world.x,
+          y: world.y,
+          circleId,
+          avatar: makeAvatar(current.people.length + 1),
+          shapeType: 'circle',
+          sides,
+          amplitude: 0,
+        },
+      ],
+    }))
+    setSelectedPeopleIds([])
+    setSelectedItem({ type: 'person', id })
+    // Grow the new person in so it feels placed, not blinked into existence.
+    startBoardAnim('pop:' + id, 360)
   }
 
   function handleMergeSelected() {
@@ -2254,6 +2363,7 @@ function App() {
 
     const newCircleId = `circle-${Date.now()}`
 
+    pushHistory()
     setGraph((current) => {
       const newCircle = {
         id: newCircleId,
@@ -2306,30 +2416,44 @@ function App() {
   function createPerson() {
     if (!createMenu) return
 
-    const source = circlesById.get(createMenu.sourceCircleId)
-    if (!source) return
+    // Drop the person exactly where the menu was opened and auto-detect which
+    // bubble that point falls inside (innermost). Empty space -> free-floating,
+    // not forced into the source circle. We skip ensureContainment so the rest
+    // of the board never reflows or jumps. selectedItem is passed as null so the
+    // hit test reports the containing circle/person, not a connector handle.
+    const hit = hitTestBoard(boardIndex, cameraRef.current, null, {
+      x: createMenu.screenX,
+      y: createMenu.screenY,
+    })
+    let circleId = ''
+    if (hit && (hit.type === 'circle-body' || hit.type === 'circle-center' || hit.type === 'circle-edge')) {
+      circleId = hit.circle.id
+    } else if (hit && hit.type === 'person') {
+      circleId = hit.person.circleId ?? ''
+    }
 
     const id = `person-${Date.now()}`
     const sides = Math.floor(Math.random() * 5) + 8
+    pushHistory()
     setGraph((current) => {
-      const nextGraph = ensureContainment({
+      const nextGraph: GraphState = {
         ...current,
         people: [
           ...current.people,
           {
             id,
             name: `New person ${current.people.length + 1}`,
-            role: `Inside ${source.name}`,
+            role: circleId ? `Inside ${circlesById.get(circleId)?.name ?? ''}` : '',
             x: createMenu.x,
             y: createMenu.y,
-            circleId: source.id,
+            circleId,
             avatar: makeAvatar(current.people.length + 1),
             shapeType: 'circle',
             sides,
             amplitude: 0,
           },
         ],
-      })
+      }
       if (createMenu.dragSourceType === 'person' && createMenu.dragSourceId) {
         return {
           ...nextGraph,
@@ -2351,6 +2475,17 @@ function App() {
     setCreateMenu(null)
   }
 
+  // "Add circle" in the create menu auto-detects containment the same way the
+  // double-tap shortcut does: a target point inside the source circle nests a
+  // subset, otherwise it spawns a connected circle outside.
+  function createCircleAuto() {
+    if (!createMenu) return
+    const source = circlesById.get(createMenu.sourceCircleId)
+    if (!source) return
+    const inside = Math.hypot(createMenu.x - source.x, createMenu.y - source.y) <= source.radius
+    createCircle(inside ? 'nested' : 'external')
+  }
+
   function createCircle(mode: 'nested' | 'external') {
     if (!createMenu) return
 
@@ -2359,6 +2494,7 @@ function App() {
 
     const id = `circle-${Date.now()}`
     const isNested = mode === 'nested'
+    pushHistory()
     setGraph((current) => {
       const nextGraph = ensureContainment({
         ...current,
@@ -2492,14 +2628,16 @@ function App() {
   // mounts — its mount-time effects (e.g. the native wheel listener for trackpad
   // pinch-zoom / two-finger pan) need surfaceRef to exist on first commit. When
   // Supabase isn't configured we just never show the overlay (local dev mode).
-  const isAuthLoading =
+  // Signed-out visitors are no longer gated behind a sign-in wall: the only
+  // blocking overlay left is the brief "loading your board" state for a user
+  // whose Supabase graph is still being fetched.
+  const showAuthOverlay =
     auth.status !== 'unconfigured' &&
     (auth.status === 'loading' || (auth.status === 'authenticated' && !graphLoaded))
-  const showAuthOverlay = isAuthLoading || auth.status === 'anonymous'
 
   // Keep references to unused features so they remain in codebase for future use and satisfy TS/ESLint checks
   if (false as boolean) {
-    console.log(setDemoMode, setShowCircleLabels, setShowPersonLabels, setCircleFillMode, setCenterBehavior, applyCircleShapeMode, CheckIcon)
+    console.log(setDemoMode, setShowCircleLabels, setShowPersonLabels, setCircleFillMode, setCenterBehavior, applyCircleShapeMode, CheckIcon, SubsetIcon)
   }
 
   return (
@@ -2587,6 +2725,26 @@ function App() {
                 </button>
               </div>
             )}
+            {auth.status === 'anonymous' && (
+              <div style={{ borderTop: '1px solid var(--md-outline-variant)', paddingTop: '16px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 500, color: 'rgba(28, 37, 40, 0.64)', display: 'block', marginBottom: '8px' }}>
+                  Account
+                </label>
+                <p style={{ margin: '0 0 12px', fontSize: '13px', color: 'var(--md-on-surface-variant)' }}>
+                  Sign in to save your data across devices. Until then it stays in this browser.
+                </p>
+                <button
+                  type="button"
+                  className="m3-primary-button"
+                  onClick={() => void auth.signInWithGoogle()}
+                >
+                  Sign in with Google
+                </button>
+                {auth.error && (
+                  <p style={{ margin: '8px 0 0', color: 'var(--md-error, #b3261e)', fontSize: '13px' }}>{auth.error}</p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -2622,37 +2780,14 @@ function App() {
 
       {createMenu ? (
         <div className="create-menu" style={menuPosition(createMenu)}>
-          {createMenu.dragSourceType === 'person' ? (
-            <>
-              <button type="button" onClick={createPerson}>
-                <PersonIcon />
-                <span>Add person</span>
-              </button>
-              <button type="button" onClick={() => createCircle('nested')}>
-                <SubsetIcon />
-                <span>Add subset inside source circle</span>
-              </button>
-              <button type="button" onClick={() => createCircle('external')}>
-                <CircleIcon />
-                <span>Add circle</span>
-              </button>
-            </>
-          ) : (
-            <>
-              <button type="button" onClick={createPerson}>
-                <PersonIcon />
-                <span>Add person here</span>
-              </button>
-              <button type="button" onClick={() => createCircle('nested')}>
-                <SubsetIcon />
-                <span>Add subset inside source circle</span>
-              </button>
-              <button type="button" onClick={() => createCircle('external')}>
-                <CircleIcon />
-                <span>Create connected circle outside</span>
-              </button>
-            </>
-          )}
+          <button type="button" onClick={createPerson}>
+            <PersonIcon />
+            <span>Add person</span>
+          </button>
+          <button type="button" onClick={createCircleAuto}>
+            <CircleIcon />
+            <span>Add circle</span>
+          </button>
         </div>
       ) : null}
 
@@ -3046,6 +3181,7 @@ function App() {
                                      key={c.id}
                                      type="button"
                                      onClick={() => {
+                                       pushHistory()
                                        setGraph((current) => {
                                          const freePos = findFreeSpaceInCircle(current.circles, current.people, c.id)
                                          return ensureContainment({
@@ -3417,37 +3553,33 @@ function App() {
               </>
             )}
 
-            {selectedConnection && (() => {
-              const fromNode = peopleById.get(selectedConnection.fromId) || circlesById.get(selectedConnection.fromId)
-              const toNode = peopleById.get(selectedConnection.toId) || circlesById.get(selectedConnection.toId)
-              return (
-                <>
-                  <dl>
-                    <div>
-                      <dt>From</dt>
-                      <dd>{fromNode ? fromNode.name : 'Unknown'}</dd>
-                    </div>
-                    <div>
-                      <dt>To</dt>
-                      <dd>{toNode ? toNode.name : 'Unknown'}</dd>
-                    </div>
-                  </dl>
+            {selectedConnection && (
+              <>
+                <dl>
+                  <div>
+                    <dt>From</dt>
+                    <dd>{(peopleById.get(selectedConnection.fromId) || circlesById.get(selectedConnection.fromId))?.name ?? 'Unknown'}</dd>
+                  </div>
+                  <div>
+                    <dt>To</dt>
+                    <dd>{(peopleById.get(selectedConnection.toId) || circlesById.get(selectedConnection.toId))?.name ?? 'Unknown'}</dd>
+                  </div>
+                </dl>
 
-                  <button
-                    type="button"
-                    className="primary-action"
-                    style={{
-                      marginTop: '16px',
-                      background: 'var(--md-error-container)',
-                      color: 'var(--md-on-error-container)',
-                    }}
-                    onClick={() => deleteConnection(selectedConnection.id)}
-                  >
-                    Delete connection
-                  </button>
-                </>
-              )
-            })()}
+                <button
+                  type="button"
+                  className="primary-action"
+                  style={{
+                    marginTop: '16px',
+                    background: 'var(--md-error-container)',
+                    color: 'var(--md-on-error-container)',
+                  }}
+                  onClick={() => deleteConnection(selectedConnection.id)}
+                >
+                  Delete connection
+                </button>
+              </>
+            )}
       </aside>
       )}
 
@@ -3455,25 +3587,21 @@ function App() {
         <div style={authOverlayStyle}>
           <div style={authCardStyle}>
             <span className="brand__mark">DN</span>
-            {auth.status === 'anonymous' ? (
-              <>
-                <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 500, color: 'var(--md-on-surface)' }}>
-                  Circle graph
-                </h1>
-                <p style={{ margin: 0, color: 'var(--md-on-surface-variant)', textAlign: 'center' }}>
-                  Sign in to save your connections across sessions.
-                </p>
-                <button type="button" className="m3-primary-button" onClick={() => void auth.signInWithGoogle()}>
-                  Continue with Google
-                </button>
-                {auth.error && (
-                  <p style={{ margin: 0, color: 'var(--md-error, #b3261e)', fontSize: '13px' }}>{auth.error}</p>
-                )}
-              </>
-            ) : (
-              <p style={{ margin: 0, color: 'var(--md-on-surface-variant)' }}>Loading your board…</p>
-            )}
+            <p style={{ margin: 0, color: 'var(--md-on-surface-variant)' }}>Loading your board…</p>
           </div>
+        </div>
+      )}
+
+      {auth.status === 'anonymous' && (
+        <div className="local-save-hint" role="note">
+          <span>Sign in to save your data — your board is kept locally for now.</span>
+          <button
+            type="button"
+            className="local-save-hint__action"
+            onClick={() => void auth.signInWithGoogle()}
+          >
+            Sign in
+          </button>
         </div>
       )}
     </main>
@@ -3616,6 +3744,12 @@ function cameraWorldRect(surface: HTMLElement, camera: Camera, padPx = 120): Wor
 // Set by the board so freshly-decoded images can trigger a repaint (otherwise an
 // avatar only appears after the next interaction-driven redraw).
 let requestBoardRepaint: (() => void) | null = null
+
+// Undo history kept at module scope (not useRef) so the mutating helpers that
+// read/write it aren't analyzed as accessing React refs during render. Single
+// mount in this app, so a plain stack is enough; one snapshot per user action.
+const MAX_UNDO_STEPS = 100
+const undoHistory: GraphState[] = []
 
 function getCanvasImage(src: string): HTMLImageElement | null {
   const cached = imageCache.get(src)
