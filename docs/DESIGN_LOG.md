@@ -17,6 +17,11 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-14 — Circle resize hover state and contact-based element movement
+
+- Decision: when hovering over a circle's edge (resize handle area), render a subtle highlighted stroke even if the circle is selected. When resizing a circle, child elements (sub-circles or people) only move inward if they are touching the boundary being shrunk, rather than scaling uniformly.
+- Why: uniform scaling on shrink made internal elements jump inward too quickly and look disconnected from the edge. Restricting movement to contact/collision pushing makes the resize operation feel more physical and intuitive. The edge highlight provides clear affordance that the circle can be dragged to resize.
+
 ### 2026-06-14 — Real brand logos for connections and Google sign-in
 
 - Decision: connection chips in the person inspector and the "Continue with Google" button

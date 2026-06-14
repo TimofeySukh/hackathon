@@ -14,7 +14,7 @@ import {
   PERSON_COLLISION_RADIUS,
   PERSON_CONTAINMENT_RADIUS,
 } from './constants'
-import { clamp, getSeparation } from './geometry'
+import { getSeparation } from './geometry'
 
 export function makeCircle(
   id: string,
@@ -152,33 +152,99 @@ function pullCircleContentsTowardCenter(
   circle: CircleNode,
   radiusRatio: number,
 ): GraphState {
-  const descendantCircleIds = getDescendantCircleIds(state.circles, circleId)
-  const containedCircleIds = new Set(descendantCircleIds)
-  containedCircleIds.add(circleId)
-  const scale = clamp(radiusRatio, 0.12, 1)
+  const requestedRadius = circle.radius * radiusRatio
 
-  function pullPoint(point: { x: number; y: number }) {
-    return {
-      x: circle.x + (point.x - circle.x) * scale,
-      y: circle.y + (point.y - circle.y) * scale,
+  const circles = state.circles.map((c) => ({ ...c }))
+  const people = state.people.map((p) => ({ ...p }))
+
+  const circlesById = new Map(circles.map((c) => [c.id, c]))
+  const descendantCircleIds = getDescendantCircleIds(circles, circleId)
+
+  // Temporarily update root circle's radius for nested containment check
+  const rootCircle = circlesById.get(circleId)
+  if (rootCircle) {
+    rootCircle.radius = requestedRadius
+  }
+
+  // Process descendant circles in tree order starting from circleId
+  const queue = [circleId]
+  while (queue.length > 0) {
+    const parentId = queue.shift()!
+    const parent = circlesById.get(parentId)!
+
+    const children = circles.filter((c) => c.parentId === parentId)
+    for (const child of children) {
+      const dx = child.x - parent.x
+      const dy = child.y - parent.y
+      const d = Math.hypot(dx, dy)
+
+      const maxAllowed = parent.radius - child.radius - CIRCLE_CONTAINMENT_PADDING
+      if (d > maxAllowed) {
+        if (maxAllowed < 0) {
+          const newRadius = Math.max(MIN_CIRCLE_RADIUS, parent.radius - CIRCLE_CONTAINMENT_PADDING)
+          child.radius = newRadius
+          child.minRadius = Math.max(MIN_CIRCLE_RADIUS, child.minRadius * radiusRatio)
+          child.x = parent.x
+          child.y = parent.y
+        } else {
+          if (d > 0.0001) {
+            child.x = parent.x + (dx / d) * maxAllowed
+            child.y = parent.y + (dy / d) * maxAllowed
+          } else {
+            child.x = parent.x
+            child.y = parent.y
+          }
+        }
+      }
+      queue.push(child.id)
     }
   }
 
+  circles.forEach((c) => {
+    circlesById.set(c.id, c)
+  })
+
+  const containedCircleIds = new Set(descendantCircleIds)
+  containedCircleIds.add(circleId)
+
+  const updatedPeople = people.map((person) => {
+    if (containedCircleIds.has(person.circleId)) {
+      const parent = circlesById.get(person.circleId)
+      if (!parent) return person
+
+      const dx = person.x - parent.x
+      const dy = person.y - parent.y
+      const d = Math.hypot(dx, dy)
+
+      const maxAllowed = parent.radius - PERSON_CONTAINMENT_RADIUS
+      if (d > maxAllowed) {
+        const targetD = Math.max(0, maxAllowed)
+        if (d > 0.0001) {
+          return {
+            ...person,
+            x: parent.x + (dx / d) * targetD,
+            y: parent.y + (dy / d) * targetD,
+          }
+        } else {
+          return {
+            ...person,
+            x: parent.x,
+            y: parent.y,
+          }
+        }
+      }
+    }
+    return person
+  })
+
   return {
     ...state,
-    circles: state.circles.map((candidate) =>
-      descendantCircleIds.has(candidate.id)
-        ? {
-            ...candidate,
-            ...pullPoint(candidate),
-            radius: Math.max(MIN_CIRCLE_RADIUS, candidate.radius * scale),
-            minRadius: Math.max(MIN_CIRCLE_RADIUS, candidate.minRadius * scale),
-          }
-        : candidate,
-    ),
-    people: state.people.map((person) =>
-      containedCircleIds.has(person.circleId) ? { ...person, ...pullPoint(person) } : person,
-    ),
+    circles: state.circles.map((c) => {
+      if (c.id === circleId) return c
+      const updated = circlesById.get(c.id)
+      return updated ? updated : c
+    }),
+    people: updatedPeople,
   }
 }
 

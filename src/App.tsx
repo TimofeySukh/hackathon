@@ -513,9 +513,8 @@ function App() {
   const [showCircleStylePanel, setShowCircleStylePanel] = useState(false)
   const [selectedPeopleIds, setSelectedPeopleIds] = useState<string[]>([])
   const [selectedCircleIds, setSelectedCircleIds] = useState<string[]>([])
-  // Person currently under the cursor — promoted to an interactive DOM node so it
-  // can be clicked/dragged even inside a dense circle that's otherwise canvas-only.
   const [hoveredPersonId, setHoveredPersonId] = useState<string | null>(null)
+  const [hoveredCircleEdgeId, setHoveredCircleEdgeId] = useState<string | null>(null)
 
   // Viewport size in CSS px, used to cull off-screen nodes. Updated on resize.
   const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight })
@@ -1246,6 +1245,7 @@ function App() {
         selectedPeopleIds,
         marqueeRef.current,
         selectedCircleIds,
+        hoveredCircleEdgeId,
       )
     }
   }
@@ -1338,6 +1338,7 @@ function App() {
       selectedPeopleIds,
       marquee,
       selectedCircleIds,
+      hoveredCircleEdgeId,
       frame,
     )
   }
@@ -1404,6 +1405,7 @@ function App() {
     imageEpoch,
     marquee,
     selectedCircleIds,
+    hoveredCircleEdgeId,
   ])
 
   useEffect(() => {
@@ -1862,6 +1864,30 @@ function App() {
       return
     }
 
+    // Cursor handling based on active state / hover
+    if (pan || moving || movingPerson) {
+      setSurfaceCursor('grabbing')
+    } else if (resizing) {
+      const circle = graph.circles.find((c) => c.id === resizing.circleId)
+      if (circle) {
+        const world = screenToWorld({ x: event.clientX, y: event.clientY })
+        setSurfaceCursor(getResizeCursor(world, circle))
+      }
+    } else {
+      const hit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
+        x: event.clientX,
+        y: event.clientY,
+      })
+      if (hit?.type === 'circle-edge') {
+        const world = screenToWorld({ x: event.clientX, y: event.clientY })
+        setSurfaceCursor(getResizeCursor(world, hit.circle))
+      } else if (hit?.type === 'person' || hit?.type === 'circle-center' || hit?.type === 'connection' || hit?.type === 'connector-handle') {
+        setSurfaceCursor('pointer')
+      } else {
+        setSurfaceCursor('default')
+      }
+    }
+
     // Idle hover is canvas hit-testing now; React only stores the hovered ids.
     if (!pan && !moving && !movingPerson && !resizing) {
       const hit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
@@ -1872,13 +1898,12 @@ function App() {
       if (id !== hoveredPersonId) setHoveredPersonId(id)
       const connId = hit?.type === 'connection' ? hit.connection.id : null
       if (connId !== hoveredConnId) setHoveredConnId(connId)
-      // Pointer over anything interactive, plain arrow over the empty board.
-      setSurfaceCursor(hit ? 'pointer' : 'default')
+      const edgeId = hit?.type === 'circle-edge' ? hit.circle.id : null
+      if (edgeId !== hoveredCircleEdgeId) setHoveredCircleEdgeId(edgeId)
     } else {
       if (hoveredPersonId) setHoveredPersonId(null)
       if (hoveredConnId) setHoveredConnId(null)
-      // A real pan or drag is in progress → closed hand.
-      setSurfaceCursor('grabbing')
+      if (hoveredCircleEdgeId) setHoveredCircleEdgeId(null)
     }
   }
 
@@ -2894,6 +2919,8 @@ function App() {
         onPointerLeave={() => {
           if (hoveredPersonId) setHoveredPersonId(null)
           if (hoveredConnId) setHoveredConnId(null)
+          if (hoveredCircleEdgeId) setHoveredCircleEdgeId(null)
+          setSurfaceCursor('default')
         }}
       >
         <canvas ref={peopleCanvasRef} className="board-canvas-layer" aria-label="Relationship board" />
@@ -4482,4 +4509,21 @@ function GoogleIcon() {
   return <img className="google-icon" src={googleIcon} alt="" aria-hidden="true" />
 }
 
+function getResizeCursor(point: { x: number; y: number }, circle: { x: number; y: number }): string {
+  const dx = point.x - circle.x
+  const dy = point.y - circle.y
+  let deg = (Math.atan2(dy, dx) * 180) / Math.PI
+  if (deg < 0) deg += 360
+
+  if (deg >= 337.5 || deg < 22.5) return 'ew-resize'
+  if (deg >= 22.5 && deg < 67.5) return 'nwse-resize'
+  if (deg >= 67.5 && deg < 112.5) return 'ns-resize'
+  if (deg >= 112.5 && deg < 157.5) return 'nesw-resize'
+  if (deg >= 157.5 && deg < 202.5) return 'ew-resize'
+  if (deg >= 202.5 && deg < 247.5) return 'nwse-resize'
+  if (deg >= 247.5 && deg < 292.5) return 'ns-resize'
+  return 'nesw-resize'
+}
+
 export default App
+

@@ -248,7 +248,6 @@ function drawFavoritePersonOutline(ctx: CanvasRenderingContext2D, person: Person
   const radius = PERSON_VISUAL_RADIUS + 7 / scale
   const dotCount = 18
   const haloRadius = Math.max(2.5 / scale, 1.6)
-  const dotRadius = Math.max(1.45 / scale, 0.95)
   ctx.save()
   for (let i = 0; i < dotCount; i += 1) {
     const angle = (Math.PI * 2 * i) / dotCount - Math.PI / 2
@@ -256,10 +255,6 @@ function drawFavoritePersonOutline(ctx: CanvasRenderingContext2D, person: Person
     const y = person.y + Math.sin(angle) * radius
     ctx.beginPath()
     ctx.arc(x, y, haloRadius, 0, Math.PI * 2)
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.92)'
-    ctx.fill()
-    ctx.beginPath()
-    ctx.arc(x, y, dotRadius, 0, Math.PI * 2)
     ctx.fillStyle = color
     ctx.fill()
   }
@@ -326,6 +321,7 @@ export function drawBoardLayer(
   selectedPeopleIds: string[] = [],
   marquee: MarqueeState | null = null,
   selectedCircleIds: string[] = [],
+  hoveredCircleEdgeId: string | null = null,
   anim: AnimFrame = EMPTY_ANIM_FRAME,
 ) {
   const { dpr, width, height } = resizeCanvas(canvas, surface)
@@ -345,7 +341,7 @@ export function drawBoardLayer(
   ctx.translate(camera.x, camera.y)
   ctx.scale(camera.scale, camera.scale)
 
-  drawCircleFills(ctx, visibleCircles, selectedItem, camera.scale, circleShapeMode, circleFillMode, selectedCircleIds)
+  drawCircleFills(ctx, visibleCircles, selectedItem, camera.scale, circleShapeMode, circleFillMode, selectedCircleIds, hoveredCircleEdgeId)
 
   if (camera.scale < ZONE_ONLY_SCALE) {
     // Far-zoom simplified view: only the colored zones and the labels of the
@@ -472,6 +468,7 @@ function drawCircleFills(
   circleShapeMode: CircleShapeMode,
   circleFillMode: CircleFillMode,
   selectedCircleIds: string[] = [],
+  hoveredCircleEdgeId: string | null = null,
 ) {
   for (const circle of circles) {
     const tone = getCircleColors(circle)
@@ -488,13 +485,27 @@ function drawCircleFills(
     ctx.fill(path)
     ctx.restore()
 
-    ctx.save()
-    ctx.strokeStyle = tone.border
     const isSelected = (selectedItem?.type === 'circle' && selectedItem.id === circle.id) || selectedCircleIds.includes(circle.id)
+    const isEdgeHovered = hoveredCircleEdgeId === circle.id
+
+    if (isEdgeHovered) {
+      ctx.save()
+      ctx.strokeStyle = isSelected ? tone.border : '#64748b'
+      ctx.globalAlpha = isSelected ? 0.24 : 0.18
+      ctx.lineWidth = isSelected ? Math.max(9 / scale, 6) : Math.max(8 / scale, 5)
+      if (isTransparent && !isSelected) ctx.setLineDash([8 / scale, 7 / scale])
+      ctx.stroke(path)
+      ctx.restore()
+    }
+
+    ctx.save()
+    ctx.strokeStyle = isSelected ? tone.border : isEdgeHovered ? '#64748b' : tone.border
     ctx.lineWidth =
       isSelected
-        ? Math.max(3.5 / scale, 2)
-        : Math.max((isTransparent ? 2.2 : 1.4) / scale, isTransparent ? 1.4 : 0.9)
+        ? (isEdgeHovered ? Math.max(4.5 / scale, 3) : Math.max(3.5 / scale, 2))
+        : isEdgeHovered
+          ? Math.max(2.8 / scale, 1.8)
+          : Math.max((isTransparent ? 2.2 : 1.4) / scale, isTransparent ? 1.4 : 0.9)
     // Transparent zones use a dashed outline, but a selected zone draws solid
     // so the selection reads as a continuous ring without gaps.
     if (isTransparent && !isSelected) ctx.setLineDash([8 / scale, 7 / scale])
@@ -644,7 +655,7 @@ function drawPeople(
       ctx.stroke()
       ctx.restore()
     }
-    if (person.isFavorite) drawFavoritePersonOutline(ctx, person, circleColor, scale)
+    if (person.isFavorite) drawFavoritePersonOutline(ctx, person, '#ffd600', scale)
     if (showPersonLabels && (scale >= 0.62 || isSelected || isHovered)) drawPersonLabel(ctx, person, scale)
   }
 }
