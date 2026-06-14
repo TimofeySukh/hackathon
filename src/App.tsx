@@ -3357,8 +3357,8 @@ function App() {
                    const toneColors = personCircle ? getCircleColors(personCircle) : null
                    return (
                      <div className="inspector-visual-row">
-                       <div className="inspector-field" style={{ flex: 1, marginTop: 0 }}>
-                         <div style={{ position: 'relative', width: '100%' }}>
+                       <div className="inspector-field inspector-field--circle-select">
+                         <div className="custom-select-wrap">
                            <button
                              type="button"
                              onClick={() => setShowCircleDropdown(!showCircleDropdown)}
