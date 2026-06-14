@@ -100,6 +100,18 @@ function pickDescription(record: Record<string, unknown>) {
   )
 }
 
+function buildProfileDetails(record: Record<string, unknown>, company: string | undefined) {
+  const lines = [
+    pickString(record.location, record.city),
+    company ? `Current company: ${company}` : undefined,
+    pickString(record.educations_details) ? `Education: ${pickString(record.educations_details)}` : undefined,
+    typeof record.connections === 'number' ? `LinkedIn connections: ${record.connections}` : undefined,
+    typeof record.followers === 'number' ? `LinkedIn followers: ${record.followers}` : undefined,
+  ].filter((line): line is string => Boolean(line))
+
+  return lines.length ? lines.join('\n') : undefined
+}
+
 function normalizeBrightDataProfile(payload: unknown, url: string): EnrichedProfile | null {
   const record = Array.isArray(payload) ? payload[0] : payload
   if (!record || typeof record !== 'object' || Array.isArray(record)) return null
@@ -107,7 +119,7 @@ function normalizeBrightDataProfile(payload: unknown, url: string): EnrichedProf
   const name = pickString(candidate.name, candidate.full_name)
   const company = pickCompanyName(candidate)
   const headline = pickString(candidate.position, candidate.headline, candidate.title)
-  const description = pickDescription(candidate)
+  const description = pickDescription(candidate) ?? buildProfileDetails(candidate, company)
   const avatarUrl = pickAvatarUrl(candidate)
 
   if (!name && !company && !headline && !description && !avatarUrl) return null

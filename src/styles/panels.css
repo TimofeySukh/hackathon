@@ -323,6 +323,19 @@
   letter-spacing: 0;
 }
 
+.search-results__spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.42);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: searchSpinner 0.72s linear infinite;
+}
+
+@keyframes searchSpinner {
+  to { transform: rotate(360deg); }
+}
+
 .search-results__text {
   display: flex;
   flex-direction: column;

@@ -32,6 +32,7 @@ import {
 } from './constants'
 import { colorMix, getCircleColors } from './colors'
 import { distanceToSegment, drawCurvePath, ellipsize, getNodePath, roundedRect } from './geometry'
+import { makeInitials } from './text'
 
 const personSpriteCache = new Map<string, HTMLCanvasElement>()
 const imageCache = new Map<string, HTMLImageElement>()
@@ -202,7 +203,9 @@ function drawImageCover(
 }
 
 function getPersonSprite(person: PersonNode, fillColor: string, size: number, stroke: string, strokeWidth: number): HTMLCanvasElement {
-  const imageKey = person.imageUrl ? `img:${person.imageUrl.length}` : person.avatar
+  // Always derive the letters from the current name so they stay in sync with any rename.
+  const avatar = makeInitials(person.name)
+  const imageKey = person.imageUrl ? `img:${person.imageUrl.length}` : avatar
   const key = `${fillColor}|${imageKey}|${person.shapeType ?? 'wavy'}|${person.sides ?? 8}|${person.amplitude ?? 1}|${stroke}|${strokeWidth}|${size}`
   const cached = personSpriteCache.get(key)
   if (cached) return cached
@@ -233,7 +236,7 @@ function getPersonSprite(person: PersonNode, fillColor: string, size: number, st
     ctx.font = `500 ${(11 * scale).toFixed(1)}px Inter, system-ui, sans-serif`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(person.avatar, size / 2, size / 2 + scale)
+    ctx.fillText(avatar, size / 2, size / 2 + scale)
   }
   ctx.restore()
 
@@ -555,13 +558,15 @@ function drawCircleCenter(ctx: CanvasRenderingContext2D, circle: CircleNode, sca
     drawImageCover(ctx, image, circle.x - radius, circle.y - radius, radius * 2, radius * 2)
   } else {
     ctx.fillStyle = '#ffffff'
+    // Keep a deliberately-set emoji icon (e.g. flags), otherwise derive letters from the current name.
     const hasEmojiIcon = Array.from(circle.icon).some((char) => (char.codePointAt(0) ?? 0) > 127)
+    const icon = hasEmojiIcon ? circle.icon : makeInitials(circle.name)
     ctx.font = hasEmojiIcon
       ? '18px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif'
       : '500 10px Inter, system-ui, sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(circle.icon, circle.x, circle.y + (hasEmojiIcon ? 1.5 : 0.5))
+    ctx.fillText(icon, circle.x, circle.y + (hasEmojiIcon ? 1.5 : 0.5))
   }
   ctx.restore()
 }

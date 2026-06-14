@@ -2,6 +2,14 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react'
 import type { User } from '@supabase/supabase-js'
 import * as zip from '@zip.js/zip.js'
+import linkedinIcon from './assets/brands/linkedin.svg'
+import telegramIcon from './assets/brands/telegram.svg'
+import instagramIcon from './assets/brands/instagram.svg'
+import facebookIcon from './assets/brands/facebook.svg'
+import whatsappIcon from './assets/brands/whatsapp.svg'
+import xIcon from './assets/brands/x.svg'
+import websiteIcon from './assets/brands/website.svg'
+import googleIcon from './assets/brands/google.svg'
 
 zip.configure({ useWebWorkers: false })
 import { useAuth } from './lib/useAuth'
@@ -47,6 +55,7 @@ import {
   getDescendantCircleIds,
 } from './lib/board/layout'
 import { createBoardIndex, hitTestBoard, readAnimFrame, drawBoardLayer, setBoardRepaintCallback } from './lib/board/render'
+import { makeInitials } from './lib/board/text'
 
 export type { CircleNode, PersonNode, Connection, GraphState, CircleTone } from './lib/board/types'
 
@@ -361,6 +370,44 @@ function App() {
   const gestureSnapshotTakenRef = useRef(false)
   const auth = useAuth()
   const userId = auth.session?.user?.id ?? null
+  // Sign-in dialog: a single "Sign in" button opens this; it holds every
+  // sign-in option so the Settings panel itself stays compact.
+  const [showSignInModal, setShowSignInModal] = useState(false)
+  const [emailInput, setEmailInput] = useState('')
+  const [passwordInput, setPasswordInput] = useState('')
+  const [emailAuthMode, setEmailAuthMode] = useState<'signin' | 'signup'>('signin')
+  const [emailAuthBusy, setEmailAuthBusy] = useState(false)
+  const [emailAuthNotice, setEmailAuthNotice] = useState<string | null>(null)
+
+  const openSignInModal = () => {
+    setEmailAuthMode('signin')
+    setEmailAuthNotice(null)
+    setShowSignInModal(true)
+  }
+
+  const handleEmailAuthSubmit = async () => {
+    const email = emailInput.trim()
+    if (!email || !passwordInput || emailAuthBusy) return
+    setEmailAuthBusy(true)
+    setEmailAuthNotice(null)
+    try {
+      if (emailAuthMode === 'signup') {
+        const { error, needsConfirmation } = await auth.signUpWithEmail(email, passwordInput)
+        if (!error && needsConfirmation) {
+          setEmailAuthNotice('Check your email to confirm your account, then sign in.')
+          setPasswordInput('')
+        }
+      } else {
+        const { error } = await auth.signInWithEmail(email, passwordInput)
+        if (!error) {
+          setShowSignInModal(false)
+          setPasswordInput('')
+        }
+      }
+    } finally {
+      setEmailAuthBusy(false)
+    }
+  }
   // True once we've pulled this user's saved graph (or confirmed they have none).
   // The board stays hidden until then so the demo seed never flashes or gets saved.
   const [graphLoaded, setGraphLoaded] = useState(false)
@@ -1125,8 +1172,8 @@ function App() {
       ? [{
           kind: 'linkedin-profile',
           id: linkedInUrl,
-          name: isImportingLinkedInProfile ? 'Adding LinkedIn profile...' : 'Add LinkedIn profile',
-          sub: linkedInUrl,
+          name: isImportingLinkedInProfile ? 'Enriching with Bright Data...' : 'Add LinkedIn profile',
+          sub: isImportingLinkedInProfile ? linkedInUrl : linkedInUrl,
         }]
       : []
     const people: SearchResult[] = displayPeople
@@ -2626,7 +2673,11 @@ function App() {
                     onClick={() => handleSelectSearchResult(result)}
                   >
                     <span className={`search-results__icon search-results__icon--${result.kind}`}>
-                      {result.kind === 'person' ? <PersonIcon /> : result.kind === 'linkedin-profile' ? <LinkedInIcon /> : <CircleIcon />}
+                      {result.kind === 'person'
+                        ? <PersonIcon />
+                        : result.kind === 'linkedin-profile'
+                          ? isImportingLinkedInProfile ? <span className="search-results__spinner" aria-hidden="true" /> : <LinkedInIcon />
+                          : <CircleIcon />}
                     </span>
                     <span className="search-results__text">
                       <span className="search-results__name">{result.name || 'Untitled'}</span>
@@ -2749,13 +2800,10 @@ function App() {
                 <button
                   type="button"
                   className="m3-primary-button"
-                  onClick={() => void auth.signInWithGoogle()}
+                  onClick={() => openSignInModal()}
                 >
-                  Sign in with Google
+                  Sign in
                 </button>
-                {auth.error && (
-                  <p style={{ margin: '8px 0 0', color: 'var(--md-error, #b3261e)', fontSize: '13px' }}>{auth.error}</p>
-                )}
               </div>
             )}
           </div>
@@ -3215,8 +3263,8 @@ function App() {
                    const toneColors = personCircle ? getCircleColors(personCircle) : null
                    return (
                      <div className="inspector-visual-row">
-                       <div className="inspector-field" style={{ flex: 1, marginTop: 0 }}>
-                         <div style={{ position: 'relative', width: '100%' }}>
+                       <div className="inspector-field inspector-field--circle-select">
+                         <div className="custom-select-wrap">
                            <button
                              type="button"
                              onClick={() => setShowCircleDropdown(!showCircleDropdown)}
@@ -3665,13 +3713,143 @@ function App() {
         </div>
       )}
 
+      {showSignInModal && auth.status === 'anonymous' && (
+        <div
+          style={{ ...authOverlayStyle, background: 'rgba(0, 0, 0, 0.4)' }}
+          onClick={() => setShowSignInModal(false)}
+        >
+          <div
+            style={{ ...authCardStyle, alignItems: 'stretch', gap: '0', width: '320px', position: 'relative' }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              aria-label="Close"
+              onClick={() => setShowSignInModal(false)}
+              style={{
+                position: 'absolute',
+                top: '12px',
+                right: '12px',
+                background: 'none',
+                border: 'none',
+                fontSize: '20px',
+                lineHeight: 1,
+                cursor: 'pointer',
+                color: 'var(--md-on-surface-variant)',
+              }}
+            >
+              ×
+            </button>
+            <h2 style={{ margin: '0 0 4px', fontSize: '18px', fontWeight: 600, color: 'var(--md-on-surface)' }}>
+              {emailAuthMode === 'signup' ? 'Create account' : 'Sign in'}
+            </h2>
+            <p style={{ margin: '0 0 16px', fontSize: '13px', color: 'var(--md-on-surface-variant)' }}>
+              Save your board across devices.
+            </p>
+            <button
+              type="button"
+              className="m3-primary-button"
+              onClick={() => void auth.signInWithGoogle()}
+            >
+              <GoogleIcon />
+              Continue with Google
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '16px 0' }}>
+              <span style={{ flex: 1, height: '1px', background: 'var(--md-outline-variant)' }} />
+              <span style={{ fontSize: '12px', color: 'var(--md-on-surface-variant)' }}>or</span>
+              <span style={{ flex: 1, height: '1px', background: 'var(--md-outline-variant)' }} />
+            </div>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault()
+                void handleEmailAuthSubmit()
+              }}
+              style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
+            >
+              <input
+                type="email"
+                autoComplete="email"
+                placeholder="Email"
+                value={emailInput}
+                onChange={(event) => setEmailInput(event.target.value)}
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--md-outline, rgba(28, 37, 40, 0.24))',
+                  fontSize: '14px',
+                  background: 'var(--md-surface, #fff)',
+                  color: 'var(--md-on-surface, #1c2528)',
+                }}
+              />
+              <input
+                type="password"
+                autoComplete={emailAuthMode === 'signup' ? 'new-password' : 'current-password'}
+                placeholder="Password"
+                value={passwordInput}
+                onChange={(event) => setPasswordInput(event.target.value)}
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--md-outline, rgba(28, 37, 40, 0.24))',
+                  fontSize: '14px',
+                  background: 'var(--md-surface, #fff)',
+                  color: 'var(--md-on-surface, #1c2528)',
+                }}
+              />
+              <button
+                type="submit"
+                className="m3-primary-button"
+                disabled={emailAuthBusy || !emailInput.trim() || !passwordInput}
+              >
+                {emailAuthBusy
+                  ? 'Please wait…'
+                  : emailAuthMode === 'signup'
+                    ? 'Create account'
+                    : 'Sign in with email'}
+              </button>
+            </form>
+            <button
+              type="button"
+              onClick={() => {
+                setEmailAuthMode((mode) => (mode === 'signup' ? 'signin' : 'signup'))
+                setEmailAuthNotice(null)
+              }}
+              style={{
+                marginTop: '12px',
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+                fontSize: '13px',
+                color: 'var(--md-primary, #00696e)',
+                alignSelf: 'center',
+              }}
+            >
+              {emailAuthMode === 'signup'
+                ? 'Already have an account? Sign in'
+                : "Don't have an account? Sign up"}
+            </button>
+            {emailAuthNotice && (
+              <p style={{ margin: '12px 0 0', color: 'var(--md-on-surface-variant)', fontSize: '13px', textAlign: 'center' }}>{emailAuthNotice}</p>
+            )}
+            {auth.error && (
+              <p style={{ margin: '12px 0 0', color: 'var(--md-error, #b3261e)', fontSize: '13px', textAlign: 'center' }}>{auth.error}</p>
+            )}
+          </div>
+        </div>
+      )}
+
       {auth.status === 'anonymous' && (
         <div className="local-save-hint" role="note">
           <span>Sign in to save your data — your board is kept locally for now.</span>
           <button
             type="button"
             className="local-save-hint__action"
-            onClick={() => void auth.signInWithGoogle()}
+            onClick={() => openSignInModal()}
           >
             Sign in
           </button>
@@ -3924,14 +4102,6 @@ function makeUniqueId(baseId: string, existingIds: Set<string>) {
   let index = 2
   while (existingIds.has(`${baseId}-${index}`)) index += 1
   return `${baseId}-${index}`
-}
-
-function makeInitials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  const initials = parts.length >= 2
-    ? `${parts[0].slice(0, 1)}${parts[parts.length - 1].slice(0, 1)}`
-    : parts[0]?.slice(0, 2) ?? ''
-  return initials.toUpperCase() || 'IN'
 }
 
 function findPersonByLinkedInProfileUrl(people: PersonNode[], profileUrl: string) {
@@ -4292,14 +4462,24 @@ function CloseIcon() {
   )
 }
 
+// Official full-color brand logos (gilbarbara/logos, CC0), imported as SVG assets
+// so they stay crisp at any size. "website" is a generic globe (no brand).
+const SERVICE_ICONS: Record<PersonLinkService, string> = {
+  linkedin: linkedinIcon,
+  telegram: telegramIcon,
+  instagram: instagramIcon,
+  facebook: facebookIcon,
+  whatsapp: whatsappIcon,
+  x: xIcon,
+  website: websiteIcon,
+}
+
 function ConnectionServiceIcon({ service }: { service: PersonLinkService }) {
-  if (service === 'linkedin') return <span className="service-icon service-icon--linkedin">in</span>
-  if (service === 'telegram') return <span className="service-icon service-icon--telegram">tg</span>
-  if (service === 'instagram') return <span className="service-icon service-icon--instagram">ig</span>
-  if (service === 'facebook') return <span className="service-icon service-icon--facebook">f</span>
-  if (service === 'whatsapp') return <span className="service-icon service-icon--whatsapp">wa</span>
-  if (service === 'x') return <span className="service-icon service-icon--x">x</span>
-  return <span className="service-icon service-icon--website">web</span>
+  return <img className="service-icon" src={SERVICE_ICONS[service]} alt="" aria-hidden="true" />
+}
+
+function GoogleIcon() {
+  return <img className="google-icon" src={googleIcon} alt="" aria-hidden="true" />
 }
 
 export default App

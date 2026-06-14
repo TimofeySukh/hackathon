@@ -583,6 +583,13 @@ input[type="range"]::-webkit-slider-thumb:active {
   margin: 8px 0 0 0;
   padding-bottom: 0;
   border-bottom: none;
+  min-width: 0;
+}
+
+.inspector-field--circle-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-top: 0;
 }
 
 /* Avatar circular picker */
