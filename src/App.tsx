@@ -412,7 +412,11 @@ function normalizeLinkInput(rawValue: string, service: PersonLinkService): { lab
 function normalizeLinkedInProfileUrl(rawValue: string): string | null {
   const value = extractLinkedInProfileUrlCandidate(rawValue)
   if (!value) return null
-  const withProtocol = /^https?:\/\//i.test(value) ? value : `https://${value}`
+  const withProtocol = /^https?:\/\//i.test(value)
+    ? value
+    : value.toLowerCase().startsWith('ps://')
+      ? `htt${value}`
+      : `https://${value}`
   try {
     const url = new URL(withProtocol)
     const host = url.hostname.toLowerCase().replace(/^www\./, '')
@@ -428,8 +432,18 @@ function normalizeLinkedInProfileUrl(rawValue: string): string | null {
 function extractLinkedInProfileUrlCandidate(rawValue: string) {
   const value = rawValue.trim()
   if (!value) return ''
-  const match = value.match(/(?:https?:\/\/)?(?:[\w-]+\.)?linkedin\.com\/(?:in|pub)\/[^\s"'<>]+/i)
+  const match = value.match(/(?:(?:https?|ps):\/\/)?(?:[\w-]+\.)?linkedin\.com\/(?:in|pub)\/[^\s"'<>]+/i)
   return (match?.[0] ?? value).replace(/[),.;]+$/, '')
+}
+
+function getLinkedInProfileImportUrl(rawValue: string) {
+  const normalized = normalizeLinkedInProfileUrl(rawValue)
+  if (normalized) return normalized
+
+  const value = rawValue.trim()
+  const slugMatch = value.match(/linkedin\.com\/(?:in|pub)\/([^/\s"'<>?#]+)/i)
+  if (!slugMatch?.[1]) return null
+  return `https://www.linkedin.com/in/${slugMatch[1].replace(/[),.;]+$/, '')}/`
 }
 
 function getLinkedInSlug(profileUrl: string) {
@@ -831,7 +845,7 @@ function App() {
 
   async function handleImportLinkedInProfileFromSearch() {
     if (isImportingLinkedInProfile) return
-    const profileUrl = normalizeLinkedInProfileUrl(searchQuery)
+    const profileUrl = getLinkedInProfileImportUrl(searchQuery)
     if (!profileUrl) return
     const existingPerson = findPersonByLinkedInProfileUrl(graph.people, profileUrl)
     if (existingPerson && !personNeedsLinkedInEnrichment(existingPerson, graph.circles)) {
@@ -1399,7 +1413,7 @@ function App() {
   const searchResults = useMemo<SearchResult[]>(() => {
     const q = searchQuery.trim().toLowerCase()
     if (!q) return []
-    const linkedInUrl = normalizeLinkedInProfileUrl(searchQuery)
+    const linkedInUrl = getLinkedInProfileImportUrl(searchQuery)
     const linkedInImport: SearchResult[] = linkedInUrl
       ? [{
           kind: 'linkedin-profile',
