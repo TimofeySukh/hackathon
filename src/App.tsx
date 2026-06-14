@@ -6,6 +6,7 @@ import * as zip from '@zip.js/zip.js'
 zip.configure({ useWebWorkers: false })
 import { useAuth } from './lib/useAuth'
 import { loadGraph, saveGraph, loadLocalGraph, saveLocalGraph } from './lib/graphPersistence'
+import { enrichLinkedInProfile } from './lib/linkedinEnrichment'
 // STRESS TEST — dev-only performance harness. See src/lib/stressTest.ts.
 
 export type CircleTone = 'blue' | 'red' | 'green' | 'amber' | 'violet'
@@ -135,6 +136,7 @@ type LinkedInProfileImport = {
   name: string
   company: string
   headline: string
+  description?: string
   avatarUrl?: string
 }
 
@@ -484,18 +486,22 @@ async function buildLinkedInProfileImport(rawValue: string): Promise<LinkedInPro
   const url = normalizeLinkedInProfileUrl(rawValue)
   if (!url) return null
   const slug = getLinkedInSlug(url)
-  const metadata = await fetchLinkedInProfileMetadata(url)
+  const enrichment = await enrichLinkedInProfile(url)
+  const needsPreviewFallback = !enrichment?.name || !enrichment?.company || !enrichment?.headline || !enrichment?.avatarUrl
+  const metadata = needsPreviewFallback ? await fetchLinkedInProfileMetadata(url) : {}
   const fallbackName = titleCaseSlug(slug)
-  const name = (metadata.name || fallbackName || 'LinkedIn Connection').trim()
-  const company = (metadata.company || 'Unknown Company').trim()
-  const headline = (metadata.headline || company || 'LinkedIn connection').trim()
+  const name = (enrichment?.name || metadata.name || fallbackName || 'LinkedIn Connection').trim()
+  const company = (enrichment?.company || metadata.company || 'Unknown Company').trim()
+  const headline = (enrichment?.headline || metadata.headline || company || 'LinkedIn connection').trim()
+  const description = enrichment?.description?.trim()
   return {
     url,
     slug,
     name,
     company,
     headline,
-    avatarUrl: metadata.avatarUrl,
+    description,
+    avatarUrl: enrichment?.avatarUrl || metadata.avatarUrl,
   }
 }
 
@@ -817,6 +823,13 @@ function App() {
     if (isImportingLinkedInProfile) return
     const profileUrl = normalizeLinkedInProfileUrl(searchQuery)
     if (!profileUrl) return
+    const existingPerson = findPersonByLinkedInProfileUrl(graph.people, profileUrl)
+    if (existingPerson) {
+      selectItem({ type: 'person', id: existingPerson.id })
+      focusCameraOnWorld(existingPerson.x, existingPerson.y, 1.5)
+      closeSearch()
+      return
+    }
     setIsImportingLinkedInProfile(true)
     try {
       const profile = await buildLinkedInProfileImport(profileUrl)
@@ -4928,13 +4941,17 @@ function makeInitials(name: string) {
   return initials.toUpperCase() || 'IN'
 }
 
+function findPersonByLinkedInProfileUrl(people: PersonNode[], profileUrl: string) {
+  return people.find((person) =>
+    (person.links ?? []).some((link) => link.service === 'linkedin' && normalizeLinkedInProfileUrl(link.url) === profileUrl)
+  )
+}
+
 function addLinkedInProfileToGraph(
   current: GraphState,
   profile: LinkedInProfileImport,
 ): { graph: GraphState; person: PersonNode } {
-  const existingPerson = current.people.find((person) =>
-    (person.links ?? []).some((link) => link.service === 'linkedin' && normalizeLinkedInProfileUrl(link.url) === profile.url)
-  )
+  const existingPerson = findPersonByLinkedInProfileUrl(current.people, profile.url)
   if (existingPerson) return { graph: current, person: existingPerson }
 
   const nextCircles = [...current.circles]
@@ -4972,6 +4989,14 @@ function addLinkedInProfileToGraph(
   const pAngle = (companyMembers.length / Math.max(6, companyMembers.length + 1)) * 2 * Math.PI
   const existingIds = new Set(nextPeople.map((person) => person.id))
   const personId = makeUniqueId(`linkedin-person-${slugifyId(profile.slug || profile.name)}`, existingIds)
+  const notes: PersonNote[] = profile.description
+    ? [{
+        id: `note-profile-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+        title: 'Profile',
+        body: profile.description,
+      }]
+    : []
+
   const person: PersonNode = {
     id: personId,
     name: profile.name,
@@ -4984,13 +5009,7 @@ function addLinkedInProfileToGraph(
     sides: 10,
     amplitude: 0,
     imageUrl: profile.avatarUrl,
-    notes: profile.company === 'Unknown Company'
-      ? [{
-          id: `note-company-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
-          title: 'Company',
-          body: 'Company was not available from the LinkedIn profile preview. Update the company circle or role after import.',
-        }]
-      : [],
+    notes,
     links: [{
       id: `link-linkedin-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
       service: 'linkedin',

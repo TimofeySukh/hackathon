@@ -16,8 +16,15 @@ selects the node and flies the camera to it at a comfortable zoom.
   shows an "Add LinkedIn profile" action at the top of results. Clicking it, or
   pressing Enter while it is first, imports the profile into the board.
 - LinkedIn profile import normalizes the URL, tries to read public Open Graph metadata
-  for name, headline/company, and avatar, then falls back to the URL slug when LinkedIn
-  blocks metadata access from the browser.
+  for name, headline/company, and avatar, then falls back to the URL slug when no
+  backend enrichment is available.
+- Signed-in users get a server-side Bright Data enrichment call for manual one-profile
+  imports only. The result provides name, current company, headline, avatar, and profile
+  description when Bright Data returns those fields. The description is saved as a
+  regular person note titled "Profile".
+- Manual LinkedIn enrichment checks the existing graph first and then a local per-URL
+  cache before calling Bright Data, so repeated imports of the same profile avoid another
+  paid request. LinkedIn ZIP import does not call Bright Data.
 - Picking a result (click or Enter on the first match) selects the node — opening the
   inspector — and animates the camera so the node sits slightly above screen centre
   (clear of the bottom inspector). Zoom is a fixed 1.5× for a person and fit-to-circle
@@ -51,6 +58,9 @@ Reuses the Material 3 chrome language (see [`../DESIGN_SYSTEM.md`](../DESIGN_SYS
   `driveCamera`), `handleSelectSearchResult`, `handleImportLinkedInProfileFromSearch`,
   `closeSearch`, `SearchIcon`; the `searchResults` memo builds the matches and injects
   the LinkedIn import action when the query is a profile URL.
+- Backend: `supabase/functions/enrich-linkedin-profile/index.ts` calls Bright Data's
+  LinkedIn profile scraper with the `BRIGHTDATA_API_KEY` secret after validating the
+  user's Supabase session.
 - Related state / hooks: `searchOpen`, `searchQuery`, `searchInputRef`,
   `searchPanelRef`, `focusAnimRef`; the shared outside-click effect handles dismissal.
 

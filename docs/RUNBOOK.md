@@ -307,15 +307,17 @@ Deploy functions before testing AI features:
 ```bash
 supabase functions deploy sync-person-ai-note
 supabase functions deploy search-people-ai
+supabase functions deploy enrich-linkedin-profile
 ```
 
-`supabase/config.toml` sets AI functions to `verify_jwt = false` at the Supabase gateway because each function performs its own user-token validation with `supabase.auth.getUser()`. Do not remove the in-function authorization checks.
+`supabase/config.toml` sets AI and LinkedIn enrichment functions to `verify_jwt = false` at the Supabase gateway because each function performs its own user-token validation with `supabase.auth.getUser()`. Do not remove the in-function authorization checks.
 
 Required AI function secrets:
 
 ```bash
 supabase secrets set GEMINI_API_KEY=your-gemini-api-key
 supabase secrets set OPENROUTER_API_KEY=your-openrouter-api-key
+supabase secrets set BRIGHTDATA_API_KEY=your-bright-data-api-key
 ```
 
 Optional AI model overrides:
@@ -325,9 +327,9 @@ supabase secrets set GEMINI_MODEL=gemini-2.5-flash
 supabase secrets set OPENROUTER_MODEL=openrouter/free
 ```
 
-AI note sync and AI people search now run inside Supabase Edge Functions through direct provider API calls. The functions try Gemini first and fall back to OpenRouter for provider quota or availability errors.
+AI note sync and AI people search now run inside Supabase Edge Functions through direct provider API calls. The functions try Gemini first and fall back to OpenRouter for provider quota or availability errors. Manual one-profile LinkedIn search imports call Bright Data through `enrich-linkedin-profile`; LinkedIn ZIP import does not call Bright Data.
 
-The browser never calls Gemini or OpenRouter directly. It invokes Edge Functions, and those functions authenticate the user, load user-owned graph context, call AI providers with server-side API keys, and return or persist structured AI output.
+The browser never calls Gemini, OpenRouter, or Bright Data directly. It invokes Edge Functions, and those functions authenticate the user, load user-owned graph context when needed, call providers with server-side API keys, and return or persist structured output.
 
 Configure Google as an auth provider in Supabase Auth. Add redirect URLs for each app URL used by the team, including:
 

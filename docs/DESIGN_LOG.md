@@ -17,6 +17,19 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-14 — Manual LinkedIn enrichment uses Bright Data behind Supabase
+
+- Decision: single-profile LinkedIn imports from board search call a Supabase Edge
+  Function that validates the user's session and then calls Bright Data's LinkedIn
+  profile scraper. ZIP import remains local CSV processing and never calls Bright Data.
+- Quota control: the frontend first checks whether the normalized LinkedIn URL already
+  exists in the graph, then checks a local 30-day per-URL enrichment cache. Bright Data is
+  only called for uncached manual one-profile imports.
+- Data mapping: Bright Data fields normalize into person name, current company circle,
+  headline/role, avatar image, and a "Profile" note containing the profile description.
+- Why: the Bright Data API key must stay server-side, and the free monthly request budget
+  should only be spent on explicit manual enrichments.
+
 ### 2026-06-14 — Isolated load tests for large imports
 
 - Decision: large import testing now has two automated checks: a dry-run-first database

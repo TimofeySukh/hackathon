@@ -8,8 +8,11 @@ Provides a compact links menu for person nodes inside the inspector. Connections
 
 - Imported LinkedIn profile URLs from `Connections.csv` are saved as LinkedIn connections on the imported person.
 - LinkedIn profile URLs pasted into board search can also create one person directly.
-  The import uses the profile preview metadata when available, otherwise it derives the
-  name from the URL slug and places the person under `Unknown Company` for later cleanup.
+  Signed-in manual imports use Bright Data enrichment when available, otherwise they
+  derive the name from the URL slug and place the person under `Unknown Company` for
+  later cleanup.
+- Bright Data profile descriptions are saved as a regular note titled "Profile"; the
+  LinkedIn profile URL is still saved as a LinkedIn connection.
 - Users can add any custom URL, social profile, handle, or phone number from the person inspector.
 - URL-like input is normalized into an openable `https://` link when needed.
 - `@handle` input opens a quick service picker for Telegram, Instagram, or X before saving.

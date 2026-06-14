@@ -48,7 +48,7 @@ Supabase database migrations for profiles, personal boards, persisted graph data
 
 ### `supabase/functions/`
 
-Supabase Edge Functions. `sync-person-ai-note` sends person note context through the shared Gemini/OpenRouter AI provider layer and upserts `person_ai_notes`. `search-people-ai` sends graph candidates through the same provider layer and returns ranked natural-language search results.
+Supabase Edge Functions. `sync-person-ai-note` sends person note context through the shared Gemini/OpenRouter AI provider layer and upserts `person_ai_notes`. `search-people-ai` sends graph candidates through the same provider layer and returns ranked natural-language search results. `enrich-linkedin-profile` calls Bright Data for signed-in manual one-profile LinkedIn imports.
 
 ### `src/`
 
