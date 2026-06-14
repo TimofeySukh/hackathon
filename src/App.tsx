@@ -122,6 +122,13 @@ type SelectedItem =
     }
   | null
 
+type SearchResult = {
+  kind: 'person' | 'circle'
+  id: string
+  name: string
+  sub: string
+}
+
 type CircleShapeMode = 'circles' | 'figures'
 type CircleFillMode = 'transparent' | 'solid'
 
@@ -641,9 +648,65 @@ function App() {
   const settingsPanelRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Search: a pill in the top toolbar that finds people (by name/role) and
+  // circles (the "tags"), then flies the camera to the picked node.
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const searchPanelRef = useRef<HTMLDivElement>(null)
+  const focusAnimRef = useRef<number | null>(null)
+
   function selectItem(item: SelectedItem) {
     setShowCircleStylePanel(false)
     setSelectedItem(item)
+  }
+
+  // Smoothly fly the camera so (wx, wy) in world space lands a touch above the
+  // screen centre (keeps the node clear of the bottom inspector) at targetScale.
+  // Reuses driveCamera: each frame drives the live camera and re-arms its settle
+  // timer, which commits the final position to React state when we stop.
+  function focusCameraOnWorld(wx: number, wy: number, targetScale: number) {
+    const start = { ...cameraRef.current }
+    const cx = window.innerWidth / 2
+    const cy = window.innerHeight * 0.44
+    const end = { x: cx - wx * targetScale, y: cy - wy * targetScale, scale: targetScale }
+    if (focusAnimRef.current != null) window.cancelAnimationFrame(focusAnimRef.current)
+    const t0 = performance.now()
+    const duration = 520
+    const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
+    const step = (now: number) => {
+      const t = Math.min(1, (now - t0) / duration)
+      const e = easeInOutCubic(t)
+      driveCameraRef.current({
+        x: start.x + (end.x - start.x) * e,
+        y: start.y + (end.y - start.y) * e,
+        scale: start.scale + (end.scale - start.scale) * e,
+      })
+      focusAnimRef.current = t < 1 ? window.requestAnimationFrame(step) : null
+    }
+    focusAnimRef.current = window.requestAnimationFrame(step)
+  }
+
+  function closeSearch() {
+    setSearchOpen(false)
+    setSearchQuery('')
+  }
+
+  function handleSelectSearchResult(result: SearchResult) {
+    if (result.kind === 'person') {
+      const person = graph.people.find((p) => p.id === result.id)
+      if (!person) return
+      selectItem({ type: 'person', id: person.id })
+      focusCameraOnWorld(person.x, person.y, 1.5)
+    } else {
+      const circle = graph.circles.find((c) => c.id === result.id)
+      if (!circle) return
+      selectItem({ type: 'circle', id: circle.id })
+      const minDim = Math.min(window.innerWidth, window.innerHeight)
+      const scale = Math.max(0.25, Math.min(1.6, (0.55 * minDim) / (2 * circle.radius)))
+      focusCameraOnWorld(circle.x, circle.y, scale)
+    }
+    closeSearch()
   }
 
   // Snapshot the current graph before a mutating action so Ctrl+Z can restore
@@ -1219,12 +1282,19 @@ function App() {
       ) {
         setShowSettings(false)
       }
+      if (
+        searchOpen &&
+        searchPanelRef.current &&
+        !searchPanelRef.current.contains(event.target as Node)
+      ) {
+        closeSearch()
+      }
     }
     document.addEventListener('pointerdown', handleOutsideClick)
     return () => {
       document.removeEventListener('pointerdown', handleOutsideClick)
     }
-  }, [showSettings])
+  }, [showSettings, searchOpen])
 
   useEffect(() => {
     if (!showCircleStylePanel) return
@@ -1304,6 +1374,21 @@ function App() {
 
   const circlesById = useMemo(() => new Map(displayCircles.map((circle) => [circle.id, circle])), [displayCircles])
   const peopleById = useMemo(() => new Map(displayPeople.map((person) => [person.id, person])), [displayPeople])
+
+  // Live search results: people matched on name/role, circles ("tags") on name.
+  // Capped so the dropdown stays compact; people first since finding a person is
+  // the primary use, circles after.
+  const searchResults = useMemo<SearchResult[]>(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return []
+    const people: SearchResult[] = displayPeople
+      .filter((p) => p.name.toLowerCase().includes(q) || (p.role || '').toLowerCase().includes(q))
+      .map((p) => ({ kind: 'person', id: p.id, name: p.name, sub: p.role || '' }))
+    const circles: SearchResult[] = displayCircles
+      .filter((c) => c.name.toLowerCase().includes(q))
+      .map((c) => ({ kind: 'circle', id: c.id, name: c.name, sub: 'Circle' }))
+    return [...people, ...circles].slice(0, 8)
+  }, [searchQuery, displayPeople, displayCircles])
   const sortedCircles = useMemo(() => {
     function getDepth(circleId: string | null): number {
       let depth = 0
@@ -1422,6 +1507,7 @@ function App() {
     if (settleTimerRef.current != null) window.clearTimeout(settleTimerRef.current)
     if (dragRafRef.current != null) window.cancelAnimationFrame(dragRafRef.current)
     if (boardAnimRafRef.current != null) window.cancelAnimationFrame(boardAnimRafRef.current)
+    if (focusAnimRef.current != null) window.cancelAnimationFrame(focusAnimRef.current)
   }, [])
 
   // Track viewport size so culling has the current visible rectangle.
@@ -2641,13 +2727,90 @@ function App() {
   }
 
   return (
-    <main className={`app-shell ${demoMode ? 'is-demo-mode' : ''}`}>
+    <main className={`app-shell ${demoMode ? 'is-demo-mode' : ''} ${searchOpen ? 'is-search-open' : ''} ${showSettings ? 'is-settings-open' : ''}`}>
       <div className="toolbar" aria-label="Graph controls" style={{ justifyContent: 'flex-end' }}>
+        <div
+          ref={searchPanelRef}
+          className={`search-box ${searchOpen ? 'is-open' : ''}`}
+        >
+          <button
+            type="button"
+            className="search-box__toggle"
+            aria-label="Search"
+            onClick={() => {
+              if (searchOpen) {
+                closeSearch()
+              } else {
+                setShowSettings(false)
+                setSearchOpen(true)
+                window.requestAnimationFrame(() => searchInputRef.current?.focus())
+              }
+            }}
+          >
+            <SearchIcon />
+          </button>
+          {searchOpen && (
+            <>
+              <input
+                ref={searchInputRef}
+                className="search-box__input"
+                type="text"
+                value={searchQuery}
+                placeholder="Search people or circles…"
+                aria-label="Search people or circles"
+                onChange={(event) => setSearchQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    event.preventDefault()
+                    closeSearch()
+                  } else if (event.key === 'Enter' && searchResults.length > 0) {
+                    event.preventDefault()
+                    handleSelectSearchResult(searchResults[0])
+                  }
+                }}
+              />
+              {searchQuery.trim() !== '' && (
+                <button type="button" className="search-box__clear" aria-label="Clear search" onClick={() => { setSearchQuery(''); searchInputRef.current?.focus() }}>
+                  ×
+                </button>
+              )}
+            </>
+          )}
+          {searchOpen && searchQuery.trim() !== '' && (
+            <div className="search-results" role="listbox">
+              {searchResults.length === 0 ? (
+                <div className="search-results__empty">No matches</div>
+              ) : (
+                searchResults.map((result) => (
+                  <button
+                    key={`${result.kind}:${result.id}`}
+                    type="button"
+                    role="option"
+                    aria-selected={false}
+                    className="search-results__item"
+                    onClick={() => handleSelectSearchResult(result)}
+                  >
+                    <span className={`search-results__icon search-results__icon--${result.kind}`}>
+                      {result.kind === 'person' ? <PersonIcon /> : <CircleIcon />}
+                    </span>
+                    <span className="search-results__text">
+                      <span className="search-results__name">{result.name || 'Untitled'}</span>
+                      {result.sub ? <span className="search-results__sub">{result.sub}</span> : null}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
         <div className={`toolbar__group ${demoMode ? 'toolbar__group--demo' : ''}`}>
           <button
             ref={settingsButtonRef}
             type="button"
-            onClick={() => setShowSettings(!showSettings)}
+            onClick={() => {
+              if (!showSettings) closeSearch()
+              setShowSettings(!showSettings)
+            }}
             aria-label="Settings"
             style={{
               background: showSettings ? 'var(--md-secondary-container)' : 'transparent',
@@ -3625,6 +3788,12 @@ type BoardIndex = {
   peopleByCell: Map<string, PersonNode[]>
   circlesByCell: Map<string, CircleNode[]>
   connectionsByEndpoint: Map<string, Connection[]>
+  // Reverse adjacency: a parent circle -> the circles that hang off it
+  // (circle.connectedTo) and the people attached to it (person.circleId). Lets
+  // edge rendering find edges whose *other* endpoint is off-screen, so a line
+  // stays drawn as long as either endpoint is visible.
+  circleChildren: Map<string, CircleNode[]>
+  peopleByCircle: Map<string, PersonNode[]>
 }
 
 const BOARD_GRID_SIZE = 360
@@ -3661,11 +3830,16 @@ function createBoardIndex(circles: CircleNode[], people: PersonNode[], connectio
   const peopleByCell = new Map<string, PersonNode[]>()
   const circlesByCell = new Map<string, CircleNode[]>()
   const connectionsByEndpoint = new Map<string, Connection[]>()
+  const circleChildren = new Map<string, CircleNode[]>()
+  const peopleByCircle = new Map<string, PersonNode[]>()
 
   for (const person of people) {
     const x = Math.floor(person.x / BOARD_GRID_SIZE)
     const y = Math.floor(person.y / BOARD_GRID_SIZE)
     pushCell(peopleByCell, x, y, person)
+    const peers = peopleByCircle.get(person.circleId)
+    if (peers) peers.push(person)
+    else peopleByCircle.set(person.circleId, [person])
   }
 
   for (const circle of circles) {
@@ -3675,6 +3849,11 @@ function createBoardIndex(circles: CircleNode[], people: PersonNode[], connectio
       for (let y = ys.from; y <= ys.to; y += 1) {
         pushCell(circlesByCell, x, y, circle)
       }
+    }
+    if (circle.connectedTo) {
+      const siblings = circleChildren.get(circle.connectedTo)
+      if (siblings) siblings.push(circle)
+      else circleChildren.set(circle.connectedTo, [circle])
     }
   }
 
@@ -3696,6 +3875,8 @@ function createBoardIndex(circles: CircleNode[], people: PersonNode[], connectio
     peopleByCell,
     circlesByCell,
     connectionsByEndpoint,
+    circleChildren,
+    peopleByCircle,
   }
 }
 
@@ -3940,7 +4121,7 @@ function drawBoardLayer(
 
   drawCircleFills(ctx, visibleCircles, selectedItem, camera.scale, circleShapeMode, circleFillMode, selectedCircleIds)
   drawCircleEdges(ctx, visibleCircles, index, camera.scale)
-  drawPersonEdges(ctx, visiblePeople, index, camera.scale)
+  drawPersonEdges(ctx, visiblePeople, visibleCircles, index, camera.scale)
   drawCustomConnections(ctx, visiblePeopleIds, visibleCircleIds, index, selectedItem, hoveredConnId, camera.scale)
   drawCircleDetails(ctx, visibleCircles, camera.scale, circleFillMode, showCircleLabels, anim.scales)
   drawPeople(ctx, visiblePeople, index, selectedItem, hoveredPersonId, camera.scale, dpr, showPersonLabels, selectedPeopleIds, anim.scales)
@@ -3967,25 +4148,48 @@ function drawBoardLayer(
 
 function drawCircleEdges(ctx: CanvasRenderingContext2D, circles: CircleNode[], index: BoardIndex, scale: number) {
   ctx.beginPath()
-  ctx.strokeStyle = 'rgba(71, 85, 105, 0.52)'
-  ctx.lineWidth = Math.max(2 / scale, 1.1)
+  ctx.strokeStyle = 'rgba(71, 85, 105, 0.24)'
+  ctx.lineWidth = Math.max(1.6 / scale, 0.8)
+  // An edge is drawn if EITHER endpoint is on-screen: walk each visible circle
+  // both as the child (its connectedTo source may be off-screen) and as the
+  // parent (its children may be off-screen). The `drawn` set dedupes edges
+  // whose two endpoints are both visible. Edge identity == the child circle id.
+  const drawn = new Set<string>()
+  const addEdge = (child: CircleNode) => {
+    if (drawn.has(child.id)) return
+    const source = child.connectedTo ? index.circlesById.get(child.connectedTo) : null
+    if (!source) return
+    drawn.add(child.id)
+    drawCurvePath(ctx, source, child)
+  }
   for (const circle of circles) {
-    const source = circle.connectedTo ? index.circlesById.get(circle.connectedTo) : null
-    if (!source) continue
-    drawCurvePath(ctx, source, circle)
+    addEdge(circle)
+    const children = index.circleChildren.get(circle.id)
+    if (children) for (const child of children) addEdge(child)
   }
   ctx.stroke()
 }
 
-function drawPersonEdges(ctx: CanvasRenderingContext2D, people: PersonNode[], index: BoardIndex, scale: number) {
+function drawPersonEdges(ctx: CanvasRenderingContext2D, people: PersonNode[], circles: CircleNode[], index: BoardIndex, scale: number) {
   ctx.beginPath()
-  ctx.strokeStyle = 'rgba(71, 85, 105, 0.28)'
+  ctx.strokeStyle = 'rgba(71, 85, 105, 0.16)'
   ctx.lineWidth = Math.max(1.15 / scale, 0.7)
-  for (const person of people) {
+  // Draw a person<->circle edge if either endpoint is visible: walk visible
+  // people (circle may be off-screen) and visible circles (people may be
+  // off-screen). Edge identity == the person id, so `drawn` dedupes overlaps.
+  const drawn = new Set<string>()
+  const addEdge = (person: PersonNode) => {
+    if (drawn.has(person.id)) return
     const circle = index.circlesById.get(person.circleId)
-    if (!circle) continue
+    if (!circle) return
+    drawn.add(person.id)
     ctx.moveTo(circle.x, circle.y)
     ctx.lineTo(person.x, person.y)
+  }
+  for (const person of people) addEdge(person)
+  for (const circle of circles) {
+    const peers = index.peopleByCircle.get(circle.id)
+    if (peers) for (const person of peers) addEdge(person)
   }
   ctx.stroke()
 }
@@ -4016,7 +4220,7 @@ function drawCustomConnections(
     const isSelected = selectedItem?.type === 'connection' && selectedItem.id === conn.id
     const isHovered = hoveredConnId === conn.id
     ctx.beginPath()
-    ctx.strokeStyle = isSelected ? '#00629d' : isHovered ? '#64748b' : conn.id.startsWith('stress-link-') ? 'rgba(148, 163, 184, 0.30)' : '#94a3b8'
+    ctx.strokeStyle = isSelected ? '#00629d' : isHovered ? '#64748b' : conn.id.startsWith('stress-link-') ? 'rgba(148, 163, 184, 0.30)' : 'rgba(148, 163, 184, 0.45)'
     ctx.lineWidth = isSelected ? Math.max(4 / scale, 2) : isHovered ? Math.max(3 / scale, 1.5) : Math.max(1.6 / scale, 0.55)
     drawCurvePath(ctx, source, target)
     ctx.stroke()
@@ -5017,6 +5221,15 @@ function CircleIcon() {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="12" cy="12" r="8" />
       <path d="M4 12h16" />
+    </svg>
+  )
+}
+
+function SearchIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
     </svg>
   )
 }
