@@ -1546,6 +1546,7 @@ function App() {
     marquee,
     selectedCircleIds,
     hoveredCircleEdgeId,
+    viewMode,
   ])
 
   useEffect(() => {
@@ -1588,7 +1589,7 @@ function App() {
     return () => {
       surface.removeEventListener('wheel', handleWheel)
     }
-  }, [])
+  }, [viewMode])
 
   function screenToWorld(point: { x: number; y: number }) {
     const liveCamera = cameraRef.current

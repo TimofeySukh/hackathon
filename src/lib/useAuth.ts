@@ -46,7 +46,24 @@ export function useAuth() {
       }
     }
 
+    const sessionTimeout = setTimeout(() => {
+      if (isMounted) {
+        setAuthState((current) => {
+          if (current.status === 'loading') {
+            console.warn('Supabase session fetch timed out, falling back to local mode.')
+            return {
+              session: null,
+              status: 'anonymous',
+              error: 'Session fetch timed out',
+            }
+          }
+          return current
+        })
+      }
+    }, 1500)
+
     supabase.auth.getSession().then(({ data, error }) => {
+      clearTimeout(sessionTimeout)
       if (!isMounted) return
 
       if (error) {
@@ -59,6 +76,15 @@ export function useAuth() {
       }
 
       void loadWorkspace(data.session)
+    }).catch((err) => {
+      clearTimeout(sessionTimeout)
+      if (!isMounted) return
+      console.error('Failed to get session:', err)
+      setAuthState({
+        session: null,
+        status: 'anonymous',
+        error: err instanceof Error ? err.message : String(err),
+      })
     })
 
     const {
