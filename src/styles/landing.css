@@ -20,8 +20,8 @@
   box-sizing: border-box;
 }
 
-/* Ambient Background Blobs */
-.landing-bg-blobs {
+/* Ambient Background Flowers peaking from edges */
+.landing-bg-flowers {
   position: absolute;
   top: 0;
   left: 0;
@@ -32,46 +32,58 @@
   z-index: 0;
 }
 
-.landing-blob {
+.landing-flower-wrap {
   position: absolute;
-  border-radius: 50%;
-  filter: blur(100px);
-  opacity: 0.15;
-  mix-blend-mode: multiply;
+  filter: blur(1px); /* extremely subtle blur for soft edges */
 }
 
-.landing-blob-1 {
-  top: -10%;
-  right: 10%;
-  width: 450px;
-  height: 450px;
-  background-color: var(--md-tone-blue);
-  animation: float-blob-slow 25s infinite ease-in-out;
+.flower-top-right {
+  top: -120px;
+  right: -120px;
+  width: 380px;
+  height: 380px;
+  animation: rotate-clockwise 140s linear infinite;
 }
 
-.landing-blob-2 {
-  top: 30%;
-  left: -5%;
-  width: 500px;
-  height: 500px;
-  background-color: var(--md-tone-violet);
-  animation: float-blob-slow 30s infinite ease-in-out alternate;
+.flower-bottom-left {
+  bottom: -150px;
+  left: -150px;
+  width: 480px;
+  height: 480px;
+  animation: rotate-counter-clockwise 180s linear infinite;
 }
 
-.landing-blob-3 {
-  bottom: 10%;
-  right: -5%;
-  width: 400px;
-  height: 400px;
-  background-color: var(--md-tone-green);
-  animation: float-blob-slow 20s infinite ease-in-out 5s;
+.flower-right-center {
+  top: 35%;
+  right: -100px;
+  width: 280px;
+  height: 280px;
+  animation: rotate-clockwise 220s linear infinite;
 }
 
-@keyframes float-blob-slow {
-  0% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(40px, -60px) scale(1.1); }
-  66% { transform: translate(-30px, 30px) scale(0.9); }
-  100% { transform: translate(0, 0) scale(1); }
+/* Centered Hero Configuration */
+.hero-section-centered {
+  grid-template-columns: 1fr !important;
+  text-align: center;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 200px) !important;
+  max-width: 800px !important;
+  margin: 0 auto;
+}
+
+.hero-content-centered {
+  align-items: center !important;
+}
+
+.hero-content-centered .hero-description {
+  max-width: 620px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.hero-content-centered .hero-ctas {
+  justify-content: center;
 }
 
 /* Header & Navbar */

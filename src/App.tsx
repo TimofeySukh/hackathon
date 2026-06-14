@@ -383,6 +383,21 @@ function App() {
     window.location.hash = 'board';
   };
 
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hasAppQuery = window.location.search.includes('app=true') || window.location.hash === '#board';
+      if (hasAppQuery) {
+        setViewMode('board');
+        localStorage.setItem('viewMode', 'board');
+      } else {
+        setViewMode('landing');
+        localStorage.setItem('viewMode', 'landing');
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
   const surfaceRef = useRef<HTMLDivElement | null>(null)
   // Canvas 2D board renderer: circles, edges, people, labels, and interaction chrome.
   const peopleCanvasRef = useRef<HTMLCanvasElement | null>(null)

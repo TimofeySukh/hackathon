@@ -12,11 +12,79 @@ export default function LandingPage({ onLaunchApp }: LandingPageProps) {
 
   return (
     <div className="landing-container">
-      {/* Background Blobs */}
-      <div className="landing-bg-blobs" aria-hidden="true">
-        <div className="landing-blob landing-blob-1" />
-        <div className="landing-blob landing-blob-2" />
-        <div className="landing-blob landing-blob-3" />
+      {/* Background Flowers peaking from edges */}
+      <div className="landing-bg-flowers" aria-hidden="true">
+        {/* Flower 1: Top Right */}
+        <div className="landing-flower-wrap flower-top-right">
+          <svg viewBox="0 0 200 200" width="100%" height="100%">
+            <defs>
+              <linearGradient id="flower-grad-1" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="var(--md-tone-violet)" />
+                <stop offset="100%" stopColor="var(--md-primary)" />
+              </linearGradient>
+            </defs>
+            <g fill="url(#flower-grad-1)" opacity="0.35">
+              <circle cx="100" cy="55" r="28" />
+              <circle cx="100" cy="145" r="28" />
+              <circle cx="55" cy="100" r="28" />
+              <circle cx="145" cy="100" r="28" />
+              <circle cx="68" cy="68" r="28" />
+              <circle cx="132" cy="132" r="28" />
+              <circle cx="68" cy="132" r="28" />
+              <circle cx="132" cy="68" r="28" />
+              <circle cx="100" cy="100" r="32" fill="#ffffff" />
+              <circle cx="100" cy="100" r="22" fill="url(#flower-grad-1)" />
+            </g>
+          </svg>
+        </div>
+
+        {/* Flower 2: Bottom Left */}
+        <div className="landing-flower-wrap flower-bottom-left">
+          <svg viewBox="0 0 200 200" width="100%" height="100%">
+            <defs>
+              <linearGradient id="flower-grad-2" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="var(--md-tone-green)" />
+                <stop offset="100%" stopColor="var(--md-primary)" />
+              </linearGradient>
+            </defs>
+            <g fill="url(#flower-grad-2)" opacity="0.3">
+              <circle cx="100" cy="55" r="28" />
+              <circle cx="100" cy="145" r="28" />
+              <circle cx="55" cy="100" r="28" />
+              <circle cx="145" cy="100" r="28" />
+              <circle cx="68" cy="68" r="28" />
+              <circle cx="132" cy="132" r="28" />
+              <circle cx="68" cy="132" r="28" />
+              <circle cx="132" cy="68" r="28" />
+              <circle cx="100" cy="100" r="32" fill="#ffffff" />
+              <circle cx="100" cy="100" r="22" fill="url(#flower-grad-2)" />
+            </g>
+          </svg>
+        </div>
+
+        {/* Flower 3: Right Center */}
+        <div className="landing-flower-wrap flower-right-center">
+          <svg viewBox="0 0 200 200" width="100%" height="100%">
+            <defs>
+              <linearGradient id="flower-grad-3" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="var(--md-tone-amber)" />
+                <stop offset="100%" stopColor="var(--md-tone-red)" />
+              </linearGradient>
+            </defs>
+            <g fill="url(#flower-grad-3)" opacity="0.25">
+              <circle cx="100" cy="55" r="28" />
+              <circle cx="100" cy="145" r="28" />
+              <circle cx="55" cy="100" r="28" />
+              <circle cx="145" cy="100" r="28" />
+              <circle cx="68" cy="68" r="28" />
+              <circle cx="132" cy="132" r="28" />
+              <circle cx="68" cy="132" r="28" />
+              <circle cx="132" cy="68" r="28" />
+              <circle cx="100" cy="100" r="32" fill="#ffffff" />
+              <circle cx="100" cy="100" r="22" fill="url(#flower-grad-3)" />
+            </g>
+          </svg>
+        </div>
       </div>
 
       {/* Header / Navigation */}
@@ -40,8 +108,8 @@ export default function LandingPage({ onLaunchApp }: LandingPageProps) {
       {/* Main Content */}
       <main className="landing-main">
         {/* Hero Section */}
-        <section className="landing-section hero-section">
-          <div className="hero-content">
+        <section className="landing-section hero-section hero-section-centered">
+          <div className="hero-content hero-content-centered">
             <span className="hero-tagline">Spatial Relationship Mapping</span>
             <h1 className="hero-title">
               Map your social universe.
@@ -57,142 +125,6 @@ export default function LandingPage({ onLaunchApp }: LandingPageProps) {
                 View Live Demo
               </button>
             </div>
-          </div>
-
-          <div className="hero-illustration">
-            {/* Custom Interactive SVG Social Graph */}
-            <svg className="social-graph-svg" viewBox="0 0 500 500" width="500" height="500">
-              <defs>
-                {/* 3D-like glassmorphic radial gradients */}
-                <radialGradient id="center-grad" cx="35%" cy="35%" r="65%">
-                  <stop offset="0%" stopColor="#ffffff" />
-                  <stop offset="20%" stopColor="#d2e4ff" />
-                  <stop offset="100%" stopColor="#00629d" />
-                </radialGradient>
-                <radialGradient id="blue-grad" cx="35%" cy="35%" r="65%">
-                  <stop offset="0%" stopColor="#ffffff" />
-                  <stop offset="30%" stopColor="#d2e4ff" />
-                  <stop offset="100%" stopColor="#00629d" />
-                </radialGradient>
-                <radialGradient id="green-grad" cx="35%" cy="35%" r="65%">
-                  <stop offset="0%" stopColor="#ffffff" />
-                  <stop offset="30%" stopColor="#d1e8d2" />
-                  <stop offset="100%" stopColor="#1e824a" />
-                </radialGradient>
-                <radialGradient id="amber-grad" cx="35%" cy="35%" r="65%">
-                  <stop offset="0%" stopColor="#ffffff" />
-                  <stop offset="30%" stopColor="#ffe082" />
-                  <stop offset="100%" stopColor="#d87a00" />
-                </radialGradient>
-                <radialGradient id="violet-grad" cx="35%" cy="35%" r="65%">
-                  <stop offset="0%" stopColor="#ffffff" />
-                  <stop offset="30%" stopColor="#eaddff" />
-                  <stop offset="100%" stopColor="#7f67be" />
-                </radialGradient>
-                <radialGradient id="red-grad" cx="35%" cy="35%" r="65%">
-                  <stop offset="0%" stopColor="#ffffff" />
-                  <stop offset="30%" stopColor="#ffdad6" />
-                  <stop offset="100%" stopColor="#c00015" />
-                </radialGradient>
-              </defs>
-
-              {/* Orbits */}
-              <circle className="orbit-line orbit-1" cx="250" cy="250" r="85" />
-              <circle className="orbit-line orbit-2" cx="250" cy="250" r="160" />
-              <circle className="orbit-line orbit-3" cx="250" cy="250" r="220" />
-
-              {/* Orbiting Groups/Nodes - Grouped in rotating SVG elements */}
-              
-              {/* Inner Orbit (85px radius) */}
-              <g className="orbit-1" style={{ transformOrigin: '250px 250px' }}>
-                {/* Node 1: Blue */}
-                <line className="connection-line" x1="250" y1="250" x2="250" y2="165" stroke="var(--md-tone-blue)" />
-                <g className="social-node" style={{ transform: 'translate(250px, 165px)' }}>
-                  <circle className="social-node-pulse" r="38" fill="var(--md-primary-container)" opacity="0.3" />
-                  <circle r="26" fill="url(#blue-grad)" stroke="var(--md-primary)" strokeWidth="1" />
-                  <circle cx="-5" cy="-5" r="4" fill="#ffffff" opacity="0.4" />
-                </g>
-
-                {/* Node 2: Green */}
-                <line className="connection-line" x1="250" y1="250" x2="335" y2="250" stroke="var(--md-tone-green)" />
-                <g className="social-node" style={{ transform: 'translate(335px, 250px)' }}>
-                  <circle className="social-node-pulse" r="34" fill="#d1e8d2" opacity="0.3" />
-                  <circle r="22" fill="url(#green-grad)" stroke="var(--md-tone-green)" strokeWidth="1" />
-                  <circle cx="-4" cy="-4" r="3" fill="#ffffff" opacity="0.4" />
-                </g>
-              </g>
-
-              {/* Middle Orbit (160px radius) */}
-              <g className="orbit-2" style={{ transformOrigin: '250px 250px' }}>
-                {/* Node 3: Amber */}
-                <line className="connection-line" x1="250" y1="250" x2="137" y2="137" stroke="var(--md-tone-amber)" />
-                <g className="social-node" style={{ transform: 'translate(137px, 137px)' }}>
-                  <circle className="social-node-pulse" r="36" fill="#ffe082" opacity="0.25" />
-                  <circle r="25" fill="url(#amber-grad)" stroke="var(--md-tone-amber)" strokeWidth="1" />
-                  <circle cx="-5" cy="-5" r="4" fill="#ffffff" opacity="0.4" />
-                </g>
-
-                {/* Node 4: Violet */}
-                <line className="connection-line" x1="250" y1="250" x2="363" y2="363" stroke="var(--md-tone-violet)" />
-                <g className="social-node" style={{ transform: 'translate(363px, 363px)' }}>
-                  <circle className="social-node-pulse" r="40" fill="#eaddff" opacity="0.25" />
-                  <circle r="28" fill="url(#violet-grad)" stroke="var(--md-tone-violet)" strokeWidth="1" />
-                  <circle cx="-6" cy="-6" r="4" fill="#ffffff" opacity="0.4" />
-                </g>
-
-                {/* Node 5: Red */}
-                <line className="connection-line" x1="250" y1="250" x2="90" y2="250" stroke="var(--md-tone-red)" />
-                <g className="social-node" style={{ transform: 'translate(90px, 250px)' }}>
-                  <circle className="social-node-pulse" r="34" fill="#ffdad6" opacity="0.25" />
-                  <circle r="23" fill="url(#red-grad)" stroke="var(--md-tone-red)" strokeWidth="1" />
-                  <circle cx="-4" cy="-4" r="3" fill="#ffffff" opacity="0.4" />
-                </g>
-              </g>
-
-              {/* Outer Orbit (220px radius) */}
-              <g className="orbit-3" style={{ transformOrigin: '250px 250px' }}>
-                {/* Connections to simulate a network */}
-                <line className="connection-line" x1="250" y1="30" x2="250" y2="250" stroke="var(--md-outline-variant)" />
-                <line className="connection-line" x1="440" y1="140" x2="330" y2="250" stroke="var(--md-outline-variant)" />
-                <line className="connection-line" x1="60" y1="360" x2="100" y2="250" stroke="var(--md-outline-variant)" />
-
-                {/* Node 6: Blue */}
-                <g className="social-node" style={{ transform: 'translate(250px, 30px)' }}>
-                  <circle className="social-node-pulse" r="42" fill="var(--md-primary-container)" opacity="0.2" />
-                  <circle r="30" fill="url(#blue-grad)" stroke="var(--md-primary)" strokeWidth="1" />
-                  <circle cx="-6" cy="-6" r="5" fill="#ffffff" opacity="0.4" />
-                </g>
-
-                {/* Node 7: Violet */}
-                <g className="social-node" style={{ transform: 'translate(440px, 140px)' }}>
-                  <circle className="social-node-pulse" r="36" fill="#eaddff" opacity="0.2" />
-                  <circle r="25" fill="url(#violet-grad)" stroke="var(--md-tone-violet)" strokeWidth="1" />
-                  <circle cx="-5" cy="-5" r="4" fill="#ffffff" opacity="0.4" />
-                </g>
-
-                {/* Node 8: Green */}
-                <g className="social-node" style={{ transform: 'translate(60px, 360px)' }}>
-                  <circle className="social-node-pulse" r="36" fill="#d1e8d2" opacity="0.2" />
-                  <circle r="25" fill="url(#green-grad)" stroke="var(--md-tone-green)" strokeWidth="1" />
-                  <circle cx="-5" cy="-5" r="4" fill="#ffffff" opacity="0.4" />
-                </g>
-
-                {/* Node 9: Amber */}
-                <g className="social-node" style={{ transform: 'translate(398px, 398px)' }}>
-                  <circle className="social-node-pulse" r="34" fill="#ffe082" opacity="0.2" />
-                  <circle r="23" fill="url(#amber-grad)" stroke="var(--md-tone-amber)" strokeWidth="1" />
-                  <circle cx="-4" cy="-4" r="3" fill="#ffffff" opacity="0.4" />
-                </g>
-              </g>
-
-              {/* Central Active Node */}
-              <g className="social-node" style={{ transform: 'translate(250px, 250px)' }}>
-                <circle className="social-node-pulse" r="70" fill="var(--md-primary-container)" opacity="0.2" />
-                <circle className="social-node-pulse" style={{ animationDuration: '4s' }} r="50" fill="var(--md-primary-container)" opacity="0.3" />
-                <circle r="34" fill="url(#center-grad)" stroke="var(--md-primary)" strokeWidth="1.5" />
-                <circle cx="-7" cy="-7" r="6" fill="#ffffff" opacity="0.4" />
-              </g>
-            </svg>
           </div>
         </section>
 
