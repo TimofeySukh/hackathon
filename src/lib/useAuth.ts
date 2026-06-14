@@ -102,7 +102,9 @@ export function useAuth() {
   }
 
   const signUpWithEmail = async (email: string, password: string) => {
-    if (!supabase) return { error: 'Auth is not configured.' as string | null, needsConfirmation: false }
+    if (!supabase) {
+      return { error: 'Auth is not configured.' as string | null, needsConfirmation: false, alreadyRegistered: false }
+    }
 
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -114,12 +116,37 @@ export function useAuth() {
 
     if (error) {
       setAuthState((currentState) => ({ ...currentState, error: error.message }))
-      return { error: error.message, needsConfirmation: false }
+      return { error: error.message, needsConfirmation: false, alreadyRegistered: false }
     }
 
+    // To prevent email enumeration, Supabase returns a fake user with an empty
+    // `identities` array when the address already belongs to a confirmed account.
+    // We treat that as "already registered" so we can steer the user to sign in.
+    const alreadyRegistered = Boolean(data.user && (data.user.identities?.length ?? 0) === 0)
+
     // When email confirmation is required, Supabase returns a user but no session.
-    const needsConfirmation = Boolean(data.user && !data.session)
-    return { error: null, needsConfirmation }
+    const needsConfirmation = Boolean(data.user && !data.session && !alreadyRegistered)
+
+    return { error: null, needsConfirmation, alreadyRegistered }
+  }
+
+  const resendConfirmation = async (email: string) => {
+    if (!supabase) return { error: 'Auth is not configured.' as string | null }
+
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: {
+        emailRedirectTo: window.location.origin,
+      },
+    })
+
+    if (error) {
+      setAuthState((currentState) => ({ ...currentState, error: error.message }))
+      return { error: error.message }
+    }
+
+    return { error: null }
   }
 
   const signOut = async () => {
@@ -137,6 +164,7 @@ export function useAuth() {
     signInWithGoogle,
     signInWithEmail,
     signUpWithEmail,
+    resendConfirmation,
     signOut,
   }
 }

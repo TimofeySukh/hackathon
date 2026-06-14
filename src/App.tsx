@@ -15,6 +15,8 @@ zip.configure({ useWebWorkers: false })
 import { useAuth } from './lib/useAuth'
 import { loadGraph, saveGraph, loadLocalGraph, saveLocalGraph } from './lib/graphPersistence'
 import { enrichLinkedInProfile } from './lib/linkedinEnrichment'
+import { OnboardingCoach, ONBOARDING_STEPS, ONBOARDING_DONE_STEP } from './Onboarding'
+import type { OnboardingAction } from './Onboarding'
 // STRESS TEST — dev-only performance harness. See src/lib/stressTest.ts.
 
 export type CircleTone = 'blue' | 'red' | 'green' | 'amber' | 'violet'
@@ -648,6 +650,26 @@ const authCardStyle: CSSProperties = {
   maxWidth: '320px',
 }
 
+// First-run flag for the onboarding tour. Kept in localStorage so a returning
+// visitor (signed in or not) doesn't see it again.
+const ONBOARDING_STORAGE_KEY = 'social-onboarding-done-v1'
+
+function hasSeenOnboarding(): boolean {
+  try {
+    return window.localStorage.getItem(ONBOARDING_STORAGE_KEY) === '1'
+  } catch {
+    return true
+  }
+}
+
+function markOnboardingSeen() {
+  try {
+    window.localStorage.setItem(ONBOARDING_STORAGE_KEY, '1')
+  } catch {
+    // Ignore storage failures (private mode etc.) — worst case the tour reappears.
+  }
+}
+
 function App() {
   const surfaceRef = useRef<HTMLDivElement | null>(null)
   // Canvas 2D board renderer: circles, edges, people, labels, and interaction chrome.
@@ -679,11 +701,23 @@ function App() {
   const [emailAuthMode, setEmailAuthMode] = useState<'signin' | 'signup'>('signin')
   const [emailAuthBusy, setEmailAuthBusy] = useState(false)
   const [emailAuthNotice, setEmailAuthNotice] = useState<string | null>(null)
+  // Once set, the modal swaps to a "check your inbox" screen for this address.
+  const [pendingConfirmEmail, setPendingConfirmEmail] = useState<string | null>(null)
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent'>('idle')
 
   const openSignInModal = () => {
     setEmailAuthMode('signin')
     setEmailAuthNotice(null)
+    setPendingConfirmEmail(null)
     setShowSignInModal(true)
+  }
+
+  const closeSignInModal = () => {
+    setShowSignInModal(false)
+    setPendingConfirmEmail(null)
+    setEmailAuthNotice(null)
+    setResendState('idle')
+    setPasswordInput('')
   }
 
   const handleEmailAuthSubmit = async () => {
@@ -693,21 +727,37 @@ function App() {
     setEmailAuthNotice(null)
     try {
       if (emailAuthMode === 'signup') {
-        const { error, needsConfirmation } = await auth.signUpWithEmail(email, passwordInput)
-        if (!error && needsConfirmation) {
-          setEmailAuthNotice('Check your email to confirm your account, then sign in.')
+        const { error, needsConfirmation, alreadyRegistered } = await auth.signUpWithEmail(email, passwordInput)
+        if (error) return
+        if (alreadyRegistered) {
+          // Supabase masks existing accounts; nudge the user to sign in instead.
+          setEmailAuthMode('signin')
+          setEmailAuthNotice('This email is already registered. Try signing in instead.')
+          return
+        }
+        if (needsConfirmation) {
+          // Confirmation required: show the dedicated "check your inbox" screen.
+          setPendingConfirmEmail(email)
+          setResendState('idle')
           setPasswordInput('')
+        } else {
+          // Confirmation disabled — the account is active right away.
+          closeSignInModal()
         }
       } else {
         const { error } = await auth.signInWithEmail(email, passwordInput)
-        if (!error) {
-          setShowSignInModal(false)
-          setPasswordInput('')
-        }
+        if (!error) closeSignInModal()
       }
     } finally {
       setEmailAuthBusy(false)
     }
+  }
+
+  const handleResendConfirmation = async () => {
+    if (!pendingConfirmEmail || resendState === 'sending') return
+    setResendState('sending')
+    const { error } = await auth.resendConfirmation(pendingConfirmEmail)
+    setResendState(error ? 'idle' : 'sent')
   }
   // True once we've pulled this user's saved graph (or confirmed they have none).
   // The board stays hidden until then so the demo seed never flashes or gets saved.
@@ -852,6 +902,35 @@ function App() {
   const searchPanelRef = useRef<HTMLDivElement>(null)
   const focusAnimRef = useRef<number | null>(null)
 
+  // Onboarding tour: -1 means inactive/finished. Brand-new visitors start at the
+  // welcome card; each instructional step auto-advances when its gesture happens.
+  const [onboardingStep, setOnboardingStep] = useState(() => (hasSeenOnboarding() ? -1 : 0))
+
+  function finishOnboarding() {
+    setOnboardingStep(-1)
+    markOnboardingSeen()
+  }
+
+  // Called from board interaction handlers. If the current tour step is waiting
+  // for this exact action, advance; reaching the closing card persists the flag.
+  function notifyOnboarding(action: OnboardingAction) {
+    setOnboardingStep((step) => {
+      if (step < 0 || step >= ONBOARDING_DONE_STEP) return step
+      if (ONBOARDING_STEPS[step].trigger !== action) return step
+      const next = step + 1
+      if (next === ONBOARDING_DONE_STEP) markOnboardingSeen()
+      return next
+    })
+  }
+
+  // The closing "you're ready" card dismisses itself after a beat so it never
+  // lingers in the way; the Done button still closes it instantly.
+  useEffect(() => {
+    if (onboardingStep !== ONBOARDING_DONE_STEP) return
+    const timer = window.setTimeout(() => setOnboardingStep(-1), 3600)
+    return () => window.clearTimeout(timer)
+  }, [onboardingStep])
+
   function selectItem(item: SelectedItem) {
     setShowCircleStylePanel(false)
     setSelectedItem(item)
@@ -910,6 +989,7 @@ function App() {
         : addLinkedInProfileToGraph(graph, profile)
       pushHistory()
       setGraph(next.graph)
+      notifyOnboarding('import')
       selectItem({ type: 'person', id: next.person.id })
       focusCameraOnWorld(next.person.x, next.person.y, 1.5)
       closeSearch()
@@ -1020,6 +1100,7 @@ function App() {
       const result = await buildLinkedInConnectionsGraph(graph, csvText)
       pushHistory()
       setGraph(result.graph)
+      notifyOnboarding('import')
 
       alert(`LinkedIn data imported successfully: ${result.importedPeople} people across ${result.importedCompanies} companies.`)
     } catch (err) {
@@ -1731,6 +1812,7 @@ function App() {
           y: currentCamera.y - event.deltaY,
         })
       }
+      notifyOnboarding('move')
     }
 
     surface.addEventListener('wheel', handleWheel, { passive: false })
@@ -2191,6 +2273,7 @@ function App() {
     if (panRef.current?.pointerId === event.pointerId) {
       panRef.current = null
       settleGesture()
+      notifyOnboarding('move')
     }
 
     const movingPersonId = movePersonRef.current?.pointerId === event.pointerId ? movePersonRef.current.personId : null
@@ -2199,14 +2282,21 @@ function App() {
     const disconnectedCircleIds = moveCircleRef.current?.pointerId === event.pointerId ? moveCircleRef.current.disconnectedCircleIds : null
     const wasRightClickDrag = isRightClickDragRef.current
 
-    const endingMove =
+    const wasResize = resizeCircleRef.current?.pointerId === event.pointerId
+    const wasNodeMove =
       moveCircleRef.current?.pointerId === event.pointerId ||
-      movePersonRef.current?.pointerId === event.pointerId ||
-      resizeCircleRef.current?.pointerId === event.pointerId
+      movePersonRef.current?.pointerId === event.pointerId
+
+    const endingMove = wasNodeMove || wasResize
 
     if (moveCircleRef.current?.pointerId === event.pointerId) moveCircleRef.current = null
     if (movePersonRef.current?.pointerId === event.pointerId) movePersonRef.current = null
     if (resizeCircleRef.current?.pointerId === event.pointerId) resizeCircleRef.current = null
+
+    // Resizing a circle (dragging its edge) and moving a node are distinct
+    // onboarding milestones; a resize shouldn't satisfy the "move" step.
+    if (wasResize) notifyOnboarding('resize')
+    else if (wasNodeMove) notifyOnboarding('move')
 
     if (endingMove) {
       // Apply the final dragged position immediately, including any queued layout pass.
@@ -2513,6 +2603,7 @@ function App() {
     setSelectedItem({ type: 'person', id })
     // Grow the new person in so it feels placed, not blinked into existence.
     startBoardAnim('pop:' + id, 360)
+    notifyOnboarding('create')
   }
 
   function handleMergeSelected() {
@@ -2650,6 +2741,7 @@ function App() {
     // Grow the new person in so it feels placed, not blinked into existence.
     startBoardAnim('pop:' + id, 360)
     setCreateMenu(null)
+    notifyOnboarding('create')
   }
 
   // "Add circle" in the create menu auto-detects containment the same way the
@@ -2711,6 +2803,7 @@ function App() {
     })
     selectItem({ type: 'circle', id })
     setCreateMenu(null)
+    notifyOnboarding('create')
   }
 
   /* Commented out to hide from menu, keeping in code for future use
@@ -3853,7 +3946,7 @@ function App() {
       {showSignInModal && auth.status === 'anonymous' && (
         <div
           style={{ ...authOverlayStyle, background: 'rgba(0, 0, 0, 0.4)' }}
-          onClick={() => setShowSignInModal(false)}
+          onClick={() => closeSignInModal()}
         >
           <div
             style={{ ...authCardStyle, alignItems: 'stretch', gap: '0', width: '320px', position: 'relative' }}
@@ -3862,7 +3955,7 @@ function App() {
             <button
               type="button"
               aria-label="Close"
-              onClick={() => setShowSignInModal(false)}
+              onClick={() => closeSignInModal()}
               style={{
                 position: 'absolute',
                 top: '12px',
@@ -3877,104 +3970,166 @@ function App() {
             >
               ×
             </button>
-            <h2 style={{ margin: '0 0 4px', fontSize: '18px', fontWeight: 600, color: 'var(--md-on-surface)' }}>
-              {emailAuthMode === 'signup' ? 'Create account' : 'Sign in'}
-            </h2>
-            <p style={{ margin: '0 0 16px', fontSize: '13px', color: 'var(--md-on-surface-variant)' }}>
-              Save your board across devices.
-            </p>
-            <button
-              type="button"
-              className="m3-primary-button"
-              onClick={() => void auth.signInWithGoogle()}
-            >
-              <GoogleIcon />
-              Continue with Google
-            </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '16px 0' }}>
-              <span style={{ flex: 1, height: '1px', background: 'var(--md-outline-variant)' }} />
-              <span style={{ fontSize: '12px', color: 'var(--md-on-surface-variant)' }}>or</span>
-              <span style={{ flex: 1, height: '1px', background: 'var(--md-outline-variant)' }} />
-            </div>
-            <form
-              onSubmit={(event) => {
-                event.preventDefault()
-                void handleEmailAuthSubmit()
-              }}
-              style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
-            >
-              <input
-                type="email"
-                autoComplete="email"
-                placeholder="Email"
-                value={emailInput}
-                onChange={(event) => setEmailInput(event.target.value)}
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  padding: '10px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--md-outline, rgba(28, 37, 40, 0.24))',
-                  fontSize: '14px',
-                  background: 'var(--md-surface, #fff)',
-                  color: 'var(--md-on-surface, #1c2528)',
-                }}
-              />
-              <input
-                type="password"
-                autoComplete={emailAuthMode === 'signup' ? 'new-password' : 'current-password'}
-                placeholder="Password"
-                value={passwordInput}
-                onChange={(event) => setPasswordInput(event.target.value)}
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  padding: '10px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--md-outline, rgba(28, 37, 40, 0.24))',
-                  fontSize: '14px',
-                  background: 'var(--md-surface, #fff)',
-                  color: 'var(--md-on-surface, #1c2528)',
-                }}
-              />
-              <button
-                type="submit"
-                className="m3-primary-button"
-                disabled={emailAuthBusy || !emailInput.trim() || !passwordInput}
-              >
-                {emailAuthBusy
-                  ? 'Please wait…'
-                  : emailAuthMode === 'signup'
-                    ? 'Create account'
-                    : 'Sign in with email'}
-              </button>
-            </form>
-            <button
-              type="button"
-              onClick={() => {
-                setEmailAuthMode((mode) => (mode === 'signup' ? 'signin' : 'signup'))
-                setEmailAuthNotice(null)
-              }}
-              style={{
-                marginTop: '12px',
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                cursor: 'pointer',
-                fontSize: '13px',
-                color: 'var(--md-primary, #00696e)',
-                alignSelf: 'center',
-              }}
-            >
-              {emailAuthMode === 'signup'
-                ? 'Already have an account? Sign in'
-                : "Don't have an account? Sign up"}
-            </button>
-            {emailAuthNotice && (
-              <p style={{ margin: '12px 0 0', color: 'var(--md-on-surface-variant)', fontSize: '13px', textAlign: 'center' }}>{emailAuthNotice}</p>
-            )}
-            {auth.error && (
-              <p style={{ margin: '12px 0 0', color: 'var(--md-error, #b3261e)', fontSize: '13px', textAlign: 'center' }}>{auth.error}</p>
+            {pendingConfirmEmail ? (
+              <>
+                <div style={{ fontSize: '40px', lineHeight: 1, marginBottom: '8px', textAlign: 'center' }}>📬</div>
+                <h2 style={{ margin: '0 0 8px', fontSize: '18px', fontWeight: 600, color: 'var(--md-on-surface)', textAlign: 'center' }}>
+                  Confirm your email
+                </h2>
+                <p style={{ margin: '0 0 4px', fontSize: '13px', color: 'var(--md-on-surface-variant)', textAlign: 'center' }}>
+                  We sent a confirmation link to
+                </p>
+                <p style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 600, color: 'var(--md-on-surface)', textAlign: 'center', wordBreak: 'break-all' }}>
+                  {pendingConfirmEmail}
+                </p>
+                <p style={{ margin: '0 0 20px', fontSize: '13px', color: 'var(--md-on-surface-variant)', textAlign: 'center' }}>
+                  Click the link in that email to activate your account, then come back here to sign in. Check your spam folder if it doesn't arrive within a minute.
+                </p>
+                <button
+                  type="button"
+                  className="m3-primary-button"
+                  onClick={() => {
+                    setPendingConfirmEmail(null)
+                    setEmailAuthMode('signin')
+                    setResendState('idle')
+                  }}
+                >
+                  Back to sign in
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleResendConfirmation()}
+                  disabled={resendState !== 'idle'}
+                  style={{
+                    marginTop: '12px',
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    cursor: resendState === 'idle' ? 'pointer' : 'default',
+                    fontSize: '13px',
+                    color: resendState === 'idle' ? 'var(--md-primary, #00696e)' : 'var(--md-on-surface-variant)',
+                    alignSelf: 'center',
+                  }}
+                >
+                  {resendState === 'sending'
+                    ? 'Sending…'
+                    : resendState === 'sent'
+                      ? 'Confirmation email resent ✓'
+                      : "Didn't get it? Resend email"}
+                </button>
+                {auth.error && (
+                  <p style={{ margin: '12px 0 0', color: 'var(--md-error, #b3261e)', fontSize: '13px', textAlign: 'center' }}>{auth.error}</p>
+                )}
+              </>
+            ) : (
+              <>
+                <h2 style={{ margin: '0 0 4px', fontSize: '18px', fontWeight: 600, color: 'var(--md-on-surface)' }}>
+                  {emailAuthMode === 'signup' ? 'Create account' : 'Sign in'}
+                </h2>
+                <p style={{ margin: '0 0 16px', fontSize: '13px', color: 'var(--md-on-surface-variant)' }}>
+                  {emailAuthMode === 'signup'
+                    ? 'Create an account to save your board across devices.'
+                    : 'Save your board across devices.'}
+                </p>
+                <button
+                  type="button"
+                  className="m3-primary-button"
+                  onClick={() => void auth.signInWithGoogle()}
+                >
+                  <GoogleIcon />
+                  Continue with Google
+                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '16px 0' }}>
+                  <span style={{ flex: 1, height: '1px', background: 'var(--md-outline-variant)' }} />
+                  <span style={{ fontSize: '12px', color: 'var(--md-on-surface-variant)' }}>or</span>
+                  <span style={{ flex: 1, height: '1px', background: 'var(--md-outline-variant)' }} />
+                </div>
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    void handleEmailAuthSubmit()
+                  }}
+                  style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
+                >
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    placeholder="Email"
+                    value={emailInput}
+                    onChange={(event) => setEmailInput(event.target.value)}
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--md-outline, rgba(28, 37, 40, 0.24))',
+                      fontSize: '14px',
+                      background: 'var(--md-surface, #fff)',
+                      color: 'var(--md-on-surface, #1c2528)',
+                    }}
+                  />
+                  <input
+                    type="password"
+                    autoComplete={emailAuthMode === 'signup' ? 'new-password' : 'current-password'}
+                    placeholder={emailAuthMode === 'signup' ? 'Password (at least 6 characters)' : 'Password'}
+                    value={passwordInput}
+                    onChange={(event) => setPasswordInput(event.target.value)}
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--md-outline, rgba(28, 37, 40, 0.24))',
+                      fontSize: '14px',
+                      background: 'var(--md-surface, #fff)',
+                      color: 'var(--md-on-surface, #1c2528)',
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    className="m3-primary-button"
+                    disabled={emailAuthBusy || !emailInput.trim() || !passwordInput}
+                  >
+                    {emailAuthBusy
+                      ? 'Please wait…'
+                      : emailAuthMode === 'signup'
+                        ? 'Create account'
+                        : 'Sign in with email'}
+                  </button>
+                </form>
+                {emailAuthMode === 'signup' && (
+                  <p style={{ margin: '10px 0 0', fontSize: '12px', color: 'var(--md-on-surface-variant)', textAlign: 'center' }}>
+                    We'll email you a link to confirm your address before your account is active.
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmailAuthMode((mode) => (mode === 'signup' ? 'signin' : 'signup'))
+                    setEmailAuthNotice(null)
+                  }}
+                  style={{
+                    marginTop: '12px',
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    color: 'var(--md-primary, #00696e)',
+                    alignSelf: 'center',
+                  }}
+                >
+                  {emailAuthMode === 'signup'
+                    ? 'Already have an account? Sign in'
+                    : "Don't have an account? Sign up"}
+                </button>
+                {emailAuthNotice && (
+                  <p style={{ margin: '12px 0 0', color: 'var(--md-on-surface-variant)', fontSize: '13px', textAlign: 'center' }}>{emailAuthNotice}</p>
+                )}
+                {auth.error && (
+                  <p style={{ margin: '12px 0 0', color: 'var(--md-error, #b3261e)', fontSize: '13px', textAlign: 'center' }}>{auth.error}</p>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -3991,6 +4146,22 @@ function App() {
             Sign in
           </button>
         </div>
+      )}
+
+      {graphLoaded && !demoMode && onboardingStep >= 0 && (
+        <OnboardingCoach
+          step={onboardingStep}
+          onNext={() => {
+            if (onboardingStep >= ONBOARDING_DONE_STEP) finishOnboarding()
+            else setOnboardingStep((s) => (s < 0 ? s : s + 1))
+          }}
+          onSkip={finishOnboarding}
+          onOpenSearch={() => {
+            setShowSettings(false)
+            setSearchOpen(true)
+            window.requestAnimationFrame(() => searchInputRef.current?.focus())
+          }}
+        />
       )}
     </main>
   )
