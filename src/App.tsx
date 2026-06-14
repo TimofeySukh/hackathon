@@ -4075,7 +4075,13 @@ function drawCircleDetails(
 }
 
 function getCircleRenderPath(circle: CircleNode, circleShapeMode: CircleShapeMode) {
-  void circleShapeMode
+  // In "circles" mode (the default) every circle renders as a clean circle,
+  // regardless of any wavy/polygon shape baked into its data — otherwise the
+  // demo seed shows flower shapes on a fresh device. Only "figures" mode honors
+  // the authored shape.
+  if (circleShapeMode === 'circles') {
+    return getNodePath(circle.x, circle.y, circle.radius, 'circle', circle.sides ?? 25, 0)
+  }
   const amplitude = circle.amplitude ?? 0
   const sides = circle.sides ?? 25
   const shapeType: ShapeType = amplitude > 0 ? 'wavy' : sides >= 25 ? 'circle' : 'polygon'
