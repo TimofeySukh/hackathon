@@ -1,4 +1,5 @@
 import { type MouseEvent } from 'react'
+import { getNodePath } from './lib/board/geometry'
 
 interface LandingPageProps {
   onLaunchApp: () => void
@@ -18,23 +19,16 @@ export default function LandingPage({ onLaunchApp }: LandingPageProps) {
         <div className="landing-flower-wrap flower-top-right">
           <svg viewBox="0 0 200 200" width="100%" height="100%">
             <defs>
-              <linearGradient id="flower-grad-1" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id="shape-grad-1" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="var(--md-tone-violet)" />
                 <stop offset="100%" stopColor="var(--md-primary)" />
               </linearGradient>
             </defs>
-            <g fill="url(#flower-grad-1)" opacity="0.35">
-              <circle cx="100" cy="55" r="28" />
-              <circle cx="100" cy="145" r="28" />
-              <circle cx="55" cy="100" r="28" />
-              <circle cx="145" cy="100" r="28" />
-              <circle cx="68" cy="68" r="28" />
-              <circle cx="132" cy="132" r="28" />
-              <circle cx="68" cy="132" r="28" />
-              <circle cx="132" cy="68" r="28" />
-              <circle cx="100" cy="100" r="32" fill="#ffffff" />
-              <circle cx="100" cy="100" r="22" fill="url(#flower-grad-1)" />
-            </g>
+            <path
+              d={getNodePath(100, 100, 80, 'wavy', 8, 15)}
+              fill="url(#shape-grad-1)"
+              opacity="0.3"
+            />
           </svg>
         </div>
 
@@ -42,23 +36,16 @@ export default function LandingPage({ onLaunchApp }: LandingPageProps) {
         <div className="landing-flower-wrap flower-bottom-left">
           <svg viewBox="0 0 200 200" width="100%" height="100%">
             <defs>
-              <linearGradient id="flower-grad-2" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id="shape-grad-2" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="var(--md-tone-green)" />
                 <stop offset="100%" stopColor="var(--md-primary)" />
               </linearGradient>
             </defs>
-            <g fill="url(#flower-grad-2)" opacity="0.3">
-              <circle cx="100" cy="55" r="28" />
-              <circle cx="100" cy="145" r="28" />
-              <circle cx="55" cy="100" r="28" />
-              <circle cx="145" cy="100" r="28" />
-              <circle cx="68" cy="68" r="28" />
-              <circle cx="132" cy="132" r="28" />
-              <circle cx="68" cy="132" r="28" />
-              <circle cx="132" cy="68" r="28" />
-              <circle cx="100" cy="100" r="32" fill="#ffffff" />
-              <circle cx="100" cy="100" r="22" fill="url(#flower-grad-2)" />
-            </g>
+            <path
+              d={getNodePath(100, 100, 80, 'polygon', 6, 12)}
+              fill="url(#shape-grad-2)"
+              opacity="0.25"
+            />
           </svg>
         </div>
 
@@ -66,23 +53,16 @@ export default function LandingPage({ onLaunchApp }: LandingPageProps) {
         <div className="landing-flower-wrap flower-right-center">
           <svg viewBox="0 0 200 200" width="100%" height="100%">
             <defs>
-              <linearGradient id="flower-grad-3" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id="shape-grad-3" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="var(--md-tone-amber)" />
                 <stop offset="100%" stopColor="var(--md-tone-red)" />
               </linearGradient>
             </defs>
-            <g fill="url(#flower-grad-3)" opacity="0.25">
-              <circle cx="100" cy="55" r="28" />
-              <circle cx="100" cy="145" r="28" />
-              <circle cx="55" cy="100" r="28" />
-              <circle cx="145" cy="100" r="28" />
-              <circle cx="68" cy="68" r="28" />
-              <circle cx="132" cy="132" r="28" />
-              <circle cx="68" cy="132" r="28" />
-              <circle cx="132" cy="68" r="28" />
-              <circle cx="100" cy="100" r="32" fill="#ffffff" />
-              <circle cx="100" cy="100" r="22" fill="url(#flower-grad-3)" />
-            </g>
+            <path
+              d={getNodePath(100, 100, 75, 'wavy', 5, 14)}
+              fill="url(#shape-grad-3)"
+              opacity="0.2"
+            />
           </svg>
         </div>
       </div>
