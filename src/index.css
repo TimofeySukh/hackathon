@@ -676,6 +676,29 @@ svg {
     width: min(292px, calc(100vw - 28px));
   }
 
+  /* Let the open search field use the full row left of the settings button, and
+     keep the settings/sign-in panel inside the viewport on narrow screens. */
+  .search-box.is-open {
+    max-width: none;
+  }
+
+  .settings-panel {
+    width: min(280px, calc(100vw - 32px));
+  }
+
+  /* Keep the "sign in to save" banner clear of the top-right toolbar buttons,
+     and get it out of the way entirely while a chrome panel is open. The
+     .app-shell prefix lifts specificity above the base .local-save-hint rule,
+     which is declared later in the file. */
+  .app-shell .local-save-hint {
+    max-width: calc(100vw - 132px);
+  }
+
+  .app-shell.is-search-open .local-save-hint,
+  .app-shell.is-settings-open .local-save-hint {
+    display: none;
+  }
+
   .circle-style-popover {
     position: fixed;
     left: 16px;
@@ -1421,6 +1444,185 @@ input[type="range"]::-webkit-slider-thumb:active {
   border: none;
   background: var(--md-surface-container);
   box-shadow: var(--md-elev-2);
+}
+
+/* Search ------------------------------------------------------------------ */
+.search-box {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 48px;
+  gap: 2px;
+  padding: 4px;
+  border-radius: var(--md-r-full);
+  background: var(--md-surface-container);
+  box-shadow: var(--md-elev-2);
+  pointer-events: auto;
+  transition: max-width var(--md-dur-medium, 0.24s) var(--md-ease-standard, ease);
+}
+
+.search-box.is-open {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 360px;
+  padding-right: 8px;
+}
+
+.search-box__toggle {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--md-r-full);
+  background: transparent;
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.search-box__toggle:hover {
+  background: var(--md-surface-container-high);
+  color: var(--md-on-surface);
+}
+
+.search-box.is-open .search-box__toggle {
+  cursor: default;
+}
+
+.search-box.is-open .search-box__toggle:hover {
+  background: transparent;
+}
+
+.search-box__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 40px;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 15px;
+  color: var(--md-on-surface);
+}
+
+.search-box__input::placeholder {
+  color: var(--md-on-surface-variant);
+}
+
+.search-box__clear {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--md-on-surface-variant);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.search-box__clear:hover {
+  background: var(--md-surface-container-high);
+  color: var(--md-on-surface);
+}
+
+.search-results {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: min(60vh, 360px);
+  overflow-y: auto;
+  padding: 6px;
+  border-radius: var(--md-r-md);
+  background: var(--md-surface-container);
+  box-shadow: var(--md-elev-2);
+  animation: searchResultsIn var(--md-dur-short, 0.14s) var(--md-ease-decelerate, ease-out);
+}
+
+@keyframes searchResultsIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.search-results__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--md-r-sm);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.search-results__item:hover {
+  background: var(--md-surface-container-high);
+}
+
+.search-results__icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+.search-results__icon svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.search-results__icon--person {
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+.search-results__icon--circle {
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+}
+
+.search-results__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.search-results__name {
+  font-size: 14px;
+  color: var(--md-on-surface);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-results__sub {
+  font-size: 12px;
+  color: var(--md-on-surface-variant);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-results__empty {
+  padding: 12px;
+  font-size: 13px;
+  color: var(--md-on-surface-variant);
+  text-align: center;
 }
 
 .merge-prompt-panel {

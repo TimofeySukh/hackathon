@@ -17,6 +17,26 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-14 — Board search: find a person or circle, fly the camera to it
+
+- Decision: a search pill sits in the top toolbar immediately left of the settings
+  gear. Collapsed it is a magnifier icon button (same 48px pill as the other chrome);
+  tapping it expands an inline input with a live results dropdown. Matching people
+  (name + role) come first, then circles — circles are the app's "tags". Picking a
+  result selects the node (opening the inspector) and animates the camera so the node
+  lands a touch above screen centre at a comfortable zoom: a fixed 1.5× for a person,
+  fit-to-circle for a circle. The fly reuses the existing `driveCamera` settle path
+  (an eased per-frame `requestAnimationFrame` tween, then commit to React state).
+- Mobile: the expanded field grows with `flex: 1` to fill the row left of the gear,
+  and the dropdown spans that width. The persistent "sign in to save" banner was the
+  collision risk — it is capped to `calc(100vw - 132px)` so it never reaches the
+  toolbar buttons, and is hidden entirely (`.is-search-open` / `.is-settings-open` on
+  `.app-shell`) while either chrome panel is open. Opening search and opening settings
+  are mutually exclusive so their dropdowns can't stack.
+- Why: with two top-right buttons plus a wide banner, the old fixed 320px banner
+  overlapped the gear on a 375px screen; constraining the banner and giving search/
+  settings the row when active keeps the top bar legible on phones.
+
 ### 2026-06-14 — Motion: interaction feedback for chrome and canvas
 
 - Decision: every interaction now gives motion feedback instead of an instant state flip.

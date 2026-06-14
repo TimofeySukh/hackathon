@@ -21,3 +21,4 @@ design without reverse-engineering `src/App.tsx`.
   connections, pan/zoom, create menu, inspector.
 - [Person notes (Trello-Style)](person-notes.md) — Trello-style notes list column, cards, composer, and inline editing.
 - [Person connections](person-connections.md) — profile links, social handles, phone-app links, LinkedIn import links, and quick open/delete controls.
+- [Board search](board-search.md) — find a person (name/role) or circle (tag) from the toolbar and fly the camera to it.
