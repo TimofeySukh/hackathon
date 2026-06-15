@@ -362,12 +362,12 @@
   background: var(--md-surface-container-highest);
   color: var(--md-on-surface-variant);
   cursor: pointer;
-  transition: background-color 0.18s, color 0.18s, transform 0.18s, box-shadow 0.18s;
+  transition: background-color 0.18s, color 0.18s, transform 0.18s, border-radius 0.18s;
 }
 
 .circle-fill-toggle:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 3px 8px rgba(0,0,0,.12);
+  border-radius: 12px;
+  transform: scale(1.06);
 }
 
 .circle-fill-toggle.is-transparent {
@@ -1103,19 +1103,16 @@
 
 @keyframes swatchSpringBack {
   0% {
-    transform: scaleX(1.12) scaleY(0.93);
+    transform: scaleX(1.10) scaleY(0.94);
   }
-  20% {
-    transform: scaleX(0.90) scaleY(1.10);
-  }
-  40% {
-    transform: scaleX(1.05) scaleY(0.96);
+  30% {
+    transform: scaleX(0.95) scaleY(1.05);
   }
   60% {
-    transform: scaleX(0.98) scaleY(1.02);
+    transform: scaleX(1.02) scaleY(0.98);
   }
-  80% {
-    transform: scaleX(1.01) scaleY(0.99);
+  85% {
+    transform: scaleX(0.99) scaleY(1.01);
   }
   100% {
     transform: scale(1);
@@ -1124,19 +1121,16 @@
 
 @keyframes swatchNeighborLeftSpringBack {
   0% {
-    transform: translateX(-4.5px) scaleX(0.92) scaleY(1.04);
+    transform: translateX(-4px) scaleX(0.94) scaleY(1.03);
   }
-  20% {
-    transform: translateX(1.5px) scaleX(1.04) scaleY(0.97);
-  }
-  40% {
-    transform: translateX(-0.8px) scaleX(0.98) scaleY(1.01);
+  30% {
+    transform: translateX(1px) scaleX(1.02) scaleY(0.99);
   }
   60% {
-    transform: translateX(0.4px) scaleX(1.01) scaleY(0.99);
+    transform: translateX(-0.3px) scaleX(0.99) scaleY(1.005);
   }
-  80% {
-    transform: translateX(-0.1px) scaleX(1) scaleY(1);
+  85% {
+    transform: translateX(0.1px) scaleX(1) scaleY(1);
   }
   100% {
     transform: translateX(0) scale(1);
@@ -1145,19 +1139,16 @@
 
 @keyframes swatchNeighborRightSpringBack {
   0% {
-    transform: translateX(4.5px) scaleX(0.92) scaleY(1.04);
+    transform: translateX(4px) scaleX(0.94) scaleY(1.03);
   }
-  20% {
-    transform: translateX(-1.5px) scaleX(1.04) scaleY(0.97);
-  }
-  40% {
-    transform: translateX(0.8px) scaleX(0.98) scaleY(1.01);
+  30% {
+    transform: translateX(-1px) scaleX(1.02) scaleY(0.99);
   }
   60% {
-    transform: translateX(-0.4px) scaleX(1.01) scaleY(0.99);
+    transform: translateX(0.3px) scaleX(0.99) scaleY(1.005);
   }
-  80% {
-    transform: translateX(0.1px) scaleX(1) scaleY(1);
+  85% {
+    transform: translateX(-0.1px) scaleX(1) scaleY(1);
   }
   100% {
     transform: translateX(0) scale(1);
