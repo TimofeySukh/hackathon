@@ -19,10 +19,10 @@ rediscover, write it here.
 
 ### 2026-06-15 — Persist Circle Shape and Fill Defaults
 
-- Decision: the quick circle style popover remains the source for per-circle shape
-  controls, but fill, Wavyness, and Edges now also persist to `localStorage` as defaults
-  for newly created circles. Color is intentionally excluded from the defaults so new
-  circles keep the automatic tone assignment.
+- Decision: the compact circle quick card keeps Wavyness and Edges directly visible next
+  to the fast color/fill/avatar controls. Fill, Wavyness, and Edges also persist to
+  `localStorage` as defaults for newly created circles. Color is intentionally excluded
+  from the defaults so new circles keep the automatic tone assignment.
 - Why: a user who likes a particular circle shape should not have to repeat it for every
   new circle, while keeping color automatic prevents new circles from all blending into
   the same category.
@@ -209,7 +209,7 @@ rediscover, write it here.
 ### 2026-06-13 — Arc-Like Circle Color Picker
 
 - Decision: Replaced the native color input in the circle style popover with an in-app wheel picker plus brightness slider. The circle inspector keeps five quick color buttons directly visible and shows the palette button as the custom color when one is active.
-- Shape rule: The old amplitude/corners controls remain in the code but are hidden from the visible popover for now. `Amplitude = 0` still renders a smooth polygon, or a true circle at 25 corners. `Amplitude > 0` still renders the same corner count as a flower/wavy shape.
+- Shape rule: Superseded on 2026-06-15 by the compact quick-card sliders. `Amplitude = 0` still renders a smooth polygon, or a true circle at 25 corners. `Amplitude > 0` still renders the same corner count as a flower/wavy shape.
 - Rendering: People inside a custom-colored circle and connector handles now use the circle's resolved custom color, not just its legacy tone.
 
 ### 2026-06-13 — Compact Inspector, Person Connections, and Circle Style Popover

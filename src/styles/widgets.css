@@ -69,6 +69,7 @@
 .m3-primary-button:hover {
   background: color-mix(in srgb, var(--md-on-primary) 8%, var(--md-primary));
   box-shadow: var(--md-elev-1);
+  transform: scale(1.025);
 }
 
 .m3-primary-button:active {
@@ -234,6 +235,13 @@
   gap: 6px;
   min-width: 0;
   flex: 1 1 auto;
+}
+
+.circle-quick-style {
+  display: grid;
+  gap: 12px;
+  margin-top: 8px;
+  min-width: 0;
 }
 
 .quick-circle-color {
@@ -626,6 +634,10 @@
 .circle-style-shape-controls {
   display: grid;
   gap: 12px; /* match the popover's section rhythm */
+}
+
+.circle-quick-sliders {
+  padding: 2px 4px 0;
 }
 
 /* Material 3 slider (reusable) — see components/M3Slider.tsx. Thick track, a
@@ -1154,6 +1166,7 @@
 .onboarding-coach__primary:hover {
   background: color-mix(in srgb, var(--md-on-primary) 8%, var(--md-primary));
   box-shadow: var(--md-elev-1);
+  transform: scale(1.025);
 }
 
 .onboarding-coach__primary:active {

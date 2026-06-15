@@ -3089,7 +3089,7 @@ function App() {
           <div style={{ marginTop: '12px', display: 'grid', gap: '16px' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <label style={{ fontSize: '12px', fontWeight: 500, color: 'rgba(28, 37, 40, 0.64)' }}>
+                <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--md-on-surface-variant)' }}>
                   LinkedIn Data Import
                 </label>
                 <button
@@ -3124,7 +3124,7 @@ function App() {
             </div>
             {auth.status === 'authenticated' && (
               <div style={{ borderTop: '1px solid var(--md-outline-variant)', paddingTop: '16px' }}>
-                <label style={{ fontSize: '12px', fontWeight: 500, color: 'rgba(28, 37, 40, 0.64)', display: 'block', marginBottom: '8px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--md-on-surface-variant)', display: 'block', marginBottom: '8px' }}>
                   Account
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
@@ -3161,7 +3161,7 @@ function App() {
             )}
             {auth.status === 'anonymous' && (
               <div style={{ borderTop: '1px solid var(--md-outline-variant)', paddingTop: '16px' }}>
-                <label style={{ fontSize: '12px', fontWeight: 500, color: 'rgba(28, 37, 40, 0.64)', display: 'block', marginBottom: '8px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--md-on-surface-variant)', display: 'block', marginBottom: '8px' }}>
                   Account
                 </label>
                 <p style={{ margin: '0 0 12px', fontSize: '13px', color: 'var(--md-on-surface-variant)' }}>
@@ -3328,7 +3328,7 @@ function App() {
                 aria-label="Selected item name"
               />
             ) : (
-              <div style={{ fontSize: '15px', fontWeight: 500, padding: '4px 0 12px 0', borderBottom: '1px solid rgba(28, 37, 40, 0.08)', marginBottom: '8px' }}>
+              <div style={{ fontSize: '15px', fontWeight: 500, padding: '4px 0 12px 0', borderBottom: '1px solid color-mix(in srgb, var(--md-on-surface) 8%, transparent)', marginBottom: '8px' }}>
                 Relationship Link
               </div>
             )}
@@ -3341,171 +3341,173 @@ function App() {
                   const selectedCircleSides = selectedCircle.sides ?? 25
                   const selectedCircleAmplitude = selectedCircle.amplitude ?? 0
                   return (
-                <div className="inspector-visual-row">
-                  <div className="quick-circle-colors" aria-label="Quick circle colors" style={{ position: 'relative' }}>
+                    <div className="circle-quick-style">
+                      <div className="inspector-visual-row">
+                        <div className="quick-circle-colors" aria-label="Quick circle colors" style={{ position: 'relative' }}>
 
-                    {(['blue', 'red', 'green', 'amber', 'violet'] as CircleTone[]).map((tone) => {
-                      const id = `tone:${tone}`
-                      return (
-                        <button
-                          key={tone}
-                          type="button"
-                          data-ind-key={id}
-                          className={`quick-circle-color ${selectedCircle.tone === tone && !selectedCircle.customColor ? 'is-selected' : ''} ${pressingSwatchId === id ? 'is-pressing' : ''} ${returningSwatchId === id ? 'is-returning' : ''}`}
-                          style={{ backgroundColor: MATERIAL_TONES[tone].centerBg }}
-                          onPointerDown={() => handleSwatchPointerDown(id, () => updateCircleStyle(selectedCircle.id, { tone, customColor: undefined }))}
-                          onPointerUp={() => handleSwatchPointerUp(id)}
-                          onPointerLeave={() => handleSwatchPointerUp(id)}
-                          onPointerCancel={() => handleSwatchPointerUp(id)}
-                          aria-label={`Set quick color ${tone}`}
-                        />
-                      )
-                    })}
-                    <button
-                      type="button"
-                      className={`quick-circle-color quick-circle-color--more ${selectedCircle.customColor ? 'is-selected is-custom-color' : ''} ${showCircleStylePanel ? 'is-open' : ''}`}
-                      style={
-                        selectedCircle.customColor
-                          ? {
-                              backgroundColor: selectedCircleColors.centerBg,
-                              color: getReadableColor(selectedCircleColors.centerBg),
-                            }
-                          : undefined
-                      }
-                      onClick={() => setShowCircleStylePanel(!showCircleStylePanel)}
-                      title="Customize circle"
-                      aria-label="Customize circle"
-                    >
-                      <PaletteIcon />
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    className={`circle-fill-toggle ${(selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'is-transparent' : 'is-solid'}`}
-                    onClick={() => updateCircleStyleAndCreationDefaults(selectedCircle.id, { fillMode: (selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'solid' : 'transparent' })}
-                    title={(selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'Switch to solid fill' : 'Switch to transparent fill'}
-                    aria-label={(selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'Switch to solid fill' : 'Switch to transparent fill'}
-                  >
-                    <TransparencyIcon />
-                  </button>
-                      <div className={`circle-style-popover ${showCircleStylePanel ? 'is-open' : ''}`}>
-                        <div className="circle-style-theme-tabs">
-                          <SelectionIndicator
-                            variant="pill"
-                            activeKey={selectedCircle.fillMode ?? circleFillMode}
-                          />
-                          <button
-                            type="button"
-                            data-ind-key="transparent"
-                            className={(selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'is-selected' : ''}
-                            onClick={() => updateCircleStyleAndCreationDefaults(selectedCircle.id, { fillMode: 'transparent' })}
-                          >
-                            Transparent
-                          </button>
-                          <button
-                            type="button"
-                            data-ind-key="solid"
-                            className={(selectedCircle.fillMode ?? circleFillMode) === 'solid' ? 'is-selected' : ''}
-                            onClick={() => updateCircleStyleAndCreationDefaults(selectedCircle.id, { fillMode: 'solid' })}
-                          >
-                            Solid
-                          </button>
-                        </div>
-                        <button
-                          type="button"
-                          className="color-wheel"
-                          style={{
-                            '--wheel-color': selectedCircleColors.centerBg,
-                            '--wheel-x': `${50 + Math.cos((selectedCircleHsv.h - 180) * Math.PI / 180) * selectedCircleHsv.s * 50}%`,
-                            '--wheel-y': `${50 + Math.sin((selectedCircleHsv.h - 180) * Math.PI / 180) * selectedCircleHsv.s * 50}%`,
-                          } as CSSProperties}
-                          onPointerDown={(event) => handleColorWheelPointer(event, selectedCircle)}
-                          onPointerMove={(event) => {
-                            if (event.buttons === 1) handleColorWheelPointer(event, selectedCircle)
-                          }}
-                          aria-label="Pick circle color"
-                        >
-                          <span className="color-wheel__thumb" />
-                        </button>
-                        <button
-                          type="button"
-                          className="brightness-slider"
-                          style={{
-                            '--brightness-color': hsvToHex({ ...selectedCircleHsv, v: 1 }),
-                            '--brightness-pos': `${selectedCircleHsv.v * 100}%`,
-                          } as CSSProperties}
-                          onPointerDown={(event) => handleBrightnessPointer(event, selectedCircle)}
-                          onPointerMove={(event) => {
-                            if (event.buttons === 1) handleBrightnessPointer(event, selectedCircle)
-                          }}
-                          aria-label="Pick color brightness"
-                        >
-                          <span className="brightness-slider__thumb" />
-                        </button>
-                        <div className="circle-style-presets" style={{ position: 'relative' }}>
-
-                          {CIRCLE_COLOR_PRESETS.slice(0, 8).map((color) => {
-                            const id = `preset:${color.toLowerCase()}`
+                          {(['blue', 'red', 'green', 'amber', 'violet'] as CircleTone[]).map((tone) => {
+                            const id = `tone:${tone}`
                             return (
                               <button
-                                key={color}
+                                key={tone}
                                 type="button"
                                 data-ind-key={id}
-                                className={`circle-style-preset ${selectedCircleColors.centerBg.toLowerCase() === color.toLowerCase() ? 'is-selected' : ''} ${pressingSwatchId === id ? 'is-pressing' : ''} ${returningSwatchId === id ? 'is-returning' : ''}`}
-                                style={{ backgroundColor: color }}
-                                onPointerDown={() => handleSwatchPointerDown(id, () => updateCircleStyle(selectedCircle.id, { customColor: color }))}
+                                className={`quick-circle-color ${selectedCircle.tone === tone && !selectedCircle.customColor ? 'is-selected' : ''} ${pressingSwatchId === id ? 'is-pressing' : ''} ${returningSwatchId === id ? 'is-returning' : ''}`}
+                                style={{ backgroundColor: MATERIAL_TONES[tone].centerBg }}
+                                onPointerDown={() => handleSwatchPointerDown(id, () => updateCircleStyle(selectedCircle.id, { tone, customColor: undefined }))}
                                 onPointerUp={() => handleSwatchPointerUp(id)}
                                 onPointerLeave={() => handleSwatchPointerUp(id)}
                                 onPointerCancel={() => handleSwatchPointerUp(id)}
-                                aria-label={`Set circle color ${color}`}
+                                aria-label={`Set quick color ${tone}`}
                               />
                             )
                           })}
+                          <button
+                            type="button"
+                            className={`quick-circle-color quick-circle-color--more ${selectedCircle.customColor ? 'is-selected is-custom-color' : ''} ${showCircleStylePanel ? 'is-open' : ''}`}
+                            style={
+                              selectedCircle.customColor
+                                ? {
+                                    backgroundColor: selectedCircleColors.centerBg,
+                                    color: getReadableColor(selectedCircleColors.centerBg),
+                                  }
+                                : undefined
+                            }
+                            onClick={() => setShowCircleStylePanel(!showCircleStylePanel)}
+                            title="Customize circle"
+                            aria-label="Customize circle"
+                          >
+                            <PaletteIcon />
+                          </button>
                         </div>
-                        <div className="circle-style-shape-controls">
-                          <M3Slider
-                            variant="wave"
-                            label={selectedCircleAmplitude <= 0 ? 'Wavyness' : `Wavyness ${Math.round(selectedCircleAmplitude)}`}
-                            min={0}
-                            max={28}
-                            step={0.1}
-                            value={selectedCircleAmplitude}
-                            onChange={(value) => updateCircleAmplitude(selectedCircle, value)}
-                          />
-                          <M3Slider
-                            variant="plain"
-                            label={selectedCircleSides >= 25 ? 'Edges — circle' : `Edges ${selectedCircleSides}`}
-                            min={5}
-                            max={25}
-                            value={selectedCircleSides}
-                            onChange={(value) => updateCircleCorners(selectedCircle, value)}
-                          />
-                        </div>
-                      </div>
+                        <button
+                          type="button"
+                          className={`circle-fill-toggle ${(selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'is-transparent' : 'is-solid'}`}
+                          onClick={() => updateCircleStyleAndCreationDefaults(selectedCircle.id, { fillMode: (selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'solid' : 'transparent' })}
+                          title={(selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'Switch to solid fill' : 'Switch to transparent fill'}
+                          aria-label={(selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'Switch to solid fill' : 'Switch to transparent fill'}
+                        >
+                          <TransparencyIcon />
+                        </button>
+                        <div className={`circle-style-popover ${showCircleStylePanel ? 'is-open' : ''}`}>
+                          <div className="circle-style-theme-tabs">
+                            <SelectionIndicator
+                              variant="pill"
+                              activeKey={selectedCircle.fillMode ?? circleFillMode}
+                            />
+                            <button
+                              type="button"
+                              data-ind-key="transparent"
+                              className={(selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'is-selected' : ''}
+                              onClick={() => updateCircleStyleAndCreationDefaults(selectedCircle.id, { fillMode: 'transparent' })}
+                            >
+                              Transparent
+                            </button>
+                            <button
+                              type="button"
+                              data-ind-key="solid"
+                              className={(selectedCircle.fillMode ?? circleFillMode) === 'solid' ? 'is-selected' : ''}
+                              onClick={() => updateCircleStyleAndCreationDefaults(selectedCircle.id, { fillMode: 'solid' })}
+                            >
+                              Solid
+                            </button>
+                          </div>
+                          <button
+                            type="button"
+                            className="color-wheel"
+                            style={{
+                              '--wheel-color': selectedCircleColors.centerBg,
+                              '--wheel-x': `${50 + Math.cos((selectedCircleHsv.h - 180) * Math.PI / 180) * selectedCircleHsv.s * 50}%`,
+                              '--wheel-y': `${50 + Math.sin((selectedCircleHsv.h - 180) * Math.PI / 180) * selectedCircleHsv.s * 50}%`,
+                            } as CSSProperties}
+                            onPointerDown={(event) => handleColorWheelPointer(event, selectedCircle)}
+                            onPointerMove={(event) => {
+                              if (event.buttons === 1) handleColorWheelPointer(event, selectedCircle)
+                            }}
+                            aria-label="Pick circle color"
+                          >
+                            <span className="color-wheel__thumb" />
+                          </button>
+                          <button
+                            type="button"
+                            className="brightness-slider"
+                            style={{
+                              '--brightness-color': hsvToHex({ ...selectedCircleHsv, v: 1 }),
+                              '--brightness-pos': `${selectedCircleHsv.v * 100}%`,
+                            } as CSSProperties}
+                            onPointerDown={(event) => handleBrightnessPointer(event, selectedCircle)}
+                            onPointerMove={(event) => {
+                              if (event.buttons === 1) handleBrightnessPointer(event, selectedCircle)
+                            }}
+                            aria-label="Pick color brightness"
+                          >
+                            <span className="brightness-slider__thumb" />
+                          </button>
+                          <div className="circle-style-presets" style={{ position: 'relative' }}>
 
-                  <div className="m3-avatar-picker-container">
-                    <label className="m3-avatar-picker" title="Upload circle photo">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="m3-file-input-hidden"
-                        onChange={(e) => handleImageUpload(e, (base64) => updateCircleStyle(selectedCircle.id, { imageUrl: base64 }))}
-                      />
-                      {selectedCircle.imageUrl ? (
-                        <img src={selectedCircle.imageUrl} alt="Circle avatar" />
-                      ) : (
-                        <svg className="m3-avatar-picker-default-icon" viewBox="0 0 24 24">
-                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                          <circle cx="8.5" cy="8.5" r="1.5" />
-                          <polyline points="21 15 16 10 5 21" />
-                        </svg>
-                      )}
-                      <div className="m3-avatar-picker-overlay">
-                        <UploadIcon />
+                            {CIRCLE_COLOR_PRESETS.slice(0, 8).map((color) => {
+                              const id = `preset:${color.toLowerCase()}`
+                              return (
+                                <button
+                                  key={color}
+                                  type="button"
+                                  data-ind-key={id}
+                                  className={`circle-style-preset ${selectedCircleColors.centerBg.toLowerCase() === color.toLowerCase() ? 'is-selected' : ''} ${pressingSwatchId === id ? 'is-pressing' : ''} ${returningSwatchId === id ? 'is-returning' : ''}`}
+                                  style={{ backgroundColor: color }}
+                                  onPointerDown={() => handleSwatchPointerDown(id, () => updateCircleStyle(selectedCircle.id, { customColor: color }))}
+                                  onPointerUp={() => handleSwatchPointerUp(id)}
+                                  onPointerLeave={() => handleSwatchPointerUp(id)}
+                                  onPointerCancel={() => handleSwatchPointerUp(id)}
+                                  aria-label={`Set circle color ${color}`}
+                                />
+                              )
+                            })}
+                          </div>
+                        </div>
+
+                        <div className="m3-avatar-picker-container">
+                          <label className="m3-avatar-picker" title="Upload circle photo">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="m3-file-input-hidden"
+                              onChange={(e) => handleImageUpload(e, (base64) => updateCircleStyle(selectedCircle.id, { imageUrl: base64 }))}
+                            />
+                            {selectedCircle.imageUrl ? (
+                              <img src={selectedCircle.imageUrl} alt="Circle avatar" />
+                            ) : (
+                              <svg className="m3-avatar-picker-default-icon" viewBox="0 0 24 24">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                <circle cx="8.5" cy="8.5" r="1.5" />
+                                <polyline points="21 15 16 10 5 21" />
+                              </svg>
+                            )}
+                            <div className="m3-avatar-picker-overlay">
+                              <UploadIcon />
+                            </div>
+                          </label>
+                        </div>
                       </div>
-                    </label>
-                  </div>
-                </div>
+                      <div className="circle-style-shape-controls circle-quick-sliders">
+                        <M3Slider
+                          variant="wave"
+                          label={selectedCircleAmplitude <= 0 ? 'Wavyness' : `Wavyness ${Math.round(selectedCircleAmplitude)}`}
+                          min={0}
+                          max={28}
+                          step={0.1}
+                          value={selectedCircleAmplitude}
+                          onChange={(value) => updateCircleAmplitude(selectedCircle, value)}
+                        />
+                        <M3Slider
+                          variant="plain"
+                          label={selectedCircleSides >= 25 ? 'Edges — circle' : `Edges ${selectedCircleSides}`}
+                          min={5}
+                          max={25}
+                          value={selectedCircleSides}
+                          onChange={(value) => updateCircleCorners(selectedCircle, value)}
+                        />
+                      </div>
+                    </div>
                   )
                 })()}
 

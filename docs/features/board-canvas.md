@@ -48,10 +48,11 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   the same screen-readable label treatment as person names.
 - **Seed icons**: default country and region circles use geographic icons or flags in
   their center handles. Company circles may still use short text initials.
-- **Circle design**: selecting a circle shows quick color swatches plus a compact style
-  popover. The popover controls transparent/solid fill, custom color/brightness,
-  Wavyness, and Edges. Changing fill, Wavyness, or Edges also saves those shape/fill
-  choices as the defaults for newly created circles; color stays automatic.
+- **Circle design**: selecting a circle shows quick color swatches, the fill toggle,
+  avatar upload, and the Wavyness/Edges sliders directly in the compact quick card. The
+  palette popover is only for detailed color/brightness controls. Changing fill,
+  Wavyness, or Edges also saves those shape/fill choices as the defaults for newly
+  created circles; color stays automatic.
 - **Favorite**: a person can be starred; favorited people get a thicker neon-yellow
   outline on the canvas.
 - **Collision rules**: people repel other people in their owning circle and the center
@@ -72,7 +73,7 @@ This is the most Material-3-aligned part of the app today; keep it that way.
 - **Shapes**: nodes render as `wavy` (flower), soft `polygon`, or `circle` via
   `getNodePath`. Circle Wavyness maps to amplitude; Edges maps to side count, with 25
   edges treated as a clean circle. New circles use the last saved shape/fill defaults
-  from the quick style popover. People default to clean circular avatars.
+  from the compact quick card. People default to clean circular avatars.
 - **Surfaces**: node labels draw inside the Canvas 2D board layer, while the help/stress
   panels float above the grid background. Selection is shown by a stronger border/state,
   not a color swap.
