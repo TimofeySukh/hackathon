@@ -123,11 +123,27 @@ function circleRadiusAtAngle(
   if (shapeType === 'polygon') {
     if (sides >= 25) return R
     const a = (2 * Math.PI) / sides
-    const phi = (((theta + Math.PI / 2) % a) + a) % a
-    const sharp = (R * Math.cos(a / 2)) / Math.cos(phi - a / 2)
-    const apothem = R * Math.cos(a / 2)
-    const round = 0.34
-    return sharp * (1 - round) + apothem * round
+    const phi = Math.abs((((theta + Math.PI / 2) % a) + a) % a - a / 2)
+    const softness = amplitude === 0 ? 0.42 : Math.min(1.0, Math.max(0.0, amplitude / 20.0))
+    const Vx = R
+    const Vy = 0
+    const Mx = R * Math.cos(a / 2) * Math.cos(a / 2)
+    const My = R * Math.cos(a / 2) * Math.sin(a / 2)
+    const Ex = (1 - softness) * Vx + softness * Mx
+    const Ey = (1 - softness) * Vy + softness * My
+    const phiE = Math.atan2(Ey, Ex)
+    if (phi >= phiE) {
+      return (R * Math.cos(a / 2)) / Math.cos(phi - a / 2)
+    } else {
+      if (phi < 1e-6) return (Ex + R) / 2
+      const tanPhi = Math.tan(phi)
+      const A = ((Ex - R) / 2) * tanPhi
+      const B = -Ey
+      const C = ((Ex + R) / 2) * tanPhi
+      const u = (-B - Math.sqrt(B * B - 4 * A * C)) / (2 * A)
+      const x = (Ex + R) / 2 + (u * u * (Ex - R)) / 2
+      return x / Math.cos(phi)
+    }
   }
 
   // Fallback for when shapeType is not provided (backwards compatibility)
@@ -137,14 +153,28 @@ function circleRadiusAtAngle(
     return baseR + amplitude * Math.cos(sides * theta)
   }
   if (sides >= 25) return R // clean circle
-  // Rounded polygon: sharp n-gon radius blended toward the apothem so corners
-  // round in while edges stay flat. A vertex sits at the top (-π/2).
   const a = (2 * Math.PI) / sides
-  const phi = (((theta + Math.PI / 2) % a) + a) % a
-  const sharp = (R * Math.cos(a / 2)) / Math.cos(phi - a / 2)
-  const apothem = R * Math.cos(a / 2)
-  const round = 0.34
-  return sharp * (1 - round) + apothem * round
+  const phi = Math.abs((((theta + Math.PI / 2) % a) + a) % a - a / 2)
+  const softness = amplitude === 0 ? 0.42 : Math.min(1.0, Math.max(0.0, amplitude / 20.0))
+  const Vx = R
+  const Vy = 0
+  const Mx = R * Math.cos(a / 2) * Math.cos(a / 2)
+  const My = R * Math.cos(a / 2) * Math.sin(a / 2)
+  const Ex = (1 - softness) * Vx + softness * Mx
+  const Ey = (1 - softness) * Vy + softness * My
+  const phiE = Math.atan2(Ey, Ex)
+  if (phi >= phiE) {
+    return (R * Math.cos(a / 2)) / Math.cos(phi - a / 2)
+  } else {
+    if (phi < 1e-6) return (Ex + R) / 2
+    const tanPhi = Math.tan(phi)
+    const A = ((Ex - R) / 2) * tanPhi
+    const B = -Ey
+    const C = ((Ex + R) / 2) * tanPhi
+    const u = (-B - Math.sqrt(B * B - 4 * A * C)) / (2 * A)
+    const x = (Ex + R) / 2 + (u * u * (Ex - R)) / 2
+    return x / Math.cos(phi)
+  }
 }
 
 export type OutlinePoint = { x: number; y: number }
