@@ -242,8 +242,8 @@
   cursor: pointer;
   padding: 0;
   transition:
-    border-radius 0.18s cubic-bezier(0.34, 1.56, 0.64, 1),
-    transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border-radius 0.22s cubic-bezier(0.34, 1.45, 0.5, 1),
+    transform 0.22s cubic-bezier(0.34, 1.45, 0.5, 1);
 }
 
 /* Connected button-group press (M3 Expressive): the pressed swatch grows and
@@ -252,15 +252,20 @@
    right) — the row behaves like one elastic group, not every item at once.
    We also squash the active item and stretch/compress neighbours horizontally. */
 .quick-circle-color.is-pressing {
-  transform: scaleX(1.06) scaleY(0.95);
+  transform: scaleX(1.12) scaleY(0.93);
+  transition:
+    border-radius 0.1s cubic-bezier(0.2, 0, 0, 1),
+    transform 0.1s cubic-bezier(0.2, 0, 0, 1);
 }
 
 .quick-circle-color:has(+ .quick-circle-color.is-pressing) {
-  transform: translateX(-3px) scaleX(0.96) scaleY(1.02);
+  transform: translateX(-4.5px) scaleX(0.92) scaleY(1.04);
+  transition: transform 0.1s cubic-bezier(0.2, 0, 0, 1);
 }
 
 .quick-circle-color.is-pressing + .quick-circle-color {
-  transform: translateX(3px) scaleX(0.96) scaleY(1.02);
+  transform: translateX(4.5px) scaleX(0.92) scaleY(1.04);
+  transition: transform 0.1s cubic-bezier(0.2, 0, 0, 1);
 }
 
 /* The selected color morphs from a circle to a rounded square (M3 shape morph),
@@ -533,22 +538,27 @@
   border: 1px solid rgba(0, 0, 0, 0.16);
   cursor: pointer;
   transition:
-    border-radius 0.18s cubic-bezier(0.34, 1.56, 0.64, 1),
-    transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border-radius 0.22s cubic-bezier(0.34, 1.45, 0.5, 1),
+    transform 0.22s cubic-bezier(0.34, 1.45, 0.5, 1);
 }
 
 /* Same connected-group press as the quick swatches: only immediate neighbours
    recoil away from the pressed preset, with squash/stretch deformation. */
 .circle-style-preset.is-pressing {
-  transform: scaleX(1.06) scaleY(0.95);
+  transform: scaleX(1.12) scaleY(0.93);
+  transition:
+    border-radius 0.1s cubic-bezier(0.2, 0, 0, 1),
+    transform 0.1s cubic-bezier(0.2, 0, 0, 1);
 }
 
 .circle-style-preset:has(+ .circle-style-preset.is-pressing) {
-  transform: translateX(-3px) scaleX(0.96) scaleY(1.02);
+  transform: translateX(-4.5px) scaleX(0.92) scaleY(1.04);
+  transition: transform 0.1s cubic-bezier(0.2, 0, 0, 1);
 }
 
 .circle-style-preset.is-pressing + .circle-style-preset {
-  transform: translateX(3px) scaleX(0.96) scaleY(1.02);
+  transform: translateX(4.5px) scaleX(0.92) scaleY(1.04);
+  transition: transform 0.1s cubic-bezier(0.2, 0, 0, 1);
 }
 
 /* Selected preset morphs circle -> rounded square (M3 shape morph). */
