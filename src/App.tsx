@@ -1076,9 +1076,7 @@ function App() {
       sides,
       amplitude,
     })
-    // Smooth shape morph for jumps (e.g. tapping the wavyness track far from the
-    // current value). Fine drag steps update live and don't need it.
-    if (Math.abs(amplitude - fromAmplitude) > 3) {
+    if (fromAmplitude !== amplitude) {
       startBoardAnim('morph:' + circle.id, 300, {
         fromSides: sides,
         fromAmp: fromAmplitude,
