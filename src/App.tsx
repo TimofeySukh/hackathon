@@ -414,6 +414,8 @@ function App() {
   // True once the current drag/resize gesture has recorded its undo snapshot.
   // Only touched from pointer event handlers, never during render.
   const gestureSnapshotTakenRef = useRef(false)
+  const [pressingSwatchId, setPressingSwatchId] = useState<string | null>(null)
+  const pressingSwatchTimeRef = useRef<number>(0)
   const auth = useAuth()
   const userId = auth.session?.user?.id ?? null
   // Sign-in dialog: a single "Sign in" button opens this; it holds every
@@ -1039,6 +1041,23 @@ function App() {
       ...current,
       v: x,
     })
+  }
+
+  function handleSwatchPointerDown(id: string, action: () => void) {
+    setPressingSwatchId(id)
+    pressingSwatchTimeRef.current = performance.now()
+    action()
+  }
+
+  function handleSwatchPointerUp(id: string) {
+    const elapsed = performance.now() - pressingSwatchTimeRef.current
+    if (elapsed < 250) {
+      setTimeout(() => {
+        setPressingSwatchId((curr) => (curr === id ? null : curr))
+      }, 250 - elapsed)
+    } else {
+      setPressingSwatchId((curr) => (curr === id ? null : curr))
+    }
   }
 
   function updateCircleCorners(circle: CircleNode, sides: number) {
@@ -3189,16 +3208,22 @@ function App() {
                   return (
                 <div className="inspector-visual-row">
                   <div className="quick-circle-colors" aria-label="Quick circle colors">
-                    {(['blue', 'red', 'green', 'amber', 'violet'] as CircleTone[]).map((tone) => (
-                      <button
-                        key={tone}
-                        type="button"
-                        className={`quick-circle-color ${selectedCircle.tone === tone && !selectedCircle.customColor ? 'is-selected' : ''}`}
-                        style={{ backgroundColor: MATERIAL_TONES[tone].centerBg }}
-                        onPointerDown={() => updateCircleStyle(selectedCircle.id, { tone, customColor: undefined })}
-                        aria-label={`Set quick color ${tone}`}
-                      />
-                    ))}
+                    {(['blue', 'red', 'green', 'amber', 'violet'] as CircleTone[]).map((tone) => {
+                      const id = `tone:${tone}`
+                      return (
+                        <button
+                          key={tone}
+                          type="button"
+                          className={`quick-circle-color ${selectedCircle.tone === tone && !selectedCircle.customColor ? 'is-selected' : ''} ${pressingSwatchId === id ? 'is-pressing' : ''}`}
+                          style={{ backgroundColor: MATERIAL_TONES[tone].centerBg }}
+                          onPointerDown={() => handleSwatchPointerDown(id, () => updateCircleStyle(selectedCircle.id, { tone, customColor: undefined }))}
+                          onPointerUp={() => handleSwatchPointerUp(id)}
+                          onPointerLeave={() => handleSwatchPointerUp(id)}
+                          onPointerCancel={() => handleSwatchPointerUp(id)}
+                          aria-label={`Set quick color ${tone}`}
+                        />
+                      )
+                    })}
                     <button
                       type="button"
                       className={`quick-circle-color quick-circle-color--more ${selectedCircle.customColor ? 'is-selected is-custom-color' : ''} ${showCircleStylePanel ? 'is-open' : ''}`}
@@ -3282,16 +3307,22 @@ function App() {
                           <span className="brightness-slider__thumb" />
                         </button>
                         <div className="circle-style-presets">
-                          {CIRCLE_COLOR_PRESETS.slice(0, 8).map((color) => (
-                            <button
-                              key={color}
-                              type="button"
-                              className={`circle-style-preset ${selectedCircleColors.centerBg.toLowerCase() === color.toLowerCase() ? 'is-selected' : ''}`}
-                              style={{ backgroundColor: color }}
-                              onPointerDown={() => updateCircleStyle(selectedCircle.id, { customColor: color })}
-                              aria-label={`Set circle color ${color}`}
-                            />
-                          ))}
+                          {CIRCLE_COLOR_PRESETS.slice(0, 8).map((color) => {
+                            const id = `preset:${color}`
+                            return (
+                              <button
+                                key={color}
+                                type="button"
+                                className={`circle-style-preset ${selectedCircleColors.centerBg.toLowerCase() === color.toLowerCase() ? 'is-selected' : ''} ${pressingSwatchId === id ? 'is-pressing' : ''}`}
+                                style={{ backgroundColor: color }}
+                                onPointerDown={() => handleSwatchPointerDown(id, () => updateCircleStyle(selectedCircle.id, { customColor: color }))}
+                                onPointerUp={() => handleSwatchPointerUp(id)}
+                                onPointerLeave={() => handleSwatchPointerUp(id)}
+                                onPointerCancel={() => handleSwatchPointerUp(id)}
+                                aria-label={`Set circle color ${color}`}
+                              />
+                            )
+                          })}
                         </div>
                         <div className="circle-style-shape-controls">
                           <M3Slider
