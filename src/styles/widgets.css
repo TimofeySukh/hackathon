@@ -160,10 +160,10 @@
   top: calc(100% + 4px);
   left: 0;
   right: 0;
-  background: #ffffff;
-  border: 1px solid rgba(9, 30, 66, 0.08);
-  border-radius: 14px;
-  box-shadow: 0px 8px 16px -4px rgba(9, 30, 66, 0.25), 0px 0px 1px rgba(9, 30, 66, 0.31);
+  background: var(--md-surface-container);
+  border: none;
+  border-radius: var(--md-r-md);
+  box-shadow: var(--md-elev-2);
   max-height: 200px;
   overflow-y: auto;
   overflow-x: hidden;
@@ -410,10 +410,10 @@
 }
 
 .circle-style-popover {
-  position: fixed;
+  position: absolute;
   z-index: 1200;
-  right: 24px;
-  bottom: 124px;
+  right: 0;
+  bottom: calc(100% + 12px); /* open above the palette icon, anchored to the visual row */
   width: min(344px, calc(100vw - 48px));
   display: grid;
   gap: 12px;
@@ -431,7 +431,7 @@
   opacity: 0;
   visibility: hidden;
   transform: scale(0.92);
-  transform-origin: calc(100% - 24px) calc(100% + 40px);
+  transform-origin: bottom right; /* scale up from the palette icon below it */
   transition:
     opacity var(--md-dur-medium) var(--md-ease-standard),
     transform var(--md-dur-medium) var(--md-ease-spring-gentle),
@@ -464,7 +464,7 @@
   border-radius: var(--md-r-full);
   background: transparent;
   color: var(--md-on-surface-variant);
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   display: inline-flex;
@@ -802,7 +802,7 @@
 .connection-item__main:hover {
   background: color-mix(in srgb, var(--md-on-surface) 8%, var(--md-surface));
   box-shadow: var(--md-elev-1);
-  transform: translateY(-1px);
+  transform: scale(1.01);
 }
 
 .connection-item__main:active {
@@ -855,35 +855,40 @@
   gap: 6px;
 }
 
+/* Filled rounded-rectangle field: tonal fill, no border, no underline, no focus ring.
+   Rounded corners (r-sm) but still reads as a rectangle. Focus is a subtle fill deepen. */
 .connection-composer input {
   min-width: 0;
-  height: 34px;
-  border: 1px solid var(--md-outline-variant);
-  border-radius: var(--md-r-full);
-  background: var(--md-surface);
+  height: 40px;
+  border: none;
+  border-radius: var(--md-r-sm);
+  background: var(--md-surface-container-highest);
   color: var(--md-on-surface);
-  padding: 0 12px;
-  font-size: 12.5px;
+  padding: 0 16px;
+  font-size: 14px;
   outline: none;
-  transition:
-    border-color var(--md-dur-short) var(--md-ease-standard),
-    background-color var(--md-dur-short) var(--md-ease-standard),
-    box-shadow var(--md-dur-short) var(--md-ease-standard);
+  transition: background-color var(--md-dur-short) var(--md-ease-standard);
+}
+
+.connection-composer input::placeholder {
+  color: var(--md-on-surface-variant);
+}
+
+.connection-composer input:hover {
+  background: color-mix(in srgb, var(--md-on-surface) 4%, var(--md-surface-container-highest));
 }
 
 .connection-composer input:focus {
-  border-color: var(--md-primary);
-  background: var(--md-surface-container-low);
-  box-shadow: inset 0 -2px 0 var(--md-primary);
+  background: color-mix(in srgb, var(--md-on-surface) 7%, var(--md-surface-container-highest));
 }
 
 .connection-composer button {
-  height: 34px;
-  border-radius: var(--md-r-full);
+  height: 40px;
+  border-radius: var(--md-r-sm); /* Rectangular — local rule for the notes/connections menu */
   background: var(--md-primary);
   color: var(--md-on-primary);
-  padding: 0 12px;
-  font-size: 12.5px;
+  padding: 0 20px;
+  font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   transition:
@@ -915,7 +920,7 @@
   background: var(--md-surface);
   color: var(--md-on-surface);
   padding: 4px;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   text-align: left;

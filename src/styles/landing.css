@@ -162,8 +162,13 @@
   text-decoration: none;
   cursor: pointer;
   transition: background-color var(--md-dur-short) var(--md-ease-standard),
-              transform var(--md-dur-short) var(--md-ease-standard),
+              transform var(--md-dur-medium) var(--md-ease-spring),
               box-shadow var(--md-dur-short) var(--md-ease-standard);
+}
+
+/* Spring "breathe": grow slightly toward the user on hover, squash on press. */
+.m3-btn:hover {
+  transform: scale(1.03);
 }
 
 .m3-btn:active {
@@ -237,12 +242,11 @@
   align-items: flex-start;
 }
 
+/* Eyebrow: M3 sentence case (label-large), not UPPERCASE + tracking. */
 .hero-tagline {
   font-size: 14px;
   font-weight: 500;
   color: var(--md-primary);
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
   margin-bottom: 16px;
 }
 
@@ -407,18 +411,24 @@
   flex-direction: column;
   align-items: flex-start;
   transition: background-color var(--md-dur-medium) var(--md-ease-standard),
-              transform var(--md-dur-medium) var(--md-ease-standard),
+              transform var(--md-dur-medium) var(--md-ease-spring),
               box-shadow var(--md-dur-medium) var(--md-ease-standard);
   position: relative;
   overflow: hidden;
   border: 1px solid transparent;
 }
 
+/* Hover: spring "breathe" toward the user (M3 Expressive spring physics) instead
+   of a vertical lift. Scale uses the overshoot spring; color/shadow stay on standard. */
 .feature-card:hover {
   background-color: var(--md-surface-container);
-  transform: translateY(-4px);
+  transform: scale(1.025);
   box-shadow: var(--md-elev-2);
   border-color: var(--md-outline-variant);
+}
+
+.feature-card:active {
+  transform: scale(0.99);
 }
 
 .feature-icon-wrapper {

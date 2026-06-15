@@ -197,15 +197,25 @@ decelerating motion. Use the tokens (defined on `.app-shell`); never hardcode ad
 durations or beziers.
 
 ```css
---md-ease-standard:   cubic-bezier(0.2, 0, 0, 1);
---md-ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
---md-ease-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1); /* enters */
---md-ease-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15); /* exits  */
+--md-ease-standard:   cubic-bezier(0.2, 0, 0, 1);   /* M3 standard — in-place changes */
+--md-ease-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1); /* M3 emphasized decelerate — enters */
+--md-ease-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15); /* M3 emphasized accelerate — exits  */
+--md-ease-emphasized: var(--md-ease-standard);      /* alias — see note below */
 --md-ease-spring:     cubic-bezier(0.34, 1.45, 0.5, 1); /* expressive spatial: fast, slight overshoot */
 --md-dur-short:  0.12s;  /* press feedback, small state changes */
 --md-dur-medium: 0.22s;  /* panel / menu entrances              */
 --md-dur-long:   0.32s;  /* larger sheets                       */
 ```
+
+> **Easing is verified against the M3 spec.** `standard`, `decelerate` (= M3 *emphasized
+> decelerate*), and `accelerate` (= M3 *emphasized accelerate*) are exact. M3 **"Emphasized"
+> (in-out) is a two-segment spring path and cannot be expressed as a single `cubic-bezier`**,
+> so we don't fake one: `--md-ease-emphasized` is just an alias of `standard`. Use
+> `decelerate` for entrances, `accelerate` for exits, `standard` for in-place changes.
+> **`--md-ease-spring` overshoots past the target (y > 1) — only ever put it on geometric
+> properties (`transform` / `left` / `top` / `width`). Never on `opacity` or `color`**: the
+> value overshoots its valid range and flashes. Durations are deliberately ~30% faster than
+> the official M3 duration tokens (snappy UI).
 
 Rules of thumb:
 
@@ -225,6 +235,14 @@ Rules of thumb:
     moves animate.
 - **Surfaces that appear** (inspector, menus, dropdowns, prompts) enter with a fade plus a
   small translate/scale toward their resting position, `--md-dur-medium` + `--md-ease-decelerate`.
+- **Hover = springy scale, never a vertical lift.** Do **not** use `transform: translateY(-Npx)`
+  on hover — it reads as a generic, un-M3 trope. Cards and CTA buttons "breathe" toward the
+  user with a small spring grow (`scale(1.01`–`1.03)` on `--md-ease-spring`) on top of the
+  state layer; press then squashes them down (`scale(0.96`–`0.985)`). The arc is rest →
+  hover-grow → press-squash → spring-back. (M3 hover itself is the state layer; the spring
+  scale is the M3-Expressive flourish.) Small chrome icon buttons keep state-layer-only hover
+  and scale *down* on press — don't add hover-grow to those (see the "Keep Chrome Button Hover
+  Pill-Shaped" log entry).
 - **Press feedback is springy, not linear.** Interactive controls get `:active { transform: scale(...) }`
   transitioned with `--md-ease-spring` so they spring back on release (not a flat ease).
   Plain controls scale *down* on press (pills ~0.96, icon buttons ~0.9). Thumbs/handles

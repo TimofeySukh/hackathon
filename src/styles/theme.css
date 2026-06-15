@@ -43,13 +43,23 @@
   --md-elev-2: 0 1px 2px rgba(0,0,0,.30), 0 2px 6px 2px rgba(0,0,0,.15);
   --md-elev-3: 0 4px 8px 3px rgba(0,0,0,.15), 0 1px 3px rgba(0,0,0,.30);
 
-  /* Motion — Material 3 emphasized/standard easing + durations */
+  /* Motion — Material 3 easing + durations.
+     Verified against the M3 spec (m3.material.io/styles/motion/easing-and-duration):
+       standard            = cubic-bezier(0.2, 0, 0, 1)      (in-place changes)
+       emphasized decel.   = cubic-bezier(0.05, 0.7, 0.1, 1) (enters)
+       emphasized accel.   = cubic-bezier(0.3, 0, 0.8, 0.15) (exits)
+     M3 "Emphasized" (in-out) is a two-segment spring path that CANNOT be expressed
+     as a single cubic-bezier, so we DON'T fake it: in-place uses --md-ease-standard,
+     entrances use --md-ease-decelerate, exits use --md-ease-accelerate. */
   --md-ease-standard: cubic-bezier(0.2, 0, 0, 1);
-  --md-ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
-  --md-ease-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
-  --md-ease-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
-  /* Expressive spatial spring: fast move with a slight overshoot. Used by the
-     persistent selection indicator so state changes feel physical, not linear. */
+  --md-ease-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1); /* M3 emphasized decelerate — enters */
+  --md-ease-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15); /* M3 emphasized accelerate — exits  */
+  /* Back-compat alias; equals standard (see note above — no true single-bezier emphasized). */
+  --md-ease-emphasized: var(--md-ease-standard);
+  /* Expressive spatial spring: fast move with a slight overshoot.
+     OVERSHOOTS past the target (y > 1), so ONLY use it on geometric props
+     (transform / left / top / width). NEVER on opacity or color — the value
+     overshoots its valid range and flashes. (This bit us before.) */
   --md-ease-spring: cubic-bezier(0.34, 1.45, 0.5, 1);
   --md-ease-spring-gentle: cubic-bezier(0.34, 1.1, 0.5, 1);
   --md-dur-short: 0.12s;

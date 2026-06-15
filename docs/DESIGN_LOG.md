@@ -17,6 +17,73 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-15 — Circle-style popover anchors above the palette icon; shape controls moved in
+
+- Decision: the "Customize circle" popover (`.circle-style-popover`) was `position: fixed`
+  with hardcoded `right: 24px; bottom: 124px` — it floated at the bottom of the viewport,
+  detached from the palette icon that opens it. Now it's `position: absolute` anchored to
+  `.inspector-visual-row` (made `position: relative`), opening **above** the icon
+  (`bottom: calc(100% + 12px); right: 0`), `transform-origin: bottom right` so it scales up
+  from the icon. The inspector has no `overflow` clip, so absolute positioning isn't clipped.
+  Mobile (`max-width: 720px`) keeps the fixed-bottom sheet.
+- Decision: moved the Wavyness (wave `M3Slider`) and Edges (`M3Slider`) controls out of the
+  always-visible inspector body row (`.circle-quick-sliders`) and **into the popover**, after
+  the color presets, so all circle customization (fill mode, color, shape) lives in one
+  surface. No duplication — there's a single set of sliders now, inside the popover.
+
+- Decision: hover feedback "breathes" toward the user via a small spring scale instead of
+  a vertical `translateY` lift, which read as boring/un-M3. Cards/CTA buttons grow slightly
+  on hover (`scale(1.01`–`1.03)`) with `--md-ease-spring`, squash on press (`scale(0.96`–
+  `0.985)`), so the arc is rest → hover-grow → press-squash → spring-back. Applied to
+  `.feature-card`, `.m3-btn`, `.m3-primary-button`, `.primary-action`,
+  `.onboarding-coach__primary`, `.trello-card`, `.connection-item__main`. **No `translateY`
+  on hover anywhere** (verified there are zero hover rules with translateY).
+- Why: vertical lift is the most generic hover trope and isn't an M3 hover pattern (M3 hover
+  is a state layer; M3 Expressive adds spring physics). Springy scale keeps the state layer
+  and reads as alive without the jump. Rejected: pure state-layer only (too subdued for the
+  user); shape-morph on hover (already rejected for chrome buttons — see the 2026-06-15
+  "Keep Chrome Button Hover Pill-Shaped" entry).
+- Motion tokens audited against the M3 spec (m3.material.io/styles/motion/easing-and-duration):
+  `--md-ease-standard` (`0.2,0,0,1`), `--md-ease-decelerate` (`0.05,0.7,0.1,1` = emphasized
+  decelerate), `--md-ease-accelerate` (`0.3,0,0.8,0.15` = emphasized accelerate) are all
+  spec-correct. **`--md-ease-emphasized` was a fake** (it held standard); M3 "Emphasized"
+  (in-out) is a two-segment spring path that cannot be one cubic-bezier, so it's now an
+  explicit alias of standard with a note: in-place→standard, enter→decelerate, exit→accelerate.
+  `--md-ease-spring` (`0.34,1.45,0.5,1`) overshoots past 1, so it is documented as
+  transform/geometry-only — putting it on opacity/color makes the value overshoot its range
+  and flash (this bit us before). Durations (`120/220/320ms`) are deliberately ~30% faster
+  than the M3 duration tokens (snappy UI) — kept as-is.
+- M3 cleanup in the same pass: removed all `text-transform: uppercase` eyebrows (6 spots)
+  in favor of M3 sentence case; bumped those 11px labels to 12px (label-medium, on-scale);
+  `font-weight: 800` → 500 on the LinkedIn search icon; replaced hardcoded
+  `rgba(28,37,40,*)` grays with `--md-on-surface-variant` / a tonal divider.
+- Text fields: the connection composer (`.connection-composer input`) and the generic
+  inspector text field (`.inspector-field input[type="text"]`) were *outlined* (1px border
+  that became a full blue ring on focus, on a pill) — ugly. **Final recipe: filled
+  rounded-rectangle.** Tonal `--md-surface-container-highest` fill, **no border, no underline,
+  no focus ring**, `--md-r-sm` (8px — reads as a rectangle, not a pill, not the asymmetric
+  rounded-top/flat-bottom), 14px text; focus is a subtle fill deepen only. Iteration history
+  (all rejected): (1) original outlined pill; (2) M3 filled-with-bottom-underline (rounded
+  top + flat bottom + 2px line — "square bottom + a line for no reason"); (3) full filled
+  pill `--md-r-full` (like the search box — clean but the user wanted a rectangle shape).
+- Note editor (`.trello-list__composer-card`): dropped the `:focus-within` bottom underline
+  (`inset 0 -2px primary`) — same "полоса" problem. Then dropped the focus fill-deepen too —
+  it darkened the card toward the list container and made it blend in. **The note card keeps
+  its resting light `--md-surface-container-low` at all times**; focus is shown only by the
+  caret. Note text bumped to on-scale 14px (body-medium); the card stays `--md-r-md`.
+- **Local rule — notes/connections menu uses rectangular buttons, not pills.** Within the
+  inspector notes + connections composer, the action buttons (`.trello-list__composer-add-btn`
+  "Save note", `.trello-list__composer-cancel-btn` discard, `.trello-list__add-btn` new note,
+  and `.connection-composer button` Save) are `--md-r-sm` (8px) to match the rounded-rectangle
+  fields in the same dense panel. This is a deliberate deviation from the global "buttons are
+  pills" rule, scoped to this menu only, for shape consistency with the fields next to them.
+- Audit pass: fixed the color-select dropdown (`.custom-select-dropdown`) from hardcoded
+  `#fff` + Atlassian `rgba(9,30,66,*)` shadow + `14px` radius → `--md-surface-container` /
+  `--md-elev-2` / `--md-r-md`, no border. Aligned stray off-scale sizes (12.5/11.5→12,
+  stress dd 15→14, search input 15→16, inspector name 21→22). **Remaining off-scale (not
+  yet changed, lower priority):** ~20 `13px` uses (mostly landing + LinkedIn-guide), and the
+  onboarding/landing display sizes (17/18/44/48/56px).
+
 ### 2026-06-15 — Persist Circle Shape and Fill Defaults
 
 - Decision: the compact circle quick card keeps Wavyness and Edges directly visible next

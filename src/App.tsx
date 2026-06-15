@@ -3463,6 +3463,25 @@ function App() {
                               )
                             })}
                           </div>
+                          <div className="circle-style-shape-controls">
+                            <M3Slider
+                              variant="wave"
+                              label={selectedCircleAmplitude <= 0 ? 'Wavyness' : `Wavyness ${Math.round(selectedCircleAmplitude)}`}
+                              min={0}
+                              max={28}
+                              step={0.1}
+                              value={selectedCircleAmplitude}
+                              onChange={(value) => updateCircleAmplitude(selectedCircle, value)}
+                            />
+                            <M3Slider
+                              variant="plain"
+                              label={selectedCircleSides >= 25 ? 'Edges — circle' : `Edges ${selectedCircleSides}`}
+                              min={5}
+                              max={25}
+                              value={selectedCircleSides}
+                              onChange={(value) => updateCircleCorners(selectedCircle, value)}
+                            />
+                          </div>
                         </div>
 
                         <div className="m3-avatar-picker-container">
@@ -3487,25 +3506,6 @@ function App() {
                             </div>
                           </label>
                         </div>
-                      </div>
-                      <div className="circle-style-shape-controls circle-quick-sliders">
-                        <M3Slider
-                          variant="wave"
-                          label={selectedCircleAmplitude <= 0 ? 'Wavyness' : `Wavyness ${Math.round(selectedCircleAmplitude)}`}
-                          min={0}
-                          max={28}
-                          step={0.1}
-                          value={selectedCircleAmplitude}
-                          onChange={(value) => updateCircleAmplitude(selectedCircle, value)}
-                        />
-                        <M3Slider
-                          variant="plain"
-                          label={selectedCircleSides >= 25 ? 'Edges — circle' : `Edges ${selectedCircleSides}`}
-                          min={5}
-                          max={25}
-                          value={selectedCircleSides}
-                          onChange={(value) => updateCircleCorners(selectedCircle, value)}
-                        />
                       </div>
                     </div>
                   )

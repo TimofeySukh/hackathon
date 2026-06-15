@@ -25,11 +25,10 @@
   gap: 12px;
 }
 
+/* Eyebrow: M3 sentence case (label-medium), no UPPERCASE + tracking. */
 .stress-panel__header strong {
   font-size: 12px;
   font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .stress-panel__header span {
@@ -49,7 +48,7 @@
 .stress-slider span,
 .stress-toggles span,
 .stress-panel dt {
-  color: rgba(28, 37, 40, 0.64);
+  color: var(--md-on-surface-variant);
   font-size: 12px;
   font-weight: 500;
 }
@@ -100,7 +99,7 @@
 .stress-panel dd {
   margin: 0;
   color: var(--md-on-surface);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 400;
 }
 
@@ -212,7 +211,7 @@
   border: 1px solid transparent;
   border-radius: var(--md-r-sm);
   padding: 6px 42px 6px 8px;
-  font-size: 21px;
+  font-size: 22px;
   font-weight: 400;
   outline: none;
   transition: border-color 0.2s, background-color 0.2s;
@@ -282,6 +281,7 @@
 .primary-action:hover {
   background: color-mix(in srgb, var(--md-on-primary) 8%, var(--md-primary));
   box-shadow: var(--md-elev-1);
+  transform: scale(1.025);
 }
 
 .primary-action:active {

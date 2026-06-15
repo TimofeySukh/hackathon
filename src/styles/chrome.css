@@ -126,15 +126,15 @@
   pointer-events: none;
 }
 
+/* Eyebrow: M3 uses sentence case, not UPPERCASE + tracking (label-medium 12/500). */
 .help-panel strong {
   font-size: 12px;
   font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  color: var(--md-on-surface-variant);
 }
 
 .help-panel span {
-  color: rgba(28, 37, 40, 0.68);
+  color: var(--md-on-surface-variant);
   font-size: 12px;
   font-weight: 400;
   line-height: 1.35;
