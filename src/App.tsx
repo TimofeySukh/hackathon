@@ -1051,10 +1051,11 @@ function App() {
 
   function handleSwatchPointerUp(id: string) {
     const elapsed = performance.now() - pressingSwatchTimeRef.current
-    if (elapsed < 250) {
+    const minDur = 250 // Match the 0.25s CSS transition duration!
+    if (elapsed < minDur) {
       setTimeout(() => {
         setPressingSwatchId((curr) => (curr === id ? null : curr))
-      }, 250 - elapsed)
+      }, minDur - elapsed)
     } else {
       setPressingSwatchId((curr) => (curr === id ? null : curr))
     }
