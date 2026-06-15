@@ -33,6 +33,7 @@ import type {
   PersonLinkService,
   PersonLink,
   PersonNode,
+  ShapeType,
   GraphState,
   Camera,
   DragConnector,
@@ -357,6 +358,61 @@ const authCardStyle: CSSProperties = {
 // First-run flag for the onboarding tour. Kept in localStorage so a returning
 // visitor isn't shown the card on every load.
 const ONBOARDING_STORAGE_KEY = 'social-onboarding-done-v1'
+const CIRCLE_CREATION_DEFAULTS_KEY = 'hackathon-board:circle-creation-defaults:v1'
+
+type CircleCreationDefaults = {
+  fillMode: CircleFillMode
+  shapeType: ShapeType
+  sides: number
+  amplitude: number
+}
+
+const DEFAULT_CIRCLE_CREATION_DEFAULTS: CircleCreationDefaults = {
+  fillMode: 'transparent',
+  shapeType: 'circle',
+  sides: 25,
+  amplitude: 0,
+}
+
+function normalizeCircleCreationDefaults(value: Partial<CircleCreationDefaults> | null | undefined): CircleCreationDefaults {
+  const fillMode = value?.fillMode === 'solid' ? 'solid' : 'transparent'
+  const sides = Math.round(clamp(Number(value?.sides ?? DEFAULT_CIRCLE_CREATION_DEFAULTS.sides), 5, 25))
+  const amplitude = clamp(Number(value?.amplitude ?? DEFAULT_CIRCLE_CREATION_DEFAULTS.amplitude), 0, 28)
+  const shapeType: ShapeType =
+    value?.shapeType === 'polygon'
+      ? 'polygon'
+      : value?.shapeType === 'wavy'
+        ? 'wavy'
+        : amplitude > 0
+          ? 'wavy'
+          : sides >= 25
+            ? 'circle'
+            : 'polygon'
+
+  return {
+    fillMode,
+    shapeType,
+    sides: shapeType === 'circle' ? 25 : sides,
+    amplitude: shapeType === 'circle' ? 0 : amplitude,
+  }
+}
+
+function loadCircleCreationDefaults(): CircleCreationDefaults {
+  try {
+    const raw = window.localStorage.getItem(CIRCLE_CREATION_DEFAULTS_KEY)
+    return normalizeCircleCreationDefaults(raw ? JSON.parse(raw) : null)
+  } catch {
+    return DEFAULT_CIRCLE_CREATION_DEFAULTS
+  }
+}
+
+function saveCircleCreationDefaults(defaults: CircleCreationDefaults) {
+  try {
+    window.localStorage.setItem(CIRCLE_CREATION_DEFAULTS_KEY, JSON.stringify(defaults))
+  } catch {
+    // ignore
+  }
+}
 
 function hasSeenOnboarding(): boolean {
   try {
@@ -675,6 +731,7 @@ function App() {
   const [showPersonLabels, setShowPersonLabels] = useState(true)
   const [circleShapeMode, setCircleShapeMode] = useState<CircleShapeMode>('circles')
   const [circleFillMode, setCircleFillMode] = useState<CircleFillMode>('transparent')
+  const [circleCreationDefaults, setCircleCreationDefaultsState] = useState(loadCircleCreationDefaults)
   const [centerBehavior, setCenterBehavior] = useState<'connect' | 'move'>('connect')
   const [hoveredConnId, setHoveredConnId] = useState<string | null>(null)
   const [openNotesPersonId, setOpenNotesPersonId] = useState<string | null>(null)
@@ -1019,6 +1076,24 @@ function App() {
     updateCircleStyle(circleId, { customColor: hsvToHex(hsv) })
   }
 
+  function updateCircleCreationDefaults(updates: Partial<CircleCreationDefaults>) {
+    setCircleCreationDefaultsState((current) => {
+      const next = normalizeCircleCreationDefaults({ ...current, ...updates })
+      saveCircleCreationDefaults(next)
+      return next
+    })
+  }
+
+  function updateCircleStyleAndCreationDefaults(id: string, updates: Partial<CircleNode>) {
+    updateCircleStyle(id, updates)
+    const defaultUpdates: Partial<CircleCreationDefaults> = {}
+    if (updates.fillMode) defaultUpdates.fillMode = updates.fillMode
+    if (updates.shapeType) defaultUpdates.shapeType = updates.shapeType
+    if (typeof updates.sides === 'number') defaultUpdates.sides = updates.sides
+    if (typeof updates.amplitude === 'number') defaultUpdates.amplitude = updates.amplitude
+    if (Object.keys(defaultUpdates).length > 0) updateCircleCreationDefaults(defaultUpdates)
+  }
+
   function handleColorWheelPointer(event: ReactPointerEvent<HTMLButtonElement>, circle: CircleNode) {
     event.preventDefault()
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -1093,11 +1168,12 @@ function App() {
     const amplitude = circle.amplitude ?? 0
     const fromShapeType = circle.shapeType ?? (amplitude > 0 ? 'wavy' : fromSides >= 25 ? 'circle' : 'polygon')
     const toShapeType = amplitude > 0 ? 'wavy' : sides >= 25 ? 'circle' : 'polygon'
-    updateCircleStyle(circle.id, {
+    const updates: Partial<CircleNode> = {
       shapeType: toShapeType,
       sides,
       amplitude,
-    })
+    }
+    updateCircleStyleAndCreationDefaults(circle.id, updates)
     // Morph the shape smoothly over a snappy 250ms interval.
     if (fromSides !== sides) {
       startBoardAnim('morph:' + circle.id, 250, {
@@ -1116,11 +1192,12 @@ function App() {
     const fromAmplitude = circle.amplitude ?? 0
     const fromShapeType = circle.shapeType ?? (fromAmplitude > 0 ? 'wavy' : sides >= 25 ? 'circle' : 'polygon')
     const toShapeType = amplitude > 0 ? 'wavy' : sides >= 25 ? 'circle' : 'polygon'
-    updateCircleStyle(circle.id, {
+    const updates: Partial<CircleNode> = {
       shapeType: toShapeType,
       sides,
       amplitude,
-    })
+    }
+    updateCircleStyleAndCreationDefaults(circle.id, updates)
     // Only schedule a morph animation for significant jumps (e.g. tapping the track).
     // Continuous drag steps update statically in real-time.
     if (Math.abs(amplitude - fromAmplitude) > 1.5) {
@@ -2610,9 +2687,10 @@ function App() {
         parentId: parentCircleId,
         connectedTo: parentCircleId,
         tone: 'violet' as const,
-        shapeType: 'circle' as const,
-        sides: 25,
-        amplitude: 0,
+        fillMode: circleCreationDefaults.fillMode,
+        shapeType: circleCreationDefaults.shapeType,
+        sides: circleCreationDefaults.sides,
+        amplitude: circleCreationDefaults.amplitude,
       }
 
       const nextCircles = current.circles.map((c) =>
@@ -2735,9 +2813,10 @@ function App() {
             parentId: isNested ? source.id : null,
             connectedTo: source.id,
             tone: isNested ? 'violet' : nextTone(current.circles.length),
-            shapeType: 'circle',
-            sides: 25,
-            amplitude: 0,
+            fillMode: circleCreationDefaults.fillMode,
+            shapeType: circleCreationDefaults.shapeType,
+            sides: circleCreationDefaults.sides,
+            amplitude: circleCreationDefaults.amplitude,
           },
         ],
       })
@@ -3303,7 +3382,7 @@ function App() {
                   <button
                     type="button"
                     className={`circle-fill-toggle ${(selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'is-transparent' : 'is-solid'}`}
-                    onClick={() => updateCircleStyle(selectedCircle.id, { fillMode: (selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'solid' : 'transparent' })}
+                    onClick={() => updateCircleStyleAndCreationDefaults(selectedCircle.id, { fillMode: (selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'solid' : 'transparent' })}
                     title={(selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'Switch to solid fill' : 'Switch to transparent fill'}
                     aria-label={(selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'Switch to solid fill' : 'Switch to transparent fill'}
                   >
@@ -3319,7 +3398,7 @@ function App() {
                             type="button"
                             data-ind-key="transparent"
                             className={(selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'is-selected' : ''}
-                            onClick={() => updateCircleStyle(selectedCircle.id, { fillMode: 'transparent' })}
+                            onClick={() => updateCircleStyleAndCreationDefaults(selectedCircle.id, { fillMode: 'transparent' })}
                           >
                             Transparent
                           </button>
@@ -3327,7 +3406,7 @@ function App() {
                             type="button"
                             data-ind-key="solid"
                             className={(selectedCircle.fillMode ?? circleFillMode) === 'solid' ? 'is-selected' : ''}
-                            onClick={() => updateCircleStyle(selectedCircle.id, { fillMode: 'solid' })}
+                            onClick={() => updateCircleStyleAndCreationDefaults(selectedCircle.id, { fillMode: 'solid' })}
                           >
                             Solid
                           </button>
@@ -3395,7 +3474,7 @@ function App() {
                           />
                           <M3Slider
                             variant="plain"
-                            label={selectedCircleSides >= 25 ? 'Corners — circle' : `Corners ${selectedCircleSides}`}
+                            label={selectedCircleSides >= 25 ? 'Edges — circle' : `Edges ${selectedCircleSides}`}
                             min={5}
                             max={25}
                             value={selectedCircleSides}

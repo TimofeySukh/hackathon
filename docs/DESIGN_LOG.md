@@ -17,6 +17,16 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-15 — Persist Circle Shape and Fill Defaults
+
+- Decision: the quick circle style popover remains the source for per-circle shape
+  controls, but fill, Wavyness, and Edges now also persist to `localStorage` as defaults
+  for newly created circles. Color is intentionally excluded from the defaults so new
+  circles keep the automatic tone assignment.
+- Why: a user who likes a particular circle shape should not have to repeat it for every
+  new circle, while keeping color automatic prevents new circles from all blending into
+  the same category.
+
 ### 2026-06-15 — Search and Person Inspector M3 Interaction Pass
 
 - Decision: search results now behave like an M3 suggestion menu: animated surface
@@ -51,7 +61,7 @@ rediscover, write it here.
 
 ### 2026-06-15 — M3 sliders (incl. wavy slider) + corrected connected-group press
 
-- Decision: added a reusable `M3Slider` (`src/components/M3Slider.tsx`) — the canonical slider for the app (thick track, vertical pill handle, gap each side). Its `variant="wave"` draws the active track as a sine wave whose amplitude grows with the value (M3 Expressive wavy slider). Used it in the circle picker: replaced the two bottom rows of color presets (24 presets → top row of 8 kept) with two sliders — **Wavyness** (wave variant → circle amplitude) and **Corners** (plain → sides). The Wavyness slider's wave mirrors exactly what it controls. Removed the old hidden native `input[type=range]` shape controls.
+- Decision: added a reusable `M3Slider` (`src/components/M3Slider.tsx`) — the canonical slider for the app (thick track, vertical pill handle, gap each side). Its `variant="wave"` draws the active track as a sine wave whose amplitude grows with the value (M3 Expressive wavy slider). Used it in the circle picker: replaced the two bottom rows of color presets (24 presets → top row of 8 kept) with two sliders — **Wavyness** (wave variant → circle amplitude) and **Edges** (plain → sides). The Wavyness slider's wave mirrors exactly what it controls. Removed the old hidden native `input[type=range]` shape controls.
 - Corrected the connected-group press (from the earlier same-day entry): it is **not** "pressed grows, all others shrink". Per M3, only the **immediate neighbours** react and each recoils *away* from the pressed item. Implemented with adjacency combinators: `.item:has(+ .item:active)` (left neighbour → `translateX(-5px)`), `.item:active + .item` (right neighbour → `translateX(5px)`), pressed `scale(1.12)`, all on `--md-ease-spring`. Round items translate away; rectangular group buttons should instead `scaleX` anchored on their far side (far edge + height fixed, near edge pushes away). Adjacency only works in a single row — which is why presets were reduced to one row.
 - Why: the user pointed out the real Google behaviour (neighbours deform, asymmetrically, not the whole group) and asked to surface circle-shape controls as proper Material sliders, with the wave amount integrated into the slider itself.
 
