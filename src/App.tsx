@@ -3268,8 +3268,11 @@ function App() {
                   </div>
                   <button
                     type="button"
-                    className={`circle-fill-toggle ${(selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'is-transparent' : 'is-solid'}`}
-                    onClick={() => updateCircleStyle(selectedCircle.id, { fillMode: (selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'solid' : 'transparent' })}
+                    className={`circle-fill-toggle ${(selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'is-transparent' : 'is-solid'} ${pressingSwatchId === 'toggle-fill' ? 'is-pressing' : ''} ${returningSwatchId === 'toggle-fill' ? 'is-returning' : ''}`}
+                    onPointerDown={() => handleSwatchPointerDown('toggle-fill', () => updateCircleStyle(selectedCircle.id, { fillMode: (selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'solid' : 'transparent' }))}
+                    onPointerUp={() => handleSwatchPointerUp('toggle-fill')}
+                    onPointerLeave={() => handleSwatchPointerUp('toggle-fill')}
+                    onPointerCancel={() => handleSwatchPointerUp('toggle-fill')}
                     title={(selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'Switch to solid fill' : 'Switch to transparent fill'}
                     aria-label={(selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'Switch to solid fill' : 'Switch to transparent fill'}
                   >

@@ -21,6 +21,8 @@ rediscover, write it here.
 
 - Decision: restored the `Solid / Transparent` segmented theme tabs to the original sliding pill capsule container utilizing the `SelectionIndicator` component (pill variant). Unselected tabs now have a hover overlay (`background: color-mix(...)`) to indicate interactivity.
 - Decision: implemented bouncy, asymmetric spring-back keyframe animations (`@keyframes swatchSpringBack`, `@keyframes swatchNeighborLeftSpringBack`, and `@keyframes swatchNeighborRightSpringBack`) with decaying wobbles over a 350ms duration when `.is-returning` is active. This replaces the linear return transitions, introducing organic motion physics to the color swatches and preset buttons.
+- Decision: added transitions on `left`/`top` properties to the color picker thumb and brightness slider thumb (`var(--md-dur-medium)` + `var(--md-ease-spring)`), enabling them to glide and overshoot slightly when landing on new coordinates from preset selects. Drag responsiveness is kept instant (zero latency) by overriding transitions to `none` during active pointer interaction (`:active`).
+- Decision: wired the transparency toggle button (`.circle-fill-toggle`) into the same pointer-down/pointer-up hooks and `.is-pressing` / `.is-returning` CSS classes as the color swatches. The button now squashes horizontally on press down and plays a spring-back wobbly keyframe animation on release, matching the tactile physical behavior of neighboring swatch buttons.
 
 ### 2026-06-15 — Fixed shape morphing animation & incorrect corners at waviness 0
 
