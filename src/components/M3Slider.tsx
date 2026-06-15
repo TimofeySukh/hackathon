@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 
 /**
@@ -9,6 +9,11 @@ import type { PointerEvent as ReactPointerEvent } from 'react'
  * `variant="wave"` renders the active portion of the track as a sine wave whose
  * amplitude grows with the value (M3 Expressive wavy slider). Use it when the
  * value *is* a wave amount, so the control visualises what it changes.
+ *
+ * Motion: a tap on the track makes the handle (and the active fill/wave) *glide*
+ * to the tapped spot via a short spring tween instead of teleporting. Dragging
+ * is instant (zero latency) — the glide is disabled on the first pointer move.
+ * External value changes glide too. Honors prefers-reduced-motion.
  */
 export function M3Slider({
   value,
@@ -40,22 +45,98 @@ export function M3Slider({
     return () => ro.disconnect()
   }, [])
 
-  const [localFrac, setLocalFrac] = useState<number | null>(null)
-  const [isDragging, setIsDragging] = useState(false)
+  const targetFrac = max > min ? (value - min) / (max - min) : 0
 
-  const frac = max > min ? (value - min) / (max - min) : 0
-  const activeFrac = isDragging && localFrac !== null ? localFrac : frac
+  // Fraction actually rendered. Tweened toward the target on tap / external
+  // change; set instantly while dragging.
+  const [renderFrac, setRenderFrac] = useState(targetFrac)
+  const renderRef = useRef(targetFrac)
+  const rafRef = useRef<number | null>(null)
+  const draggingRef = useRef(false)
+  // Position of the pointer when it was pressed down. We only cancel the glide
+  // animation and switch to instant drag mode after the pointer has moved >=5 px
+  // from this point. Without a threshold, pointermove fires on the same frame as
+  // pointerdown (for any mouse jitter) and kills the animation before it starts.
+  const downPosRef = useRef<{ x: number; moved: boolean } | null>(null)
+  const selfChangeRef = useRef(false)
 
-  function setFromClientX(clientX: number) {
+  function prefersReducedMotion() {
+    return (
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    )
+  }
+
+  function setRender(f: number) {
+    renderRef.current = f
+    setRenderFrac(f)
+  }
+
+  function cancelAnim() {
+    if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
+    rafRef.current = null
+  }
+
+  // Short, decelerating spring-ish glide (no overshoot, so it can't visually
+  // pass the tapped point on a single-direction value control).
+  function animateTo(target: number) {
+    cancelAnim()
+    if (prefersReducedMotion()) {
+      setRender(target)
+      return
+    }
+    const start = renderRef.current
+    const t0 = performance.now()
+    const dur = 200
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - t0) / dur)
+      const eased = 1 - Math.pow(1 - p, 3)
+      setRender(start + (target - start) * eased)
+      if (p < 1) {
+        rafRef.current = requestAnimationFrame(tick)
+      } else {
+        rafRef.current = null
+      }
+    }
+    rafRef.current = requestAnimationFrame(tick)
+  }
+
+  // External value changes glide; our own pointer-driven changes are handled in
+  // the pointer handlers (skip here to avoid fighting them).
+  useEffect(() => {
+    if (selfChangeRef.current) {
+      selfChangeRef.current = false
+      return
+    }
+    if (draggingRef.current) {
+      setRender(targetFrac)
+      return
+    }
+    if (Math.abs(targetFrac - renderRef.current) < 0.0005) return
+    animateTo(targetFrac)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetFrac])
+
+  useEffect(() => () => cancelAnim(), [])
+
+  function fracFromClientX(clientX: number) {
     const el = trackRef.current
-    if (!el) return
+    if (!el) return renderRef.current
     const r = el.getBoundingClientRect()
-    let f = (clientX - r.left) / r.width
-    f = Math.max(0, Math.min(1, f))
-    setLocalFrac(f)
+    const f = (clientX - r.left) / r.width
+    return Math.max(0, Math.min(1, f))
+  }
+
+  // Commit a fraction as a stepped value and return the stepped fraction so the
+  // handle sits exactly on the committed value.
+  function commit(f: number) {
     let v = min + f * (max - min)
     v = Math.round(v / step) * step
-    onChange(Math.max(min, Math.min(max, v)))
+    v = Math.max(min, Math.min(max, v))
+    selfChangeRef.current = true
+    onChange(v)
+    return max > min ? (v - min) / (max - min) : 0
   }
 
   function onPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
@@ -64,21 +145,29 @@ export function M3Slider({
     } catch {
       // Pointer may already be gone (or synthetic); capture is best-effort.
     }
-    setIsDragging(true)
-    setFromClientX(event.clientX)
+    draggingRef.current = true
+    downPosRef.current = { x: event.clientX, moved: false }
+    animateTo(commit(fracFromClientX(event.clientX))) // glide to the tapped spot
   }
 
   function onPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
-    if (isDragging || event.buttons === 1) {
-      setFromClientX(event.clientX)
+    if (!draggingRef.current && event.buttons !== 1) return
+    const down = downPosRef.current
+    if (down && !down.moved) {
+      // Stay in glide mode until the pointer moves at least 5 px horizontally.
+      if (Math.abs(event.clientX - down.x) < 5) return
+      down.moved = true
+      cancelAnim() // threshold crossed → drop the glide, track instantly
     }
+    setRender(commit(fracFromClientX(event.clientX)))
   }
 
   function onPointerUpOrCancel() {
-    setIsDragging(false)
-    setLocalFrac(null)
+    draggingRef.current = false
+    downPosRef.current = null
   }
 
+  const activeFrac = renderFrac
   const H = 28
   const mid = H / 2
   const gap = 6
