@@ -621,6 +621,14 @@ function App() {
   const [selectedItem, setSelectedItem] = useState<SelectedItem>(null)
   const [showCircleDropdown, setShowCircleDropdown] = useState(false)
   const [showCircleStylePanel, setShowCircleStylePanel] = useState(false)
+  // Which color picker is being actively dragged (vs tapped). A tap glides the
+  // thumb to the point; an active drag tracks the pointer with no latency.
+  const [pickerDragging, setPickerDragging] = useState<'wheel' | 'brightness' | null>(null)
+  // Pointer-down position for each picker — used to enforce a min-distance
+  // threshold before switching from "tap glide" mode to "instant drag" mode.
+  // Without this, pointermove fires immediately for any mouse movement,
+  // stripping the CSS transition before the thumb has a chance to animate.
+  const pickerDownRef = useRef<{ x: number; y: number; moved: boolean } | null>(null)
   const [selectedPeopleIds, setSelectedPeopleIds] = useState<string[]>([])
   const [selectedCircleIds, setSelectedCircleIds] = useState<string[]>([])
   const [hoveredPersonId, setHoveredPersonId] = useState<string | null>(null)
@@ -1094,9 +1102,17 @@ function App() {
     if (Object.keys(defaultUpdates).length > 0) updateCircleCreationDefaults(defaultUpdates)
   }
 
-  function handleColorWheelPointer(event: ReactPointerEvent<HTMLButtonElement>, circle: CircleNode) {
+  // Minimum pointer movement (px) before a tap is promoted to a drag.
+  // Below this threshold the CSS transition stays active so the thumb glides
+  // to the tapped spot.  Above it we drop the transition for zero-latency tracking.
+  const PICKER_DRAG_THRESHOLD = 5
+
+  function handleColorWheelPointerDown(event: ReactPointerEvent<HTMLButtonElement>, circle: CircleNode) {
     event.preventDefault()
-    event.currentTarget.setPointerCapture(event.pointerId)
+    try { event.currentTarget.setPointerCapture(event.pointerId) } catch { /* best-effort */ }
+    // Record the down position; reset moved flag so the glide can fire.
+    pickerDownRef.current = { x: event.clientX, y: event.clientY, moved: false }
+    setPickerDragging(null) // ensure transition is active for the coming glide
     const rect = event.currentTarget.getBoundingClientRect()
     const centerX = rect.left + rect.width / 2
     const centerY = rect.top + rect.height / 2
@@ -1107,23 +1123,61 @@ function App() {
     const current = hexToHsv(getCircleColors(circle).centerBg)
     const angle = Math.atan2(dy, dx)
     const hue = (angle * 180) / Math.PI + 180
-    setCircleColorFromHsv(circle.id, {
-      h: hue,
-      s: distance / radius,
-      v: current.v,
-    })
+    setCircleColorFromHsv(circle.id, { h: hue, s: distance / radius, v: current.v })
   }
 
-  function handleBrightnessPointer(event: ReactPointerEvent<HTMLButtonElement>, circle: CircleNode) {
+  function handleColorWheelPointerMove(event: ReactPointerEvent<HTMLButtonElement>, circle: CircleNode) {
+    if (event.buttons !== 1 || !pickerDownRef.current) return
+    const down = pickerDownRef.current
+    // Promote to drag only after crossing the threshold distance.
+    if (!down.moved) {
+      const dist = Math.hypot(event.clientX - down.x, event.clientY - down.y)
+      if (dist < PICKER_DRAG_THRESHOLD) return // still within tap zone — let the glide play
+      down.moved = true
+      setPickerDragging('wheel') // drop transition; track instantly from here
+    }
+    const rect = event.currentTarget.getBoundingClientRect()
+    const centerX = rect.left + rect.width / 2
+    const centerY = rect.top + rect.height / 2
+    const dx = event.clientX - centerX
+    const dy = event.clientY - centerY
+    const radius = Math.max(1, Math.min(rect.width, rect.height) / 2)
+    const distance = Math.min(radius, Math.hypot(dx, dy))
+    const current = hexToHsv(getCircleColors(circle).centerBg)
+    const angle = Math.atan2(dy, dx)
+    const hue = (angle * 180) / Math.PI + 180
+    setCircleColorFromHsv(circle.id, { h: hue, s: distance / radius, v: current.v })
+  }
+
+  function handleBrightnessPointerDown(event: ReactPointerEvent<HTMLButtonElement>, circle: CircleNode) {
     event.preventDefault()
-    event.currentTarget.setPointerCapture(event.pointerId)
+    try { event.currentTarget.setPointerCapture(event.pointerId) } catch { /* best-effort */ }
+    pickerDownRef.current = { x: event.clientX, y: event.clientY, moved: false }
+    setPickerDragging(null)
     const rect = event.currentTarget.getBoundingClientRect()
     const x = clamp((event.clientX - rect.left) / rect.width, 0, 1)
     const current = hexToHsv(getCircleColors(circle).centerBg)
-    setCircleColorFromHsv(circle.id, {
-      ...current,
-      v: x,
-    })
+    setCircleColorFromHsv(circle.id, { ...current, v: x })
+  }
+
+  function handleBrightnessPointerMove(event: ReactPointerEvent<HTMLButtonElement>, circle: CircleNode) {
+    if (event.buttons !== 1 || !pickerDownRef.current) return
+    const down = pickerDownRef.current
+    if (!down.moved) {
+      const dist = Math.hypot(event.clientX - down.x, event.clientY - down.y)
+      if (dist < PICKER_DRAG_THRESHOLD) return
+      down.moved = true
+      setPickerDragging('brightness')
+    }
+    const rect = event.currentTarget.getBoundingClientRect()
+    const x = clamp((event.clientX - rect.left) / rect.width, 0, 1)
+    const current = hexToHsv(getCircleColors(circle).centerBg)
+    setCircleColorFromHsv(circle.id, { ...current, v: x })
+  }
+
+  function handlePickerPointerUp() {
+    pickerDownRef.current = null
+    setPickerDragging(null)
   }
 
   function handleSwatchPointerDown(id: string, action: () => void) {
@@ -3414,31 +3468,33 @@ function App() {
                           </div>
                           <button
                             type="button"
-                            className="color-wheel"
+                            className={`color-wheel ${pickerDragging === 'wheel' ? 'is-dragging' : ''}`}
                             style={{
                               '--wheel-color': selectedCircleColors.centerBg,
                               '--wheel-x': `${50 + Math.cos((selectedCircleHsv.h - 180) * Math.PI / 180) * selectedCircleHsv.s * 50}%`,
                               '--wheel-y': `${50 + Math.sin((selectedCircleHsv.h - 180) * Math.PI / 180) * selectedCircleHsv.s * 50}%`,
                             } as CSSProperties}
-                            onPointerDown={(event) => handleColorWheelPointer(event, selectedCircle)}
-                            onPointerMove={(event) => {
-                              if (event.buttons === 1) handleColorWheelPointer(event, selectedCircle)
-                            }}
+                            onPointerDown={(event) => handleColorWheelPointerDown(event, selectedCircle)}
+                            onPointerMove={(event) => handleColorWheelPointerMove(event, selectedCircle)}
+                            onPointerUp={handlePickerPointerUp}
+                            onPointerCancel={handlePickerPointerUp}
+                            onLostPointerCapture={handlePickerPointerUp}
                             aria-label="Pick circle color"
                           >
                             <span className="color-wheel__thumb" />
                           </button>
                           <button
                             type="button"
-                            className="brightness-slider"
+                            className={`brightness-slider ${pickerDragging === 'brightness' ? 'is-dragging' : ''}`}
                             style={{
                               '--brightness-color': hsvToHex({ ...selectedCircleHsv, v: 1 }),
                               '--brightness-pos': `${selectedCircleHsv.v * 100}%`,
                             } as CSSProperties}
-                            onPointerDown={(event) => handleBrightnessPointer(event, selectedCircle)}
-                            onPointerMove={(event) => {
-                              if (event.buttons === 1) handleBrightnessPointer(event, selectedCircle)
-                            }}
+                            onPointerDown={(event) => handleBrightnessPointerDown(event, selectedCircle)}
+                            onPointerMove={(event) => handleBrightnessPointerMove(event, selectedCircle)}
+                            onPointerUp={handlePickerPointerUp}
+                            onPointerCancel={handlePickerPointerUp}
+                            onLostPointerCapture={handlePickerPointerUp}
                             aria-label="Pick color brightness"
                           >
                             <span className="brightness-slider__thumb" />
