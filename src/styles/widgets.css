@@ -242,24 +242,25 @@
   cursor: pointer;
   padding: 0;
   transition:
-    border-radius var(--md-dur-medium) var(--md-ease-spring),
-    transform var(--md-dur-medium) var(--md-ease-spring);
+    border-radius 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* Connected button-group press (M3 Expressive): the pressed swatch grows and
    springs back; only its *immediate* neighbours react, each recoiling *away*
    from the pressed one (left neighbour shifts left, right neighbour shifts
-   right) — the row behaves like one elastic group, not every item at once. */
+   right) — the row behaves like one elastic group, not every item at once.
+   We also squash the active item and stretch/compress neighbours horizontally. */
 .quick-circle-color:active {
-  transform: scale(1.12);
+  transform: scaleX(1.18) scaleY(0.92);
 }
 
 .quick-circle-color:has(+ .quick-circle-color:active) {
-  transform: translateX(-5px);
+  transform: translateX(-7px) scaleX(0.85) scaleY(1.05);
 }
 
 .quick-circle-color:active + .quick-circle-color {
-  transform: translateX(5px);
+  transform: translateX(7px) scaleX(0.85) scaleY(1.05);
 }
 
 /* The selected color morphs from a circle to a rounded square (M3 shape morph),
@@ -532,22 +533,22 @@
   border: 1px solid rgba(0, 0, 0, 0.16);
   cursor: pointer;
   transition:
-    border-radius var(--md-dur-medium) var(--md-ease-spring),
-    transform var(--md-dur-medium) var(--md-ease-spring);
+    border-radius 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* Same connected-group press as the quick swatches: only immediate neighbours
-   recoil away from the pressed preset. */
+   recoil away from the pressed preset, with squash/stretch deformation. */
 .circle-style-preset:active {
-  transform: scale(1.15);
+  transform: scaleX(1.18) scaleY(0.92);
 }
 
 .circle-style-preset:has(+ .circle-style-preset:active) {
-  transform: translateX(-5px);
+  transform: translateX(-7px) scaleX(0.85) scaleY(1.05);
 }
 
 .circle-style-preset:active + .circle-style-preset {
-  transform: translateX(5px);
+  transform: translateX(7px) scaleX(0.85) scaleY(1.05);
 }
 
 /* Selected preset morphs circle -> rounded square (M3 shape morph). */
