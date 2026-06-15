@@ -15,6 +15,13 @@ not thousands of per-contact database writes.
 - LinkedIn ZIP import reads `Connections.csv` from the uploaded archive.
 - The import groups people by company, creates missing company circles, and adds new
   people under those circles.
+- Imported nodes are placed **non-overlapping up front** so the O(n²) collision relaxer
+  never has to untangle a pile-up: people are sunflower-packed inside their company
+  (`personPackOffset`), each company circle is sized to its member count
+  (`packedCircleRadius`), and company circles are packed into compact concentric rings
+  around `you` (`packCirclesInRings`). Above `IMPORT_LAYOUT_LIMIT` nodes the global
+  containment relax is skipped because the layout is already clean. See the 2026-06-15
+  "Bulk import lays out non-overlapping" entry in `../DESIGN_LOG.md`.
 - Large imports are processed in chunks that yield back to the browser between batches,
   so the settings panel can repaint and the event loop is not blocked for the whole import.
 - The import button is disabled while a ZIP import is running and shows `Importing...`.

@@ -156,7 +156,7 @@ async function main() {
       Object.assign(window, { __importResponsivenessMonitor: monitor })
     })
 
-    await page.getByLabel('Settings').click()
+    await page.getByLabel('Settings', { exact: true }).click()
 
     const dialogPromise = page.waitForEvent('dialog', { timeout: 60000 })
     const startedAt = performance.now()

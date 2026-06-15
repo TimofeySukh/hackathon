@@ -48,7 +48,9 @@ import {
   CONNECT_THRESHOLD,
   PERSON_CONTAINMENT_RADIUS,
   CIRCLE_CONTAINMENT_PADDING,
+  CIRCLE_COLLISION_GAP,
   MERGE_LAYOUT_LIMIT,
+  IMPORT_LAYOUT_LIMIT,
   MATERIAL_TONES,
   CIRCLE_COLOR_PRESETS,
   LINK_SERVICE_OPTIONS,
@@ -61,6 +63,9 @@ import {
   createFreshGraph,
   findFreeSpaceInCircle,
   getDescendantCircleIds,
+  personPackOffset,
+  packedCircleRadius,
+  packCirclesInRings,
 } from './lib/board/layout'
 import { createBoardIndex, hitTestBoard, readAnimFrame, drawBoardLayer, setBoardRepaintCallback } from './lib/board/render'
 import { makeInitials } from './lib/board/text'
@@ -4398,32 +4403,63 @@ async function buildLinkedInConnectionsGraph(
   const nextCircles = [...current.circles]
   const nextPeople = [...current.people]
   const existingPersonIds = new Set(nextPeople.map((person) => person.id))
-  const youCircle = nextCircles.find((circle) => circle.id === 'you')
+  const circlesById = new Map(nextCircles.map((circle) => [circle.id, circle]))
+  const youCircle = circlesById.get('you')
   const youX = youCircle ? youCircle.x : 0
   const youY = youCircle ? youCircle.y : 0
-  const totalCompanies = Math.max(1, companyGroups.size)
-  let companyIndex = 0
   let importedPeople = 0
   let importedCompanies = 0
 
+  // Plan every company up front: its id, whether it already exists, and the radius
+  // it needs to hold its members (sunflower-packed). New companies are then placed
+  // in compact, non-overlapping concentric rings around "you" so the O(n^2)
+  // collision relaxer never has to untangle an import pile-up.
+  type PlannedCompany = { id: string; name: string; members: string[][]; radius: number }
+  const planned: PlannedCompany[] = []
   for (const [companyName, members] of companyGroups) {
     const cleanCompName = companyName ? companyName : 'No Company'
     const companyId = `linkedin-company-${slugifyId(cleanCompName)}`
+    const existing = circlesById.get(companyId)
+    planned.push({
+      id: companyId,
+      name: cleanCompName,
+      members,
+      radius: existing ? existing.radius : packedCircleRadius(members.length),
+    })
+  }
 
-    let companyCircle = nextCircles.find((circle) => circle.id === companyId)
+  // Pack new companies outside the farthest existing top-level circle so we never
+  // land on top of content already on the board (e.g. on a re-import).
+  let startRadius = youCircle ? youCircle.radius : 104
+  for (const circle of nextCircles) {
+    if (circle.id === 'you' || circle.parentId != null) continue
+    startRadius = Math.max(startRadius, Math.hypot(circle.x - youX, circle.y - youY) + circle.radius)
+  }
+  const companyPositions = packCirclesInRings(
+    planned.filter((company) => !circlesById.has(company.id)).map((company) => ({ id: company.id, radius: company.radius })),
+    youX,
+    youY,
+    CIRCLE_COLLISION_GAP + 24,
+    startRadius,
+  )
+
+  // Sunflower slot per circle, so re-imports keep packing past existing members.
+  const slotByCircle = new Map<string, number>()
+  for (const person of nextPeople) slotByCircle.set(person.circleId, (slotByCircle.get(person.circleId) ?? 0) + 1)
+
+  let processedCompanies = 0
+  for (const company of planned) {
+    let companyCircle = circlesById.get(company.id)
     if (!companyCircle) {
-      const angle = (companyIndex / totalCompanies) * 2 * Math.PI
-      const placementRadius = 680
-      const icon = makeInitials(cleanCompName)
-
+      const pos = companyPositions.get(company.id) ?? { x: youX, y: youY }
       companyCircle = {
-        id: companyId,
-        name: cleanCompName,
-        icon,
-        x: youX + Math.cos(angle) * placementRadius,
-        y: youY + Math.sin(angle) * placementRadius,
-        radius: 90,
-        minRadius: 90,
+        id: company.id,
+        name: company.name,
+        icon: makeInitials(company.name),
+        x: pos.x,
+        y: pos.y,
+        radius: company.radius,
+        minRadius: company.radius,
         parentId: null,
         connectedTo: 'you',
         tone: nextTone(nextCircles.length),
@@ -4432,28 +4468,25 @@ async function buildLinkedInConnectionsGraph(
         amplitude: 8,
       }
       nextCircles.push(companyCircle)
+      circlesById.set(companyCircle.id, companyCircle)
       importedCompanies += 1
     }
-    companyIndex += 1
 
-    let personIndex = 0
-    for (const memberRow of members) {
+    let slot = slotByCircle.get(companyCircle.id) ?? 0
+    for (const memberRow of company.members) {
       const firstName = memberRow[importHeaders.firstNameIdx] || ''
       const lastName = memberRow[importHeaders.lastNameIdx] || ''
       const name = `${firstName} ${lastName}`.trim()
       if (!name) continue
 
       const personId = `linkedin-person-${slugifyId(name)}`
-      if (existingPersonIds.has(personId)) {
-        personIndex += 1
-        continue
-      }
+      if (existingPersonIds.has(personId)) continue
 
       const position = importHeaders.positionIdx !== -1 ? memberRow[importHeaders.positionIdx] || '' : ''
       const url = importHeaders.urlIdx !== -1 ? memberRow[importHeaders.urlIdx] || '' : ''
       const email = importHeaders.emailIdx !== -1 ? memberRow[importHeaders.emailIdx] || '' : ''
       const connectedOn = importHeaders.connectedOnIdx !== -1 ? memberRow[importHeaders.connectedOnIdx] || '' : ''
-      const pAngle = (personIndex / members.length) * 2 * Math.PI
+      const offset = personPackOffset(slot)
       const notesList: PersonNote[] = []
 
       if (position) {
@@ -4491,8 +4524,8 @@ async function buildLinkedInConnectionsGraph(
         id: personId,
         name,
         role: position || 'Connection',
-        x: companyCircle.x + Math.cos(pAngle) * 35,
-        y: companyCircle.y + Math.sin(pAngle) * 35,
+        x: companyCircle.x + offset.x,
+        y: companyCircle.y + offset.y,
         circleId: companyCircle.id,
         avatar: makeInitials(name),
         shapeType: 'circle',
@@ -4504,22 +4537,26 @@ async function buildLinkedInConnectionsGraph(
 
       existingPersonIds.add(personId)
       importedPeople += 1
-      personIndex += 1
+      slot += 1
 
       if (importedPeople > 0 && importedPeople % 250 === 0) {
         await yieldToBrowser()
       }
     }
+    slotByCircle.set(companyCircle.id, slot)
+
+    processedCompanies += 1
+    if (processedCompanies % 50 === 0) await yieldToBrowser()
   }
 
   await yieldToBrowser()
 
+  // The import builds a non-overlapping layout, so the O(n^2) containment relax is
+  // pure cost on a large graph (it would re-freeze the tab). Run it only for small
+  // imports, where it cheaply tidies any edge cases; trust the packing above it.
+  const built = { ...current, circles: nextCircles, people: nextPeople }
   return {
-    graph: ensureContainment({
-      ...current,
-      circles: nextCircles,
-      people: nextPeople,
-    }),
+    graph: nextCircles.length + nextPeople.length > IMPORT_LAYOUT_LIMIT ? built : ensureContainment(built),
     importedPeople,
     importedCompanies,
   }

@@ -27,6 +27,17 @@ export const PERSON_CIRCLE_COLLISION_GAP = 8
 export const CIRCLE_COLLISION_GAP = 4
 export const COLLISION_PASSES = 10
 
+// Sunflower (phyllotaxis) packing spacing for people laid out inside a circle on
+// import. The golden-angle spiral's minimum nearest-neighbour distance is ~1.657x
+// this (measured), so 28 keeps people at least 2*PERSON_COLLISION_RADIUS +
+// PERSON_COLLISION_GAP = 46px apart — no overlap, so the O(n^2) relaxer isn't needed.
+export const PERSON_PACK_SPACING = 28
+// Above this many imported nodes (circles + people), skip the O(n^2) containment
+// relax after a bulk import: the import builder already lays everything out
+// non-overlapping, so running the relaxer would only freeze the tab for no gain.
+// Mirrors MERGE_LAYOUT_LIMIT for the merge path.
+export const IMPORT_LAYOUT_LIMIT = 1500
+
 // Side of one spatial-hash cell (world units) used by the board index.
 export const BOARD_GRID_SIZE = 360
 

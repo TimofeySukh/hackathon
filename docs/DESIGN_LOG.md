@@ -17,6 +17,38 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-15 — Bulk import lays out non-overlapping up front (no collision-storm freeze)
+
+- Problem: importing a large LinkedIn ZIP dropped every company onto one 680px ring
+  and every person onto a fixed 35px ring around the company centre. Hundreds of
+  circles and people landed on top of each other, so the O(n²) collision relaxer
+  (`resolveCollisions` in `src/lib/board/layout.ts`) had to untangle the whole
+  pile-up — which froze the tab on import and left the board at ~1 FPS afterwards.
+- Decision: build a deterministic, **non-overlapping** layout at import time instead
+  of relying on the relaxer:
+  - **People** are placed inside their company with a sunflower / phyllotaxis packing
+    (`personPackOffset`). The golden-angle spiral's minimum nearest-neighbour distance
+    is ~1.657× the spacing constant, so `PERSON_PACK_SPACING = 28` keeps everyone ≥46px
+    apart (`2*PERSON_COLLISION_RADIUS + PERSON_COLLISION_GAP`). The inner offset puts the
+    first point at 56px so it clears the centre handle.
+  - **Company radius** is sized to its member count up front (`packedCircleRadius`) so
+    people fit without forcing the circle to grow.
+  - **Company circles** are packed into compact concentric rings around `you`
+    (`packCirclesInRings`), provably non-overlapping for variable radii, starting beyond
+    any existing top-level circle so a re-import never lands on existing content.
+  - The global `ensureContainment` (O(n²)) is **skipped above `IMPORT_LAYOUT_LIMIT`
+    (1500 nodes)** — the packed layout is already clean, so the relaxer would only
+    re-freeze the tab. Below the limit it still runs to tidy edge cases. This mirrors
+    the existing `MERGE_LAYOUT_LIMIT` pattern.
+- Verified: a geometry check on 32,665 people / 600 companies (skewed sizes, biggest
+  1,901) found zero circle overlaps, zero person overlaps, everyone inside their circle
+  and clear of the centre. `test:ui-import` at 8,000 people / 500 companies and 8,000 /
+  1 imports in ~0.4s with ≤26ms event-loop lag (was a multi-second freeze).
+- Out of scope (still O(n²), separate follow-up): the steady-state render overdraw of
+  membership edges (the "fan" from hub circles) and dragging a node on a huge graph,
+  which still calls `ensureContainment`. The shared collision core would need a spatial
+  grid to fix those.
+
 ### 2026-06-15 — Circle-style popover anchors above the palette icon; shape controls moved in
 
 - Decision: the "Customize circle" popover (`.circle-style-popover`) was `position: fixed`

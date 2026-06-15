@@ -13,6 +13,7 @@ import {
   PERSON_COLLISION_GAP,
   PERSON_COLLISION_RADIUS,
   PERSON_CONTAINMENT_RADIUS,
+  PERSON_PACK_SPACING,
 } from './constants'
 import { getSeparation } from './geometry'
 
@@ -51,6 +52,101 @@ export function createFreshGraph(): GraphState {
     people: [],
     connections: [],
   })
+}
+
+// ---------------------------------------------------------------------------
+// Deterministic non-overlapping packing for bulk import (e.g. a LinkedIn ZIP).
+//
+// The old import dropped every company onto one 680px ring and every person onto
+// a fixed 35px ring, so hundreds of nodes overlapped and the O(n^2) collision
+// relaxer had to untangle the pile-up — which froze the tab and left the board at
+// ~1 FPS. These helpers instead place everything apart up front, so no collision
+// resolution is needed.
+// ---------------------------------------------------------------------------
+
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5))
+// Innermost sunflower point sits at PERSON_PACK_SPACING * sqrt(PERSON_PACK_INNER).
+// With spacing 25 that is 50px — clear of the centre handle (24) + person (21) + gap.
+const PERSON_PACK_INNER = 4
+
+// Offset of the k-th person from its circle centre in a sunflower/phyllotaxis
+// packing. Even areal density; minimum nearest-neighbour distance ~1.657 * spacing.
+export function personPackOffset(index: number): { x: number; y: number } {
+  const r = PERSON_PACK_SPACING * Math.sqrt(index + PERSON_PACK_INNER)
+  const theta = index * GOLDEN_ANGLE
+  return { x: Math.cos(theta) * r, y: Math.sin(theta) * r }
+}
+
+// Radius a circle needs so `count` sunflower-packed people fit inside with the
+// containment margin. Floors at 90 to match the default imported-circle size.
+export function packedCircleRadius(count: number): number {
+  if (count <= 1) return 90
+  const rMax = PERSON_PACK_SPACING * Math.sqrt(count - 1 + PERSON_PACK_INNER)
+  return Math.max(90, Math.ceil(rMax + PERSON_CONTAINMENT_RADIUS))
+}
+
+// Smallest angular separation on a ring of centre-radius R whose chord spans at
+// least `dist`. Returns 2π when two such items can't share the ring (one per ring).
+function chordAngle(R: number, dist: number): number {
+  if (R <= 0) return 2 * Math.PI
+  const s = dist / (2 * R)
+  if (s >= 1) return 2 * Math.PI
+  return 2 * Math.asin(s)
+}
+
+// Pack circles of varying radius into concentric rings around (cx, cy), compactly
+// and provably without overlaps:
+//  - within a ring, neighbours are spaced by chord >= rA + rB + gap, and the ring
+//    reserves the closing step so the last and first item don't overlap either;
+//  - the largest remaining circle leads each ring, so the band width covers every
+//    member; the next band starts beyond this ring's outer extent + gap, and the
+//    worst-case (radially-aligned) centre distance between rings equals that, so
+//    cross-ring pairs can't overlap.
+// Returns a map of input id -> centre position.
+export function packCirclesInRings(
+  items: { id: string; radius: number }[],
+  cx: number,
+  cy: number,
+  gap: number,
+  startRadius: number,
+): Map<string, { x: number; y: number }> {
+  const result = new Map<string, { x: number; y: number }>()
+  const sorted = [...items].sort((a, b) => b.radius - a.radius)
+
+  let bandInner = startRadius + gap
+  let i = 0
+  while (i < sorted.length) {
+    const ringMaxR = sorted[i].radius // largest remaining leads the ring
+    const ringCenterR = bandInner + ringMaxR
+
+    const ringItems: { id: string; angle: number }[] = []
+    let firstRadius = sorted[i].radius
+    let prevRadius = 0
+    let angle = 0
+
+    while (i < sorted.length) {
+      const r = sorted[i].radius
+      const stepFromPrev = ringItems.length === 0 ? 0 : chordAngle(ringCenterR, prevRadius + r + gap)
+      const closeStep = chordAngle(ringCenterR, firstRadius + r + gap)
+      // Place the first item unconditionally; otherwise only if it fits before
+      // wrapping while still reserving room to close back to the first item.
+      if (ringItems.length > 0 && angle + stepFromPrev + closeStep > 2 * Math.PI) break
+
+      angle += stepFromPrev
+      if (ringItems.length === 0) firstRadius = r
+      ringItems.push({ id: sorted[i].id, angle })
+      prevRadius = r
+      i += 1
+    }
+
+    for (const it of ringItems) {
+      result.set(it.id, { x: cx + Math.cos(it.angle) * ringCenterR, y: cy + Math.sin(it.angle) * ringCenterR })
+    }
+
+    bandInner = ringCenterR + ringMaxR + gap
+  }
+
+  return result
 }
 
 export function findFreeSpaceInCircle(
