@@ -17,7 +17,6 @@ import LandingPage from './LandingPage'
 import { loadGraph, saveGraph, loadLocalGraph, saveLocalGraph } from './lib/graphPersistence'
 import { enrichLinkedInProfile } from './lib/linkedinEnrichment'
 import { OnboardingCoach } from './Onboarding'
-import { SelectionIndicator } from './components/SelectionIndicator'
 import { M3Slider } from './components/M3Slider'
 import { ONBOARDING_STEPS, ONBOARDING_DONE_STEP } from './onboardingSteps'
 import type { OnboardingAction } from './onboardingSteps'
@@ -3266,13 +3265,8 @@ function App() {
                     {showCircleStylePanel && (
                       <div className="circle-style-popover">
                         <div className="circle-style-theme-tabs">
-                          <SelectionIndicator
-                            variant="pill"
-                            activeKey={selectedCircle.fillMode ?? circleFillMode}
-                          />
                           <button
                             type="button"
-                            data-ind-key="transparent"
                             className={(selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'is-selected' : ''}
                             onClick={() => updateCircleStyle(selectedCircle.id, { fillMode: 'transparent' })}
                           >
@@ -3280,7 +3274,6 @@ function App() {
                           </button>
                           <button
                             type="button"
-                            data-ind-key="solid"
                             className={(selectedCircle.fillMode ?? circleFillMode) === 'solid' ? 'is-selected' : ''}
                             onClick={() => updateCircleStyle(selectedCircle.id, { fillMode: 'solid' })}
                           >
