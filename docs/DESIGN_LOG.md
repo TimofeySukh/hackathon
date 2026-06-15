@@ -17,6 +17,19 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-15 — Circles load transparent and clean by default
+
+- Decision: fresh graph circles, newly created circles, imported LinkedIn company
+  circles, and synthetic load-test circles now start as transparent clean circles
+  (`shapeType: 'circle'`, `sides: 25`, `amplitude: 0`).
+- Decision: removed persisted circle creation style defaults. Editing fill, Wavyness, or
+  Edges changes only the selected circle; it no longer makes future circles inherit that
+  shape/fill. Per-circle shape edits now record `shapeCustom`; on load, unmarked legacy
+  circle styles are normalized back to clean transparent circles so old saved defaults do
+  not reappear as flowers.
+- Why: the board should open as a quiet circle map. Figure shapes are a deliberate
+  per-circle styling choice, not the default visual language.
+
 ### 2026-06-15 — Bulk import lays out non-overlapping up front (no collision-storm freeze)
 
 - Problem: importing a large LinkedIn ZIP dropped every company onto one 680px ring

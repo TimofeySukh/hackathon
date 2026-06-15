@@ -379,44 +379,13 @@ const DEFAULT_CIRCLE_CREATION_DEFAULTS: CircleCreationDefaults = {
   amplitude: 0,
 }
 
-function normalizeCircleCreationDefaults(value: Partial<CircleCreationDefaults> | null | undefined): CircleCreationDefaults {
-  const fillMode = value?.fillMode === 'solid' ? 'solid' : 'transparent'
-  const sides = Math.round(clamp(Number(value?.sides ?? DEFAULT_CIRCLE_CREATION_DEFAULTS.sides), 5, 25))
-  const amplitude = clamp(Number(value?.amplitude ?? DEFAULT_CIRCLE_CREATION_DEFAULTS.amplitude), 0, 28)
-  const shapeType: ShapeType =
-    value?.shapeType === 'polygon'
-      ? 'polygon'
-      : value?.shapeType === 'wavy'
-        ? 'wavy'
-        : amplitude > 0
-          ? 'wavy'
-          : sides >= 25
-            ? 'circle'
-            : 'polygon'
-
-  return {
-    fillMode,
-    shapeType,
-    sides: shapeType === 'circle' ? 25 : sides,
-    amplitude: shapeType === 'circle' ? 0 : amplitude,
-  }
-}
-
 function loadCircleCreationDefaults(): CircleCreationDefaults {
   try {
-    const raw = window.localStorage.getItem(CIRCLE_CREATION_DEFAULTS_KEY)
-    return normalizeCircleCreationDefaults(raw ? JSON.parse(raw) : null)
-  } catch {
-    return DEFAULT_CIRCLE_CREATION_DEFAULTS
-  }
-}
-
-function saveCircleCreationDefaults(defaults: CircleCreationDefaults) {
-  try {
-    window.localStorage.setItem(CIRCLE_CREATION_DEFAULTS_KEY, JSON.stringify(defaults))
+    window.localStorage.removeItem(CIRCLE_CREATION_DEFAULTS_KEY)
   } catch {
     // ignore
   }
+  return DEFAULT_CIRCLE_CREATION_DEFAULTS
 }
 
 function hasSeenOnboarding(): boolean {
@@ -546,7 +515,7 @@ function App() {
     loadGraph(userId)
       .then((saved) => {
         if (cancelled) return
-        const base = saved ?? createFreshGraph()
+        const base = sanitizeDefaultCircleStyles(saved ?? createFreshGraph())
         setGraph(stampYouIdentity(base, auth.session!.user))
         setGraphLoaded(true)
       })
@@ -583,7 +552,7 @@ function App() {
     setGraphLoaded(false)
     const saved = loadLocalGraph()
     if (saved) {
-      setGraph(saved)
+      setGraph(sanitizeDefaultCircleStyles(saved))
     }
     setGraphLoaded(true)
   }, [isLocalMode])
@@ -744,7 +713,7 @@ function App() {
   const [showPersonLabels, setShowPersonLabels] = useState(true)
   const [circleShapeMode, setCircleShapeMode] = useState<CircleShapeMode>('circles')
   const [circleFillMode, setCircleFillMode] = useState<CircleFillMode>('transparent')
-  const [circleCreationDefaults, setCircleCreationDefaultsState] = useState(loadCircleCreationDefaults)
+  const [circleCreationDefaults] = useState(loadCircleCreationDefaults)
   const [centerBehavior, setCenterBehavior] = useState<'connect' | 'move'>('connect')
   const [hoveredConnId, setHoveredConnId] = useState<string | null>(null)
   const [openNotesPersonId, setOpenNotesPersonId] = useState<string | null>(null)
@@ -1089,22 +1058,8 @@ function App() {
     updateCircleStyle(circleId, { customColor: hsvToHex(hsv) })
   }
 
-  function updateCircleCreationDefaults(updates: Partial<CircleCreationDefaults>) {
-    setCircleCreationDefaultsState((current) => {
-      const next = normalizeCircleCreationDefaults({ ...current, ...updates })
-      saveCircleCreationDefaults(next)
-      return next
-    })
-  }
-
   function updateCircleStyleAndCreationDefaults(id: string, updates: Partial<CircleNode>) {
     updateCircleStyle(id, updates)
-    const defaultUpdates: Partial<CircleCreationDefaults> = {}
-    if (updates.fillMode) defaultUpdates.fillMode = updates.fillMode
-    if (updates.shapeType) defaultUpdates.shapeType = updates.shapeType
-    if (typeof updates.sides === 'number') defaultUpdates.sides = updates.sides
-    if (typeof updates.amplitude === 'number') defaultUpdates.amplitude = updates.amplitude
-    if (Object.keys(defaultUpdates).length > 0) updateCircleCreationDefaults(defaultUpdates)
   }
 
   // Minimum pointer movement (px) before a tap is promoted to a drag.
@@ -1229,6 +1184,7 @@ function App() {
     const toShapeType = amplitude > 0 ? 'wavy' : sides >= 25 ? 'circle' : 'polygon'
     const updates: Partial<CircleNode> = {
       shapeType: toShapeType,
+      shapeCustom: toShapeType !== 'circle',
       sides,
       amplitude,
     }
@@ -1253,6 +1209,7 @@ function App() {
     const toShapeType = amplitude > 0 ? 'wavy' : sides >= 25 ? 'circle' : 'polygon'
     const updates: Partial<CircleNode> = {
       shapeType: toShapeType,
+      shapeCustom: toShapeType !== 'circle',
       sides,
       amplitude,
     }
@@ -2748,6 +2705,7 @@ function App() {
         tone: 'violet' as const,
         fillMode: circleCreationDefaults.fillMode,
         shapeType: circleCreationDefaults.shapeType,
+        shapeCustom: false,
         sides: circleCreationDefaults.sides,
         amplitude: circleCreationDefaults.amplitude,
       }
@@ -2874,6 +2832,7 @@ function App() {
             tone: isNested ? 'violet' : nextTone(current.circles.length),
             fillMode: circleCreationDefaults.fillMode,
             shapeType: circleCreationDefaults.shapeType,
+            shapeCustom: false,
             sides: circleCreationDefaults.sides,
             amplitude: circleCreationDefaults.amplitude,
           },
@@ -3581,7 +3540,7 @@ function App() {
                         type="button"
                         className={`m3-segmented-button-item ${(!selectedCircle.shapeType || selectedCircle.shapeType === 'wavy') ? 'is-selected' : ''}`}
                         onClick={() => {
-                          const updates: Partial<CircleNode> = { shapeType: 'wavy' }
+                          const updates: Partial<CircleNode> = { shapeType: 'wavy', shapeCustom: true }
                           if ((selectedCircle.amplitude ?? 5) > 50) {
                             updates.amplitude = 15
                           }
@@ -3594,7 +3553,7 @@ function App() {
                         type="button"
                         className={`m3-segmented-button-item ${selectedCircle.shapeType === 'polygon' ? 'is-selected' : ''}`}
                         onClick={() => {
-                          const updates: Partial<CircleNode> = { shapeType: 'polygon' }
+                          const updates: Partial<CircleNode> = { shapeType: 'polygon', shapeCustom: true }
                           if ((selectedCircle.amplitude ?? 5) > 20) {
                             updates.amplitude = 8
                           }
@@ -3607,7 +3566,7 @@ function App() {
                         type="button"
                         className={`m3-segmented-button-item ${selectedCircle.shapeType === 'circle' ? 'is-selected' : ''}`}
                         onClick={() => {
-                          updateCircleStyle(selectedCircle.id, { shapeType: 'circle' })
+                          updateCircleStyle(selectedCircle.id, { shapeType: 'circle', shapeCustom: false, sides: 25, amplitude: 0 })
                         }}
                       >
                         Circle
@@ -4463,9 +4422,11 @@ async function buildLinkedInConnectionsGraph(
         parentId: null,
         connectedTo: 'you',
         tone: nextTone(nextCircles.length),
-        shapeType: 'wavy',
-        sides: 12,
-        amplitude: 8,
+        fillMode: 'transparent',
+        shapeType: 'circle',
+        shapeCustom: false,
+        sides: 25,
+        amplitude: 0,
       }
       nextCircles.push(companyCircle)
       circlesById.set(companyCircle.id, companyCircle)
@@ -4609,9 +4570,11 @@ function ensureLinkedInCompanyCircle(current: GraphState, profile: LinkedInProfi
       parentId: null,
       connectedTo: 'you',
       tone: nextTone(nextCircles.length),
-      shapeType: 'wavy',
-      sides: 12,
-      amplitude: 8,
+      fillMode: 'transparent',
+      shapeType: 'circle',
+      shapeCustom: false,
+      sides: 25,
+      amplitude: 0,
     }
     nextCircles.push(companyCircle)
   }
@@ -4755,6 +4718,25 @@ function stampYouIdentity(graph: GraphState, user: User): GraphState {
           }
         : circle,
     ),
+  }
+}
+
+function sanitizeDefaultCircleStyles(graph: GraphState): GraphState {
+  return {
+    ...graph,
+    circles: graph.circles.map((circle) => {
+      if (circle.shapeCustom === true) return circle
+      if (circle.shapeType === 'circle' && circle.fillMode === 'transparent' && circle.sides === 25 && circle.amplitude === 0) return circle
+
+      return {
+        ...circle,
+        fillMode: 'transparent',
+        shapeType: 'circle',
+        shapeCustom: false,
+        sides: 25,
+        amplitude: 0,
+      }
+    }),
   }
 }
 

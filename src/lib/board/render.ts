@@ -568,7 +568,7 @@ function getCircleRenderPath(
   const amplitude = circle.amplitude ?? 0
   const sides = circle.sides ?? 25
   const shapeType: ShapeType = circle.shapeType ?? (amplitude > 0 ? 'wavy' : sides >= 25 ? 'circle' : 'polygon')
-  const isCustomShape = amplitude > 0 || sides < 25
+  const isCustomShape = circle.shapeCustom === true && (shapeType !== 'circle' || amplitude > 0 || sides < 25)
   // "circles" mode keeps *untouched* circles as clean circles (so a fresh board
   // never shows stray shapes), but always honors a shape the user explicitly set.
   if (circleShapeMode === 'circles' && !isCustomShape) {
@@ -841,5 +841,4 @@ function findConnectionNearPoint(index: BoardIndex, point: { x: number; y: numbe
   }
   return best
 }
-
 

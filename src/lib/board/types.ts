@@ -21,6 +21,7 @@ export type CircleNode = {
   connectedTo: string | null
   tone: CircleTone
   shapeType?: ShapeType
+  shapeCustom?: boolean
   sides?: number
   amplitude?: number
   imageUrl?: string

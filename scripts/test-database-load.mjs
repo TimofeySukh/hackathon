@@ -73,9 +73,11 @@ function makeCircle(id, name, x, y, radius, connectedTo = 'you') {
     parentId: null,
     connectedTo,
     tone: 'blue',
-    shapeType: 'wavy',
-    sides: 12,
-    amplitude: 8,
+    fillMode: 'transparent',
+    shapeType: 'circle',
+    shapeCustom: false,
+    sides: 25,
+    amplitude: 0,
   }
 }
 

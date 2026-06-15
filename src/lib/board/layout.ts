@@ -39,9 +39,11 @@ export function makeCircle(
     parentId,
     connectedTo,
     tone,
-    shapeType: 'wavy',
-    sides: Math.max(8, Math.round(radius / 10)),
-    amplitude: Math.max(4, Math.round(radius * 0.055)),
+    fillMode: 'transparent',
+    shapeType: 'circle',
+    shapeCustom: false,
+    sides: 25,
+    amplitude: 0,
   }
 }
 
