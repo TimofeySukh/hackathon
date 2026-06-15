@@ -412,7 +412,9 @@
   box-shadow: var(--md-elev-3);
   border: 1px solid var(--md-outline-variant);
   backdrop-filter: blur(18px);
-  animation: circleStyleIn 0.16s cubic-bezier(.2, 0, 0, 1);
+  transform-origin: bottom right;
+  animation: panelIn var(--md-dur-medium, 0.22s) var(--md-ease-decelerate) forwards;
+  will-change: transform, opacity;
 }
 
 .circle-style-theme-tabs {
@@ -656,10 +658,10 @@
   height: 26px;
 }
 
-@keyframes circleStyleIn {
+@keyframes panelIn {
   from {
     opacity: 0;
-    transform: translateY(8px) scale(.98);
+    transform: translateY(8px) scale(0.96);
   }
   to {
     opacity: 1;
