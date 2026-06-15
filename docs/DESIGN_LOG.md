@@ -325,6 +325,16 @@ rediscover, write it here.
   few and cheap): circle culling made circles pop in late during a long pan because the DOM
   layer only re-culls on settle while the people canvas repaints live every frame.
 
+### 2026-06-15 — Keep Chrome Button Hover Pill-Shaped
+
+- Decision: ordinary chrome buttons keep their Material 3 pill/circle shape on hover.
+  Hover is expressed with an 8% state layer or tonal overlay; press feedback scales the
+  control down with the M3 spring token. Shape morph remains reserved for selected
+  swatches/presets and persistent selection indicators.
+- Why: changing filled/text/icon buttons from pills to 8px rectangles on hover made the
+  corners appear to change after the animation settled, and it did not match the button
+  recipe in `DESIGN_SYSTEM.md`.
+
 ### 2026-06-11 — Compact Shape Type Selection and Stacked Overlay Fixes
 
 - Decision: Replaced the bulky, native dropdown select elements for Shape Type selections (for both Circles and People) with a custom-styled Material 3 Segmented Button component (`.m3-segmented-button`). Shifted the Settings panel styling out of inline styles, defining it as `.settings-panel` in `src/index.css` with a high `z-index: 100` stacking order.

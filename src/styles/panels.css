@@ -55,22 +55,18 @@
     background-color 0.2s,
     color 0.2s,
     border-color 0.2s,
-    transform var(--md-dur-medium) var(--md-ease-spring-gentle),
-    border-radius var(--md-dur-short) var(--md-ease-standard);
-  will-change: transform, border-radius;
+    transform var(--md-dur-short) var(--md-ease-spring);
+  will-change: transform;
 }
 
 .linkedin-guide-help:hover {
   background: var(--md-secondary-container);
   border-color: var(--md-secondary-container);
   color: var(--md-on-secondary-container);
-  transform: translateY(-3px) scale(1.08);
-  border-radius: 6px;
 }
 
 .linkedin-guide-help:active {
-  transform: translateY(-3px) scale(1.18);
-  transition: transform 0.1s var(--md-ease-standard);
+  transform: translateY(-3px) scale(0.9);
 }
 
 /* LinkedIn sync guide: scrollable panel that replaces Settings, same theme. */
@@ -129,20 +125,16 @@
   cursor: pointer;
   transition:
     background-color 0.2s,
-    transform var(--md-dur-medium) var(--md-ease-spring-gentle),
-    border-radius var(--md-dur-short) var(--md-ease-standard);
-  will-change: transform, border-radius;
+    transform var(--md-dur-short) var(--md-ease-spring);
+  will-change: transform;
 }
 
 .linkedin-guide-panel__back:hover {
   background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
-  transform: scale(1.08);
-  border-radius: 8px;
 }
 
 .linkedin-guide-panel__back:active {
-  transform: scale(1.18);
-  transition: transform 0.1s var(--md-ease-standard);
+  transform: scale(0.9);
 }
 
 .linkedin-guide-panel__title {
@@ -513,20 +505,16 @@
   height: 28px;
   transition:
     background-color 0.2s,
-    transform var(--md-dur-medium) var(--md-ease-spring-gentle),
-    border-radius var(--md-dur-short) var(--md-ease-standard);
-  will-change: transform, border-radius;
+    transform var(--md-dur-short) var(--md-ease-spring);
+  will-change: transform;
 }
 
 .auth-card__close:hover {
   background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
-  transform: scale(1.08);
-  border-radius: 8px;
 }
 
 .auth-card__close:active {
-  transform: scale(1.18);
-  transition: transform 0.1s var(--md-ease-standard);
+  transform: scale(0.9);
 }
 
 .auth-card__switch {
@@ -541,18 +529,14 @@
   border-radius: var(--md-r-full);
   transition:
     background-color 0.2s,
-    transform var(--md-dur-medium) var(--md-ease-spring-gentle),
-    border-radius var(--md-dur-short) var(--md-ease-standard);
-  will-change: transform, border-radius;
+    transform var(--md-dur-short) var(--md-ease-spring);
+  will-change: transform;
 }
 
 .auth-card__switch:hover {
   background: color-mix(in srgb, var(--md-primary) 8%, transparent);
-  transform: scale(1.04);
-  border-radius: 8px;
 }
 
 .auth-card__switch:active {
-  transform: scale(1.08);
-  transition: transform 0.1s var(--md-ease-standard);
+  transform: scale(0.96);
 }

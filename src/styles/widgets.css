@@ -62,21 +62,18 @@
   transition:
     background-color 0.2s,
     box-shadow 0.2s,
-    transform var(--md-dur-medium) var(--md-ease-spring-gentle),
-    border-radius var(--md-dur-short) var(--md-ease-standard);
-  will-change: transform, border-radius;
+    transform var(--md-dur-short) var(--md-ease-spring);
+  will-change: transform;
 }
 
 .m3-primary-button:hover {
-  background: color-mix(in srgb, var(--md-primary) 92%, black);
+  background: color-mix(in srgb, var(--md-on-primary) 8%, var(--md-primary));
   box-shadow: var(--md-elev-1);
-  transform: scale(1.04);
-  border-radius: 8px;
 }
 
 .m3-primary-button:active {
-  background: color-mix(in srgb, var(--md-primary) 85%, black);
-  transform: scale(1.08);
+  background: color-mix(in srgb, var(--md-on-primary) 10%, var(--md-primary));
+  transform: scale(0.96);
 }
 
 /* Bottom-left hint shown to signed-out visitors: their work is saved locally
@@ -468,14 +465,8 @@
   transition:
     color 0.18s,
     background-color 0.18s,
-    transform var(--md-dur-medium) var(--md-ease-spring-gentle),
-    border-radius var(--md-dur-short) var(--md-ease-standard);
-  will-change: transform, border-radius;
-}
-
-.circle-style-theme-tabs button:hover {
-  transform: scale(1.04);
-  border-radius: 8px;
+    transform var(--md-dur-short) var(--md-ease-spring);
+  will-change: transform;
 }
 
 .circle-style-theme-tabs button:hover:not(.is-selected) {
@@ -483,7 +474,7 @@
 }
 
 .circle-style-theme-tabs button:active {
-  transform: scale(1.08);
+  transform: scale(0.96);
 }
 
 /* The selected tab's filled pill is the sliding .selection-indicator (pill
@@ -1041,16 +1032,18 @@
   cursor: pointer;
   transition:
     background-color 0.15s,
-    transform var(--md-dur-medium) var(--md-ease-spring-gentle),
-    border-radius var(--md-dur-short) var(--md-ease-standard);
-  will-change: transform, border-radius;
+    transform var(--md-dur-short) var(--md-ease-spring);
+  will-change: transform;
 }
 
 .onboarding-coach__skip:hover,
 .onboarding-coach__back:hover {
   background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
-  transform: scale(1.04);
-  border-radius: 8px;
+}
+
+.onboarding-coach__skip:active,
+.onboarding-coach__back:active {
+  transform: scale(0.96);
 }
 
 /* The post-action "Great!" beat: a compact card that pops in for ~1s before the
@@ -1111,20 +1104,18 @@
   transition:
     background-color 0.2s,
     box-shadow 0.2s,
-    transform var(--md-dur-medium) var(--md-ease-spring-gentle),
-    border-radius var(--md-dur-short) var(--md-ease-standard);
-  will-change: transform, border-radius;
+    transform var(--md-dur-short) var(--md-ease-spring);
+  will-change: transform;
 }
 
 .onboarding-coach__primary:hover {
-  background: color-mix(in srgb, var(--md-primary) 92%, black);
+  background: color-mix(in srgb, var(--md-on-primary) 8%, var(--md-primary));
   box-shadow: var(--md-elev-1);
-  transform: scale(1.04);
-  border-radius: 8px;
 }
 
 .onboarding-coach__primary:active {
-  transform: scale(1.08);
+  background: color-mix(in srgb, var(--md-on-primary) 10%, var(--md-primary));
+  transform: scale(0.96);
 }
 
 @media (max-width: 720px) {

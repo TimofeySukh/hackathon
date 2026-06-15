@@ -275,19 +275,18 @@
   transition:
     background-color 0.2s,
     box-shadow 0.2s,
-    transform var(--md-dur-medium) var(--md-ease-spring-gentle),
-    border-radius var(--md-dur-short) var(--md-ease-standard);
-  will-change: transform, border-radius;
+    transform var(--md-dur-short) var(--md-ease-spring);
+  will-change: transform;
 }
 
 .primary-action:hover {
-  background: color-mix(in srgb, var(--md-primary) 92%, var(--md-on-primary));
-  transform: scale(1.04);
-  border-radius: 8px;
+  background: color-mix(in srgb, var(--md-on-primary) 8%, var(--md-primary));
+  box-shadow: var(--md-elev-1);
 }
 
 .primary-action:active {
-  transform: scale(1.08);
+  background: color-mix(in srgb, var(--md-on-primary) 10%, var(--md-primary));
+  transform: scale(0.96);
 }
 
 .inspector p {
