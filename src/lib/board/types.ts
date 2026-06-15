@@ -141,12 +141,32 @@ export type BoardIndex = {
   peopleByCircle: Map<string, PersonNode[]>
 }
 
-export type BoardAnim = { start: number; duration: number }
+// A circle shape morph: animate from one (sides, amplitude) to another so the
+// shape change (corners and/or waviness) eases instead of snapping. Both shapes
+// are sampled to matching points and lerped, so side counts can differ.
+export type CircleMorph = {
+  fromSides: number
+  fromAmp: number
+  toSides: number
+  toAmp: number
+  fromShapeType?: ShapeType
+  toShapeType?: ShapeType
+}
+
+export type BoardAnim = {
+  start: number
+  duration: number
+  // For 'morph:<id>' anims.
+  morph?: CircleMorph
+}
 
 export type AnimFrame = {
   // nodeId -> current draw-scale multiplier (1 = at rest). Drives the press
   // bounce on selection and the grow-in pop for freshly created nodes.
   scales: Map<string, number>
+  // circleId -> in-flight shape morph (with eased progress `t`) that overrides
+  // the circle's stored shape while the animation runs.
+  morphs: Map<string, CircleMorph & { t: number }>
 }
 
 export type LayoutContext = {

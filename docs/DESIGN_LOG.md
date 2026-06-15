@@ -17,6 +17,35 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-15 — Fixed shape morphing animation & incorrect corners at waviness 0
+
+- Decision: fixed the board animation loop (`tickBoardAnims` in `src/App.tsx`) where animation parameters (like `morph`) were dropped during the first-frame anchoring phase. Fixing this allows the shape morph animation to execute fully rather than snapping instantly.
+- Decision: enabled smooth transition of both amplitude and sides/corners during morphing by retaining from/to shape types and sample configurations in `CircleMorph`.
+- Decision: corrected polygon/corner rendering at waviness 0 (`amplitude === 0`). The canvas engine's sampling function (`circleRadiusAtAngle` in `src/lib/board/geometry.ts`) now accepts the node's `shapeType` parameter. It renders a clean circle when `shapeType` is `'circle'` (or `'wavy'` with 0 amplitude), preventing corners from appearing on circles and newly created avatar nodes that happen to have discrete `sides < 25`.
+
+### 2026-06-15 — Re-enabled circle shape controls + amplitude shape-morph
+
+- Decision: re-enabled per-circle shape editing. `getCircleRenderPath` (`src/lib/board/render.ts`) used to force a clean circle in the default `circles` mode (a guard from the old demo-seed era, now obsolete since boards start blank). It now honours a circle's authored shape whenever it's *customised* (`amplitude > 0 || sides < 25`), while untouched circles still render as clean circles. So the Wavyness/Corners sliders actually change the shape again.
+- Shape morph: changing **amplitude** animates smoothly via the board anim loop (`morph:<id>` BoardAnim with `{from,to}`, eased in `readAnimFrame`, applied through `AnimFrame.amplitudes` → `getCircleRenderPath` override). Only triggered on jumps (`|Δ| > 3`, e.g. tapping the track) — fine drag is already live. **Sides do not morph** (vertex/lobe count is discrete; fractional `sides` breaks the wavy seam and polygon vertices), so Corners snaps.
+- Picker presets: reduced to 8 and re-curated so they're distinct from the five quick-swatch tones (teal/cyan/deep-purple/magenta/brown/slate/lime/coral) — the presets now add reach instead of repeating colors already one tap away. Popover section spacing unified to 12px.
+
+### 2026-06-15 — M3 sliders (incl. wavy slider) + corrected connected-group press
+
+- Decision: added a reusable `M3Slider` (`src/components/M3Slider.tsx`) — the canonical slider for the app (thick track, vertical pill handle, gap each side). Its `variant="wave"` draws the active track as a sine wave whose amplitude grows with the value (M3 Expressive wavy slider). Used it in the circle picker: replaced the two bottom rows of color presets (24 presets → top row of 8 kept) with two sliders — **Wavyness** (wave variant → circle amplitude) and **Corners** (plain → sides). The Wavyness slider's wave mirrors exactly what it controls. Removed the old hidden native `input[type=range]` shape controls.
+- Corrected the connected-group press (from the earlier same-day entry): it is **not** "pressed grows, all others shrink". Per M3, only the **immediate neighbours** react and each recoils *away* from the pressed item. Implemented with adjacency combinators: `.item:has(+ .item:active)` (left neighbour → `translateX(-5px)`), `.item:active + .item` (right neighbour → `translateX(5px)`), pressed `scale(1.12)`, all on `--md-ease-spring`. Round items translate away; rectangular group buttons should instead `scaleX` anchored on their far side (far edge + height fixed, near edge pushes away). Adjacency only works in a single row — which is why presets were reduced to one row.
+- Why: the user pointed out the real Google behaviour (neighbours deform, asymmetrically, not the whole group) and asked to surface circle-shape controls as proper Material sliders, with the wave amount integrated into the slider itself.
+
+### 2026-06-15 — Selection motion: shape-morph for swatches, sliding pill for segments
+
+- Decision: replaced per-item `.is-selected { outline }` "blinks" with motion that expresses *continuity* (the core of M3 motion — elements persist and change, they don't spawn/vanish). Two patterns, each matched to its control:
+  - **Shape morph** for color swatches and presets: the selected item morphs from a circle to a rounded square (`border-radius: 50% → 8–9px`, animated with `--md-ease-spring`). Reads instantly even between similar colors, needs no extra chrome, and packs tightly.
+  - **Sliding pill** (`SelectionIndicator`, `variant="pill"`) for the Transparent/Solid segmented tabs: one persistent pill that translates and resizes under the active segment.
+- Added the `--md-ease-spring` token (`cubic-bezier(0.34,1.45,0.5,1)` — fast move with a slight overshoot).
+- Also: merged the palette / "more colors" button into the swatch row as a same-size (30px) member (was a larger, separate 40px button that didn't read as part of the colors); it shows the custom color and morphs to a rounded square when custom is the active selection. Fixed swatch flex-shrink (`flex: 0 0 auto`) — they were shrinking to ~24.8px in the `flex:1` row, which also caused the indicator to drift.
+- Why we dropped the sliding *ring* for swatches (tried first, removed): a 2px ring with a hole around a circle looked bad mid-slide, and on the already-selected item it only read as "slightly bigger" — ambiguous. Shape morph is unambiguous and is itself a headline M3 Expressive feature.
+- Implementation note for `SelectionIndicator`: it finds its container via its own `parentElement` — a child's `useLayoutEffect` runs *before* the parent's `ref` is attached, so passing a `containerRef` prop resolves to null. Siblings carry `data-ind-key`; first placement on mount is instant (`no-anim`), only later moves animate; the transition lives in CSS so `prefers-reduced-motion` collapses it. The `ring` variant still exists in the component for reuse but is currently unused.
+- Rejected: per-item outlines (blink, no continuity); animating the node itself on selection (a node *bounce* was tried and removed earlier — selection feedback belongs to the inspector/indicator).
+
 ### 2026-06-14 — Landing Page with Animated Orbits and Hash-based Routing
 
 - Decision: Introduced a Google Material 3-style landing page with gently rotating SVG orbits for social nodes and ambient color-mix gradient blobs. Implemented a simple, hash-based view router (`#board` / `?app=true`) coupled with `localStorage` persistence to manage transition between the landing page and the interactive workspace.

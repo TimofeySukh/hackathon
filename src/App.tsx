@@ -17,6 +17,8 @@ import LandingPage from './LandingPage'
 import { loadGraph, saveGraph, loadLocalGraph, saveLocalGraph } from './lib/graphPersistence'
 import { enrichLinkedInProfile } from './lib/linkedinEnrichment'
 import { OnboardingCoach } from './Onboarding'
+import { SelectionIndicator } from './components/SelectionIndicator'
+import { M3Slider } from './components/M3Slider'
 import { ONBOARDING_STEPS, ONBOARDING_DONE_STEP } from './onboardingSteps'
 import type { OnboardingAction } from './onboardingSteps'
 // STRESS TEST — dev-only performance harness. See src/lib/stressTest.ts.
@@ -26,6 +28,7 @@ import type {
   CircleShapeMode,
   CircleFillMode,
   CircleNode,
+  CircleMorph,
   PersonNote,
   PersonLinkService,
   PersonLink,
@@ -1039,21 +1042,52 @@ function App() {
   }
 
   function updateCircleCorners(circle: CircleNode, sides: number) {
-    const currentAmplitude = circle.amplitude ?? 0
+    const fromSides = circle.sides ?? 25
+    const amplitude = circle.amplitude ?? 0
+    const fromShapeType = circle.shapeType ?? (amplitude > 0 ? 'wavy' : fromSides >= 25 ? 'circle' : 'polygon')
+    const toShapeType = amplitude > 0 ? 'wavy' : sides >= 25 ? 'circle' : 'polygon'
     updateCircleStyle(circle.id, {
-      shapeType: currentAmplitude > 0 ? 'wavy' : sides >= 25 ? 'circle' : 'polygon',
+      shapeType: toShapeType,
       sides,
-      amplitude: currentAmplitude,
+      amplitude,
     })
+    // Morph the shape between side counts so the polygon eases instead of
+    // snapping. Short for single-step drags, longer for bigger jumps (track taps).
+    if (fromSides !== sides) {
+      const duration = Math.min(320, 140 + Math.abs(sides - fromSides) * 30)
+      startBoardAnim('morph:' + circle.id, duration, {
+        fromSides,
+        fromAmp: amplitude,
+        toSides: sides,
+        toAmp: amplitude,
+        fromShapeType,
+        toShapeType,
+      })
+    }
   }
 
   function updateCircleAmplitude(circle: CircleNode, amplitude: number) {
     const sides = circle.sides ?? 25
+    const fromAmplitude = circle.amplitude ?? 0
+    const fromShapeType = circle.shapeType ?? (fromAmplitude > 0 ? 'wavy' : sides >= 25 ? 'circle' : 'polygon')
+    const toShapeType = amplitude > 0 ? 'wavy' : sides >= 25 ? 'circle' : 'polygon'
     updateCircleStyle(circle.id, {
-      shapeType: amplitude > 0 ? 'wavy' : sides >= 25 ? 'circle' : 'polygon',
+      shapeType: toShapeType,
       sides,
       amplitude,
     })
+    // Smooth shape morph for jumps (e.g. tapping the wavyness track far from the
+    // current value). Fine drag steps update live and don't need it.
+    if (Math.abs(amplitude - fromAmplitude) > 3) {
+      startBoardAnim('morph:' + circle.id, 300, {
+        fromSides: sides,
+        fromAmp: fromAmplitude,
+        toSides: sides,
+        toAmp: amplitude,
+        fromShapeType,
+        toShapeType,
+      })
+    }
   }
 
   function deleteCircle(circleId: string) {
@@ -1225,7 +1259,7 @@ function App() {
     if (!showCircleStylePanel) return
     function handleOutsideCircleStyleClick(event: PointerEvent) {
       const target = event.target as HTMLElement
-      if (target.closest('.circle-style-popover') || target.closest('.circle-style-button')) return
+      if (target.closest('.circle-style-popover') || target.closest('.quick-circle-color--more')) return
       setShowCircleStylePanel(false)
     }
     document.addEventListener('pointerdown', handleOutsideCircleStyleClick)
@@ -1500,7 +1534,7 @@ function App() {
       if (now - start >= a.duration) {
         boardAnimsRef.current.delete(key)
       } else {
-        if (a.start < 0) boardAnimsRef.current.set(key, { start, duration: a.duration })
+        if (a.start < 0) boardAnimsRef.current.set(key, { ...a, start })
         active = true
       }
     }
@@ -1515,9 +1549,9 @@ function App() {
   // Register (or restart) a transient board animation and ensure the loop runs.
   // start = -1 anchors to the rAF clock on the first frame (keeps clock reads
   // out of render-reachable code).
-  function startBoardAnim(key: string, duration: number) {
+  function startBoardAnim(key: string, duration: number, morph?: CircleMorph) {
     if (prefersReducedMotion()) return
-    boardAnimsRef.current.set(key, { start: -1, duration })
+    boardAnimsRef.current.set(key, { start: -1, duration, morph })
     if (boardAnimRafRef.current == null) {
       boardAnimRafRef.current = window.requestAnimationFrame(tickBoardAnims)
     }
@@ -3156,21 +3190,6 @@ function App() {
                   const selectedCircleAmplitude = selectedCircle.amplitude ?? 0
                   return (
                 <div className="inspector-visual-row">
-                  <div className="circle-style-control">
-                    <button
-                      type="button"
-                      className={`circle-style-button ${selectedCircle.customColor ? 'is-custom-color' : ''} ${showCircleStylePanel ? 'is-open' : ''}`}
-                      style={{
-                        backgroundColor: selectedCircle.customColor ? selectedCircleColors.centerBg : undefined,
-                        color: selectedCircle.customColor ? getReadableColor(selectedCircleColors.centerBg) : undefined,
-                      }}
-                      onClick={() => setShowCircleStylePanel(!showCircleStylePanel)}
-                      title="Customize circle"
-                      aria-label="Customize circle"
-                    >
-                      <PaletteIcon />
-                    </button>
-                  </div>
                   <div className="quick-circle-colors" aria-label="Quick circle colors">
                     {(['blue', 'red', 'green', 'amber', 'violet'] as CircleTone[]).map((tone) => (
                       <button
@@ -3182,6 +3201,23 @@ function App() {
                         aria-label={`Set quick color ${tone}`}
                       />
                     ))}
+                    <button
+                      type="button"
+                      className={`quick-circle-color quick-circle-color--more ${selectedCircle.customColor ? 'is-selected is-custom-color' : ''} ${showCircleStylePanel ? 'is-open' : ''}`}
+                      style={
+                        selectedCircle.customColor
+                          ? {
+                              backgroundColor: selectedCircleColors.centerBg,
+                              color: getReadableColor(selectedCircleColors.centerBg),
+                            }
+                          : undefined
+                      }
+                      onClick={() => setShowCircleStylePanel(!showCircleStylePanel)}
+                      title="Customize circle"
+                      aria-label="Customize circle"
+                    >
+                      <PaletteIcon />
+                    </button>
                   </div>
                   <button
                     type="button"
@@ -3195,8 +3231,13 @@ function App() {
                     {showCircleStylePanel && (
                       <div className="circle-style-popover">
                         <div className="circle-style-theme-tabs">
+                          <SelectionIndicator
+                            variant="pill"
+                            activeKey={selectedCircle.fillMode ?? circleFillMode}
+                          />
                           <button
                             type="button"
+                            data-ind-key="transparent"
                             className={(selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'is-selected' : ''}
                             onClick={() => updateCircleStyle(selectedCircle.id, { fillMode: 'transparent' })}
                           >
@@ -3204,6 +3245,7 @@ function App() {
                           </button>
                           <button
                             type="button"
+                            data-ind-key="solid"
                             className={(selectedCircle.fillMode ?? circleFillMode) === 'solid' ? 'is-selected' : ''}
                             onClick={() => updateCircleStyle(selectedCircle.id, { fillMode: 'solid' })}
                           >
@@ -3242,7 +3284,7 @@ function App() {
                           <span className="brightness-slider__thumb" />
                         </button>
                         <div className="circle-style-presets">
-                          {CIRCLE_COLOR_PRESETS.map((color) => (
+                          {CIRCLE_COLOR_PRESETS.slice(0, 8).map((color) => (
                             <button
                               key={color}
                               type="button"
@@ -3253,29 +3295,23 @@ function App() {
                             />
                           ))}
                         </div>
-                        <div className="circle-style-shape-controls" aria-hidden="true">
-                        <label className="circle-style-control-row">
-                          <span>{`Amplitude ${Math.round(selectedCircleAmplitude)}`}</span>
-                          <input
-                            className="wave-slider"
-                            type="range"
-                            min="0"
-                            max="28"
+                        <div className="circle-style-shape-controls">
+                          <M3Slider
+                            variant="wave"
+                            label={selectedCircleAmplitude <= 0 ? 'Wavyness' : `Wavyness ${Math.round(selectedCircleAmplitude)}`}
+                            min={0}
+                            max={28}
                             value={selectedCircleAmplitude}
-                            onChange={(event) => updateCircleAmplitude(selectedCircle, Number(event.target.value))}
+                            onChange={(value) => updateCircleAmplitude(selectedCircle, value)}
                           />
-                        </label>
-                        <label className="circle-style-control-row">
-                          <span>{selectedCircleSides >= 25 ? 'Corners circle' : `Corners ${selectedCircleSides}`}</span>
-                          <input
-                            className="corner-slider"
-                            type="range"
-                            min="5"
-                            max="25"
+                          <M3Slider
+                            variant="plain"
+                            label={selectedCircleSides >= 25 ? 'Corners — circle' : `Corners ${selectedCircleSides}`}
+                            min={5}
+                            max={25}
                             value={selectedCircleSides}
-                            onChange={(event) => updateCircleCorners(selectedCircle, Number(event.target.value))}
+                            onChange={(value) => updateCircleCorners(selectedCircle, value)}
                           />
-                        </label>
                         </div>
                       </div>
                     )}

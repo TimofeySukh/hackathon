@@ -98,6 +98,85 @@ export function getNodePath(
   return path
 }
 
+// Radius of a circle node's outline at a given angle, as a single radial
+// function. Used to sample any shape (circle / rounded polygon / wavy) into
+// angle-parameterised points so two shapes can be morphed by lerping
+// corresponding points — even when their side counts differ.
+function circleRadiusAtAngle(
+  R: number,
+  sides: number,
+  amplitude: number,
+  theta: number,
+  shapeType?: ShapeType,
+) {
+  // If shapeType is explicitly provided, follow its specific rules.
+  if (shapeType === 'circle') {
+    return R
+  }
+  if (shapeType === 'wavy') {
+    if (amplitude > 0) {
+      const baseR = R - amplitude - 4
+      return baseR + amplitude * Math.cos(sides * theta)
+    }
+    return R
+  }
+  if (shapeType === 'polygon') {
+    if (sides >= 25) return R
+    const a = (2 * Math.PI) / sides
+    const phi = (((theta + Math.PI / 2) % a) + a) % a
+    const sharp = (R * Math.cos(a / 2)) / Math.cos(phi - a / 2)
+    const apothem = R * Math.cos(a / 2)
+    const round = 0.34
+    return sharp * (1 - round) + apothem * round
+  }
+
+  // Fallback for when shapeType is not provided (backwards compatibility)
+  if (amplitude > 0) {
+    // Wavy blob: matches the 'wavy' branch of getNodePath.
+    const baseR = R - amplitude - 4
+    return baseR + amplitude * Math.cos(sides * theta)
+  }
+  if (sides >= 25) return R // clean circle
+  // Rounded polygon: sharp n-gon radius blended toward the apothem so corners
+  // round in while edges stay flat. A vertex sits at the top (-π/2).
+  const a = (2 * Math.PI) / sides
+  const phi = (((theta + Math.PI / 2) % a) + a) % a
+  const sharp = (R * Math.cos(a / 2)) / Math.cos(phi - a / 2)
+  const apothem = R * Math.cos(a / 2)
+  const round = 0.34
+  return sharp * (1 - round) + apothem * round
+}
+
+export type OutlinePoint = { x: number; y: number }
+
+// Sample a circle node's outline as `n` points around the angle, all closed
+// (integer `sides`), so point i of one shape corresponds to point i of another.
+export function sampleCircleOutline(
+  cx: number,
+  cy: number,
+  R: number,
+  sides: number,
+  amplitude: number,
+  n: number,
+  shapeType?: ShapeType,
+): OutlinePoint[] {
+  const pts: OutlinePoint[] = new Array(n)
+  for (let i = 0; i < n; i++) {
+    const theta = (i / n) * 2 * Math.PI
+    const rad = circleRadiusAtAngle(R, sides, amplitude, theta, shapeType)
+    pts[i] = { x: cx + rad * Math.cos(theta), y: cy + rad * Math.sin(theta) }
+  }
+  return pts
+}
+
+export function outlinePath(points: OutlinePoint[]) {
+  let d = ''
+  for (let i = 0; i < points.length; i++) {
+    d += (i === 0 ? 'M ' : ' L ') + points[i].x.toFixed(2) + ' ' + points[i].y.toFixed(2)
+  }
+  return d + ' Z'
+}
+
 export function drawCurvePath(
   ctx: CanvasRenderingContext2D,
   from: { x: number; y: number },

@@ -7,6 +7,7 @@ import type {
   AnimFrame,
   BoardAnim,
   BoardHit,
+  CircleMorph,
   BoardIndex,
   Camera,
   CircleFillMode,
@@ -31,7 +32,15 @@ import {
   ZONE_ONLY_SCALE,
 } from './constants'
 import { colorMix, getCircleColors } from './colors'
-import { distanceToSegment, drawCurvePath, ellipsize, getNodePath, roundedRect } from './geometry'
+import {
+  distanceToSegment,
+  drawCurvePath,
+  ellipsize,
+  getNodePath,
+  outlinePath,
+  roundedRect,
+  sampleCircleOutline,
+} from './geometry'
 import { makeInitials } from './text'
 
 const personSpriteCache = new Map<string, HTMLCanvasElement>()
@@ -291,18 +300,25 @@ const easeOutBack = (t: number) => {
   return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2)
 }
 
+// Decelerating ease for shape morphs: fast start, soft settle.
+const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3)
+
 export function readAnimFrame(anims: Map<string, BoardAnim>, now: number): AnimFrame {
   if (anims.size === 0) return EMPTY_ANIM_FRAME
   const scales = new Map<string, number>()
+  const morphs = new Map<string, CircleMorph & { t: number }>()
   for (const [key, a] of anims) {
     // start < 0 means "not yet anchored to the rAF clock" → treat as just begun.
     const t = a.start < 0 ? 0 : Math.min(1, Math.max(0, (now - a.start) / a.duration))
     if (key.startsWith('pop:')) {
       // Grow-in for freshly created nodes: 0 -> slight overshoot -> 1.
       scales.set(key.slice(4), Math.max(0, easeOutBack(t)))
+    } else if (key.startsWith('morph:') && a.morph) {
+      // Smoothly morph a circle's shape (sides and/or amplitude).
+      morphs.set(key.slice(6), { ...a.morph, t: easeOutCubic(t) })
     }
   }
-  return { scales }
+  return { scales, morphs }
 }
 
 export function drawBoardLayer(
@@ -341,7 +357,7 @@ export function drawBoardLayer(
   ctx.translate(camera.x, camera.y)
   ctx.scale(camera.scale, camera.scale)
 
-  drawCircleFills(ctx, visibleCircles, selectedItem, camera.scale, circleShapeMode, circleFillMode, selectedCircleIds, hoveredCircleEdgeId)
+  drawCircleFills(ctx, visibleCircles, selectedItem, camera.scale, circleShapeMode, circleFillMode, selectedCircleIds, hoveredCircleEdgeId, anim.morphs)
 
   if (camera.scale < ZONE_ONLY_SCALE) {
     // Far-zoom simplified view: only the colored zones and the labels of the
@@ -469,11 +485,12 @@ function drawCircleFills(
   circleFillMode: CircleFillMode,
   selectedCircleIds: string[] = [],
   hoveredCircleEdgeId: string | null = null,
+  morphs: Map<string, CircleMorph & { t: number }> = EMPTY_ANIM_FRAME.morphs,
 ) {
   for (const circle of circles) {
     const tone = getCircleColors(circle)
     const isTransparent = (circle.fillMode ?? circleFillMode) === 'transparent'
-    const path = new Path2D(getCircleRenderPath(circle, circleShapeMode))
+    const path = new Path2D(getCircleRenderPath(circle, circleShapeMode, morphs.get(circle.id)))
     ctx.save()
     if (!isTransparent) {
       ctx.shadowColor = 'rgba(0,0,0,0.06)'
@@ -528,25 +545,36 @@ function drawCircleDetails(
   }
 }
 
-function getCircleRenderPath(circle: CircleNode, circleShapeMode: CircleShapeMode) {
-  // In "circles" mode (the default) every circle renders as a clean circle,
-  // regardless of any wavy/polygon shape baked into its data — otherwise the
-  // demo seed shows flower shapes on a fresh device. Only "figures" mode honors
-  // the authored shape.
-  if (circleShapeMode === 'circles') {
-    return getNodePath(circle.x, circle.y, circle.radius, 'circle', circle.sides ?? 25, 0)
+function getCircleRenderPath(
+  circle: CircleNode,
+  circleShapeMode: CircleShapeMode,
+  morph?: CircleMorph & { t: number },
+) {
+  // Smooth-enough point count; from/to use the same count so points correspond.
+  const n = Math.max(120, Math.round(circle.radius * 2))
+
+  // Mid-morph: lerp between the from-shape and to-shape sampled at matching
+  // points (works across different side counts without a seam).
+  if (morph) {
+    const from = sampleCircleOutline(circle.x, circle.y, circle.radius, morph.fromSides, morph.fromAmp, n, morph.fromShapeType)
+    const to = sampleCircleOutline(circle.x, circle.y, circle.radius, morph.toSides, morph.toAmp, n, morph.toShapeType)
+    for (let i = 0; i < n; i++) {
+      from[i].x += (to[i].x - from[i].x) * morph.t
+      from[i].y += (to[i].y - from[i].y) * morph.t
+    }
+    return outlinePath(from)
   }
+
   const amplitude = circle.amplitude ?? 0
   const sides = circle.sides ?? 25
-  const shapeType: ShapeType = amplitude > 0 ? 'wavy' : sides >= 25 ? 'circle' : 'polygon'
-  return getNodePath(
-    circle.x,
-    circle.y,
-    circle.radius,
-    shapeType,
-    sides,
-    amplitude,
-  )
+  const shapeType: ShapeType = circle.shapeType ?? (amplitude > 0 ? 'wavy' : sides >= 25 ? 'circle' : 'polygon')
+  const isCustomShape = amplitude > 0 || sides < 25
+  // "circles" mode keeps *untouched* circles as clean circles (so a fresh board
+  // never shows stray shapes), but always honors a shape the user explicitly set.
+  if (circleShapeMode === 'circles' && !isCustomShape) {
+    return outlinePath(sampleCircleOutline(circle.x, circle.y, circle.radius, 25, 0, n, 'circle'))
+  }
+  return outlinePath(sampleCircleOutline(circle.x, circle.y, circle.radius, sides, amplitude, n, shapeType))
 }
 
 function drawCircleCenter(ctx: CanvasRenderingContext2D, circle: CircleNode, scale: number, circleFillMode: CircleFillMode, nodeScale = 1) {
