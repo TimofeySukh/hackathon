@@ -1,16 +1,21 @@
-# Person Notes (Trello-Style)
+# Person Notes
 
 ## Purpose
 
-Provides a compact, highly interactive notes list for person nodes inside the inspector sidebar panel, structured and styled like Trello list columns and cards. It allows users to write notes quickly with minimal screen space and useful keyboard shortcuts. Profile links and social handles live in the separate Person Connections feature, not in notes.
+Provides a compact, Material 3 notes list for person nodes inside the inspector side
+sheet. It allows users to write notes quickly with minimal screen space and useful
+keyboard shortcuts. Profile links and social handles live in the separate Person
+Connections feature, not in notes.
 
 ## Behavior
 
-- **Notes List Column**: Grouped under a compact Material 3 neutral container header containing the title "Notes".
-- **Trello Cards**: Each note is rendered as a warm pastel yellow sticky note (`#fff9c4`) with rounded corners, a subtle drop shadow, and a dark slate text color. Hovering over a card reveals a small trash icon to delete the card.
+- **Notes list**: Grouped under a compact Material 3 neutral container header containing the title "Notes".
+- **Note cards**: Each note is rendered as a filled M3 card on a tonal surface. Cards
+  animate in with a short fade/translate, lift slightly on hover/focus, and scale down
+  subtly on press. Hovering or focusing a card reveals a small trash icon to delete it.
 - **Add Note Composer**:
-  - Toggled by clicking `+ Add a card` at the bottom of the list.
-  - Contains a borderless, shadowless textarea matching the card footprint.
+  - Toggled by clicking `+ Add note` at the bottom of the list.
+  - Contains a borderless textarea in the same filled-card footprint.
   - Controls row at the bottom with a blue `Save note` button and a discard `✕` button (cancellation cross icon).
 - **Keyboard Shortcuts**:
   - `Enter` (without Shift) in the composer: immediately saves the note, clears the text, and maintains input focus so the user can quickly type multiple notes in a row.
@@ -20,9 +25,14 @@ Provides a compact, highly interactive notes list for person nodes inside the in
 
 ## Design
 
-- **Surfaces / elevation**: Cards use a light box shadow (`0px 1px 1px #091e4240, 0px 0px 1px #091e424f`). The list uses a Material 3 neutral container.
-- **Components used**: Composer buttons (`.trello-list__composer-add-btn`, `.trello-list__composer-cancel-btn`) matching layout.
-- **Color roles used**: Neutral surface container colors and sticky note yellow (#fff9c4).
+- **Surfaces / elevation**: The list uses `--md-surface-container-high`; cards use
+  `--md-surface-container-low` with `--md-elev-1` and lift to `--md-elev-2` on hover/focus.
+- **Components used**: Filled note cards, filled text field behavior, filled button,
+  icon button, and Material state layers.
+- **Color roles used**: Neutral surface container colors plus `--md-primary` and
+  `--md-error` roles for actions.
+- **Motion**: New cards and editors enter with a short fade/translate or fade/scale.
+  Card hover/press, delete buttons, and composer buttons use the shared M3 motion tokens.
 
 ## Code
 

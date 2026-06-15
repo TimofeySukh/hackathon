@@ -17,6 +17,19 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-15 — Search and Person Inspector M3 Interaction Pass
+
+- Decision: search results now behave like an M3 suggestion menu: animated surface
+  entrance, staggered row entrance, active-row state layer, leading person avatars or
+  initials, and keyboard navigation with ArrowUp/ArrowDown/Home/End/Enter.
+- Decision: person notes moved away from Trello-specific white cards, raw hex colors,
+  and instant hover changes. Notes now use filled Material 3 cards on tonal surfaces,
+  plus hover/focus lift, press feedback, animated editor/composer entry, and M3 role
+  colors for actions.
+- Decision: connected swatch/preset press feedback is quieter: press scales down and
+  neighbors only shift a small amount. The previous elastic wobble was expressive but
+  too visually loud for repeated color/style work.
+
 ### 2026-06-15 — Motion physics spring return & theme tabs restoration
 
 - Decision: restored the `Solid / Transparent` segmented theme tabs to the original sliding pill capsule container utilizing the `SelectionIndicator` component (pill variant). Unselected tabs now have a hover overlay (`background: color-mix(...)`) to indicate interactivity.

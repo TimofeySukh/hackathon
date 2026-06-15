@@ -90,6 +90,9 @@ type SearchResult = {
   id: string
   name: string
   sub: string
+  avatarUrl?: string
+  initials?: string
+  color?: string
 }
 
 type LinkedInProfileImport = {
@@ -692,6 +695,7 @@ function App() {
   // circles (the "tags"), then flies the camera to the picked node.
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [activeSearchIndex, setActiveSearchIndex] = useState(0)
   const [isImportingLinkedInProfile, setIsImportingLinkedInProfile] = useState(false)
   const [isImportingLinkedInZip, setIsImportingLinkedInZip] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -733,6 +737,7 @@ function App() {
   function closeSearch() {
     setSearchOpen(false)
     setSearchQuery('')
+    setActiveSearchIndex(0)
   }
 
   async function handleImportLinkedInProfileFromSearch() {
@@ -1380,12 +1385,27 @@ function App() {
       : []
     const people: SearchResult[] = displayPeople
       .filter((p) => p.name.toLowerCase().includes(q) || (p.role || '').toLowerCase().includes(q))
-      .map((p) => ({ kind: 'person', id: p.id, name: p.name, sub: p.role || '' }))
+      .map((p) => {
+        const circle = circlesById.get(p.circleId)
+        return {
+          kind: 'person',
+          id: p.id,
+          name: p.name,
+          sub: p.role || circle?.name || '',
+          avatarUrl: p.imageUrl,
+          initials: makeInitials(p.name),
+          color: circle ? getCircleColors(circle).centerBg : undefined,
+        }
+      })
     const circles: SearchResult[] = displayCircles
       .filter((c) => c.name.toLowerCase().includes(q))
-      .map((c) => ({ kind: 'circle', id: c.id, name: c.name, sub: 'Circle' }))
+      .map((c) => ({ kind: 'circle', id: c.id, name: c.name, sub: 'Circle', color: getCircleColors(c).centerBg }))
     return [...linkedInImport, ...people, ...circles].slice(0, 8)
-  }, [searchQuery, isImportingLinkedInProfile, displayPeople, displayCircles])
+  }, [searchQuery, isImportingLinkedInProfile, displayPeople, displayCircles, circlesById])
+
+  const currentSearchIndex = searchResults.length > 0
+    ? clamp(activeSearchIndex, 0, searchResults.length - 1)
+    : 0
   const sortedCircles = useMemo(() => {
     function getDepth(circleId: string | null): number {
       let depth = 0
@@ -2885,14 +2905,31 @@ function App() {
                 value={searchQuery}
                 placeholder="Search people or circles…"
                 aria-label="Search people or circles"
-                onChange={(event) => setSearchQuery(event.target.value)}
+                aria-controls="board-search-results"
+                aria-activedescendant={searchResults.length > 0 ? `search-result-${searchResults[currentSearchIndex]?.kind}-${searchResults[currentSearchIndex]?.id}` : undefined}
+                onChange={(event) => {
+                  setSearchQuery(event.target.value)
+                  setActiveSearchIndex(0)
+                }}
                 onKeyDown={(event) => {
                   if (event.key === 'Escape') {
                     event.preventDefault()
                     closeSearch()
+                  } else if (event.key === 'ArrowDown' && searchResults.length > 0) {
+                    event.preventDefault()
+                    setActiveSearchIndex((index) => (index + 1) % searchResults.length)
+                  } else if (event.key === 'ArrowUp' && searchResults.length > 0) {
+                    event.preventDefault()
+                    setActiveSearchIndex((index) => (index - 1 + searchResults.length) % searchResults.length)
+                  } else if (event.key === 'Home' && searchResults.length > 0) {
+                    event.preventDefault()
+                    setActiveSearchIndex(0)
+                  } else if (event.key === 'End' && searchResults.length > 0) {
+                    event.preventDefault()
+                    setActiveSearchIndex(searchResults.length - 1)
                   } else if (event.key === 'Enter' && searchResults.length > 0) {
                     event.preventDefault()
-                    handleSelectSearchResult(searchResults[0])
+                    handleSelectSearchResult(searchResults[currentSearchIndex])
                   }
                 }}
               />
@@ -2904,24 +2941,32 @@ function App() {
             </>
           )}
           {searchOpen && searchQuery.trim() !== '' && (
-            <div className="search-results" role="listbox">
+            <div id="board-search-results" className="search-results" role="listbox">
               {searchResults.length === 0 ? (
                 <div className="search-results__empty">No matches</div>
               ) : (
-                searchResults.map((result) => (
+                searchResults.map((result, index) => (
                   <button
                     key={`${result.kind}:${result.id}`}
+                    id={`search-result-${result.kind}-${result.id}`}
                     type="button"
                     role="option"
-                    aria-selected={false}
-                    className="search-results__item"
+                    aria-selected={index === currentSearchIndex}
+                    className={`search-results__item ${index === currentSearchIndex ? 'is-active' : ''}`}
                     disabled={result.kind === 'linkedin-profile' && isImportingLinkedInProfile}
+                    style={{ '--search-row-index': index } as CSSProperties}
+                    onMouseEnter={() => setActiveSearchIndex(index)}
                     // eslint-disable-next-line react-hooks/refs
                     onClick={() => handleSelectSearchResult(result)}
                   >
-                    <span className={`search-results__icon search-results__icon--${result.kind}`}>
+                    <span
+                      className={`search-results__icon search-results__icon--${result.kind}`}
+                      style={result.color ? { backgroundColor: result.color } : undefined}
+                    >
                       {result.kind === 'person'
-                        ? <PersonIcon />
+                        ? result.avatarUrl
+                          ? <img src={result.avatarUrl} alt="" />
+                          : <span className="search-results__initials">{result.initials}</span>
                         : result.kind === 'linkedin-profile'
                           ? isImportingLinkedInProfile ? <span className="search-results__spinner" aria-hidden="true" /> : <LinkedInIcon />
                           : <CircleIcon />}
@@ -3498,19 +3543,6 @@ function App() {
                   type="button"
                   className="star-favorite-btn"
                   onClick={() => togglePersonFavorite(selectedPerson.id)}
-                  style={{
-                    position: 'absolute',
-                    top: 18,
-                    right: 18,
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    display: 'grid',
-                    placeItems: 'center',
-                    padding: 4,
-                    zIndex: 20,
-                    outline: 'none',
-                  }}
                   title={selectedPerson.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
                 >
                   <svg viewBox="0 0 24 24" style={{ width: 20, height: 20 }}>
@@ -3523,14 +3555,14 @@ function App() {
                   </svg>
                 </button>
 
-                 {/* Visual Settings Row: Select Circle + Avatar Photo Upload */}
-                 {(() => {
-                   const personCircle = circlesById.get(selectedPerson.circleId)
-                   const toneColors = personCircle ? getCircleColors(personCircle) : null
-                   return (
-                     <div className="inspector-visual-row">
-                       <div className="inspector-field inspector-field--circle-select">
-                         <div className="custom-select-wrap">
+                {/* Visual Settings Row: Select Circle + Avatar Photo Upload */}
+                {(() => {
+                  const personCircle = circlesById.get(selectedPerson.circleId)
+                  const toneColors = personCircle ? getCircleColors(personCircle) : null
+                  return (
+                    <div className="inspector-visual-row">
+                      <div className="inspector-field inspector-field--circle-select">
+                        <div className="custom-select-wrap">
                            <button
                              type="button"
                              onClick={() => setShowCircleDropdown(!showCircleDropdown)}
@@ -3654,8 +3686,8 @@ function App() {
  
                   {/* Scrollable list */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {selectedPerson.notes?.map((note) => (
-                      <div key={note.id}>
+                    {selectedPerson.notes?.map((note, index) => (
+                      <div key={note.id} className="trello-note-shell" style={{ '--note-index': index } as CSSProperties}>
                         {editingNoteId === note.id ? (
                           <div className="trello-card__editor">
                             <textarea
@@ -3672,12 +3704,12 @@ function App() {
                               }}
                               onBlur={() => setEditingNoteId(null)}
                               onKeyDown={(e) => {
-                                  if (e.key === 'Enter' && !e.shiftKey) {
-                                    e.preventDefault()
-                                    setEditingNoteId(null)
-                                  } else if (e.key === 'Escape') {
-                                    setEditingNoteId(null)
-                                  }
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                  e.preventDefault()
+                                  setEditingNoteId(null)
+                                } else if (e.key === 'Escape') {
+                                  setEditingNoteId(null)
+                                }
                               }}
                               style={{
                                 minHeight: '40px',
@@ -3777,7 +3809,7 @@ function App() {
                         <line x1="12" y1="5" x2="12" y2="19" />
                         <line x1="5" y1="12" x2="19" y2="12" />
                       </svg>
-                      <span>Add a card</span>
+                      <span>Add note</span>
                     </button>
                   )}
                 </div>
@@ -4762,4 +4794,3 @@ function getResizeCursor(point: { x: number; y: number }, circle: { x: number; y
 }
 
 export default App
-

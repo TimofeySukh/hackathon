@@ -25,7 +25,10 @@ selects the node and flies the camera to it at a comfortable zoom.
 - Manual LinkedIn enrichment checks the existing graph first and then a local per-URL
   cache before calling Bright Data, so repeated imports of the same profile avoid another
   paid request. LinkedIn ZIP import does not call Bright Data.
-- Picking a result (click or Enter on the first match) selects the node — opening the
+- The result list is keyboard navigable. `ArrowDown` / `ArrowUp` move the active
+  option, `Home` / `End` jump to the first or last option, and `Enter` picks the active
+  option. Moving the pointer over a row also updates the active option.
+- Picking a result (click or Enter on the active match) selects the node — opening the
   inspector — and animates the camera so the node sits slightly above screen centre
   (clear of the bottom inspector). Zoom is a fixed 1.5× for a person and fit-to-circle
   for a circle.
@@ -39,16 +42,18 @@ Reuses the Material 3 chrome language (see [`../DESIGN_SYSTEM.md`](../DESIGN_SYS
 
 - Surfaces / elevation used: `--md-surface-container` pill + dropdown at `--md-elev-2`.
 - Components used: icon button, text field (borderless, inside the pill), menu/list of
-  result rows, leading avatar chips.
+  result rows, leading avatar chips/initials for people, and leading tonal icons for
+  circles/import actions.
 - Color roles used: result icons use `secondary-container` (person) and
   `primary-container` (circle); text uses `on-surface` / `on-surface-variant`.
-- Feature-specific layout/motion: collapsed→open is a width transition; the dropdown
-  fades/slides in. On mobile the open field grows with `flex: 1` to fill the row left of
-  the gear and the dropdown spans that width. The "sign in to save" banner is capped to
-  `calc(100vw - 132px)` and hidden while search/settings is open, via `.is-search-open`
-  / `.is-settings-open` on `.app-shell`.
-- Known gaps vs. the Material 3 target: no keyboard arrow-key navigation through results
-  yet (Enter picks the first match only); no result highlighting of the matched substring.
+- Feature-specific layout/motion: collapsed→open is a spring width transition; the
+  dropdown fades/slides/scales in, and result rows stagger in by index. Active rows use
+  a Material state layer instead of a hard selected outline. On mobile the open field
+  grows with `flex: 1` to fill the row left of the gear and the dropdown spans that
+  width. The "sign in to save" banner is capped to `calc(100vw - 132px)` and hidden
+  while search/settings is open, via `.is-search-open` / `.is-settings-open` on
+  `.app-shell`.
+- Known gaps vs. the Material 3 target: no result highlighting of the matched substring.
 
 ## Code
 
@@ -61,10 +66,10 @@ Reuses the Material 3 chrome language (see [`../DESIGN_SYSTEM.md`](../DESIGN_SYS
 - Backend: `supabase/functions/enrich-linkedin-profile/index.ts` calls Bright Data's
   LinkedIn profile scraper with the `BRIGHTDATA_API_KEY` secret after validating the
   user's Supabase session.
-- Related state / hooks: `searchOpen`, `searchQuery`, `searchInputRef`,
+- Related state / hooks: `searchOpen`, `searchQuery`, `activeSearchIndex`, `searchInputRef`,
   `searchPanelRef`, `focusAnimRef`; the shared outside-click effect handles dismissal.
 
 ## Open questions / TODO
 
-- Arrow-key navigation + highlighting the matched substring in results.
 - Possibly search note/connection text too, not just name/role.
+- Highlighting the matched substring in results.

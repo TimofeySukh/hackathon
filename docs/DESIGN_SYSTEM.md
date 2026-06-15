@@ -306,11 +306,18 @@ These are the canonical patterns. Reach for one of these before writing a new co
 - Container: `--md-surface-container`, `--md-r-md`, `--md-elev-2`, no border.
 - Items: min-height 48, leading icon 24 in `--md-on-surface-variant`, label body-medium,
   `--md-r-sm` hover target with an on-surface 8% state layer.
+- Search suggestion menus follow the same surface rules. Rows may use leading avatars,
+  initials, or tonal icons; keyboard focus/active row uses the same 8% state layer.
+  Menus enter with fade + translate/scale, and rows may stagger in with short index-based
+  delays as long as `prefers-reduced-motion` collapses the movement.
 
 ### Cards (e.g. note cards)
 
 - `--md-surface-container`, `--md-r-md`, no hard Tailwind-gray borders. Optional 1px
   `--md-outline-variant` for an outlined card.
+- Filled note cards use `--md-surface-container-low` inside a
+  `--md-surface-container-high` list container. Hover/focus may lift from `--md-elev-1`
+  to `--md-elev-2`; press scales down slightly (`~0.985`) with the spring token.
 
 ### Text fields
 
