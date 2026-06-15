@@ -229,20 +229,13 @@ Rules of thumb:
   transitioned with `--md-ease-spring` so they spring back on release (not a flat ease).
   Plain controls scale *down* on press (pills ~0.96, icon buttons ~0.9). Thumbs/handles
   scale *up* on grab (~1.18).
-- **Connected button group (M3 Expressive).** When several like controls sit in a single row and
+- **Connected button group (M3 Expressive) with Spring-Back return.** When several like controls sit in a single row and
   are pressed individually (color swatches, presets, a toolbar tool group), the pressed item
-  **grows** and **only its immediate neighbours** react — each recoiling *away* from the pressed
-  one (not every item, and not a uniform shrink). Use `:active` with the adjacency/`:has()`
-  combinators so exactly the two neighbours move:
-  ```css
-  .item:active                  { transform: scale(1.12); }    /* pressed grows        */
-  .item:has(+ .item:active)     { transform: translateX(-5px); } /* left neighbour recoils  */
-  .item:active + .item          { transform: translateX(5px); }  /* right neighbour recoils */
-  ```
-  Drive all with `--md-ease-spring`. For round items (swatches) the neighbour translates away;
-  for rectangular group buttons, compress the neighbour with `transform: scaleX(...)` and
-  `transform-origin` on its *far* side, so its far edge and height stay put while its near edge
-  pushes away from the pressed button. Single row only — adjacency breaks across grid wraps.
+  **grows/squashes** and **only its immediate neighbours** react — each recoiling *away* from the pressed
+  one. The press applies squash/recoil, and release triggers a multi-stage bouncy spring-back wobble:
+  - **Pressing** (`.is-pressing`): Applied instantly on pointerdown. Active item scales down/squashes (`scaleX(1.12) scaleY(0.93)`), neighbors shift away (`translateX(-4.5px) scaleX(0.92) scaleY(1.04)` for left, positive `translateX` for right).
+  - **Release/Returning** (`.is-returning`): Active for ~350ms on release. Triggers `@keyframes swatchSpringBack` (wobbles and settles to `scale(1)`) while neighbors play `@keyframes swatchNeighbor[Left/Right]SpringBack` (recoils organically back to `translateX(0) scale(1)`). Transitions are disabled (`transition: none !important`) during keyframes to prevent interference.
+  Single row only — adjacency breaks across grid wraps.
   Canonical impl: the circle picker (`.quick-circle-colors`, `.circle-style-presets`).
 - **Shape morph on state.** Selection/toggle changes morph the corner radius (circle ↔ rounded
   square) with `--md-ease-spring`, rather than toggling an outline. This is also valid as press

@@ -17,6 +17,11 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-15 — Motion physics spring return & theme tabs restoration
+
+- Decision: restored the `Solid / Transparent` segmented theme tabs to the original sliding pill capsule container utilizing the `SelectionIndicator` component (pill variant). Unselected tabs now have a hover overlay (`background: color-mix(...)`) to indicate interactivity.
+- Decision: implemented bouncy, asymmetric spring-back keyframe animations (`@keyframes swatchSpringBack`, `@keyframes swatchNeighborLeftSpringBack`, and `@keyframes swatchNeighborRightSpringBack`) with decaying wobbles over a 350ms duration when `.is-returning` is active. This replaces the linear return transitions, introducing organic motion physics to the color swatches and preset buttons.
+
 ### 2026-06-15 — Fixed shape morphing animation & incorrect corners at waviness 0
 
 - Decision: fixed the board animation loop (`tickBoardAnims` in `src/App.tsx`) where animation parameters (like `morph`) were dropped during the first-frame anchoring phase. Fixing this allows the shape morph animation to execute fully rather than snapping instantly.

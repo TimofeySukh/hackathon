@@ -17,6 +17,7 @@ import LandingPage from './LandingPage'
 import { loadGraph, saveGraph, loadLocalGraph, saveLocalGraph } from './lib/graphPersistence'
 import { enrichLinkedInProfile } from './lib/linkedinEnrichment'
 import { OnboardingCoach } from './Onboarding'
+import { SelectionIndicator } from './components/SelectionIndicator'
 import { M3Slider } from './components/M3Slider'
 import { ONBOARDING_STEPS, ONBOARDING_DONE_STEP } from './onboardingSteps'
 import type { OnboardingAction } from './onboardingSteps'
@@ -414,6 +415,7 @@ function App() {
   // Only touched from pointer event handlers, never during render.
   const gestureSnapshotTakenRef = useRef(false)
   const [pressingSwatchId, setPressingSwatchId] = useState<string | null>(null)
+  const [returningSwatchId, setReturningSwatchId] = useState<string | null>(null)
   const pressingSwatchTimeRef = useRef<number>(0)
   const pressingSwatchIdRef = useRef<string | null>(null)
   const swatchPressTxRef = useRef<number>(0)
@@ -1047,6 +1049,7 @@ function App() {
   function handleSwatchPointerDown(id: string, action: () => void) {
     ++swatchPressTxRef.current
     setPressingSwatchId(id)
+    setReturningSwatchId(null)
     pressingSwatchIdRef.current = id
     pressingSwatchTimeRef.current = performance.now()
     action()
@@ -1057,16 +1060,24 @@ function App() {
     pressingSwatchIdRef.current = null
     const tx = swatchPressTxRef.current
     const elapsed = performance.now() - pressingSwatchTimeRef.current
-    const minDur = 180 // Match the 0.18s CSS transition duration!
+    const minDur = 180 // Match the minimum hold duration
     if (elapsed < minDur) {
       setTimeout(() => {
         if (swatchPressTxRef.current === tx) {
           setPressingSwatchId(null)
+          setReturningSwatchId(id)
+          setTimeout(() => {
+            setReturningSwatchId((curr) => curr === id ? null : curr)
+          }, 350)
         }
       }, minDur - elapsed)
     } else {
       if (swatchPressTxRef.current === tx) {
         setPressingSwatchId(null)
+        setReturningSwatchId(id)
+        setTimeout(() => {
+          setReturningSwatchId((curr) => curr === id ? null : curr)
+        }, 350)
       }
     }
   }
@@ -3218,14 +3229,19 @@ function App() {
                   const selectedCircleAmplitude = selectedCircle.amplitude ?? 0
                   return (
                 <div className="inspector-visual-row">
-                  <div className="quick-circle-colors" aria-label="Quick circle colors">
+                  <div className="quick-circle-colors" aria-label="Quick circle colors" style={{ position: 'relative' }}>
+                    <SelectionIndicator
+                      variant="ring"
+                      activeKey={selectedCircle.tone && !selectedCircle.customColor ? 'tone:' + selectedCircle.tone : null}
+                    />
                     {(['blue', 'red', 'green', 'amber', 'violet'] as CircleTone[]).map((tone) => {
                       const id = `tone:${tone}`
                       return (
                         <button
                           key={tone}
                           type="button"
-                          className={`quick-circle-color ${selectedCircle.tone === tone && !selectedCircle.customColor ? 'is-selected' : ''} ${pressingSwatchId === id ? 'is-pressing' : ''}`}
+                          data-ind-key={id}
+                          className={`quick-circle-color ${selectedCircle.tone === tone && !selectedCircle.customColor ? 'is-selected' : ''} ${pressingSwatchId === id ? 'is-pressing' : ''} ${returningSwatchId === id ? 'is-returning' : ''}`}
                           style={{ backgroundColor: MATERIAL_TONES[tone].centerBg }}
                           onPointerDown={() => handleSwatchPointerDown(id, () => updateCircleStyle(selectedCircle.id, { tone, customColor: undefined }))}
                           onPointerUp={() => handleSwatchPointerUp(id)}
@@ -3265,8 +3281,13 @@ function App() {
                     {showCircleStylePanel && (
                       <div className="circle-style-popover">
                         <div className="circle-style-theme-tabs">
+                          <SelectionIndicator
+                            variant="pill"
+                            activeKey={selectedCircle.fillMode ?? circleFillMode}
+                          />
                           <button
                             type="button"
+                            data-ind-key="transparent"
                             className={(selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'is-selected' : ''}
                             onClick={() => updateCircleStyle(selectedCircle.id, { fillMode: 'transparent' })}
                           >
@@ -3274,6 +3295,7 @@ function App() {
                           </button>
                           <button
                             type="button"
+                            data-ind-key="solid"
                             className={(selectedCircle.fillMode ?? circleFillMode) === 'solid' ? 'is-selected' : ''}
                             onClick={() => updateCircleStyle(selectedCircle.id, { fillMode: 'solid' })}
                           >
@@ -3311,14 +3333,19 @@ function App() {
                         >
                           <span className="brightness-slider__thumb" />
                         </button>
-                        <div className="circle-style-presets">
+                        <div className="circle-style-presets" style={{ position: 'relative' }}>
+                          <SelectionIndicator
+                            variant="ring"
+                            activeKey={selectedCircle.customColor ? 'preset:' + selectedCircleColors.centerBg.toLowerCase() : null}
+                          />
                           {CIRCLE_COLOR_PRESETS.slice(0, 8).map((color) => {
-                            const id = `preset:${color}`
+                            const id = `preset:${color.toLowerCase()}`
                             return (
                               <button
                                 key={color}
                                 type="button"
-                                className={`circle-style-preset ${selectedCircleColors.centerBg.toLowerCase() === color.toLowerCase() ? 'is-selected' : ''} ${pressingSwatchId === id ? 'is-pressing' : ''}`}
+                                data-ind-key={id}
+                                className={`circle-style-preset ${selectedCircleColors.centerBg.toLowerCase() === color.toLowerCase() ? 'is-selected' : ''} ${pressingSwatchId === id ? 'is-pressing' : ''} ${returningSwatchId === id ? 'is-returning' : ''}`}
                                 style={{ backgroundColor: color }}
                                 onPointerDown={() => handleSwatchPointerDown(id, () => updateCircleStyle(selectedCircle.id, { customColor: color }))}
                                 onPointerUp={() => handleSwatchPointerUp(id)}

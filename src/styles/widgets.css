@@ -407,49 +407,43 @@
 
 .circle-style-theme-tabs {
   position: relative;
-  display: flex;
-  width: 100%;
-  height: 36px;
-  background: color-mix(in srgb, var(--md-surface-container-highest) 80%, transparent);
-  border: 1px solid var(--md-outline-variant);
+  justify-self: center;
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
   border-radius: var(--md-r-full);
-  overflow: hidden;
-  padding: 0;
+  background: color-mix(in srgb, var(--md-surface-container-highest) 80%, transparent);
 }
 
 .circle-style-theme-tabs button {
-  flex: 1 1 0%;
-  height: 100%;
-  border: none;
+  position: relative;
+  z-index: 1;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--md-r-full);
   background: transparent;
   color: var(--md-on-surface-variant);
   font-size: 12.5px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  /* Animate width expansion via flex-grow with expressive spring! */
-  transition:
-    flex-grow 0.25s var(--md-ease-spring),
-    background-color 0.2s ease,
-    color 0.2s ease,
-    transform 0.18s var(--md-ease-spring);
-}
-
-.circle-style-theme-tabs button + button {
-  border-left: 1px solid var(--md-outline-variant);
+  transition: color 0.18s, transform var(--md-dur-medium) var(--md-ease-spring), background-color 0.18s;
 }
 
 .circle-style-theme-tabs button:active {
-  transform: scale(0.96);
+  transform: scale(0.94);
 }
 
+/* The selected tab's filled pill is the sliding .selection-indicator (pill
+   variant) sitting behind the buttons, not a per-button background. */
 .circle-style-theme-tabs button.is-selected {
-  flex-grow: 1.5; /* Grow selected item width */
-  background: var(--md-secondary-container);
-  color: var(--md-on-secondary-container);
-  font-weight: 600;
+  color: var(--md-on-surface);
+}
+
+.circle-style-theme-tabs button:hover:not(.is-selected) {
+  background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
 }
 
 .color-wheel {
@@ -1066,5 +1060,88 @@
   .onboarding-coach {
     bottom: auto;
     top: 76px;
+  }
+}
+
+/* --- Bouncy spring-back motion physics for swatches and preset buttons --- */
+
+.quick-circle-color.is-returning,
+.circle-style-preset.is-returning {
+  animation: swatchSpringBack 350ms cubic-bezier(0.2, 0, 0, 1);
+  transition: none !important;
+}
+
+.quick-circle-color:has(+ .quick-circle-color.is-returning),
+.circle-style-preset:has(+ .circle-style-preset.is-returning) {
+  animation: swatchNeighborLeftSpringBack 350ms cubic-bezier(0.2, 0, 0, 1);
+  transition: none !important;
+}
+
+.quick-circle-color.is-returning + .quick-circle-color,
+.circle-style-preset.is-returning + .circle-style-preset {
+  animation: swatchNeighborRightSpringBack 350ms cubic-bezier(0.2, 0, 0, 1);
+  transition: none !important;
+}
+
+@keyframes swatchSpringBack {
+  0% {
+    transform: scaleX(1.12) scaleY(0.93);
+  }
+  20% {
+    transform: scaleX(0.90) scaleY(1.10);
+  }
+  40% {
+    transform: scaleX(1.05) scaleY(0.96);
+  }
+  60% {
+    transform: scaleX(0.98) scaleY(1.02);
+  }
+  80% {
+    transform: scaleX(1.01) scaleY(0.99);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes swatchNeighborLeftSpringBack {
+  0% {
+    transform: translateX(-4.5px) scaleX(0.92) scaleY(1.04);
+  }
+  20% {
+    transform: translateX(1.5px) scaleX(1.04) scaleY(0.97);
+  }
+  40% {
+    transform: translateX(-0.8px) scaleX(0.98) scaleY(1.01);
+  }
+  60% {
+    transform: translateX(0.4px) scaleX(1.01) scaleY(0.99);
+  }
+  80% {
+    transform: translateX(-0.1px) scaleX(1) scaleY(1);
+  }
+  100% {
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes swatchNeighborRightSpringBack {
+  0% {
+    transform: translateX(4.5px) scaleX(0.92) scaleY(1.04);
+  }
+  20% {
+    transform: translateX(-1.5px) scaleX(1.04) scaleY(0.97);
+  }
+  40% {
+    transform: translateX(0.8px) scaleX(0.98) scaleY(1.01);
+  }
+  60% {
+    transform: translateX(-0.4px) scaleX(1.01) scaleY(0.99);
+  }
+  80% {
+    transform: translateX(0.1px) scaleX(1) scaleY(1);
+  }
+  100% {
+    transform: translateX(0) scale(1);
   }
 }
