@@ -272,15 +272,22 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.2s, box-shadow 0.2s, transform var(--md-dur-short) var(--md-ease-standard);
+  transition:
+    background-color 0.2s,
+    box-shadow 0.2s,
+    transform var(--md-dur-medium) var(--md-ease-spring-gentle),
+    border-radius var(--md-dur-short) var(--md-ease-standard);
+  will-change: transform, border-radius;
 }
 
 .primary-action:hover {
   background: color-mix(in srgb, var(--md-primary) 92%, var(--md-on-primary));
+  transform: scale(1.04);
+  border-radius: 8px;
 }
 
 .primary-action:active {
-  transform: scale(0.96);
+  transform: scale(1.08);
 }
 
 .inspector p {

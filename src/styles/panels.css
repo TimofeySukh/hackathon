@@ -15,11 +15,11 @@
   /* Transition states */
   opacity: 0;
   visibility: hidden;
-  transform: scale(0.1);
+  transform: scale(0.92);
   transform-origin: calc(100% - 24px) -32px;
   transition:
     opacity var(--md-dur-medium) var(--md-ease-standard),
-    transform var(--md-dur-medium) var(--md-ease-spring),
+    transform var(--md-dur-medium) var(--md-ease-spring-gentle),
     visibility var(--md-dur-medium) var(--md-ease-standard);
   pointer-events: none;
   will-change: transform, opacity;
@@ -46,7 +46,7 @@
   background: var(--md-surface-container-high);
   color: var(--md-on-surface-variant);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 500;
   line-height: 22px;
   text-align: center;
   cursor: pointer;
@@ -55,8 +55,8 @@
     background-color 0.2s,
     color 0.2s,
     border-color 0.2s,
-    transform var(--md-dur-medium) var(--md-ease-spring),
-    border-radius var(--md-dur-medium) var(--md-ease-spring);
+    transform var(--md-dur-medium) var(--md-ease-spring-gentle),
+    border-radius var(--md-dur-short) var(--md-ease-standard);
   will-change: transform, border-radius;
 }
 
@@ -92,11 +92,11 @@
   /* Transition states */
   opacity: 0;
   visibility: hidden;
-  transform: scale(0.1);
+  transform: scale(0.92);
   transform-origin: calc(100% - 24px) 60px;
   transition:
     opacity var(--md-dur-medium) var(--md-ease-standard),
-    transform var(--md-dur-medium) var(--md-ease-spring),
+    transform var(--md-dur-medium) var(--md-ease-spring-gentle),
     visibility var(--md-dur-medium) var(--md-ease-standard);
   pointer-events: none;
   will-change: transform, opacity;
@@ -129,8 +129,8 @@
   cursor: pointer;
   transition:
     background-color 0.2s,
-    transform var(--md-dur-medium) var(--md-ease-spring),
-    border-radius var(--md-dur-medium) var(--md-ease-spring);
+    transform var(--md-dur-medium) var(--md-ease-spring-gentle),
+    border-radius var(--md-dur-short) var(--md-ease-standard);
   will-change: transform, border-radius;
 }
 
@@ -183,14 +183,14 @@
   background: var(--md-primary);
   color: var(--md-on-primary);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .linkedin-guide-step__title {
   margin: 0 0 4px;
   color: var(--md-on-surface);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.25;
 }
 
@@ -488,8 +488,8 @@
   width: 100%;
   
   /* Transition state */
-  transform: scale(0.92) translateY(10px);
-  transition: transform var(--md-dur-medium) var(--md-ease-spring);
+  transform: scale(0.95) translateY(10px);
+  transition: transform var(--md-dur-medium) var(--md-ease-spring-gentle);
 }
 
 .auth-overlay.is-open .auth-card {
@@ -513,8 +513,8 @@
   height: 28px;
   transition:
     background-color 0.2s,
-    transform var(--md-dur-medium) var(--md-ease-spring),
-    border-radius var(--md-dur-medium) var(--md-ease-spring);
+    transform var(--md-dur-medium) var(--md-ease-spring-gentle),
+    border-radius var(--md-dur-short) var(--md-ease-standard);
   will-change: transform, border-radius;
 }
 
@@ -541,8 +541,8 @@
   border-radius: var(--md-r-full);
   transition:
     background-color 0.2s,
-    transform var(--md-dur-medium) var(--md-ease-spring),
-    border-radius var(--md-dur-medium) var(--md-ease-spring);
+    transform var(--md-dur-medium) var(--md-ease-spring-gentle),
+    border-radius var(--md-dur-short) var(--md-ease-standard);
   will-change: transform, border-radius;
 }
 

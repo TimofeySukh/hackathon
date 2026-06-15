@@ -51,6 +51,7 @@
   /* Expressive spatial spring: fast move with a slight overshoot. Used by the
      persistent selection indicator so state changes feel physical, not linear. */
   --md-ease-spring: cubic-bezier(0.34, 1.45, 0.5, 1);
+  --md-ease-spring-gentle: cubic-bezier(0.34, 1.1, 0.5, 1);
   --md-dur-short: 0.12s;
   --md-dur-medium: 0.22s;
   --md-dur-long: 0.32s;

@@ -1134,47 +1134,36 @@ function App() {
 
     pushHistory()
     setGraph((current) => {
-      // 1. Gather all descendant circle IDs recursively
-      const deletedCircleIds = new Set<string>([circleId])
-      let expanded = true
-      while (expanded) {
-        expanded = false
-        for (const c of current.circles) {
-          if (c.parentId && deletedCircleIds.has(c.parentId) && !deletedCircleIds.has(c.id)) {
-            deletedCircleIds.add(c.id)
-            expanded = true
-          }
-        }
-      }
+      const deletedCircle = current.circles.find((c) => c.id === circleId)
+      if (!deletedCircle) return current
 
-      // 2. Identify people inside those circles
-      const deletedPeopleIds = new Set<string>()
-      for (const p of current.people) {
-        if (deletedCircleIds.has(p.circleId)) {
-          deletedPeopleIds.add(p.id)
-        }
-      }
+      const newParentId = deletedCircle.parentId ?? 'you'
 
-      // 3. Filter circles: remove deleted, update connectedTo if it points to a deleted circle
+      // 1. Promote child circles to the parent of the deleted circle
       const nextCircles = current.circles
-        .filter((c) => !deletedCircleIds.has(c.id))
+        .filter((c) => c.id !== circleId)
         .map((c) => {
-          if (c.connectedTo && deletedCircleIds.has(c.connectedTo)) {
-            return { ...c, connectedTo: 'you' }
+          let updated = { ...c }
+          if (c.parentId === circleId) {
+            updated.parentId = newParentId
           }
-          return c
+          if (c.connectedTo === circleId) {
+            updated.connectedTo = 'you'
+          }
+          return updated
         })
 
-      // 4. Filter people: remove deleted
-      const nextPeople = current.people.filter((p) => !deletedPeopleIds.has(p.id))
+      // 2. Promote people inside the deleted circle to the parent of the deleted circle
+      const nextPeople = current.people.map((p) => {
+        if (p.circleId === circleId) {
+          return { ...p, circleId: newParentId }
+        }
+        return p
+      })
 
-      // 5. Filter connections: remove if fromId or toId is deleted
+      // 3. Filter connections: remove connection only if it directly connected the deleted circle
       const nextConnections = (current.connections || []).filter(
-        (conn) =>
-          !deletedPeopleIds.has(conn.fromId) &&
-          !deletedCircleIds.has(conn.fromId) &&
-          !deletedPeopleIds.has(conn.toId) &&
-          !deletedCircleIds.has(conn.toId)
+        (conn) => conn.fromId !== circleId && conn.toId !== circleId
       )
 
       return ensureContainment({
@@ -4010,7 +3999,7 @@ function App() {
             >
               ×
             </button>
-            <h2 style={{ margin: '0 0 4px', fontSize: '18px', fontWeight: 600, color: 'var(--md-on-surface)' }}>
+            <h2 style={{ margin: '0 0 4px', fontSize: '18px', fontWeight: 500, color: 'var(--md-on-surface)' }}>
               {emailAuthMode === 'signup' ? 'Create account' : 'Sign in'}
             </h2>
             <p style={{ margin: '0 0 16px', fontSize: '13px', color: 'var(--md-on-surface-variant)' }}>

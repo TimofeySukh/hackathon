@@ -24,7 +24,7 @@
 }
 
 .merge-prompt-text strong {
-  font-weight: 600;
+  font-weight: 500;
   color: var(--md-primary);
 }
 
@@ -62,8 +62,8 @@
   transition:
     background-color 0.2s,
     box-shadow 0.2s,
-    transform var(--md-dur-medium) var(--md-ease-spring),
-    border-radius var(--md-dur-medium) var(--md-ease-spring);
+    transform var(--md-dur-medium) var(--md-ease-spring-gentle),
+    border-radius var(--md-dur-short) var(--md-ease-standard);
   will-change: transform, border-radius;
 }
 
@@ -425,11 +425,11 @@
   /* Transition states */
   opacity: 0;
   visibility: hidden;
-  transform: scale(0.1);
+  transform: scale(0.92);
   transform-origin: calc(100% - 24px) calc(100% + 40px);
   transition:
     opacity var(--md-dur-medium) var(--md-ease-standard),
-    transform var(--md-dur-medium) var(--md-ease-spring),
+    transform var(--md-dur-medium) var(--md-ease-spring-gentle),
     visibility var(--md-dur-medium) var(--md-ease-standard);
   pointer-events: none;
 }
@@ -460,7 +460,7 @@
   background: transparent;
   color: var(--md-on-surface-variant);
   font-size: 12.5px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -468,8 +468,8 @@
   transition:
     color 0.18s,
     background-color 0.18s,
-    transform var(--md-dur-medium) var(--md-ease-spring),
-    border-radius var(--md-dur-medium) var(--md-ease-spring);
+    transform var(--md-dur-medium) var(--md-ease-spring-gentle),
+    border-radius var(--md-dur-short) var(--md-ease-standard);
   will-change: transform, border-radius;
 }
 
@@ -972,14 +972,14 @@
 
 .onboarding-coach__eyebrow {
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.02em;
   color: var(--md-primary);
 }
 
 .onboarding-coach__title {
   font-size: 17px;
-  font-weight: 600;
+  font-weight: 500;
   padding-right: 24px;
   color: var(--md-on-surface);
 }
@@ -1039,12 +1039,18 @@
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.15s;
+  transition:
+    background-color 0.15s,
+    transform var(--md-dur-medium) var(--md-ease-spring-gentle),
+    border-radius var(--md-dur-short) var(--md-ease-standard);
+  will-change: transform, border-radius;
 }
 
 .onboarding-coach__skip:hover,
 .onboarding-coach__back:hover {
   background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+  transform: scale(1.04);
+  border-radius: 8px;
 }
 
 /* The post-action "Great!" beat: a compact card that pops in for ~1s before the
@@ -1083,13 +1089,13 @@
   background: var(--md-primary);
   color: var(--md-on-primary);
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 500;
   line-height: 1;
 }
 
 .onboarding-coach__cheer-text {
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--md-on-surface);
 }
 
@@ -1100,14 +1106,25 @@
   color: var(--md-on-primary);
   padding: 9px 18px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s, box-shadow 0.2s;
+  transition:
+    background-color 0.2s,
+    box-shadow 0.2s,
+    transform var(--md-dur-medium) var(--md-ease-spring-gentle),
+    border-radius var(--md-dur-short) var(--md-ease-standard);
+  will-change: transform, border-radius;
 }
 
 .onboarding-coach__primary:hover {
   background: color-mix(in srgb, var(--md-primary) 92%, black);
   box-shadow: var(--md-elev-1);
+  transform: scale(1.04);
+  border-radius: 8px;
+}
+
+.onboarding-coach__primary:active {
+  transform: scale(1.08);
 }
 
 @media (max-width: 720px) {
