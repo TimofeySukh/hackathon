@@ -3195,7 +3195,7 @@ function App() {
                         type="button"
                         className={`quick-circle-color ${selectedCircle.tone === tone && !selectedCircle.customColor ? 'is-selected' : ''}`}
                         style={{ backgroundColor: MATERIAL_TONES[tone].centerBg }}
-                        onClick={() => updateCircleStyle(selectedCircle.id, { tone, customColor: undefined })}
+                        onPointerDown={() => updateCircleStyle(selectedCircle.id, { tone, customColor: undefined })}
                         aria-label={`Set quick color ${tone}`}
                       />
                     ))}
@@ -3288,7 +3288,7 @@ function App() {
                               type="button"
                               className={`circle-style-preset ${selectedCircleColors.centerBg.toLowerCase() === color.toLowerCase() ? 'is-selected' : ''}`}
                               style={{ backgroundColor: color }}
-                              onClick={() => updateCircleStyle(selectedCircle.id, { customColor: color })}
+                              onPointerDown={() => updateCircleStyle(selectedCircle.id, { customColor: color })}
                               aria-label={`Set circle color ${color}`}
                             />
                           ))}
@@ -3299,6 +3299,7 @@ function App() {
                             label={selectedCircleAmplitude <= 0 ? 'Wavyness' : `Wavyness ${Math.round(selectedCircleAmplitude)}`}
                             min={0}
                             max={28}
+                            step={0.1}
                             value={selectedCircleAmplitude}
                             onChange={(value) => updateCircleAmplitude(selectedCircle, value)}
                           />

@@ -223,58 +223,116 @@
   flex: 0 0 auto;
 }
 
-.circle-style-control {
-  position: relative;
-}
-
 .quick-circle-colors {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
-  flex: 1;
+  flex: 1 1 auto;
 }
 
 .quick-circle-color {
-  width: 26px;
-  height: 26px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   border: 1px solid rgba(0, 0, 0, 0.16);
   cursor: pointer;
   padding: 0;
+  transition:
+    border-radius var(--md-dur-medium) var(--md-ease-spring),
+    transform var(--md-dur-medium) var(--md-ease-spring);
 }
 
+/* Connected button-group press (M3 Expressive): the pressed swatch grows and
+   springs back; only its *immediate* neighbours react, each recoiling *away*
+   from the pressed one (left neighbour shifts left, right neighbour shifts
+   right) — the row behaves like one elastic group, not every item at once. */
+.quick-circle-color:active {
+  transform: scale(1.12);
+}
+
+.quick-circle-color:has(+ .quick-circle-color:active) {
+  transform: translateX(-5px);
+}
+
+.quick-circle-color:active + .quick-circle-color {
+  transform: translateX(5px);
+}
+
+/* The selected color morphs from a circle to a rounded square (M3 shape morph),
+   so the active swatch reads instantly without an extra outline. */
 .quick-circle-color.is-selected {
-  outline: 2px solid var(--md-primary);
-  outline-offset: 2px;
+  border-radius: 9px;
 }
 
-.circle-style-button {
-  display: grid;
-  width: 40px;
-  height: 40px;
-  place-items: center;
-  border-radius: 50%;
+.quick-circle-color:hover:not(.is-selected) {
+  border-radius: 12px;
+  transform: scale(1.06);
+}
+
+/* The palette / "more colors" entry is a same-size member of the swatch row. */
+.quick-circle-color--more {
   background: var(--md-surface-container-highest);
   color: var(--md-on-surface-variant);
-  border: 1px solid var(--md-outline-variant);
-  cursor: pointer;
-  transition: background-color 0.18s, color 0.18s, transform 0.18s, box-shadow 0.18s, outline-color 0.18s;
 }
 
-.circle-style-button:hover {
-  background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+.quick-circle-color--more:hover {
+  background: color-mix(in srgb, var(--md-on-surface) 8%, var(--md-surface-container-highest));
 }
 
-.circle-style-button.is-custom-color,
-.circle-style-button.is-open {
-  outline: 3px solid color-mix(in srgb, currentColor 24%, transparent);
-  outline-offset: 3px;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0,0,0,.16);
+.quick-circle-color--more.is-open {
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
 }
 
-.circle-style-button svg,
+.quick-circle-color--more svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Persistent selection indicator: one element that slides to the active option
+   instead of an outline/background appearing on each item. See
+   components/SelectionIndicator.tsx. */
+.selection-indicator {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  transition:
+    transform var(--md-dur-medium) var(--md-ease-spring),
+    width var(--md-dur-medium) var(--md-ease-spring),
+    height var(--md-dur-medium) var(--md-ease-spring);
+}
+
+.selection-indicator.no-anim {
+  transition: none;
+}
+
+.selection-indicator.is-hidden {
+  display: none;
+}
+
+.selection-indicator--ring {
+  border: 2px solid var(--md-primary);
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.selection-indicator--pill {
+  z-index: 0;
+  border-radius: var(--md-r-full);
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
 .circle-fill-toggle svg,
 .connection-item svg,
 .connection-service-picker svg {
@@ -342,6 +400,7 @@
 }
 
 .circle-style-theme-tabs {
+  position: relative;
   justify-self: center;
   display: inline-flex;
   gap: 6px;
@@ -351,6 +410,8 @@
 }
 
 .circle-style-theme-tabs button {
+  position: relative;
+  z-index: 1;
   height: 32px;
   padding: 0 14px;
   border-radius: var(--md-r-full);
@@ -359,14 +420,17 @@
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.18s, color 0.18s, box-shadow 0.18s, transform 0.18s;
+  transition: color 0.18s, transform var(--md-dur-medium) var(--md-ease-spring);
 }
 
+.circle-style-theme-tabs button:active {
+  transform: scale(0.94);
+}
+
+/* The selected tab's filled pill is the sliding .selection-indicator (pill
+   variant) sitting behind the buttons, not a per-button background. */
 .circle-style-theme-tabs button.is-selected {
-  background: rgba(255, 255, 255, 0.72);
   color: var(--md-on-surface);
-  box-shadow: 0 1px 2px rgba(0,0,0,.12);
-  transform: scale(1.03);
 }
 
 .color-wheel {
@@ -417,12 +481,12 @@
   box-shadow: 0 2px 7px rgba(0,0,0,.26);
   transform: translate(-50%, -50%);
   z-index: 1;
-  transition: transform 0.1s cubic-bezier(.2, 0, 0, 1), box-shadow 0.1s;
+  transition: transform var(--md-dur-short) var(--md-ease-spring), box-shadow 0.1s;
   animation: pickerThumbPop 0.16s cubic-bezier(.2, 0, 0, 1);
 }
 
 .color-wheel:active .color-wheel__thumb {
-  transform: translate(-50%, -50%) scale(1.12);
+  transform: translate(-50%, -50%) scale(1.18);
   box-shadow: 0 4px 12px rgba(0,0,0,.3);
 }
 
@@ -448,11 +512,11 @@
   background: rgba(255, 255, 255, 0.84);
   box-shadow: 0 1px 5px rgba(0,0,0,.24);
   transform: translate(-50%, -50%);
-  transition: transform 0.1s cubic-bezier(.2, 0, 0, 1);
+  transition: transform var(--md-dur-short) var(--md-ease-spring);
 }
 
 .brightness-slider:active .brightness-slider__thumb {
-  transform: translate(-50%, -50%) scale(1.12);
+  transform: translate(-50%, -50%) scale(1.18);
 }
 
 .circle-style-presets {
@@ -467,23 +531,93 @@
   border-radius: 50%;
   border: 1px solid rgba(0, 0, 0, 0.16);
   cursor: pointer;
+  transition:
+    border-radius var(--md-dur-medium) var(--md-ease-spring),
+    transform var(--md-dur-medium) var(--md-ease-spring);
 }
 
+/* Same connected-group press as the quick swatches: only immediate neighbours
+   recoil away from the pressed preset. */
+.circle-style-preset:active {
+  transform: scale(1.15);
+}
+
+.circle-style-preset:has(+ .circle-style-preset:active) {
+  transform: translateX(-5px);
+}
+
+.circle-style-preset:active + .circle-style-preset {
+  transform: translateX(5px);
+}
+
+/* Selected preset morphs circle -> rounded square (M3 shape morph). */
 .circle-style-preset.is-selected {
-  outline: 2px solid var(--md-primary);
-  outline-offset: 2px;
+  border-radius: 8px;
 }
 
-.circle-style-control-row {
-  display: grid;
-  gap: 6px;
-  color: var(--md-on-surface-variant);
-  font-size: 12px;
-  font-weight: 500;
+.circle-style-preset:hover:not(.is-selected) {
+  border-radius: 11px;
+  transform: scale(1.06);
 }
 
 .circle-style-shape-controls {
-  display: none;
+  display: grid;
+  gap: 12px; /* match the popover's section rhythm */
+}
+
+/* Material 3 slider (reusable) — see components/M3Slider.tsx. Thick track, a
+   vertical pill handle, and a gap on each side of the handle. The `wave` variant
+   draws the active track as a sine wave whose amplitude grows with the value. */
+.m3-slider {
+  display: grid;
+  gap: 6px;
+}
+
+.m3-slider__label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--md-on-surface-variant);
+}
+
+.m3-slider__track {
+  position: relative;
+  width: 100%;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.m3-slider__svg {
+  display: block;
+  overflow: visible;
+}
+
+.m3-slider__active {
+  stroke: var(--md-primary);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.m3-slider__inactive {
+  stroke: var(--md-surface-container-highest);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.m3-slider__handle {
+  position: absolute;
+  top: 50%;
+  width: 4px;
+  height: 20px;
+  border-radius: var(--md-r-full);
+  background: var(--md-primary);
+  transform: translate(-50%, -50%);
+  transition: height var(--md-dur-short) var(--md-ease-spring);
+  pointer-events: none;
+}
+
+.m3-slider__track:active .m3-slider__handle {
+  height: 26px;
 }
 
 @keyframes circleStyleIn {
