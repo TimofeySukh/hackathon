@@ -416,6 +416,8 @@ function App() {
   const gestureSnapshotTakenRef = useRef(false)
   const [pressingSwatchId, setPressingSwatchId] = useState<string | null>(null)
   const pressingSwatchTimeRef = useRef<number>(0)
+  const pressingSwatchIdRef = useRef<string | null>(null)
+  const swatchPressTxRef = useRef<number>(0)
   const auth = useAuth()
   const userId = auth.session?.user?.id ?? null
   // Sign-in dialog: a single "Sign in" button opens this; it holds every
@@ -1044,20 +1046,29 @@ function App() {
   }
 
   function handleSwatchPointerDown(id: string, action: () => void) {
+    ++swatchPressTxRef.current
     setPressingSwatchId(id)
+    pressingSwatchIdRef.current = id
     pressingSwatchTimeRef.current = performance.now()
     action()
   }
 
   function handleSwatchPointerUp(id: string) {
+    if (pressingSwatchIdRef.current !== id) return
+    pressingSwatchIdRef.current = null
+    const tx = swatchPressTxRef.current
     const elapsed = performance.now() - pressingSwatchTimeRef.current
     const minDur = 250 // Match the 0.25s CSS transition duration!
     if (elapsed < minDur) {
       setTimeout(() => {
-        setPressingSwatchId((curr) => (curr === id ? null : curr))
+        if (swatchPressTxRef.current === tx) {
+          setPressingSwatchId(null)
+        }
       }, minDur - elapsed)
     } else {
-      setPressingSwatchId((curr) => (curr === id ? null : curr))
+      if (swatchPressTxRef.current === tx) {
+        setPressingSwatchId(null)
+      }
     }
   }
 
@@ -1071,11 +1082,9 @@ function App() {
       sides,
       amplitude,
     })
-    // Morph the shape between side counts so the polygon eases instead of
-    // snapping. Short for single-step drags, longer for bigger jumps (track taps).
+    // Morph the shape smoothly over a snappy 250ms interval.
     if (fromSides !== sides) {
-      const duration = Math.min(320, 140 + Math.abs(sides - fromSides) * 30)
-      startBoardAnim('morph:' + circle.id, duration, {
+      startBoardAnim('morph:' + circle.id, 250, {
         fromSides,
         fromAmp: amplitude,
         toSides: sides,
@@ -1096,8 +1105,10 @@ function App() {
       sides,
       amplitude,
     })
-    if (fromAmplitude !== amplitude) {
-      startBoardAnim('morph:' + circle.id, 300, {
+    // Only schedule a morph animation for significant jumps (e.g. tapping the track).
+    // Continuous drag steps update statically in real-time.
+    if (Math.abs(amplitude - fromAmplitude) > 1.5) {
+      startBoardAnim('morph:' + circle.id, 250, {
         fromSides: sides,
         fromAmp: fromAmplitude,
         toSides: sides,

@@ -9,11 +9,34 @@ You)** by Google.
 - Read this file before building or restyling any UI.
 - When you add a new screen, panel, menu, or control, style it with the tokens and
   component recipes below. Do not invent new colors, radii, shadows, or font weights.
+- **Reuse before you build. Do not reinvent the wheel.** If a control already exists
+  (`SelectionIndicator`, the swatch/preset shape-morph, the pill/button recipes, etc.),
+  reuse it — and *modify it for the new use case* (add a variant/prop) rather than writing a
+  second, parallel default. One concept = one component. The whole UI must read as one system:
+  same elements, same motion, same tokens everywhere. Before adding a control, grep
+  `src/components/` and `src/styles/` for an existing one.
+- **Get the M3 spec right — don't guess.** When a recipe here doesn't cover what you need, or
+  you're unsure how Material does something, either (a) consult the official M3 docs
+  (links in *Reference* below), or (b) work only from a detailed recipe written down here.
+  If you learn a concrete M3 detail from the web, write it into this file (token/recipe) in the
+  same change so the next person doesn't have to re-research it. Keep one source of truth.
 - If a real need is not covered here, add the token or recipe to this file in the same
-  change, then use it. Keep one source of truth.
+  change, then use it.
 - When you make a notable, durable design decision (a deviation, a new pattern, a
   rejected option), record it in [`DESIGN_LOG.md`](DESIGN_LOG.md).
 - Per-feature look and behavior is documented under [`features/`](features/README.md).
+
+## Reference (official Material 3)
+
+When in doubt, read the source rather than guessing — then fold what you learn back into this
+file as a token or recipe.
+
+- Material 3 Expressive overview: https://m3.material.io/blog/building-with-m3-expressive
+- Motion (springs, schemes): https://m3.material.io/styles/motion/overview/how-it-works
+- Transitions (continuity, shared axis, container transform): https://m3.material.io/styles/motion/transitions
+- Shape & shape morph: https://m3.material.io/styles/shape/shape-morph
+- Buttons (incl. interactive shape morph / button groups): https://m3.material.io/components/buttons/overview
+- Color roles: https://m3.material.io/styles/color/roles
 
 ## Current Status (be honest about the gap)
 
@@ -178,6 +201,7 @@ durations or beziers.
 --md-ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
 --md-ease-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1); /* enters */
 --md-ease-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15); /* exits  */
+--md-ease-spring:     cubic-bezier(0.34, 1.45, 0.5, 1); /* expressive spatial: fast, slight overshoot */
 --md-dur-short:  0.12s;  /* press feedback, small state changes */
 --md-dur-medium: 0.22s;  /* panel / menu entrances              */
 --md-dur-long:   0.32s;  /* larger sheets                       */
@@ -185,15 +209,52 @@ durations or beziers.
 
 Rules of thumb:
 
+- **Continuity over appear/disappear.** This is the core of M3 motion: interface elements
+  persist and *move* rather than spawn and vanish. Selection state is an object that lives in
+  the UI and slides between options — not a property that blinks on each item.
+- **Selection should change, not blink.** Never toggle a per-item `outline`/`background` on
+  `.is-selected`. Express the selected state with continuous motion, matched to the control:
+  - **Shape morph** for swatch-like items (color swatches, presets): the selected item morphs
+    from a circle to a rounded square (`border-radius: 50% → 8–9px`) with `--md-ease-spring`.
+    Best when items are tightly packed and an extra ring/background would crowd them.
+  - **Sliding indicator** (`SelectionIndicator`, `src/components/SelectionIndicator.tsx`) for
+    segmented controls, tabs, and the active toolbar tool: one persistent pill/track that
+    translates and resizes to the selected segment. Mount it in a `position: relative` group,
+    tag each option with `data-ind-key`, drive it with `activeKey`. It moves with
+    `--md-ease-spring` at `--md-dur-medium`; first placement on mount is instant, only later
+    moves animate.
 - **Surfaces that appear** (inspector, menus, dropdowns, prompts) enter with a fade plus a
   small translate/scale toward their resting position, `--md-dur-medium` + `--md-ease-decelerate`.
-- **Press feedback**: interactive controls get a subtle `:active { transform: scale(...) }`
-  at `--md-dur-short`. Pills ~0.96, icon buttons ~0.9.
+- **Press feedback is springy, not linear.** Interactive controls get `:active { transform: scale(...) }`
+  transitioned with `--md-ease-spring` so they spring back on release (not a flat ease).
+  Plain controls scale *down* on press (pills ~0.96, icon buttons ~0.9). Thumbs/handles
+  scale *up* on grab (~1.18).
+- **Connected button group (M3 Expressive).** When several like controls sit in a single row and
+  are pressed individually (color swatches, presets, a toolbar tool group), the pressed item
+  **grows** and **only its immediate neighbours** react — each recoiling *away* from the pressed
+  one (not every item, and not a uniform shrink). Use `:active` with the adjacency/`:has()`
+  combinators so exactly the two neighbours move:
+  ```css
+  .item:active                  { transform: scale(1.12); }    /* pressed grows        */
+  .item:has(+ .item:active)     { transform: translateX(-5px); } /* left neighbour recoils  */
+  .item:active + .item          { transform: translateX(5px); }  /* right neighbour recoils */
+  ```
+  Drive all with `--md-ease-spring`. For round items (swatches) the neighbour translates away;
+  for rectangular group buttons, compress the neighbour with `transform: scaleX(...)` and
+  `transform-origin` on its *far* side, so its far edge and height stay put while its near edge
+  pushes away from the pressed button. Single row only — adjacency breaks across grid wraps.
+  Canonical impl: the circle picker (`.quick-circle-colors`, `.circle-style-presets`).
+- **Shape morph on state.** Selection/toggle changes morph the corner radius (circle ↔ rounded
+  square) with `--md-ease-spring`, rather than toggling an outline. This is also valid as press
+  feedback (corners briefly square on press) for pill/icon buttons.
 - **Canvas nodes**: feedback is rendered in the draw loop, not CSS. Newly created nodes
   **grow in** through the transient board-animation loop (`startBoardAnim` / `AnimFrame` in
   `src/App.tsx`) — repaint only while an animation is live, then settle. Note: a selection
   *bounce* was tried and removed (looked bad); selection feedback comes from the inspector
-  entrance and the existing selection emphasis, not from animating the node.
+  entrance and the existing selection emphasis, not from animating the node. The same loop also
+  **morphs a circle's wavy amplitude** (`morph:<id>` anim → `AnimFrame.amplitudes`) on jumps, so
+  shape changes ease instead of snapping. Only continuous params morph — `sides` (polygon/wave
+  vertex count) is discrete and snaps.
 - **Always honor `prefers-reduced-motion: reduce`**: a global CSS guard collapses animations
   and transitions to ~0; the canvas loop is skipped via `prefersReducedMotion()`.
 - Don't add decorative motion that isn't feedback (e.g. a separate pulse ring) — animate the
@@ -239,7 +300,13 @@ These are the canonical patterns. Reach for one of these before writing a new co
 
 ### Slider
 
-- Material 3 slider: thicker track, visible handle, `--md-primary` accent.
+- Use the reusable `M3Slider` (`src/components/M3Slider.tsx`) — don't hand-roll another or use a
+  bare `input[type=range]`. Thick track (`--md-primary` active / `--md-surface-container-highest`
+  inactive), a vertical **pill handle** (grows on press via `--md-ease-spring`), and a gap on each
+  side of the handle.
+- `variant="wave"` renders the active track as a sine wave whose amplitude grows with the value —
+  use it when the value *is* a wave amount (e.g. the circle "Wavyness" control) so the slider
+  visualises what it changes. `variant="plain"` (default) for everything else.
 
 ### Menu (e.g. create menu)
 

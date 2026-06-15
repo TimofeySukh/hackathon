@@ -251,15 +251,15 @@
    from the pressed one (left neighbour shifts left, right neighbour shifts
    right) — the row behaves like one elastic group, not every item at once.
    We also squash the active item and stretch/compress neighbours horizontally. */
-.quick-circle-color:active {
+.quick-circle-color.is-pressing {
   transform: scaleX(1.18) scaleY(0.92);
 }
 
-.quick-circle-color:has(+ .quick-circle-color:active) {
+.quick-circle-color:has(+ .quick-circle-color.is-pressing) {
   transform: translateX(-7px) scaleX(0.85) scaleY(1.05);
 }
 
-.quick-circle-color:active + .quick-circle-color {
+.quick-circle-color.is-pressing + .quick-circle-color {
   transform: translateX(7px) scaleX(0.85) scaleY(1.05);
 }
 
@@ -539,15 +539,15 @@
 
 /* Same connected-group press as the quick swatches: only immediate neighbours
    recoil away from the pressed preset, with squash/stretch deformation. */
-.circle-style-preset:active {
+.circle-style-preset.is-pressing {
   transform: scaleX(1.18) scaleY(0.92);
 }
 
-.circle-style-preset:has(+ .circle-style-preset:active) {
+.circle-style-preset:has(+ .circle-style-preset.is-pressing) {
   transform: translateX(-7px) scaleX(0.85) scaleY(1.05);
 }
 
-.circle-style-preset:active + .circle-style-preset {
+.circle-style-preset.is-pressing + .circle-style-preset {
   transform: translateX(7px) scaleX(0.85) scaleY(1.05);
 }
 

@@ -30,7 +30,7 @@ export const COLLISION_PASSES = 10
 // Side of one spatial-hash cell (world units) used by the board index.
 export const BOARD_GRID_SIZE = 360
 
-export const EMPTY_ANIM_FRAME: AnimFrame = { scales: new Map() }
+export const EMPTY_ANIM_FRAME: AnimFrame = { scales: new Map(), morphs: new Map() }
 
 export const MATERIAL_TONES: Record<CircleTone, { fill: string; border: string; text: string; centerBg: string }> = {
   blue: { fill: '#D2E4FF', border: '#004A77', text: '#001D35', centerBg: '#00629D' },
@@ -40,30 +40,28 @@ export const MATERIAL_TONES: Record<CircleTone, { fill: string; border: string; 
   violet: { fill: '#EADDFF', border: '#6750A4', text: '#21005D', centerBg: '#7F67BE' },
 }
 
+// The picker shows the first 8 of these as presets. They are deliberately
+// distinct from the five quick-swatch tones (blue/red/green/amber/violet) so the
+// presets add reach instead of repeating colors already one tap away.
 export const CIRCLE_COLOR_PRESETS = [
-  '#00629D',
-  '#C00015',
-  '#1E824A',
-  '#D87A00',
-  '#7F67BE',
+  '#00897B', // teal
+  '#00838F', // cyan
+  '#5E35B1', // deep purple
+  '#AD1457', // magenta
+  '#6D4C41', // brown
+  '#546E7A', // slate
+  '#8AC926', // lime
+  '#F95738', // coral
+  // remaining options (not shown in the 8-swatch grid, kept for reuse)
   '#0B57D0',
-  '#00897B',
-  '#6D4C41',
-  '#AD1457',
-  '#546E7A',
-  '#F57C00',
   '#2E7D32',
-  '#5E35B1',
-  '#00838F',
-  '#8D6E63',
+  '#F57C00',
   '#455A64',
   '#F4D35E',
   '#EE964B',
-  '#F95738',
   '#A23E48',
   '#6A4C93',
   '#1982C4',
-  '#8AC926',
   '#B8C480',
 ]
 
