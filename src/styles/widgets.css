@@ -1,5 +1,24 @@
 /* Merge prompt, local-save hint, circle-style popover, color wheel, connections. */
 
+/* Register the color-picker custom properties as typed <percentage> values so
+   CSS knows how to interpolate them during transitions.  Without @property the
+   browser treats them as opaque strings and can't animate through them. */
+@property --wheel-x {
+  syntax: '<percentage>';
+  inherits: true;
+  initial-value: 50%;
+}
+@property --wheel-y {
+  syntax: '<percentage>';
+  inherits: true;
+  initial-value: 50%;
+}
+@property --brightness-pos {
+  syntax: '<percentage>';
+  inherits: true;
+  initial-value: 0%;
+}
+
 .merge-prompt-panel {
   position: absolute;
   bottom: 24px;
@@ -539,9 +558,11 @@
   box-shadow: 0 2px 7px rgba(0,0,0,.26);
   transform: translate(-50%, -50%);
   z-index: 1;
+  /* Animate the typed custom props (registered via @property) so the browser
+     can correctly interpolate the percentage values on tap. */
   transition:
-    left var(--md-dur-medium) var(--md-ease-spring),
-    top var(--md-dur-medium) var(--md-ease-spring),
+    --wheel-x var(--md-dur-medium) var(--md-ease-spring),
+    --wheel-y var(--md-dur-medium) var(--md-ease-spring),
     transform var(--md-dur-short) var(--md-ease-spring),
     box-shadow 0.1s;
   animation: pickerThumbPop 0.16s cubic-bezier(.2, 0, 0, 1);
@@ -550,6 +571,12 @@
 .color-wheel:active .color-wheel__thumb {
   transform: translate(-50%, -50%) scale(1.18);
   box-shadow: 0 4px 12px rgba(0,0,0,.3);
+  /* No transition override here: a tap keeps the --wheel-x/y spring so the
+     thumb glides to the tapped point. */
+}
+
+/* Active drag (after the first move) → instant tracking, no position latency. */
+.color-wheel.is-dragging .color-wheel__thumb {
   transition: transform var(--md-dur-short) var(--md-ease-spring), box-shadow 0.1s;
 }
 
@@ -575,13 +602,19 @@
   background: rgba(255, 255, 255, 0.84);
   box-shadow: 0 1px 5px rgba(0,0,0,.24);
   transform: translate(-50%, -50%);
+  /* Animate the typed custom prop (registered via @property above). */
   transition:
-    left var(--md-dur-medium) var(--md-ease-spring),
+    --brightness-pos var(--md-dur-medium) var(--md-ease-spring),
     transform var(--md-dur-short) var(--md-ease-spring);
 }
 
 .brightness-slider:active .brightness-slider__thumb {
   transform: translate(-50%, -50%) scale(1.18);
+  /* Tap keeps the --brightness-pos spring so the thumb glides to the tapped point. */
+}
+
+/* Active drag (after the first move) → instant tracking, no position latency. */
+.brightness-slider.is-dragging .brightness-slider__thumb {
   transition: transform var(--md-dur-short) var(--md-ease-spring);
 }
 
