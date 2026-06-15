@@ -3230,10 +3230,7 @@ function App() {
                   return (
                 <div className="inspector-visual-row">
                   <div className="quick-circle-colors" aria-label="Quick circle colors" style={{ position: 'relative' }}>
-                    <SelectionIndicator
-                      variant="ring"
-                      activeKey={selectedCircle.tone && !selectedCircle.customColor ? 'tone:' + selectedCircle.tone : null}
-                    />
+
                     {(['blue', 'red', 'green', 'amber', 'violet'] as CircleTone[]).map((tone) => {
                       const id = `tone:${tone}`
                       return (
@@ -3334,10 +3331,7 @@ function App() {
                           <span className="brightness-slider__thumb" />
                         </button>
                         <div className="circle-style-presets" style={{ position: 'relative' }}>
-                          <SelectionIndicator
-                            variant="ring"
-                            activeKey={selectedCircle.customColor ? 'preset:' + selectedCircleColors.centerBg.toLowerCase() : null}
-                          />
+
                           {CIRCLE_COLOR_PRESETS.slice(0, 8).map((color) => {
                             const id = `preset:${color.toLowerCase()}`
                             return (
