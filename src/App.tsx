@@ -1058,7 +1058,7 @@ function App() {
     pressingSwatchIdRef.current = null
     const tx = swatchPressTxRef.current
     const elapsed = performance.now() - pressingSwatchTimeRef.current
-    const minDur = 250 // Match the 0.25s CSS transition duration!
+    const minDur = 180 // Match the 0.18s CSS transition duration!
     if (elapsed < minDur) {
       setTimeout(() => {
         if (swatchPressTxRef.current === tx) {
