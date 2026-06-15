@@ -11,9 +11,25 @@
   border: none;
   background: var(--md-surface-container);
   box-shadow: var(--md-elev-2);
-  transform-origin: top right;
-  animation: panelIn var(--md-dur-medium, 0.22s) var(--md-ease-decelerate) forwards;
+  
+  /* Transition states */
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(0.1);
+  transform-origin: calc(100% - 24px) -32px;
+  transition:
+    opacity var(--md-dur-medium) var(--md-ease-standard),
+    transform var(--md-dur-medium) var(--md-ease-spring),
+    visibility var(--md-dur-medium) var(--md-ease-standard);
+  pointer-events: none;
   will-change: transform, opacity;
+}
+
+.settings-panel.is-open {
+  opacity: 1;
+  visibility: visible;
+  transform: scale(1);
+  pointer-events: auto;
 }
 
 /* Small "?" help button next to the LinkedIn Data Import label. Opens the
@@ -35,13 +51,26 @@
   text-align: center;
   cursor: pointer;
   transform: translateY(-3px);
-  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+  transition:
+    background-color 0.2s,
+    color 0.2s,
+    border-color 0.2s,
+    transform var(--md-dur-medium) var(--md-ease-spring),
+    border-radius var(--md-dur-medium) var(--md-ease-spring);
+  will-change: transform, border-radius;
 }
 
 .linkedin-guide-help:hover {
   background: var(--md-secondary-container);
   border-color: var(--md-secondary-container);
   color: var(--md-on-secondary-container);
+  transform: translateY(-3px) scale(1.08);
+  border-radius: 6px;
+}
+
+.linkedin-guide-help:active {
+  transform: translateY(-3px) scale(1.18);
+  transition: transform 0.1s var(--md-ease-standard);
 }
 
 /* LinkedIn sync guide: scrollable panel that replaces Settings, same theme. */
@@ -59,20 +88,25 @@
   border: none;
   background: var(--md-surface-container);
   box-shadow: var(--md-elev-2);
-  transform-origin: top right;
-  animation: panelIn var(--md-dur-medium, 0.22s) var(--md-ease-decelerate) forwards;
+  
+  /* Transition states */
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(0.1);
+  transform-origin: calc(100% - 24px) 60px;
+  transition:
+    opacity var(--md-dur-medium) var(--md-ease-standard),
+    transform var(--md-dur-medium) var(--md-ease-spring),
+    visibility var(--md-dur-medium) var(--md-ease-standard);
+  pointer-events: none;
   will-change: transform, opacity;
 }
 
-@keyframes panelIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+.linkedin-guide-panel.is-open {
+  opacity: 1;
+  visibility: visible;
+  transform: scale(1);
+  pointer-events: auto;
 }
 
 .linkedin-guide-panel__header {
@@ -93,11 +127,22 @@
   background: transparent;
   color: var(--md-on-surface-variant);
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition:
+    background-color 0.2s,
+    transform var(--md-dur-medium) var(--md-ease-spring),
+    border-radius var(--md-dur-medium) var(--md-ease-spring);
+  will-change: transform, border-radius;
 }
 
 .linkedin-guide-panel__back:hover {
   background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+  transform: scale(1.08);
+  border-radius: 8px;
+}
+
+.linkedin-guide-panel__back:active {
+  transform: scale(1.18);
+  transition: transform 0.1s var(--md-ease-standard);
 }
 
 .linkedin-guide-panel__title {
@@ -403,4 +448,111 @@
   font-size: 13px;
   color: var(--md-on-surface-variant);
   text-align: center;
+}
+
+/* Auth Modal Overlay & Card Transitions */
+.auth-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  
+  /* Transition state */
+  opacity: 0;
+  visibility: hidden;
+  transition: 
+    opacity var(--md-dur-medium) var(--md-ease-standard),
+    visibility var(--md-dur-medium) var(--md-ease-standard);
+  pointer-events: none;
+}
+
+.auth-overlay.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.auth-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 32px;
+  border-radius: 24px;
+  background: var(--md-surface, #fff);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  max-width: 320px;
+  width: 100%;
+  
+  /* Transition state */
+  transform: scale(0.92) translateY(10px);
+  transition: transform var(--md-dur-medium) var(--md-ease-spring);
+}
+
+.auth-overlay.is-open .auth-card {
+  transform: scale(1) translateY(0);
+}
+
+.auth-card__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--md-on-surface-variant);
+  border-radius: var(--md-r-full);
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  transition:
+    background-color 0.2s,
+    transform var(--md-dur-medium) var(--md-ease-spring),
+    border-radius var(--md-dur-medium) var(--md-ease-spring);
+  will-change: transform, border-radius;
+}
+
+.auth-card__close:hover {
+  background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+  transform: scale(1.08);
+  border-radius: 8px;
+}
+
+.auth-card__close:active {
+  transform: scale(1.18);
+  transition: transform 0.1s var(--md-ease-standard);
+}
+
+.auth-card__switch {
+  margin-top: 12px;
+  background: none;
+  border: none;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--md-primary, #00696e);
+  align-self: center;
+  border-radius: var(--md-r-full);
+  transition:
+    background-color 0.2s,
+    transform var(--md-dur-medium) var(--md-ease-spring),
+    border-radius var(--md-dur-medium) var(--md-ease-spring);
+  will-change: transform, border-radius;
+}
+
+.auth-card__switch:hover {
+  background: color-mix(in srgb, var(--md-primary) 8%, transparent);
+  transform: scale(1.04);
+  border-radius: 8px;
+}
+
+.auth-card__switch:active {
+  transform: scale(1.08);
+  transition: transform 0.1s var(--md-ease-standard);
 }

@@ -2965,10 +2965,9 @@ function App() {
         </div>
       </div>
 
-      {showSettings && (
         <div
           ref={settingsPanelRef}
-          className="settings-panel"
+          className={`settings-panel ${showSettings ? 'is-open' : ''}`}
         >
           <strong style={{ fontSize: '16px', fontWeight: 500, color: 'var(--md-on-surface)' }}>
             Settings
@@ -3066,10 +3065,11 @@ function App() {
 
           </div>
         </div>
-      )}
 
-      {showLinkedInGuide && (
-        <div ref={linkedInGuidePanelRef} className="linkedin-guide-panel">
+        <div
+          ref={linkedInGuidePanelRef}
+          className={`linkedin-guide-panel ${showLinkedInGuide ? 'is-open' : ''}`}
+        >
           <div className="linkedin-guide-panel__header">
             <button
               type="button"
@@ -3128,7 +3128,6 @@ function App() {
             receive it, return here and press <strong>Import LinkedIn ZIP</strong>.
           </p>
         </div>
-      )}
 
       <div
         ref={surfaceRef}
@@ -3278,8 +3277,7 @@ function App() {
                   >
                     <TransparencyIcon />
                   </button>
-                    {showCircleStylePanel && (
-                      <div className="circle-style-popover">
+                      <div className={`circle-style-popover ${showCircleStylePanel ? 'is-open' : ''}`}>
                         <div className="circle-style-theme-tabs">
                           <SelectionIndicator
                             variant="pill"
@@ -3373,7 +3371,6 @@ function App() {
                           />
                         </div>
                       </div>
-                    )}
 
                   <div className="m3-avatar-picker-container">
                     <label className="m3-avatar-picker" title="Upload circle photo">
@@ -3995,30 +3992,21 @@ function App() {
         </div>
       )}
 
-      {showSignInModal && auth.status === 'anonymous' && (
+      {auth.status === 'anonymous' && (
         <div
-          style={{ ...authOverlayStyle, background: 'rgba(0, 0, 0, 0.4)' }}
+          className={`auth-overlay ${showSignInModal ? 'is-open' : ''}`}
           onClick={() => setShowSignInModal(false)}
         >
           <div
-            style={{ ...authCardStyle, alignItems: 'stretch', gap: '0', width: '320px', position: 'relative' }}
+            className="auth-card"
+            style={{ alignItems: 'stretch', gap: '0', width: '320px', position: 'relative' }}
             onClick={(event) => event.stopPropagation()}
           >
             <button
               type="button"
+              className="auth-card__close"
               aria-label="Close"
               onClick={() => setShowSignInModal(false)}
-              style={{
-                position: 'absolute',
-                top: '12px',
-                right: '12px',
-                background: 'none',
-                border: 'none',
-                fontSize: '20px',
-                lineHeight: 1,
-                cursor: 'pointer',
-                color: 'var(--md-on-surface-variant)',
-              }}
             >
               ×
             </button>
@@ -4096,19 +4084,10 @@ function App() {
             </form>
             <button
               type="button"
+              className="auth-card__switch"
               onClick={() => {
                 setEmailAuthMode((mode) => (mode === 'signup' ? 'signin' : 'signup'))
                 setEmailAuthNotice(null)
-              }}
-              style={{
-                marginTop: '12px',
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                cursor: 'pointer',
-                fontSize: '13px',
-                color: 'var(--md-primary, #00696e)',
-                alignSelf: 'center',
               }}
             >
               {emailAuthMode === 'signup'

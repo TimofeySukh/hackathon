@@ -59,16 +59,24 @@
   justify-content: center;
   gap: 8px;
   width: 100%;
-  transition: background-color 0.2s, box-shadow 0.2s;
+  transition:
+    background-color 0.2s,
+    box-shadow 0.2s,
+    transform var(--md-dur-medium) var(--md-ease-spring),
+    border-radius var(--md-dur-medium) var(--md-ease-spring);
+  will-change: transform, border-radius;
 }
 
 .m3-primary-button:hover {
   background: color-mix(in srgb, var(--md-primary) 92%, black);
   box-shadow: var(--md-elev-1);
+  transform: scale(1.04);
+  border-radius: 8px;
 }
 
 .m3-primary-button:active {
   background: color-mix(in srgb, var(--md-primary) 85%, black);
+  transform: scale(1.08);
 }
 
 /* Bottom-left hint shown to signed-out visitors: their work is saved locally
@@ -252,19 +260,19 @@
    right) — the row behaves like one elastic group, not every item at once.
    We also squash the active item and stretch/compress neighbours horizontally. */
 .quick-circle-color.is-pressing {
-  transform: scaleX(1.12) scaleY(0.93);
+  transform: scale(1.12);
   transition:
     border-radius 0.1s cubic-bezier(0.2, 0, 0, 1),
     transform 0.1s cubic-bezier(0.2, 0, 0, 1);
 }
 
 .quick-circle-color:has(+ .quick-circle-color.is-pressing) {
-  transform: translateX(-4.5px) scaleX(0.92) scaleY(1.04);
+  transform: translateX(-4.5px) scale(0.94);
   transition: transform 0.1s cubic-bezier(0.2, 0, 0, 1);
 }
 
 .quick-circle-color.is-pressing + .quick-circle-color {
-  transform: translateX(4.5px) scaleX(0.92) scaleY(1.04);
+  transform: translateX(4.5px) scale(0.94);
   transition: transform 0.1s cubic-bezier(0.2, 0, 0, 1);
 }
 
@@ -387,7 +395,7 @@
 }
 
 .circle-fill-toggle.is-pressing {
-  transform: scaleX(1.12) scaleY(0.93);
+  transform: scale(1.12);
   transition: transform 0.1s cubic-bezier(0.2, 0, 0, 1);
 }
 
@@ -412,9 +420,25 @@
   box-shadow: var(--md-elev-3);
   border: 1px solid var(--md-outline-variant);
   backdrop-filter: blur(18px);
-  transform-origin: bottom right;
-  animation: panelIn var(--md-dur-medium, 0.22s) var(--md-ease-decelerate) forwards;
   will-change: transform, opacity;
+
+  /* Transition states */
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(0.1);
+  transform-origin: calc(100% - 24px) calc(100% + 40px);
+  transition:
+    opacity var(--md-dur-medium) var(--md-ease-standard),
+    transform var(--md-dur-medium) var(--md-ease-spring),
+    visibility var(--md-dur-medium) var(--md-ease-standard);
+  pointer-events: none;
+}
+
+.circle-style-popover.is-open {
+  opacity: 1;
+  visibility: visible;
+  transform: scale(1);
+  pointer-events: auto;
 }
 
 .circle-style-theme-tabs {
@@ -441,21 +465,31 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.18s, transform var(--md-dur-medium) var(--md-ease-spring), background-color 0.18s;
+  transition:
+    color 0.18s,
+    background-color 0.18s,
+    transform var(--md-dur-medium) var(--md-ease-spring),
+    border-radius var(--md-dur-medium) var(--md-ease-spring);
+  will-change: transform, border-radius;
+}
+
+.circle-style-theme-tabs button:hover {
+  transform: scale(1.04);
+  border-radius: 8px;
+}
+
+.circle-style-theme-tabs button:hover:not(.is-selected) {
+  background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
 }
 
 .circle-style-theme-tabs button:active {
-  transform: scale(0.94);
+  transform: scale(1.08);
 }
 
 /* The selected tab's filled pill is the sliding .selection-indicator (pill
    variant) sitting behind the buttons, not a per-button background. */
 .circle-style-theme-tabs button.is-selected {
   color: var(--md-on-surface);
-}
-
-.circle-style-theme-tabs button:hover:not(.is-selected) {
-  background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
 }
 
 .color-wheel {
@@ -572,19 +606,19 @@
 /* Same connected-group press as the quick swatches: only immediate neighbours
    recoil away from the pressed preset, with squash/stretch deformation. */
 .circle-style-preset.is-pressing {
-  transform: scaleX(1.12) scaleY(0.93);
+  transform: scale(1.12);
   transition:
     border-radius 0.1s cubic-bezier(0.2, 0, 0, 1),
     transform 0.1s cubic-bezier(0.2, 0, 0, 1);
 }
 
 .circle-style-preset:has(+ .circle-style-preset.is-pressing) {
-  transform: translateX(-4.5px) scaleX(0.92) scaleY(1.04);
+  transform: translateX(-4.5px) scale(0.94);
   transition: transform 0.1s cubic-bezier(0.2, 0, 0, 1);
 }
 
 .circle-style-preset.is-pressing + .circle-style-preset {
-  transform: translateX(4.5px) scaleX(0.92) scaleY(1.04);
+  transform: translateX(4.5px) scale(0.94);
   transition: transform 0.1s cubic-bezier(0.2, 0, 0, 1);
 }
 
@@ -1105,16 +1139,16 @@
 
 @keyframes swatchSpringBack {
   0% {
-    transform: scaleX(1.10) scaleY(0.94);
+    transform: scale(1.12);
   }
   30% {
-    transform: scaleX(0.95) scaleY(1.05);
+    transform: scale(0.92);
   }
   60% {
-    transform: scaleX(1.02) scaleY(0.98);
+    transform: scale(1.04);
   }
   85% {
-    transform: scaleX(0.99) scaleY(1.01);
+    transform: scale(0.98);
   }
   100% {
     transform: scale(1);
@@ -1123,16 +1157,13 @@
 
 @keyframes swatchNeighborLeftSpringBack {
   0% {
-    transform: translateX(-4px) scaleX(0.94) scaleY(1.03);
+    transform: translateX(-4px) scale(0.96);
   }
   30% {
-    transform: translateX(1px) scaleX(1.02) scaleY(0.99);
+    transform: translateX(1px) scale(1.01);
   }
   60% {
-    transform: translateX(-0.3px) scaleX(0.99) scaleY(1.005);
-  }
-  85% {
-    transform: translateX(0.1px) scaleX(1) scaleY(1);
+    transform: translateX(-0.3px) scale(0.995);
   }
   100% {
     transform: translateX(0) scale(1);
@@ -1141,16 +1172,13 @@
 
 @keyframes swatchNeighborRightSpringBack {
   0% {
-    transform: translateX(4px) scaleX(0.94) scaleY(1.03);
+    transform: translateX(4px) scale(0.96);
   }
   30% {
-    transform: translateX(-1px) scaleX(1.02) scaleY(0.99);
+    transform: translateX(-1px) scale(1.01);
   }
   60% {
-    transform: translateX(0.3px) scaleX(0.99) scaleY(1.005);
-  }
-  85% {
-    transform: translateX(-0.1px) scaleX(1) scaleY(1);
+    transform: translateX(0.3px) scale(0.995);
   }
   100% {
     transform: translateX(0) scale(1);
