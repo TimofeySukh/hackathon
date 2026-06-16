@@ -377,7 +377,7 @@ export function drawBoardLayer(
     }
   } else {
     drawCircleEdges(ctx, visibleCircles, index, camera.scale)
-    drawPersonEdges(ctx, visiblePeople, visibleCircles, index, camera.scale)
+    drawPersonEdges(ctx, visiblePeople, index, camera.scale)
     drawCustomConnections(ctx, visiblePeopleIds, visibleCircleIds, index, selectedItem, hoveredConnId, camera.scale)
     drawCircleDetails(ctx, visibleCircles, camera.scale, circleFillMode, showCircleLabels, anim.scales)
     drawPeople(ctx, visiblePeople, index, selectedItem, hoveredPersonId, camera.scale, dpr, showPersonLabels, selectedPeopleIds, anim.scales)
@@ -428,13 +428,18 @@ function drawCircleEdges(ctx: CanvasRenderingContext2D, circles: CircleNode[], i
   ctx.stroke()
 }
 
-function drawPersonEdges(ctx: CanvasRenderingContext2D, people: PersonNode[], circles: CircleNode[], index: BoardIndex, scale: number) {
+function drawPersonEdges(
+  ctx: CanvasRenderingContext2D,
+  people: PersonNode[],
+  index: BoardIndex,
+  scale: number,
+) {
   ctx.beginPath()
   ctx.strokeStyle = 'rgba(71, 85, 105, 0.16)'
   ctx.lineWidth = Math.max(1.15 / scale, 0.7)
-  // Draw a person<->circle edge if either endpoint is visible: walk visible
-  // people (circle may be off-screen) and visible circles (people may be
-  // off-screen). Edge identity == the person id, so `drawn` dedupes overlaps.
+  // Draw person<->circle edges only for people in the viewport. Large imported
+  // company circles can contain thousands of offscreen people; drawing their
+  // membership fan-out on every repaint makes unrelated UI like note editing lag.
   const drawn = drawnPersonEdges
   drawn.clear()
   const addEdge = (person: PersonNode) => {
@@ -446,10 +451,6 @@ function drawPersonEdges(ctx: CanvasRenderingContext2D, people: PersonNode[], ci
     ctx.lineTo(person.x, person.y)
   }
   for (const person of people) addEdge(person)
-  for (const circle of circles) {
-    const peers = index.peopleByCircle.get(circle.id)
-    if (peers) for (const person of peers) addEdge(person)
-  }
   ctx.stroke()
 }
 
@@ -914,4 +915,3 @@ function findConnectionNearPoint(index: BoardIndex, point: { x: number; y: numbe
   }
   return best
 }
-

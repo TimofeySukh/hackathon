@@ -20,7 +20,10 @@ Connections feature, not in notes.
 - **Keyboard Shortcuts**:
   - `Enter` (without Shift) in the composer: immediately saves the note, clears the text, and maintains input focus so the user can quickly type multiple notes in a row.
   - `Escape` in the composer: cancels card creation and closes the composer.
-- **Inline Editing**: Clicking on any card body transforms the card directly into an inline textarea for quick updates. Pressing `Enter` (without Shift) or `Escape` saves or exits the editor.
+- **Inline Editing**: Clicking on any card body transforms the card directly into an
+  inline textarea for quick updates. Text changes stay in a local draft while typing so
+  the board graph is not rewritten per keystroke. Pressing `Enter` (without Shift) or
+  blurring the field saves the draft; `Escape` cancels it.
 - **Save note button**: Clicking the "Save note" button does the same as pressing Enter (saves and keeps the composer open and focused).
 
 ## Design
@@ -47,6 +50,7 @@ Connections feature, not in notes.
   - `newNoteBody` (current input content)
   - `isAddingNote` (composer toggle)
   - `editingNoteId` (active inline editor tracking)
+  - `editingNoteBody` (local inline-edit draft)
 
 ## Open questions / TODO
 
