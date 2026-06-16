@@ -46,6 +46,14 @@ import { makeInitials } from './text'
 const personSpriteCache = new Map<string, HTMLCanvasElement>()
 const imageCache = new Map<string, HTMLImageElement>()
 const SPRITE_TIERS = [64, 128, 256]
+const circlePathCache = new Map<string, Path2D>()
+const customConnCandidates = new Map<string, Connection>()
+const stressBatch: { source: { x: number; y: number }; target: { x: number; y: number } }[] = []
+const normalBatch: { source: { x: number; y: number }; target: { x: number; y: number } }[] = []
+const hoveredBatch: { source: { x: number; y: number }; target: { x: number; y: number } }[] = []
+const selectedBatch: { source: { x: number; y: number }; target: { x: number; y: number } }[] = []
+const drawnCircleEdges = new Set<string>()
+const drawnPersonEdges = new Set<string>()
 
 function pickSpriteTier(screenPx: number): number {
   for (const tier of SPRITE_TIERS) {
@@ -403,7 +411,8 @@ function drawCircleEdges(ctx: CanvasRenderingContext2D, circles: CircleNode[], i
   // both as the child (its connectedTo source may be off-screen) and as the
   // parent (its children may be off-screen). The `drawn` set dedupes edges
   // whose two endpoints are both visible. Edge identity == the child circle id.
-  const drawn = new Set<string>()
+  const drawn = drawnCircleEdges
+  drawn.clear()
   const addEdge = (child: CircleNode) => {
     if (drawn.has(child.id)) return
     const source = child.connectedTo ? index.circlesById.get(child.connectedTo) : null
@@ -426,7 +435,8 @@ function drawPersonEdges(ctx: CanvasRenderingContext2D, people: PersonNode[], ci
   // Draw a person<->circle edge if either endpoint is visible: walk visible
   // people (circle may be off-screen) and visible circles (people may be
   // off-screen). Edge identity == the person id, so `drawn` dedupes overlaps.
-  const drawn = new Set<string>()
+  const drawn = drawnPersonEdges
+  drawn.clear()
   const addEdge = (person: PersonNode) => {
     if (drawn.has(person.id)) return
     const circle = index.circlesById.get(person.circleId)
@@ -452,7 +462,8 @@ function drawCustomConnections(
   hoveredConnId: string | null,
   scale: number,
 ) {
-  const candidates = new Map<string, Connection>()
+  const candidates = customConnCandidates
+  candidates.clear()
   for (const id of visiblePeopleIds) {
     const bucket = index.connectionsByEndpoint.get(id)
     if (bucket) for (const conn of bucket) candidates.set(conn.id, conn)
@@ -462,16 +473,57 @@ function drawCustomConnections(
     if (bucket) for (const conn of bucket) candidates.set(conn.id, conn)
   }
 
+  stressBatch.length = 0
+  normalBatch.length = 0
+  hoveredBatch.length = 0
+  selectedBatch.length = 0
+
   for (const conn of candidates.values()) {
     const source = index.peopleById.get(conn.fromId) || index.circlesById.get(conn.fromId)
     const target = index.peopleById.get(conn.toId) || index.circlesById.get(conn.toId)
     if (!source || !target) continue
     const isSelected = selectedItem?.type === 'connection' && selectedItem.id === conn.id
     const isHovered = hoveredConnId === conn.id
+    if (isSelected) {
+      selectedBatch.push({ source, target })
+    } else if (isHovered) {
+      hoveredBatch.push({ source, target })
+    } else if (conn.id.startsWith('stress-link-')) {
+      stressBatch.push({ source, target })
+    } else {
+      normalBatch.push({ source, target })
+    }
+  }
+
+  if (stressBatch.length > 0) {
     ctx.beginPath()
-    ctx.strokeStyle = isSelected ? '#00629d' : isHovered ? '#64748b' : conn.id.startsWith('stress-link-') ? 'rgba(148, 163, 184, 0.30)' : 'rgba(148, 163, 184, 0.45)'
-    ctx.lineWidth = isSelected ? Math.max(4 / scale, 2) : isHovered ? Math.max(3 / scale, 1.5) : Math.max(1.6 / scale, 0.55)
-    drawCurvePath(ctx, source, target)
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.30)'
+    ctx.lineWidth = Math.max(1.6 / scale, 0.55)
+    for (const pair of stressBatch) drawCurvePath(ctx, pair.source, pair.target)
+    ctx.stroke()
+  }
+
+  if (normalBatch.length > 0) {
+    ctx.beginPath()
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.45)'
+    ctx.lineWidth = Math.max(1.6 / scale, 0.55)
+    for (const pair of normalBatch) drawCurvePath(ctx, pair.source, pair.target)
+    ctx.stroke()
+  }
+
+  if (hoveredBatch.length > 0) {
+    ctx.beginPath()
+    ctx.strokeStyle = '#64748b'
+    ctx.lineWidth = Math.max(3 / scale, 1.5)
+    for (const pair of hoveredBatch) drawCurvePath(ctx, pair.source, pair.target)
+    ctx.stroke()
+  }
+
+  if (selectedBatch.length > 0) {
+    ctx.beginPath()
+    ctx.strokeStyle = '#00629d'
+    ctx.lineWidth = Math.max(4 / scale, 2)
+    for (const pair of selectedBatch) drawCurvePath(ctx, pair.source, pair.target)
     ctx.stroke()
   }
 }
@@ -490,13 +542,8 @@ function drawCircleFills(
   for (const circle of circles) {
     const tone = getCircleColors(circle)
     const isTransparent = (circle.fillMode ?? circleFillMode) === 'transparent'
-    const path = new Path2D(getCircleRenderPath(circle, circleShapeMode, morphs.get(circle.id)))
+    const path = getCirclePath(circle, circleShapeMode, morphs.get(circle.id))
     ctx.save()
-    if (!isTransparent) {
-      ctx.shadowColor = 'rgba(0,0,0,0.06)'
-      ctx.shadowBlur = 16 / scale
-      ctx.shadowOffsetY = 8 / scale
-    }
     ctx.globalAlpha = isTransparent ? 0.34 : 1
     ctx.fillStyle = tone.fill
     ctx.fill(path)
@@ -515,20 +562,46 @@ function drawCircleFills(
       ctx.restore()
     }
 
-    ctx.save()
-    ctx.strokeStyle = isSelected ? tone.border : isEdgeHovered ? '#64748b' : tone.border
-    ctx.lineWidth =
-      isSelected
-        ? (isEdgeHovered ? Math.max(4.5 / scale, 3) : Math.max(3.5 / scale, 2))
-        : isEdgeHovered
-          ? Math.max(2.8 / scale, 1.8)
-          : Math.max((isTransparent ? 2.2 : 1.4) / scale, isTransparent ? 1.4 : 0.9)
-    // Transparent zones use a dashed outline, but a selected zone draws solid
-    // so the selection reads as a continuous ring without gaps.
-    if (isTransparent && !isSelected) ctx.setLineDash([8 / scale, 7 / scale])
-    ctx.stroke(path)
-    ctx.restore()
+    if (isTransparent || isSelected || isEdgeHovered) {
+      ctx.save()
+      ctx.strokeStyle = isSelected ? tone.border : isEdgeHovered ? '#64748b' : tone.border
+      ctx.lineWidth =
+        isSelected
+          ? (isEdgeHovered ? Math.max(4.5 / scale, 3) : Math.max(3.5 / scale, 2))
+          : isEdgeHovered
+            ? Math.max(2.8 / scale, 1.8)
+            : Math.max((isTransparent ? 2.2 : 1.4) / scale, isTransparent ? 1.4 : 0.9)
+      if (isTransparent && !isSelected) ctx.setLineDash([8 / scale, 7 / scale])
+      ctx.stroke(path)
+      ctx.restore()
+    }
   }
+}
+
+function getCirclePath(
+  circle: CircleNode,
+  circleShapeMode: CircleShapeMode,
+  morph?: CircleMorph & { t: number },
+): Path2D {
+  if (morph) {
+    return new Path2D(getCircleRenderPath(circle, circleShapeMode, morph))
+  }
+  const amplitude = circle.amplitude ?? 0
+  const sides = circle.sides ?? 25
+  const shapeType: ShapeType = circle.shapeType ?? (amplitude > 0 ? 'wavy' : sides >= 25 ? 'circle' : 'polygon')
+  const isCustomShape = circle.shapeCustom === true && (shapeType !== 'circle' || amplitude > 0 || sides < 25)
+  const shapeModeVal = circleShapeMode === 'circles' && !isCustomShape ? 'circles' : 'custom'
+  
+  const key = `${circle.id}|${circle.x}|${circle.y}|${circle.radius}|${sides}|${amplitude}|${shapeType}|${shapeModeVal}`
+  let cached = circlePathCache.get(key)
+  if (!cached) {
+    if (circlePathCache.size > 2000) {
+      circlePathCache.clear()
+    }
+    cached = new Path2D(getCircleRenderPath(circle, circleShapeMode, undefined))
+    circlePathCache.set(key, cached)
+  }
+  return cached
 }
 
 function drawCircleDetails(
