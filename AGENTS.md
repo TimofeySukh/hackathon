@@ -13,7 +13,7 @@ This repo follows the harness guidance in `docs/`.
 
 ## Rules
 
-- Keep all user-facing text, comments, and documentation in English.
+- Keep all application user-facing text, comments, documentation, and codebase elements in English. Chat responses to the user can be in the user's preferred language.
 - Treat `docs/` as the source of truth for project knowledge.
 - Update the relevant doc when behavior, structure, or commands change.
 - Follow `docs/DESIGN_SYSTEM.md` (Material 3) for any UI. New UI ships Material 3 from the start; do not copy the old chrome style.
