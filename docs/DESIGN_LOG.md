@@ -17,6 +17,20 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-17 — Stop global layout during live board interactions
+
+- Decision: drag and resize pointer-move frames no longer call the global
+  `ensureContainment` collision relaxer. They update only the actively moved/resized
+  nodes. On pointer-up and related single interactions, the global relaxer runs only while
+  the board is at or below `BOARD_INTERACTION_LAYOUT_LIMIT`.
+- Decision: person membership edges render only for people in the viewport, avoiding a
+  full fan-out over every offscreen member of a visible company circle.
+- Why: on dense LinkedIn imports, any direct manipulation could trigger repeated O(n²)
+  collision passes, causing severe lag and sometimes visually bunching circles and people
+  after the interaction.
+- Tradeoff: large boards favor responsiveness and preserving the packed import geometry
+  over automatic full-board collision cleanup after every gesture.
+
 ### 2026-06-17 — Hide automatic links from `You` to circles
 
 - Decision: the canvas no longer renders automatic circle links whose source is the

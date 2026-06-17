@@ -12,12 +12,15 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   (`MIN_SCALE`/`MAX_SCALE` clamp).
 - **Move**: drag a person to reposition inside its owning circle; nearby people in the
   same circle are pushed aside instead of overlapping. Drag a circle center or body to move
-  the whole circle and everything it contains; circles at the same nesting level push each
-  other apart.
+  the whole circle and everything it contains. Live pointer frames never run the global
+  collision solver. On small boards, the final drop still runs containment/collision
+  cleanup; on large boards, final cleanup is skipped so one interaction cannot reflow or
+  freeze a dense import.
 - **Resize**: drag a circle's edge; parent circles auto-fit (expand and shrink back to a
   minimum) as their contents move. Shrinking a circle pulls its contained people and subset
   circles toward the center, and nested subset circles shrink with the parent when position
-  packing alone cannot fit them.
+  packing alone cannot fit them. Live resize frames update only the resized circle and
+  contained nodes; large boards skip global collision cleanup after the resize gesture.
 - **Create**: right-click a circle to open the create menu, which now offers two actions —
   add person and add circle. "Add circle" auto-detects containment from the target point:
   inside the source circle it nests a subset blob, outside it spawns a connected circle.
@@ -31,6 +34,9 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
 - **Center fan-out**: automatic circle links whose source is the central `You` circle are
   not rendered. Dense imports otherwise create a starburst of non-authored lines from the
   center to every company circle. Explicit user-created connections still render.
+- **Membership edges**: person-to-circle membership lines render only for people in the
+  current viewport, so a visible imported company circle does not draw thousands of
+  offscreen contact lines during unrelated repaints.
 - **Select**: click a circle, person, or connection to load it into the inspector for
   rename / styling / notes / delete.
 - **Undo**: Ctrl/Cmd+Z reverts the last graph-mutating action — create, delete, move,
@@ -98,6 +104,9 @@ This is the most Material-3-aligned part of the app today; keep it that way.
   - `getNodePath` — wavy/polygon/circle shape generation.
   - `createBoardIndex`, `queryPeople`, `queryCircles` — the spatial grid used for
     viewport rendering and hit testing.
+  - `BOARD_INTERACTION_LAYOUT_LIMIT` — the node-count guard that keeps ordinary
+    drag/resize/create/delete interactions from running the global O(n²) layout on dense
+    boards.
   - `drawBoardLayer` — Canvas 2D renderer for circles, people, labels, edges, selected
     handles, and the draft connector.
   - `hitTestBoard` plus `handleSurfacePointerDown/Move/Up` — canvas interaction model

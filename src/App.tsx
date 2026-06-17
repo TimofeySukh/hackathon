@@ -51,6 +51,7 @@ import {
   CIRCLE_COLLISION_GAP,
   MERGE_LAYOUT_LIMIT,
   IMPORT_LAYOUT_LIMIT,
+  BOARD_INTERACTION_LAYOUT_LIMIT,
   MATERIAL_TONES,
   CIRCLE_COLOR_PRESETS,
   LINK_SERVICE_OPTIONS,
@@ -80,6 +81,14 @@ const undoHistory: GraphState[] = []
 
 const prefersReducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+function shouldRunGlobalInteractionLayout(state: GraphState) {
+  return state.circles.length + state.people.length <= BOARD_INTERACTION_LAYOUT_LIMIT
+}
+
+function settleInteractionGraph(state: GraphState) {
+  return shouldRunGlobalInteractionLayout(state) ? ensureContainment(state) : state
+}
 
 type CreateMenu = {
   sourceCircleId: string
@@ -1265,7 +1274,7 @@ function App() {
         (conn) => conn.fromId !== circleId && conn.toId !== circleId
       )
 
-      return ensureContainment({
+      return settleInteractionGraph({
         ...current,
         circles: nextCircles,
         people: nextPeople,
@@ -1327,7 +1336,7 @@ function App() {
             !deletedCircleIds.has(conn.toId)
         )
 
-        return ensureContainment({
+        return settleInteractionGraph({
           ...current,
           circles: nextCircles,
           people: nextPeople,
@@ -2108,31 +2117,28 @@ function App() {
       })
     }
 
-    // During a drag, coalesce graph layout to one animation-frame commit. The
-    // active item stays under the pointer while collision layout pushes blockers.
+    // During a drag, coalesce graph updates to one animation-frame commit. Do not
+    // run global layout here: on imported boards it is O(n^2) and makes every
+    // pointer frame rewrite the whole board.
     const moving = moveCircleRef.current
     if (moving?.pointerId === event.pointerId) {
       ensureGestureSnapshot()
       const deltaX = (event.clientX - moving.startX) / camera.scale
       const deltaY = (event.clientY - moving.startY) / camera.scale
       const { circleOrigins, personOrigins } = moving
-      pendingGraphRef.current = (current) =>
-        ensureContainment(
-          {
-            ...current,
-            circles: current.circles.map((c) =>
-              circleOrigins && c.id in circleOrigins
-                ? { ...c, x: circleOrigins[c.id].x + deltaX, y: circleOrigins[c.id].y + deltaY }
-                : c
-            ),
-            people: current.people.map((p) =>
-              personOrigins && p.id in personOrigins
-                ? { ...p, x: personOrigins[p.id].x + deltaX, y: personOrigins[p.id].y + deltaY }
-                : p
-            ),
-          },
-          { activeCircleId: moving.circleId },
-        )
+      pendingGraphRef.current = (current) => ({
+        ...current,
+        circles: current.circles.map((c) =>
+          circleOrigins && c.id in circleOrigins
+            ? { ...c, x: circleOrigins[c.id].x + deltaX, y: circleOrigins[c.id].y + deltaY }
+            : c
+        ),
+        people: current.people.map((p) =>
+          personOrigins && p.id in personOrigins
+            ? { ...p, x: personOrigins[p.id].x + deltaX, y: personOrigins[p.id].y + deltaY }
+            : p
+        ),
+      })
       scheduleDrag()
     }
 
@@ -2142,27 +2148,23 @@ function App() {
       const deltaX = (event.clientX - movingPerson.startX) / camera.scale
       const deltaY = (event.clientY - movingPerson.startY) / camera.scale
       const { selectedOrigins, circleOrigins } = movingPerson
-      pendingGraphRef.current = (current) =>
-        ensureContainment(
-          {
-            ...current,
-            circles: current.circles.map((c) =>
-              circleOrigins && c.id in circleOrigins
-                ? { ...c, x: circleOrigins[c.id].x + deltaX, y: circleOrigins[c.id].y + deltaY }
-                : c
-            ),
-            people: current.people.map((person) => {
-              if (selectedOrigins && person.id in selectedOrigins) {
-                const origin = selectedOrigins[person.id]
-                return { ...person, x: origin.x + deltaX, y: origin.y + deltaY }
-              } else if (person.id === movingPerson.personId) {
-                return { ...person, x: movingPerson.originX + deltaX, y: movingPerson.originY + deltaY }
-              }
-              return person
-            }),
-          },
-          { activePersonId: movingPerson.personId },
-        )
+      pendingGraphRef.current = (current) => ({
+        ...current,
+        circles: current.circles.map((c) =>
+          circleOrigins && c.id in circleOrigins
+            ? { ...c, x: circleOrigins[c.id].x + deltaX, y: circleOrigins[c.id].y + deltaY }
+            : c
+        ),
+        people: current.people.map((person) => {
+          if (selectedOrigins && person.id in selectedOrigins) {
+            const origin = selectedOrigins[person.id]
+            return { ...person, x: origin.x + deltaX, y: origin.y + deltaY }
+          } else if (person.id === movingPerson.personId) {
+            return { ...person, x: movingPerson.originX + deltaX, y: movingPerson.originY + deltaY }
+          }
+          return person
+        }),
+      })
       scheduleDrag()
     }
 
@@ -2170,7 +2172,7 @@ function App() {
     if (resizing?.pointerId === event.pointerId) {
       ensureGestureSnapshot()
       const world = screenToWorld({ x: event.clientX, y: event.clientY })
-      pendingGraphRef.current = (current) => resizeCircleFromPoint(current, resizing.circleId, world)
+      pendingGraphRef.current = (current) => resizeCircleFromPoint(current, resizing.circleId, world, { resolveLayout: false })
       scheduleDrag()
     }
 
@@ -2342,7 +2344,7 @@ function App() {
             next = { ...next, circles: nextCircles }
           }
         }
-        return ensureContainment(next)
+        return settleInteractionGraph(next)
       })
       isRightClickDragRef.current = false
       settleGesture()
@@ -2815,7 +2817,7 @@ function App() {
     const isNested = mode === 'nested'
     pushHistory()
     setGraph((current) => {
-      const nextGraph = ensureContainment({
+      const nextGraph = settleInteractionGraph({
         ...current,
         circles: [
           ...current.circles,
@@ -3704,7 +3706,7 @@ function App() {
                                        pushHistory()
                                        setGraph((current) => {
                                          const freePos = findFreeSpaceInCircle(current.circles, current.people, c.id)
-                                         return ensureContainment({
+                                         return settleInteractionGraph({
                                            ...current,
                                            people: current.people.map((p) =>
                                              p.id === selectedPerson.id ? { ...p, circleId: c.id, x: freePos.x, y: freePos.y } : p
@@ -4633,7 +4635,7 @@ function updateLinkedInProfileInGraph(
   }
 
   return {
-    graph: ensureContainment({
+    graph: settleInteractionGraph({
       ...current,
       circles: nextCircles,
       people: current.people.map((person) => (person.id === personId ? updatedPerson : person)),
@@ -4681,7 +4683,7 @@ function addLinkedInProfileToGraph(
   nextPeople.push(person)
 
   return {
-    graph: ensureContainment({
+    graph: settleInteractionGraph({
       ...current,
       circles: nextCircles,
       people: nextPeople,

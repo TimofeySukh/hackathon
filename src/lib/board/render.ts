@@ -85,15 +85,11 @@ export function createBoardIndex(circles: CircleNode[], people: PersonNode[], co
   const circlesByCell = new Map<string, CircleNode[]>()
   const connectionsByEndpoint = new Map<string, Connection[]>()
   const circleChildren = new Map<string, CircleNode[]>()
-  const peopleByCircle = new Map<string, PersonNode[]>()
 
   for (const person of people) {
     const x = Math.floor(person.x / BOARD_GRID_SIZE)
     const y = Math.floor(person.y / BOARD_GRID_SIZE)
     pushCell(peopleByCell, x, y, person)
-    const peers = peopleByCircle.get(person.circleId)
-    if (peers) peers.push(person)
-    else peopleByCircle.set(person.circleId, [person])
   }
 
   for (const circle of circles) {
@@ -130,7 +126,6 @@ export function createBoardIndex(circles: CircleNode[], people: PersonNode[], co
     circlesByCell,
     connectionsByEndpoint,
     circleChildren,
-    peopleByCircle,
   }
 }
 
@@ -377,7 +372,7 @@ export function drawBoardLayer(
     }
   } else {
     drawCircleEdges(ctx, visibleCircles, index, camera.scale)
-    drawPersonEdges(ctx, visiblePeople, visibleCircles, index, camera.scale)
+    drawPersonEdges(ctx, visiblePeople, index, camera.scale)
     drawCustomConnections(ctx, visiblePeopleIds, visibleCircleIds, index, selectedItem, hoveredConnId, camera.scale)
     drawCircleDetails(ctx, visibleCircles, camera.scale, circleFillMode, showCircleLabels, anim.scales)
     drawPeople(ctx, visiblePeople, index, selectedItem, hoveredPersonId, camera.scale, dpr, showPersonLabels, selectedPeopleIds, anim.scales)
@@ -429,13 +424,13 @@ function drawCircleEdges(ctx: CanvasRenderingContext2D, circles: CircleNode[], i
   ctx.stroke()
 }
 
-function drawPersonEdges(ctx: CanvasRenderingContext2D, people: PersonNode[], circles: CircleNode[], index: BoardIndex, scale: number) {
+function drawPersonEdges(ctx: CanvasRenderingContext2D, people: PersonNode[], index: BoardIndex, scale: number) {
   ctx.beginPath()
   ctx.strokeStyle = 'rgba(71, 85, 105, 0.16)'
   ctx.lineWidth = Math.max(1.15 / scale, 0.7)
-  // Draw a person<->circle edge if either endpoint is visible: walk visible
-  // people (circle may be off-screen) and visible circles (people may be
-  // off-screen). Edge identity == the person id, so `drawn` dedupes overlaps.
+  // Draw membership edges only for people in the viewport. A visible imported
+  // company circle can otherwise fan out to thousands of offscreen contacts on
+  // every repaint.
   const drawn = drawnPersonEdges
   drawn.clear()
   const addEdge = (person: PersonNode) => {
@@ -447,10 +442,6 @@ function drawPersonEdges(ctx: CanvasRenderingContext2D, people: PersonNode[], ci
     ctx.lineTo(person.x, person.y)
   }
   for (const person of people) addEdge(person)
-  for (const circle of circles) {
-    const peers = index.peopleByCircle.get(circle.id)
-    if (peers) for (const person of peers) addEdge(person)
-  }
   ctx.stroke()
 }
 

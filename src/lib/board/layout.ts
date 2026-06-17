@@ -202,20 +202,27 @@ export function findFreeSpaceInCircle(
   return bestPoint
 }
 
-export function resizeCircleFromPoint(state: GraphState, circleId: string, point: { x: number; y: number }): GraphState {
+export function resizeCircleFromPoint(
+  state: GraphState,
+  circleId: string,
+  point: { x: number; y: number },
+  options: { resolveLayout?: boolean } = {},
+): GraphState {
   const circle = state.circles.find((candidate) => candidate.id === circleId)
   if (!circle) return state
 
   const requestedRadius = Math.max(MIN_CIRCLE_RADIUS, Math.hypot(point.x - circle.x, point.y - circle.y))
   const radiusRatio = requestedRadius < circle.radius ? requestedRadius / circle.radius : 1
   const resizedState = radiusRatio < 1 ? pullCircleContentsTowardCenter(state, circleId, circle, radiusRatio) : state
-
-  return ensureContainment({
+  const nextState = {
     ...resizedState,
     circles: resizedState.circles.map((candidate) =>
       candidate.id === circleId ? { ...candidate, minRadius: requestedRadius, radius: requestedRadius } : candidate,
     ),
-  }, { activeCircleId: circleId })
+  }
+
+  if (options.resolveLayout === false) return nextState
+  return ensureContainment(nextState, { activeCircleId: circleId })
 }
 
 export function ensureContainment(state: GraphState, context: LayoutContext = {}): GraphState {
