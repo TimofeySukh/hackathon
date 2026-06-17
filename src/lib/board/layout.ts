@@ -527,34 +527,12 @@ export function getDescendantCircleIds(circles: CircleNode[], circleId: string) 
 
 export function resolveCircleOnlyLayoutInPlace(
   index: BoardIndex,
-  baseCircles: CircleNode[],
-  basePeople: PersonNode[],
   subtreeIds: Set<string>,
   draggedPersonIds: Set<string>,
   deltaX: number,
   deltaY: number,
 ): void {
-  // 1. Reset all coordinates in index from base
-  for (let i = 0; i < baseCircles.length; i++) {
-    const baseC = baseCircles[i]
-    const indexC = index.circlesById.get(baseC.id)
-    if (indexC) {
-      indexC.x = baseC.x
-      indexC.y = baseC.y
-      indexC.radius = baseC.radius
-      indexC.minRadius = baseC.minRadius
-    }
-  }
-  for (let i = 0; i < basePeople.length; i++) {
-    const baseP = basePeople[i]
-    const indexP = index.peopleById.get(baseP.id)
-    if (indexP) {
-      indexP.x = baseP.x
-      indexP.y = baseP.y
-    }
-  }
-
-  // 2. Apply drag delta to the dragged subtree of circles in-place
+  // 1. Move circles in subtree by delta increment
   for (const cid of subtreeIds) {
     const indexC = index.circlesById.get(cid)
     if (indexC) {
@@ -563,84 +541,50 @@ export function resolveCircleOnlyLayoutInPlace(
     }
   }
 
-  // 3. Apply drag delta to people in-place
-  for (let i = 0; i < basePeople.length; i++) {
-    const origP = basePeople[i]
-    const indexP = index.peopleById.get(origP.id)
-    if (!indexP) continue
-
-    const isDraggedPerson = draggedPersonIds.has(origP.id)
-    const isInDraggedCircle = origP.circleId && subtreeIds.has(origP.circleId)
-    const personDispX = (isDraggedPerson || isInDraggedCircle) ? deltaX : 0
-    const personDispY = (isDraggedPerson || isInDraggedCircle) ? deltaY : 0
-
-    indexP.x = origP.x + personDispX
-    indexP.y = origP.y + personDispY
+  // 2. Move people in subtree / selection by delta increment
+  for (const p of index.people) {
+    const isDraggedPerson = draggedPersonIds.has(p.id)
+    const isInDraggedCircle = p.circleId && subtreeIds.has(p.circleId)
+    if (isDraggedPerson || isInDraggedCircle) {
+      p.x += deltaX
+      p.y += deltaY
+    }
   }
 }
 
 export function movePersonInPlace(
   index: BoardIndex,
-  baseCircles: CircleNode[],
-  basePeople: PersonNode[],
   selectedOrigins: Record<string, { x: number; y: number }> | null,
   circleOrigins: Record<string, { x: number; y: number }> | null,
   movingPersonId: string,
-  originX: number,
-  originY: number,
   deltaX: number,
   deltaY: number,
 ): void {
-  // 1. Reset all coordinates and radii in index from base circles
-  for (let i = 0; i < baseCircles.length; i++) {
-    const baseC = baseCircles[i]
-    const indexC = index.circlesById.get(baseC.id)
+  const selectedIds = selectedOrigins ? Object.keys(selectedOrigins) : []
+  const circleIds = circleOrigins ? Object.keys(circleOrigins) : []
+
+  // 1. Move the dragged/selected circles by the increment
+  for (const cid of circleIds) {
+    const indexC = index.circlesById.get(cid)
     if (indexC) {
-      indexC.x = baseC.x
-      indexC.y = baseC.y
-      indexC.radius = baseC.radius
-      indexC.minRadius = baseC.minRadius
+      indexC.x += deltaX
+      indexC.y += deltaY
     }
   }
-  // Reset all coordinates in index from base people
-  for (let i = 0; i < basePeople.length; i++) {
-    const baseP = basePeople[i]
-    const indexP = index.peopleById.get(baseP.id)
+
+  // 2. Move the dragged/selected people by the increment
+  const draggedIds = new Set(selectedIds)
+  draggedIds.add(movingPersonId)
+
+  for (const pid of draggedIds) {
+    const indexP = index.peopleById.get(pid)
     if (indexP) {
-      indexP.x = baseP.x
-      indexP.y = baseP.y
+      indexP.x += deltaX
+      indexP.y += deltaY
     }
   }
 
-  // 2. Move circles
-  if (circleOrigins) {
-    for (const cid in circleOrigins) {
-      const indexC = index.circlesById.get(cid)
-      if (indexC) {
-        const orig = circleOrigins[cid]
-        indexC.x = orig.x + deltaX
-        indexC.y = orig.y + deltaY
-      }
-    }
-  }
-
-  // 3. Move people initially
-  for (let i = 0; i < basePeople.length; i++) {
-    const origP = basePeople[i]
-    const indexP = index.peopleById.get(origP.id)
-    if (!indexP) continue
-
-    if (selectedOrigins && origP.id in selectedOrigins) {
-      const orig = selectedOrigins[origP.id]
-      indexP.x = orig.x + deltaX
-      indexP.y = orig.y + deltaY
-    } else if (origP.id === movingPersonId) {
-      indexP.x = originX + deltaX
-      indexP.y = originY + deltaY
-    }
-  }
-
-  // 4. Pre-group people by circleId to resolve collisions inside circles
+  // 3. Pre-group people by circleId to resolve collisions inside circles
   const peopleByCircle = new Map<string, PersonNode[]>()
   for (const p of index.people) {
     if (!p.circleId) continue
@@ -664,7 +608,7 @@ export function movePersonInPlace(
     }
   }
 
-  // 5. Run collision passes for people
+  // 4. Run collision passes for people
   const passes = 10
   for (let pass = 0; pass < passes; pass += 1) {
     let changed = false
@@ -684,8 +628,8 @@ export function movePersonInPlace(
           const separation = getSeparation(a, b, minDist)
           if (!separation) continue
 
-          // During drag, the active person being dragged shouldn't be pushed around by others.
-          const activeSide = movingPersonId === a.id ? 'a' : movingPersonId === b.id ? 'b' : null
+          // During drag, the active people being dragged shouldn't be pushed around by others.
+          const activeSide = draggedIds.has(a.id) ? 'a' : draggedIds.has(b.id) ? 'b' : null
           const moveA = activeSide === 'a' ? 0 : activeSide === 'b' ? 1 : 0.5
           const moveB = activeSide === 'b' ? 0 : activeSide === 'a' ? 1 : 0.5
 
@@ -706,6 +650,9 @@ export function movePersonInPlace(
       const childCircles = childCirclesByParent.get(circleId) || []
 
       for (const person of group) {
+        // Exempt actively dragged people from parent circle constraints (repulsions and clamps)
+        if (draggedIds.has(person.id)) continue
+
         // Person repelled by child circles in the same parent circle
         for (const childCircle of childCircles) {
           const minDist = childCircle.radius + PERSON_COLLISION_RADIUS + PERSON_CIRCLE_COLLISION_GAP
@@ -750,32 +697,9 @@ export function movePersonInPlace(
 
 export function resizeCircleFromPointInPlace(
   index: BoardIndex,
-  baseCircles: CircleNode[],
-  basePeople: PersonNode[],
   circleId: string,
   point: { x: number; y: number },
 ): void {
-  // 1. Reset all coordinates and radii in index from base circles
-  for (let i = 0; i < baseCircles.length; i++) {
-    const baseC = baseCircles[i]
-    const indexC = index.circlesById.get(baseC.id)
-    if (indexC) {
-      indexC.x = baseC.x
-      indexC.y = baseC.y
-      indexC.radius = baseC.radius
-      indexC.minRadius = baseC.minRadius
-    }
-  }
-  // Reset all coordinates in index from base people
-  for (let i = 0; i < basePeople.length; i++) {
-    const baseP = basePeople[i]
-    const indexP = index.peopleById.get(baseP.id)
-    if (indexP) {
-      indexP.x = baseP.x
-      indexP.y = baseP.y
-    }
-  }
-
   const circle = index.circlesById.get(circleId)
   if (!circle) return
 

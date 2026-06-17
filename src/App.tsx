@@ -165,6 +165,8 @@ type MoveCircleState = {
   personOrigins?: Record<string, { x: number; y: number }>
   disconnectedCircleIds?: string[]
   graphSnapshot?: GraphState
+  lastX: number
+  lastY: number
 }
 
 type MovePersonState = {
@@ -178,6 +180,8 @@ type MovePersonState = {
   // Mixed selection: zones (and their contents) dragged along with the people.
   circleOrigins?: Record<string, { x: number; y: number }>
   graphSnapshot?: GraphState
+  lastX: number
+  lastY: number
 }
 
 type ResizeCircleState = {
@@ -2122,8 +2126,10 @@ function App() {
     const moving = moveCircleRef.current
     if (moving?.pointerId === event.pointerId) {
       ensureGestureSnapshot()
-      const deltaX = (event.clientX - moving.startX) / camera.scale
-      const deltaY = (event.clientY - moving.startY) / camera.scale
+      const deltaX = (event.clientX - moving.lastX) / camera.scale
+      const deltaY = (event.clientY - moving.lastY) / camera.scale
+      moving.lastX = event.clientX
+      moving.lastY = event.clientY
       const base = moving.graphSnapshot || graph
       const targets = moving.disconnectedCircleIds || [moving.circleId]
 
@@ -2144,8 +2150,6 @@ function App() {
 
       resolveCircleOnlyLayoutInPlace(
         boardIndexRef.current,
-        base.circles,
-        base.people,
         subtreeIds,
         draggedPersonIds,
         deltaX,
@@ -2157,20 +2161,17 @@ function App() {
     const movingPerson = movePersonRef.current
     if (movingPerson?.pointerId === event.pointerId) {
       ensureGestureSnapshot()
-      const deltaX = (event.clientX - movingPerson.startX) / camera.scale
-      const deltaY = (event.clientY - movingPerson.startY) / camera.scale
-      const base = movingPerson.graphSnapshot || graph
+      const deltaX = (event.clientX - movingPerson.lastX) / camera.scale
+      const deltaY = (event.clientY - movingPerson.lastY) / camera.scale
+      movingPerson.lastX = event.clientX
+      movingPerson.lastY = event.clientY
       const { selectedOrigins, circleOrigins } = movingPerson
 
       movePersonInPlace(
         boardIndexRef.current,
-        base.circles,
-        base.people,
         selectedOrigins || null,
         circleOrigins || null,
         movingPerson.personId,
-        movingPerson.originX,
-        movingPerson.originY,
         deltaX,
         deltaY,
       )
@@ -2180,13 +2181,10 @@ function App() {
     const resizing = resizeCircleRef.current
     if (resizing?.pointerId === event.pointerId) {
       ensureGestureSnapshot()
-      const base = resizing.graphSnapshot || graph
       const world = screenToWorld({ x: event.clientX, y: event.clientY })
 
       resizeCircleFromPointInPlace(
         boardIndexRef.current,
-        base.circles,
-        base.people,
         resizing.circleId,
         world,
       )
@@ -2553,6 +2551,8 @@ function App() {
         circles: graph.circles.map((c) => ({ ...c })),
         people: graph.people.map((p) => ({ ...p })),
       },
+      lastX: event.clientX,
+      lastY: event.clientY,
     }
   }
 
@@ -2608,6 +2608,8 @@ function App() {
         circles: graph.circles.map((c) => ({ ...c })),
         people: graph.people.map((p) => ({ ...p })),
       },
+      lastX: event.clientX,
+      lastY: event.clientY,
     }
   }
 
