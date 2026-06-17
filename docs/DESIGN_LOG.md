@@ -17,15 +17,6 @@ rediscover, write it here.
 
 ## Entries
 
-### 2026-06-17 — Remove automatic person membership lines
-
-- Decision: the canvas no longer renders generated person-to-circle membership lines for
-  contacts loaded from import or created inside a circle. Explicit user-created
-  connections and circle-to-circle links still render.
-- Why: dense imported circles produced a bright fan of thousands of lines from the circle
-  center to contacts. The lines were not authored relationships, made the board harder to
-  read, and added avoidable canvas work.
-
 ### 2026-06-15 — Circles load transparent and clean by default
 
 - Decision: fresh graph circles, newly created circles, imported LinkedIn company
@@ -363,8 +354,6 @@ rediscover, write it here.
 - Decision: Demo data no longer ships with ad hoc person-to-person/custom links; only
   membership lines and circle hierarchy links are visible by default. Region clusters are
   positioned farther apart, while small nested circles use smaller radii.
-- Superseded: as of 2026-06-17, automatic person membership lines are no longer rendered;
-  explicit connections and circle hierarchy links remain visible.
 - Design controls: Settings now has global segmented controls for `Circle shape`
   (simple circles vs stored figure shapes) and `Circle fill` (translucent/dashed vs solid).
   Demo mode only controls chrome visibility; it no longer owns the visual style.

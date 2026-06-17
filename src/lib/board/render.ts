@@ -53,6 +53,7 @@ const normalBatch: { source: { x: number; y: number }; target: { x: number; y: n
 const hoveredBatch: { source: { x: number; y: number }; target: { x: number; y: number } }[] = []
 const selectedBatch: { source: { x: number; y: number }; target: { x: number; y: number } }[] = []
 const drawnCircleEdges = new Set<string>()
+const drawnPersonEdges = new Set<string>()
 
 function pickSpriteTier(screenPx: number): number {
   for (const tier of SPRITE_TIERS) {
@@ -84,11 +85,15 @@ export function createBoardIndex(circles: CircleNode[], people: PersonNode[], co
   const circlesByCell = new Map<string, CircleNode[]>()
   const connectionsByEndpoint = new Map<string, Connection[]>()
   const circleChildren = new Map<string, CircleNode[]>()
+  const peopleByCircle = new Map<string, PersonNode[]>()
 
   for (const person of people) {
     const x = Math.floor(person.x / BOARD_GRID_SIZE)
     const y = Math.floor(person.y / BOARD_GRID_SIZE)
     pushCell(peopleByCell, x, y, person)
+    const peers = peopleByCircle.get(person.circleId)
+    if (peers) peers.push(person)
+    else peopleByCircle.set(person.circleId, [person])
   }
 
   for (const circle of circles) {
@@ -125,6 +130,7 @@ export function createBoardIndex(circles: CircleNode[], people: PersonNode[], co
     circlesByCell,
     connectionsByEndpoint,
     circleChildren,
+    peopleByCircle,
   }
 }
 
@@ -371,6 +377,7 @@ export function drawBoardLayer(
     }
   } else {
     drawCircleEdges(ctx, visibleCircles, index, camera.scale)
+    drawPersonEdges(ctx, visiblePeople, visibleCircles, index, camera.scale)
     drawCustomConnections(ctx, visiblePeopleIds, visibleCircleIds, index, selectedItem, hoveredConnId, camera.scale)
     drawCircleDetails(ctx, visibleCircles, camera.scale, circleFillMode, showCircleLabels, anim.scales)
     drawPeople(ctx, visiblePeople, index, selectedItem, hoveredPersonId, camera.scale, dpr, showPersonLabels, selectedPeopleIds, anim.scales)
@@ -417,6 +424,31 @@ function drawCircleEdges(ctx: CanvasRenderingContext2D, circles: CircleNode[], i
     addEdge(circle)
     const children = index.circleChildren.get(circle.id)
     if (children) for (const child of children) addEdge(child)
+  }
+  ctx.stroke()
+}
+
+function drawPersonEdges(ctx: CanvasRenderingContext2D, people: PersonNode[], circles: CircleNode[], index: BoardIndex, scale: number) {
+  ctx.beginPath()
+  ctx.strokeStyle = 'rgba(71, 85, 105, 0.16)'
+  ctx.lineWidth = Math.max(1.15 / scale, 0.7)
+  // Draw a person<->circle edge if either endpoint is visible: walk visible
+  // people (circle may be off-screen) and visible circles (people may be
+  // off-screen). Edge identity == the person id, so `drawn` dedupes overlaps.
+  const drawn = drawnPersonEdges
+  drawn.clear()
+  const addEdge = (person: PersonNode) => {
+    if (drawn.has(person.id)) return
+    const circle = index.circlesById.get(person.circleId)
+    if (!circle) return
+    drawn.add(person.id)
+    ctx.moveTo(circle.x, circle.y)
+    ctx.lineTo(person.x, person.y)
+  }
+  for (const person of people) addEdge(person)
+  for (const circle of circles) {
+    const peers = index.peopleByCircle.get(circle.id)
+    if (peers) for (const person of peers) addEdge(person)
   }
   ctx.stroke()
 }
@@ -882,3 +914,4 @@ function findConnectionNearPoint(index: BoardIndex, point: { x: number; y: numbe
   }
   return best
 }
+

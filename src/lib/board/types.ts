@@ -135,10 +135,11 @@ export type BoardIndex = {
   circlesByCell: Map<string, CircleNode[]>
   connectionsByEndpoint: Map<string, Connection[]>
   // Reverse adjacency: a parent circle -> the circles that hang off it
-  // (circle.connectedTo). Lets edge rendering find circle links whose *other*
-  // endpoint is off-screen, so a line stays drawn as long as either endpoint is
-  // visible.
+  // (circle.connectedTo) and the people attached to it (person.circleId). Lets
+  // edge rendering find edges whose *other* endpoint is off-screen, so a line
+  // stays drawn as long as either endpoint is visible.
   circleChildren: Map<string, CircleNode[]>
+  peopleByCircle: Map<string, PersonNode[]>
 }
 
 // A circle shape morph: animate from one (sides, amplitude) to another so the

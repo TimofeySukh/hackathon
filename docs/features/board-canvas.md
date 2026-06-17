@@ -28,10 +28,6 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   or jumps. This replaces the older Shift-drag-from-center shortcut.
 - **Connect**: with the "Draw Connection" center behavior, drag from a circle center to
   another node to draw a relationship link. A dashed draft edge previews the connection.
-- **Relationship lines**: the board renders explicit user-created connections and
-  circle-to-circle links. It does not render automatic person-to-circle membership lines
-  for every loaded or newly created contact, because dense imported circles turn those
-  generated lines into unreadable visual noise.
 - **Select**: click a circle, person, or connection to load it into the inspector for
   rename / styling / notes / delete.
 - **Undo**: Ctrl/Cmd+Z reverts the last graph-mutating action — create, delete, move,
@@ -82,9 +78,8 @@ This is the most Material-3-aligned part of the app today; keep it that way.
 - **Surfaces**: node labels draw inside the Canvas 2D board layer, while the help/stress
   panels float above the grid background. Selection is shown by a stronger border/state,
   not a color swap.
-- **Layering**: circle fills render first, then explicit relationship links, then circle
-  centers, labels, and people. This keeps links readable even when they pass through large
-  circles.
+- **Layering**: circle fills render first, then relationship links, then circle centers,
+  labels, and people. This keeps links readable even when they pass through large circles.
 - **Components used**: create menu (M3 menu), inspector (side sheet), toolbar (icon
   buttons). These follow the recipes in the design system.
 - **Known gaps vs. Material 3 target**:
