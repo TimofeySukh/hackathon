@@ -2548,7 +2548,11 @@ function App() {
       circleOrigins,
       personOrigins,
       disconnectedCircleIds: targets,
-      graphSnapshot: graph,
+      graphSnapshot: {
+        ...graph,
+        circles: graph.circles.map((c) => ({ ...c })),
+        people: graph.people.map((p) => ({ ...p })),
+      },
     }
   }
 
@@ -2599,7 +2603,11 @@ function App() {
       originY: person.y,
       selectedOrigins,
       circleOrigins,
-      graphSnapshot: graph,
+      graphSnapshot: {
+        ...graph,
+        circles: graph.circles.map((c) => ({ ...c })),
+        people: graph.people.map((p) => ({ ...p })),
+      },
     }
   }
 
@@ -2612,7 +2620,11 @@ function App() {
     resizeCircleRef.current = {
       pointerId: event.pointerId,
       circleId: circle.id,
-      graphSnapshot: graph,
+      graphSnapshot: {
+        ...graph,
+        circles: graph.circles.map((c) => ({ ...c })),
+        people: graph.people.map((p) => ({ ...p })),
+      },
     }
   }
 
