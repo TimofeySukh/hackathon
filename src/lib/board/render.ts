@@ -885,7 +885,9 @@ export function hitTestBoard(index: BoardIndex, camera: Camera, selectedItem: Se
   for (const circle of circles) {
     const d = Math.hypot(point.x - circle.x, point.y - circle.y)
     if (d <= CIRCLE_CENTER_RADIUS + 6 / scale) return { type: 'circle-center', circle }
-    if (Math.abs(d - circle.radius) <= EDGE_RESIZE_HIT_SIZE / scale) return { type: 'circle-edge', circle }
+    if (scale >= ZONE_ONLY_SCALE && Math.abs(d - circle.radius) <= EDGE_RESIZE_HIT_SIZE / scale) {
+      return { type: 'circle-edge', circle }
+    }
     if (d <= circle.radius) return { type: 'circle-body', circle }
   }
 
