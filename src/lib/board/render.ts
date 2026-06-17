@@ -676,7 +676,7 @@ function drawCircleCenter(ctx: CanvasRenderingContext2D, circle: CircleNode, sca
 }
 
 function drawCircleLabel(ctx: CanvasRenderingContext2D, circle: CircleNode, scale: number, force = false) {
-  if (!force && scale < 0.42) return
+  if (!force && scale < 0.50) return
   const fontSize = 13 / scale
   ctx.save()
   ctx.font = `500 ${fontSize}px Inter, system-ui, sans-serif`
@@ -749,7 +749,7 @@ function drawPeople(
       ctx.restore()
     }
     if (person.isFavorite) drawFavoritePersonOutline(ctx, person, '#ffd600', scale)
-    if (showPersonLabels && (scale >= 0.62 || isSelected || isHovered)) drawPersonLabel(ctx, person, scale)
+    if (showPersonLabels && (scale >= 0.70 || isSelected || isHovered)) drawPersonLabel(ctx, person, scale)
   }
 }
 

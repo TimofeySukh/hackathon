@@ -3,11 +3,11 @@
 
 import type { AnimFrame, CircleTone, PersonLinkService } from './types'
 
-export const MIN_SCALE = 0.02
+export const MIN_SCALE = 0.04
 export const MAX_SCALE = 4.0
 // Below this zoom the board switches to a simplified "zones only" view: just the
 // colored zone fills and their labels, with people, connections and centers hidden.
-export const ZONE_ONLY_SCALE = 0.3
+export const ZONE_ONLY_SCALE = 0.35
 
 export const CONNECT_THRESHOLD = 40
 export const MIN_CIRCLE_RADIUS = 72
