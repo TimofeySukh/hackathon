@@ -428,10 +428,6 @@ function App() {
     return window.location.hash === '#landing' ? 'landing' : 'board';
   });
 
-  const handleLaunchApp = () => {
-    setViewMode('board');
-    window.location.hash = ''; // clear hash to load the board workspace
-  };
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -3010,7 +3006,7 @@ function App() {
   if (viewMode === 'landing') {
     return (
       <div className="app-shell">
-        <LandingPage onLaunchApp={handleLaunchApp} />
+        <LandingPage />
       </div>
     )
   }

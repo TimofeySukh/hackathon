@@ -1,8 +1,6 @@
 import { useState, useEffect, type MouseEvent, type CSSProperties } from 'react'
 
-interface LandingPageProps {
-  onLaunchApp: () => void
-}
+
 
 interface GraphNode {
   id: string
@@ -95,7 +93,7 @@ const CONNECTIONS = [
   { from: 'partners', to: 'vcs', color: 'rgba(0,0,0,0.05)' },
 ]
 
-export default function LandingPage({ onLaunchApp }: LandingPageProps) {
+export default function LandingPage() {
   const [hoveredNode, setHoveredNode] = useState<string | null>(null)
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success'>('idle')
   const [uploadProgress, setUploadProgress] = useState(0)
@@ -159,11 +157,8 @@ export default function LandingPage({ onLaunchApp }: LandingPageProps) {
             <span className="landing-logo-text">Social Datanode</span>
           </a>
           <div className="landing-nav-actions">
-            <button className="lp-btn lp-btn-text" onClick={handleLiveDemo}>
-              Live Demo
-            </button>
-            <button className="lp-btn lp-btn-filled" onClick={onLaunchApp}>
-              Launch App
+            <button className="lp-btn lp-btn-filled" onClick={handleLiveDemo}>
+              View Demo
             </button>
           </div>
         </nav>
@@ -182,11 +177,8 @@ export default function LandingPage({ onLaunchApp }: LandingPageProps) {
               Visualize, cluster, and explore your personal and professional networks on an interactive, infinite canvas. Build your private social graph.
             </p>
             <div className="hero-ctas">
-              <button className="lp-btn lp-btn-filled" style={{ height: '48px', padding: '0 32px', fontSize: '15px' }} onClick={onLaunchApp}>
-                Start Mapping — Free
-              </button>
-              <button className="lp-btn lp-btn-outlined" style={{ height: '48px', padding: '0 32px', fontSize: '15px' }} onClick={handleLiveDemo}>
-                View Live Demo
+              <button className="lp-btn lp-btn-filled" style={{ height: '48px', padding: '0 32px', fontSize: '15px' }} onClick={handleLiveDemo}>
+                View Demo
               </button>
             </div>
           </div>
@@ -306,8 +298,8 @@ export default function LandingPage({ onLaunchApp }: LandingPageProps) {
               <p className="hero-description">
                 Don't start from scratch. Export your network details from LinkedIn, drop them in, and see your entire flat contact history convert into a gorgeous visual dashboard instantly.
               </p>
-              <button className="lp-btn lp-btn-outlined" onClick={onLaunchApp}>
-                Try Importing Now
+              <button className="lp-btn lp-btn-outlined" onClick={handleLiveDemo}>
+                View Demo
               </button>
             </div>
 
@@ -438,8 +430,8 @@ export default function LandingPage({ onLaunchApp }: LandingPageProps) {
             <p className="banner-desc">
               Organize your workspace, visualize connections, and gain insights with Social Datanode today. Free, open, and secure.
             </p>
-            <button className="lp-btn lp-btn-filled" style={{ height: '52px', padding: '0 36px', fontSize: '15px' }} onClick={onLaunchApp}>
-              Launch Social Datanode
+            <button className="lp-btn lp-btn-filled" style={{ height: '52px', padding: '0 36px', fontSize: '15px' }} onClick={handleLiveDemo}>
+              View Demo
             </button>
           </div>
         </section>
