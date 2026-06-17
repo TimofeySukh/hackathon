@@ -28,6 +28,9 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   or jumps. This replaces the older Shift-drag-from-center shortcut.
 - **Connect**: with the "Draw Connection" center behavior, drag from a circle center to
   another node to draw a relationship link. A dashed draft edge previews the connection.
+- **Center fan-out**: automatic circle links whose source is the central `You` circle are
+  not rendered. Dense imports otherwise create a starburst of non-authored lines from the
+  center to every company circle. Explicit user-created connections still render.
 - **Select**: click a circle, person, or connection to load it into the inspector for
   rename / styling / notes / delete.
 - **Undo**: Ctrl/Cmd+Z reverts the last graph-mutating action — create, delete, move,

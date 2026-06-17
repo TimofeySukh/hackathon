@@ -17,6 +17,16 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-17 — Hide automatic links from `You` to circles
+
+- Decision: the canvas no longer renders automatic circle links whose source is the
+  central `You` circle. New LinkedIn company circles are also created without
+  `connectedTo: 'you'`.
+- Why: large imports produced a dense starburst from the board center to every company
+  circle. Those lines are generated placement scaffolding, not meaningful authored
+  relationships, and they make the board unreadable.
+- Kept: explicit user-created connections and non-center circle links still render.
+
 ### 2026-06-15 — Circles load transparent and clean by default
 
 - Decision: fresh graph circles, newly created circles, imported LinkedIn company

@@ -417,6 +417,7 @@ function drawCircleEdges(ctx: CanvasRenderingContext2D, circles: CircleNode[], i
     if (drawn.has(child.id)) return
     const source = child.connectedTo ? index.circlesById.get(child.connectedTo) : null
     if (!source) return
+    if (source.id === 'you') return
     drawn.add(child.id)
     drawCurvePath(ctx, source, child)
   }
@@ -914,4 +915,3 @@ function findConnectionNearPoint(index: BoardIndex, point: { x: number; y: numbe
   }
   return best
 }
-

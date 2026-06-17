@@ -1247,7 +1247,7 @@ function App() {
             updated.parentId = newParentId
           }
           if (c.connectedTo === circleId) {
-            updated.connectedTo = 'you'
+            updated.connectedTo = null
           }
           return updated
         })
@@ -1312,7 +1312,7 @@ function App() {
           .filter((c) => !deletedCircleIds.has(c.id))
           .map((c) => {
             if (c.connectedTo && deletedCircleIds.has(c.connectedTo)) {
-              return { ...c, connectedTo: 'you' }
+              return { ...c, connectedTo: null }
             }
             return c
           })
@@ -4420,7 +4420,7 @@ async function buildLinkedInConnectionsGraph(
         radius: company.radius,
         minRadius: company.radius,
         parentId: null,
-        connectedTo: 'you',
+        connectedTo: null,
         tone: nextTone(nextCircles.length),
         fillMode: 'transparent',
         shapeType: 'circle',
@@ -4568,7 +4568,7 @@ function ensureLinkedInCompanyCircle(current: GraphState, profile: LinkedInProfi
       radius: 90,
       minRadius: 90,
       parentId: null,
-      connectedTo: 'you',
+      connectedTo: null,
       tone: nextTone(nextCircles.length),
       fillMode: 'transparent',
       shapeType: 'circle',
