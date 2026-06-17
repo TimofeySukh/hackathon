@@ -642,7 +642,7 @@ function getCircleRenderPath(
   return outlinePath(sampleCircleOutline(circle.x, circle.y, circle.radius, sides, amplitude, n, shapeType))
 }
 
-function drawCircleCenter(ctx: CanvasRenderingContext2D, circle: CircleNode, scale: number, circleFillMode: CircleFillMode, nodeScale = 1) {
+function drawCircleCenter(ctx: CanvasRenderingContext2D, circle: CircleNode, _scale: number, circleFillMode: CircleFillMode, nodeScale = 1) {
   const tone = getCircleColors(circle)
   const radius = CIRCLE_CENTER_RADIUS * nodeScale
   ctx.save()
@@ -651,9 +651,6 @@ function drawCircleCenter(ctx: CanvasRenderingContext2D, circle: CircleNode, sca
   ctx.fillStyle = tone.centerBg
   ctx.globalAlpha = (circle.fillMode ?? circleFillMode) === 'transparent' ? 0.92 : 1
   ctx.fill()
-  ctx.lineWidth = Math.max(3 / scale, 2)
-  ctx.strokeStyle = '#ffffff'
-  ctx.stroke()
 
   const image = circle.imageUrl ? getCanvasImage(circle.imageUrl) : null
   if (image) {
