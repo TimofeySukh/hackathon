@@ -4368,6 +4368,10 @@ async function buildLinkedInConnectionsGraph(
   const youCircle = circlesById.get('you')
   const youX = youCircle ? youCircle.x : 0
   const youY = youCircle ? youCircle.y : 0
+  const existingPeopleByCircle = new Map<string, number>()
+  for (const person of nextPeople) {
+    existingPeopleByCircle.set(person.circleId, (existingPeopleByCircle.get(person.circleId) ?? 0) + 1)
+  }
   let importedPeople = 0
   let importedCompanies = 0
 
@@ -4381,11 +4385,12 @@ async function buildLinkedInConnectionsGraph(
     const cleanCompName = companyName ? companyName : 'No Company'
     const companyId = `linkedin-company-${slugifyId(cleanCompName)}`
     const existing = circlesById.get(companyId)
+    const plannedCount = (existingPeopleByCircle.get(companyId) ?? 0) + members.length
     planned.push({
       id: companyId,
       name: cleanCompName,
       members,
-      radius: existing ? existing.radius : packedCircleRadius(members.length),
+      radius: Math.max(existing?.radius ?? 0, packedCircleRadius(plannedCount)),
     })
   }
 
@@ -4433,6 +4438,9 @@ async function buildLinkedInConnectionsGraph(
       nextCircles.push(companyCircle)
       circlesById.set(companyCircle.id, companyCircle)
       importedCompanies += 1
+    } else {
+      companyCircle = growCircleForPackedPeople(nextCircles, companyCircle, (slotByCircle.get(companyCircle.id) ?? 0) + company.members.length)
+      circlesById.set(companyCircle.id, companyCircle)
     }
 
     let slot = slotByCircle.get(companyCircle.id) ?? 0
@@ -4507,6 +4515,8 @@ async function buildLinkedInConnectionsGraph(
       }
     }
     slotByCircle.set(companyCircle.id, slot)
+    companyCircle = growCircleForPackedPeople(nextCircles, companyCircle, slot)
+    circlesById.set(companyCircle.id, companyCircle)
 
     processedCompanies += 1
     if (processedCompanies % 50 === 0) await yieldToBrowser()
@@ -4534,6 +4544,20 @@ function makeUniqueId(baseId: string, existingIds: Set<string>) {
   let index = 2
   while (existingIds.has(`${baseId}-${index}`)) index += 1
   return `${baseId}-${index}`
+}
+
+function growCircleForPackedPeople(circles: CircleNode[], circle: CircleNode, peopleCount: number): CircleNode {
+  const requiredRadius = packedCircleRadius(peopleCount)
+  if (requiredRadius <= circle.radius && requiredRadius <= circle.minRadius) return circle
+
+  const updated = {
+    ...circle,
+    radius: Math.max(circle.radius, requiredRadius),
+    minRadius: Math.max(circle.minRadius, requiredRadius),
+  }
+  const index = circles.findIndex((candidate) => candidate.id === circle.id)
+  if (index !== -1) circles[index] = updated
+  return updated
 }
 
 function findPersonByLinkedInProfileUrl(people: PersonNode[], profileUrl: string) {
@@ -4612,11 +4636,17 @@ function updateLinkedInProfileInGraph(
   if (!existingPerson) return addLinkedInProfileToGraph(current, profile)
 
   const { nextCircles, companyCircle } = ensureLinkedInCompanyCircle(current, profile)
+  const companyMembers = current.people.filter((person) => person.id !== personId && person.circleId === companyCircle.id)
+  const resizedCompanyCircle = growCircleForPackedPeople(nextCircles, companyCircle, companyMembers.length + 1)
+  const shouldReposition = existingPerson.circleId !== resizedCompanyCircle.id
+  const offset = personPackOffset(companyMembers.length)
   const updatedPerson: PersonNode = {
     ...existingPerson,
     name: profile.name || existingPerson.name,
     role: profile.headline || existingPerson.role,
-    circleId: companyCircle.id,
+    x: shouldReposition ? resizedCompanyCircle.x + offset.x : existingPerson.x,
+    y: shouldReposition ? resizedCompanyCircle.y + offset.y : existingPerson.y,
+    circleId: resizedCompanyCircle.id,
     avatar: makeInitials(profile.name || existingPerson.name),
     imageUrl: profile.avatarUrl || existingPerson.imageUrl,
     notes: buildLinkedInProfileNotes(profile, existingPerson.notes),
@@ -4654,7 +4684,8 @@ function addLinkedInProfileToGraph(
   const { nextCircles, companyCircle } = ensureLinkedInCompanyCircle(current, profile)
   const nextPeople = [...current.people]
   const companyMembers = nextPeople.filter((person) => person.circleId === companyCircle.id)
-  const pAngle = (companyMembers.length / Math.max(6, companyMembers.length + 1)) * 2 * Math.PI
+  const resizedCompanyCircle = growCircleForPackedPeople(nextCircles, companyCircle, companyMembers.length + 1)
+  const offset = personPackOffset(companyMembers.length)
   const existingIds = new Set(nextPeople.map((person) => person.id))
   const personId = makeUniqueId(`linkedin-person-${slugifyId(profile.slug || profile.name)}`, existingIds)
   const notes = buildLinkedInProfileNotes(profile)
@@ -4663,9 +4694,9 @@ function addLinkedInProfileToGraph(
     id: personId,
     name: profile.name,
     role: profile.headline || 'LinkedIn connection',
-    x: companyCircle.x + Math.cos(pAngle) * 35,
-    y: companyCircle.y + Math.sin(pAngle) * 35,
-    circleId: companyCircle.id,
+    x: resizedCompanyCircle.x + offset.x,
+    y: resizedCompanyCircle.y + offset.y,
+    circleId: resizedCompanyCircle.id,
     avatar: makeInitials(profile.name),
     shapeType: 'circle',
     sides: 10,
@@ -4724,19 +4755,36 @@ function stampYouIdentity(graph: GraphState, user: User): GraphState {
 }
 
 function sanitizeDefaultCircleStyles(graph: GraphState): GraphState {
+  const peopleByCircle = new Map<string, number>()
+  for (const person of graph.people) {
+    peopleByCircle.set(person.circleId, (peopleByCircle.get(person.circleId) ?? 0) + 1)
+  }
+
   return {
     ...graph,
     circles: graph.circles.map((circle) => {
-      if (circle.shapeCustom === true) return circle
-      if (circle.shapeType === 'circle' && circle.fillMode === 'transparent' && circle.sides === 25 && circle.amplitude === 0) return circle
+      const styledCircle = circle.shapeCustom === true ||
+        (circle.shapeType === 'circle' && circle.fillMode === 'transparent' && circle.sides === 25 && circle.amplitude === 0)
+        ? circle
+        : {
+            ...circle,
+            fillMode: 'transparent' as const,
+            shapeType: 'circle' as const,
+            shapeCustom: false,
+            sides: 25,
+            amplitude: 0,
+          }
+
+      const memberCount = styledCircle.id.startsWith('linkedin-company-') ? peopleByCircle.get(styledCircle.id) ?? 0 : 0
+      if (memberCount <= 0) return styledCircle
+
+      const requiredRadius = packedCircleRadius(memberCount)
+      if (requiredRadius <= styledCircle.radius && requiredRadius <= styledCircle.minRadius) return styledCircle
 
       return {
-        ...circle,
-        fillMode: 'transparent',
-        shapeType: 'circle',
-        shapeCustom: false,
-        sides: 25,
-        amplitude: 0,
+        ...styledCircle,
+        radius: Math.max(styledCircle.radius, requiredRadius),
+        minRadius: Math.max(styledCircle.minRadius, requiredRadius),
       }
     }),
   }

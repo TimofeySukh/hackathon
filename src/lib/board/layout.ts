@@ -9,6 +9,7 @@ import {
   CIRCLE_CONTAINMENT_PADDING,
   COLLISION_PASSES,
   MIN_CIRCLE_RADIUS,
+  IMPORT_CIRCLE_RADIUS_PADDING,
   PERSON_CIRCLE_COLLISION_GAP,
   PERSON_COLLISION_GAP,
   PERSON_COLLISION_RADIUS,
@@ -84,7 +85,7 @@ export function personPackOffset(index: number): { x: number; y: number } {
 export function packedCircleRadius(count: number): number {
   if (count <= 1) return 90
   const rMax = PERSON_PACK_SPACING * Math.sqrt(count - 1 + PERSON_PACK_INNER)
-  return Math.max(90, Math.ceil(rMax + PERSON_CONTAINMENT_RADIUS))
+  return Math.max(90, Math.ceil(rMax + PERSON_CONTAINMENT_RADIUS + IMPORT_CIRCLE_RADIUS_PADDING))
 }
 
 // Smallest angular separation on a ring of centre-radius R whose chord spans at

@@ -22,6 +22,13 @@ not thousands of per-contact database writes.
   around `you` (`packCirclesInRings`). Above `IMPORT_LAYOUT_LIMIT` nodes the global
   containment relax is skipped because the layout is already clean. See the 2026-06-15
   "Bulk import lays out non-overlapping" entry in `../DESIGN_LOG.md`.
+- Existing company circles grow to the packed radius required by their final member count
+  during re-imports and single-profile LinkedIn enrichment. The packed radius includes a
+  small visual padding beyond mathematical avatar containment so dense circles do not look
+  clipped when global cleanup is skipped.
+- Saved graphs are normalized on load with the same packed-radius rule for LinkedIn
+  company circles, so older undersized boards recover after reload without requiring a
+  fresh import.
 - Large imports are processed in chunks that yield back to the browser between batches,
   so the settings panel can repaint and the event loop is not blocked for the whole import.
 - The import button is disabled while a ZIP import is running and shows `Importing...`.

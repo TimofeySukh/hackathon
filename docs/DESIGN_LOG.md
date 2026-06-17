@@ -17,6 +17,20 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-17 — Grow imported company circles by final member count
+
+- Decision: LinkedIn ZIP re-imports and single-profile enrichment now grow existing
+  company circles to the `packedCircleRadius` required by their final member count. New
+  profile imports use the same sunflower slots as ZIP imports instead of a fixed 35px
+  ring.
+- Decision: `packedCircleRadius` includes `IMPORT_CIRCLE_RADIUS_PADDING` so imported
+  company circles have visual breathing room when large boards skip global layout cleanup.
+- Decision: saved graphs are normalized on load with the same packed-radius rule for
+  LinkedIn company circles, so older undersized boards recover after reload.
+- Why: after removing global O(n²) cleanup from interactions, undersized existing company
+  circles no longer got expanded as a side effect, so contacts could visually spill beyond
+  the circle they belonged to.
+
 ### 2026-06-17 — Stop global layout during live board interactions
 
 - Decision: drag and resize pointer-move frames no longer call the global

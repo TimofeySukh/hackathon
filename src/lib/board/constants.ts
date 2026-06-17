@@ -36,6 +36,10 @@ export const BOARD_INTERACTION_LAYOUT_LIMIT = 1500
 // this (measured), so 28 keeps people at least 2*PERSON_COLLISION_RADIUS +
 // PERSON_COLLISION_GAP = 46px apart — no overlap, so the O(n^2) relaxer isn't needed.
 export const PERSON_PACK_SPACING = 28
+// Extra slack around imported/person-packed company circles. The mathematical
+// containment radius fits avatars exactly, but dense boards need visual breathing
+// room for strokes, labels, and the fact that large imports skip global cleanup.
+export const IMPORT_CIRCLE_RADIUS_PADDING = 18
 // Above this many imported nodes (circles + people), skip the O(n^2) containment
 // relax after a bulk import: the import builder already lays everything out
 // non-overlapping, so running the relaxer would only freeze the tab for no gain.
