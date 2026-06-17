@@ -26,10 +26,11 @@ rediscover, write it here.
 - Decision: `packedCircleRadius` includes `IMPORT_CIRCLE_RADIUS_PADDING` so imported
   company circles have visual breathing room when large boards skip global layout cleanup.
 - Decision: saved graphs are normalized on load with the same packed-radius rule for
-  LinkedIn company circles, so older undersized boards recover after reload.
-- Decision: top-level LinkedIn company circles are repacked after radius normalization,
-  re-imports, and single-profile enrichment, with contained people translated by the same
-  delta as their company circle.
+  LinkedIn company circles, so older undersized boards recover after reload. Loading does
+  not repack positions, because changing saved circle coordinates on every load reads as a
+  board teleport.
+- Decision: top-level LinkedIn company circles are repacked after ZIP imports/re-imports,
+  with contained people translated by the same delta as their company circle.
 - Why: after removing global O(n²) cleanup from interactions, undersized existing company
   circles no longer got expanded or moved apart as a side effect, so contacts could
   visually spill beyond their circle or grown circles could cover neighboring companies.

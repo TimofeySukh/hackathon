@@ -4718,11 +4718,11 @@ function updateLinkedInProfileInGraph(
   }
 
   return {
-    graph: settleInteractionGraph(repackLinkedInCompanyCircles({
+    graph: settleInteractionGraph({
       ...current,
       circles: nextCircles,
       people: current.people.map((person) => (person.id === personId ? updatedPerson : person)),
-    })),
+    }),
     person: updatedPerson,
   }
 }
@@ -4767,11 +4767,11 @@ function addLinkedInProfileToGraph(
   nextPeople.push(person)
 
   return {
-    graph: settleInteractionGraph(repackLinkedInCompanyCircles({
+    graph: settleInteractionGraph({
       ...current,
       circles: nextCircles,
       people: nextPeople,
-    })),
+    }),
     person,
   }
 }
@@ -4813,7 +4813,7 @@ function sanitizeDefaultCircleStyles(graph: GraphState): GraphState {
     peopleByCircle.set(person.circleId, (peopleByCircle.get(person.circleId) ?? 0) + 1)
   }
 
-  const normalized = {
+  return {
     ...graph,
     circles: graph.circles.map((circle) => {
       const styledCircle = circle.shapeCustom === true ||
@@ -4841,8 +4841,6 @@ function sanitizeDefaultCircleStyles(graph: GraphState): GraphState {
       }
     }),
   }
-
-  return repackLinkedInCompanyCircles(normalized)
 }
 
 function menuPosition(menu: CreateMenu) {
