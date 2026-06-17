@@ -29,6 +29,9 @@ not thousands of per-contact database writes.
 - Saved graphs are normalized on load with the same packed-radius rule for LinkedIn
   company circles, so older undersized boards recover after reload without requiring a
   fresh import.
+- Top-level LinkedIn company circles are repacked after radius normalization, re-imports,
+  and single-profile enrichment. Their contained people move with them, preventing a grown
+  company circle from covering neighboring company circles.
 - Large imports are processed in chunks that yield back to the browser between batches,
   so the settings panel can repaint and the event loop is not blocked for the whole import.
 - The import button is disabled while a ZIP import is running and shows `Importing...`.

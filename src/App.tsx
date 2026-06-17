@@ -4527,7 +4527,7 @@ async function buildLinkedInConnectionsGraph(
   // The import builds a non-overlapping layout, so the O(n^2) containment relax is
   // pure cost on a large graph (it would re-freeze the tab). Run it only for small
   // imports, where it cheaply tidies any edge cases; trust the packing above it.
-  const built = { ...current, circles: nextCircles, people: nextPeople }
+  const built = repackLinkedInCompanyCircles({ ...current, circles: nextCircles, people: nextPeople })
   return {
     graph: nextCircles.length + nextPeople.length > IMPORT_LAYOUT_LIMIT ? built : ensureContainment(built),
     importedPeople,
@@ -4558,6 +4558,59 @@ function growCircleForPackedPeople(circles: CircleNode[], circle: CircleNode, pe
   const index = circles.findIndex((candidate) => candidate.id === circle.id)
   if (index !== -1) circles[index] = updated
   return updated
+}
+
+function repackLinkedInCompanyCircles(graph: GraphState): GraphState {
+  const companyCircles = graph.circles.filter(
+    (circle) => circle.parentId == null && circle.id.startsWith('linkedin-company-'),
+  )
+  if (companyCircles.length <= 1) return graph
+
+  const youCircle = graph.circles.find((circle) => circle.id === 'you')
+  const youX = youCircle?.x ?? 0
+  const youY = youCircle?.y ?? 0
+  let startRadius = youCircle?.radius ?? 104
+
+  const companyIds = new Set(companyCircles.map((circle) => circle.id))
+  for (const circle of graph.circles) {
+    if (circle.id === 'you' || circle.parentId != null || companyIds.has(circle.id)) continue
+    startRadius = Math.max(startRadius, Math.hypot(circle.x - youX, circle.y - youY) + circle.radius)
+  }
+
+  const positions = packCirclesInRings(
+    companyCircles.map((circle) => ({ id: circle.id, radius: circle.radius })),
+    youX,
+    youY,
+    CIRCLE_COLLISION_GAP + 24,
+    startRadius,
+  )
+
+  const deltaByCircleId = new Map<string, { x: number; y: number }>()
+  for (const circle of companyCircles) {
+    const next = positions.get(circle.id)
+    if (!next) continue
+    const delta = { x: next.x - circle.x, y: next.y - circle.y }
+    if (Math.abs(delta.x) < 0.001 && Math.abs(delta.y) < 0.001) continue
+
+    deltaByCircleId.set(circle.id, delta)
+    for (const descendantId of getDescendantCircleIds(graph.circles, circle.id)) {
+      deltaByCircleId.set(descendantId, delta)
+    }
+  }
+
+  if (deltaByCircleId.size === 0) return graph
+
+  return {
+    ...graph,
+    circles: graph.circles.map((circle) => {
+      const delta = deltaByCircleId.get(circle.id)
+      return delta ? { ...circle, x: circle.x + delta.x, y: circle.y + delta.y } : circle
+    }),
+    people: graph.people.map((person) => {
+      const delta = deltaByCircleId.get(person.circleId)
+      return delta ? { ...person, x: person.x + delta.x, y: person.y + delta.y } : person
+    }),
+  }
 }
 
 function findPersonByLinkedInProfileUrl(people: PersonNode[], profileUrl: string) {
@@ -4665,11 +4718,11 @@ function updateLinkedInProfileInGraph(
   }
 
   return {
-    graph: settleInteractionGraph({
+    graph: settleInteractionGraph(repackLinkedInCompanyCircles({
       ...current,
       circles: nextCircles,
       people: current.people.map((person) => (person.id === personId ? updatedPerson : person)),
-    }),
+    })),
     person: updatedPerson,
   }
 }
@@ -4714,11 +4767,11 @@ function addLinkedInProfileToGraph(
   nextPeople.push(person)
 
   return {
-    graph: settleInteractionGraph({
+    graph: settleInteractionGraph(repackLinkedInCompanyCircles({
       ...current,
       circles: nextCircles,
       people: nextPeople,
-    }),
+    })),
     person,
   }
 }
@@ -4760,7 +4813,7 @@ function sanitizeDefaultCircleStyles(graph: GraphState): GraphState {
     peopleByCircle.set(person.circleId, (peopleByCircle.get(person.circleId) ?? 0) + 1)
   }
 
-  return {
+  const normalized = {
     ...graph,
     circles: graph.circles.map((circle) => {
       const styledCircle = circle.shapeCustom === true ||
@@ -4788,6 +4841,8 @@ function sanitizeDefaultCircleStyles(graph: GraphState): GraphState {
       }
     }),
   }
+
+  return repackLinkedInCompanyCircles(normalized)
 }
 
 function menuPosition(menu: CreateMenu) {
