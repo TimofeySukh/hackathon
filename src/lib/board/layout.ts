@@ -2,10 +2,9 @@
 // resizing and the tree helpers they rely on. No React, no DOM — given a
 // GraphState it returns a new GraphState.
 
-import type { CircleNode, CircleTone, GraphState, LayoutContext, PersonNode } from './types'
+import type { CircleNode, CircleTone, GraphState, LayoutContext, PersonNode, BoardIndex } from './types'
 import {
   CIRCLE_CENTER_COLLISION_RADIUS,
-  CIRCLE_COLLISION_GAP,
   CIRCLE_CONTAINMENT_PADDING,
   COLLISION_PASSES,
   MIN_CIRCLE_RADIUS,
@@ -355,117 +354,111 @@ function pullCircleContentsTowardCenter(
 }
 
 function resolveCollisions(state: GraphState, context: LayoutContext): GraphState {
-  let circles = state.circles.map((circle) => ({ ...circle }))
-  let people = state.people.map((person) => ({ ...person }))
+  const circles = state.circles.map((circle) => ({ ...circle }))
+  const people = state.people.map((person) => ({ ...person }))
 
+  const circlesById = new Map(circles.map((c) => [c.id, c]))
+
+  // 1. Pre-group people by circleId to optimize person-person collisions
+  const peopleByCircle = new Map<string, PersonNode[]>()
+  for (const p of people) {
+    if (!p.circleId) continue
+    const list = peopleByCircle.get(p.circleId)
+    if (list) {
+      list.push(p)
+    } else {
+      peopleByCircle.set(p.circleId, [p])
+    }
+  }
+
+  // 2. Pre-group child circles by parentId for person-child circle repulsion
+  const childCirclesByParent = new Map<string, CircleNode[]>()
+  for (const c of circles) {
+    if (!c.parentId) continue
+    const list = childCirclesByParent.get(c.parentId)
+    if (list) {
+      list.push(c)
+    } else {
+      childCirclesByParent.set(c.parentId, [c])
+    }
+  }
+
+  // 3. Resolve collisions within each circle
   for (let pass = 0; pass < COLLISION_PASSES; pass += 1) {
     let changed = false
-    const circleIndexById = new Map(circles.map((circle, index) => [circle.id, index]))
-    const personIndexById = new Map(people.map((person, index) => [person.id, index]))
 
-    for (let i = 0; i < circles.length; i += 1) {
-      for (let j = i + 1; j < circles.length; j += 1) {
-        const a = circles[i]
-        const b = circles[j]
-        if (a.parentId !== b.parentId) continue
+    // A. Sibling person-person collisions inside their circle
+    for (const group of peopleByCircle.values()) {
+      for (let i = 0; i < group.length; i += 1) {
+        const a = group[i]
+        for (let j = i + 1; j < group.length; j += 1) {
+          const b = group[j]
 
-        const separation = getSeparation(a, b, a.radius + b.radius + CIRCLE_COLLISION_GAP)
-        if (!separation) continue
+          const minDist = PERSON_COLLISION_RADIUS * 2 + PERSON_COLLISION_GAP
+          const dx = b.x - a.x
+          const dy = b.y - a.y
+          if (dx * dx + dy * dy >= minDist * minDist) continue
 
-        const activeSide = context.activeCircleId === a.id ? 'a' : context.activeCircleId === b.id ? 'b' : null
-        let moveA = activeSide === 'a' ? 0 : activeSide === 'b' ? 1 : 0.5
-        let moveB = activeSide === 'b' ? 0 : activeSide === 'a' ? 1 : 0.5
+          const separation = getSeparation(a, b, minDist)
+          if (!separation) continue
 
-        if (a.id === 'you') {
-          moveA = 0
-          moveB = 1
-        } else if (b.id === 'you') {
-          moveA = 1
-          moveB = 0
+          const activeSide = context.activePersonId === a.id ? 'a' : context.activePersonId === b.id ? 'b' : null
+          const moveA = activeSide === 'a' ? 0 : activeSide === 'b' ? 1 : 0.5
+          const moveB = activeSide === 'b' ? 0 : activeSide === 'a' ? 1 : 0.5
+
+          a.x -= separation.x * moveA
+          a.y -= separation.y * moveA
+          b.x += separation.x * moveB
+          b.y += separation.y * moveB
+          changed = true
         }
-
-        if (moveA > 0) {
-          const translated = translateCircleSubtree(circles, people, a.id, -separation.x * moveA, -separation.y * moveA)
-          circles = translated.circles
-          people = translated.people
-        }
-        if (moveB > 0) {
-          const translated = translateCircleSubtree(circles, people, b.id, separation.x * moveB, separation.y * moveB)
-          circles = translated.circles
-          people = translated.people
-        }
-        changed = true
       }
     }
 
-    for (let i = 0; i < people.length; i += 1) {
-      for (let j = i + 1; j < people.length; j += 1) {
-        const a = people[i]
-        const b = people[j]
-        if (a.circleId !== b.circleId) continue
+    // B. Sibling person-circle center collisions and containment inside parent circle
+    for (const [circleId, group] of peopleByCircle.entries()) {
+      const parentCircle = circlesById.get(circleId)
+      if (!parentCircle) continue
 
-        const separation = getSeparation(a, b, PERSON_COLLISION_RADIUS * 2 + PERSON_COLLISION_GAP)
-        if (!separation) continue
+      const childCircles = childCirclesByParent.get(circleId) || []
 
-        const activeSide = context.activePersonId === a.id ? 'a' : context.activePersonId === b.id ? 'b' : null
-        const moveA = activeSide === 'a' ? 0 : activeSide === 'b' ? 1 : 0.5
-        const moveB = activeSide === 'b' ? 0 : activeSide === 'a' ? 1 : 0.5
+      for (const person of group) {
+        // Person repelled by child circles in the same parent circle
+        for (const childCircle of childCircles) {
+          const minDist = childCircle.radius + PERSON_COLLISION_RADIUS + PERSON_CIRCLE_COLLISION_GAP
+          const dx = person.x - childCircle.x
+          const dy = person.y - childCircle.y
+          if (dx * dx + dy * dy >= minDist * minDist) continue
 
-        people[i] = { ...a, x: a.x - separation.x * moveA, y: a.y - separation.y * moveA }
-        people[j] = { ...b, x: b.x + separation.x * moveB, y: b.y + separation.y * moveB }
-        changed = true
-      }
-    }
-
-    for (const childCircle of circles) {
-      if (!childCircle.parentId) continue
-      for (const person of people) {
-        if (person.circleId !== childCircle.parentId) continue
-
-        const separation = getSeparation(
-          childCircle,
-          person,
-          childCircle.radius + PERSON_COLLISION_RADIUS + PERSON_CIRCLE_COLLISION_GAP,
-        )
-        if (!separation) continue
-
-        const personIndex = personIndexById.get(person.id)
-        if (personIndex == null) continue
-        people[personIndex] = {
-          ...people[personIndex],
-          x: people[personIndex].x + separation.x,
-          y: people[personIndex].y + separation.y,
+          const separation = getSeparation(childCircle, person, minDist)
+          if (separation) {
+            person.x += separation.x
+            person.y += separation.y
+            changed = true
+          }
         }
-        changed = true
+
+        // Center repulsion
+        const centerDist = CIRCLE_CENTER_COLLISION_RADIUS + PERSON_COLLISION_RADIUS + PERSON_COLLISION_GAP
+        const dx = person.x - parentCircle.x
+        const dy = person.y - parentCircle.y
+        if (dx * dx + dy * dy < centerDist * centerDist) {
+          const separation = getSeparation(parentCircle, person, centerDist)
+          if (separation) {
+            person.x += separation.x
+            person.y += separation.y
+            changed = true
+          }
+        }
+
+        // Clamp inside parent circle
+        const clamped = clampPersonInsideCircle(person, parentCircle)
+        if (clamped.x !== person.x || clamped.y !== person.y) {
+          person.x = clamped.x
+          person.y = clamped.y
+          changed = true
+        }
       }
-    }
-
-    for (const person of people) {
-      const parentIndex = circleIndexById.get(person.circleId)
-      const personIndex = personIndexById.get(person.id)
-      if (parentIndex == null || personIndex == null) continue
-
-      const parentCircle = circles[parentIndex]
-      const separation = getSeparation(
-        parentCircle,
-        people[personIndex],
-        CIRCLE_CENTER_COLLISION_RADIUS + PERSON_COLLISION_RADIUS + PERSON_COLLISION_GAP,
-      )
-      if (!separation) continue
-
-      people[personIndex] = {
-        ...people[personIndex],
-        x: people[personIndex].x + separation.x,
-        y: people[personIndex].y + separation.y,
-      }
-      changed = true
-    }
-
-    for (const person of people) {
-      const parentIndex = circleIndexById.get(person.circleId)
-      const personIndex = personIndexById.get(person.id)
-      if (parentIndex == null || personIndex == null) continue
-      people[personIndex] = clampPersonInsideCircle(people[personIndex], circles[parentIndex])
     }
 
     if (!changed) break
@@ -474,25 +467,7 @@ function resolveCollisions(state: GraphState, context: LayoutContext): GraphStat
   return { ...state, circles, people }
 }
 
-function translateCircleSubtree(
-  circles: CircleNode[],
-  people: PersonNode[],
-  circleId: string,
-  deltaX: number,
-  deltaY: number,
-) {
-  const subtreeIds = getDescendantCircleIds(circles, circleId)
-  subtreeIds.add(circleId)
 
-  return {
-    circles: circles.map((circle) =>
-      subtreeIds.has(circle.id) ? { ...circle, x: circle.x + deltaX, y: circle.y + deltaY } : circle,
-    ),
-    people: people.map((person) =>
-      subtreeIds.has(person.circleId) ? { ...person, x: person.x + deltaX, y: person.y + deltaY } : person,
-    ),
-  }
-}
 
 function clampPersonInsideCircle(person: PersonNode, circle: CircleNode) {
   const maxDistance = Math.max(0, circle.radius - PERSON_COLLISION_RADIUS)
@@ -548,4 +523,335 @@ export function getDescendantCircleIds(circles: CircleNode[], circleId: string) 
   }
 
   return descendants
+}
+
+export function resolveCircleOnlyLayoutInPlace(
+  index: BoardIndex,
+  baseCircles: CircleNode[],
+  basePeople: PersonNode[],
+  subtreeIds: Set<string>,
+  draggedPersonIds: Set<string>,
+  deltaX: number,
+  deltaY: number,
+): void {
+  // 1. Reset all coordinates in index from base
+  for (let i = 0; i < baseCircles.length; i++) {
+    const baseC = baseCircles[i]
+    const indexC = index.circlesById.get(baseC.id)
+    if (indexC) {
+      indexC.x = baseC.x
+      indexC.y = baseC.y
+      indexC.radius = baseC.radius
+      indexC.minRadius = baseC.minRadius
+    }
+  }
+  for (let i = 0; i < basePeople.length; i++) {
+    const baseP = basePeople[i]
+    const indexP = index.peopleById.get(baseP.id)
+    if (indexP) {
+      indexP.x = baseP.x
+      indexP.y = baseP.y
+    }
+  }
+
+  // 2. Apply drag delta to the dragged subtree of circles in-place
+  for (const cid of subtreeIds) {
+    const indexC = index.circlesById.get(cid)
+    if (indexC) {
+      indexC.x += deltaX
+      indexC.y += deltaY
+    }
+  }
+
+  // 3. Apply drag delta to people in-place
+  for (let i = 0; i < basePeople.length; i++) {
+    const origP = basePeople[i]
+    const indexP = index.peopleById.get(origP.id)
+    if (!indexP) continue
+
+    const isDraggedPerson = draggedPersonIds.has(origP.id)
+    const isInDraggedCircle = origP.circleId && subtreeIds.has(origP.circleId)
+    const personDispX = (isDraggedPerson || isInDraggedCircle) ? deltaX : 0
+    const personDispY = (isDraggedPerson || isInDraggedCircle) ? deltaY : 0
+
+    indexP.x = origP.x + personDispX
+    indexP.y = origP.y + personDispY
+  }
+}
+
+export function movePersonInPlace(
+  index: BoardIndex,
+  baseCircles: CircleNode[],
+  basePeople: PersonNode[],
+  selectedOrigins: Record<string, { x: number; y: number }> | null,
+  circleOrigins: Record<string, { x: number; y: number }> | null,
+  movingPersonId: string,
+  originX: number,
+  originY: number,
+  deltaX: number,
+  deltaY: number,
+): void {
+  // 1. Reset all coordinates and radii in index from base circles
+  for (let i = 0; i < baseCircles.length; i++) {
+    const baseC = baseCircles[i]
+    const indexC = index.circlesById.get(baseC.id)
+    if (indexC) {
+      indexC.x = baseC.x
+      indexC.y = baseC.y
+      indexC.radius = baseC.radius
+      indexC.minRadius = baseC.minRadius
+    }
+  }
+  // Reset all coordinates in index from base people
+  for (let i = 0; i < basePeople.length; i++) {
+    const baseP = basePeople[i]
+    const indexP = index.peopleById.get(baseP.id)
+    if (indexP) {
+      indexP.x = baseP.x
+      indexP.y = baseP.y
+    }
+  }
+
+  // 2. Move circles
+  if (circleOrigins) {
+    for (const cid in circleOrigins) {
+      const indexC = index.circlesById.get(cid)
+      if (indexC) {
+        const orig = circleOrigins[cid]
+        indexC.x = orig.x + deltaX
+        indexC.y = orig.y + deltaY
+      }
+    }
+  }
+
+  // 3. Move people initially
+  for (let i = 0; i < basePeople.length; i++) {
+    const origP = basePeople[i]
+    const indexP = index.peopleById.get(origP.id)
+    if (!indexP) continue
+
+    if (selectedOrigins && origP.id in selectedOrigins) {
+      const orig = selectedOrigins[origP.id]
+      indexP.x = orig.x + deltaX
+      indexP.y = orig.y + deltaY
+    } else if (origP.id === movingPersonId) {
+      indexP.x = originX + deltaX
+      indexP.y = originY + deltaY
+    }
+  }
+
+  // 4. Pre-group people by circleId to resolve collisions inside circles
+  const peopleByCircle = new Map<string, PersonNode[]>()
+  for (const p of index.people) {
+    if (!p.circleId) continue
+    const list = peopleByCircle.get(p.circleId)
+    if (list) {
+      list.push(p)
+    } else {
+      peopleByCircle.set(p.circleId, [p])
+    }
+  }
+
+  // Pre-group child circles by parentId
+  const childCirclesByParent = new Map<string, CircleNode[]>()
+  for (const c of index.circles) {
+    if (!c.parentId) continue
+    const list = childCirclesByParent.get(c.parentId)
+    if (list) {
+      list.push(c)
+    } else {
+      childCirclesByParent.set(c.parentId, [c])
+    }
+  }
+
+  // 5. Run collision passes for people
+  const passes = 10
+  for (let pass = 0; pass < passes; pass += 1) {
+    let changed = false
+
+    // A. Sibling person-person collisions inside their circle
+    for (const group of peopleByCircle.values()) {
+      for (let i = 0; i < group.length; i += 1) {
+        const a = group[i]
+        for (let j = i + 1; j < group.length; j += 1) {
+          const b = group[j]
+
+          const minDist = PERSON_COLLISION_RADIUS * 2 + PERSON_COLLISION_GAP
+          const dx = b.x - a.x
+          const dy = b.y - a.y
+          if (dx * dx + dy * dy >= minDist * minDist) continue
+
+          const separation = getSeparation(a, b, minDist)
+          if (!separation) continue
+
+          // During drag, the active person being dragged shouldn't be pushed around by others.
+          const activeSide = movingPersonId === a.id ? 'a' : movingPersonId === b.id ? 'b' : null
+          const moveA = activeSide === 'a' ? 0 : activeSide === 'b' ? 1 : 0.5
+          const moveB = activeSide === 'b' ? 0 : activeSide === 'a' ? 1 : 0.5
+
+          a.x -= separation.x * moveA
+          a.y -= separation.y * moveA
+          b.x += separation.x * moveB
+          b.y += separation.y * moveB
+          changed = true
+        }
+      }
+    }
+
+    // B. Sibling person-circle center collisions and containment inside parent circle
+    for (const [circleId, group] of peopleByCircle.entries()) {
+      const parentCircle = index.circlesById.get(circleId)
+      if (!parentCircle) continue
+
+      const childCircles = childCirclesByParent.get(circleId) || []
+
+      for (const person of group) {
+        // Person repelled by child circles in the same parent circle
+        for (const childCircle of childCircles) {
+          const minDist = childCircle.radius + PERSON_COLLISION_RADIUS + PERSON_CIRCLE_COLLISION_GAP
+          const dx = person.x - childCircle.x
+          const dy = person.y - childCircle.y
+          if (dx * dx + dy * dy >= minDist * minDist) continue
+
+          const separation = getSeparation(childCircle, person, minDist)
+          if (separation) {
+            person.x += separation.x
+            person.y += separation.y
+            changed = true
+          }
+        }
+
+        // Center repulsion
+        const centerDist = CIRCLE_CENTER_COLLISION_RADIUS + PERSON_COLLISION_RADIUS + PERSON_COLLISION_GAP
+        const dx = person.x - parentCircle.x
+        const dy = person.y - parentCircle.y
+        if (dx * dx + dy * dy < centerDist * centerDist) {
+          const separation = getSeparation(parentCircle, person, centerDist)
+          if (separation) {
+            person.x += separation.x
+            person.y += separation.y
+            changed = true
+          }
+        }
+
+        // Clamp inside parent circle
+        const clamped = clampPersonInsideCircle(person, parentCircle)
+        if (clamped.x !== person.x || clamped.y !== person.y) {
+          person.x = clamped.x
+          person.y = clamped.y
+          changed = true
+        }
+      }
+    }
+
+    if (!changed) break
+  }
+}
+
+export function resizeCircleFromPointInPlace(
+  index: BoardIndex,
+  baseCircles: CircleNode[],
+  basePeople: PersonNode[],
+  circleId: string,
+  point: { x: number; y: number },
+): void {
+  // 1. Reset all coordinates and radii in index from base circles
+  for (let i = 0; i < baseCircles.length; i++) {
+    const baseC = baseCircles[i]
+    const indexC = index.circlesById.get(baseC.id)
+    if (indexC) {
+      indexC.x = baseC.x
+      indexC.y = baseC.y
+      indexC.radius = baseC.radius
+      indexC.minRadius = baseC.minRadius
+    }
+  }
+  // Reset all coordinates in index from base people
+  for (let i = 0; i < basePeople.length; i++) {
+    const baseP = basePeople[i]
+    const indexP = index.peopleById.get(baseP.id)
+    if (indexP) {
+      indexP.x = baseP.x
+      indexP.y = baseP.y
+    }
+  }
+
+  const circle = index.circlesById.get(circleId)
+  if (!circle) return
+
+  const requestedRadius = Math.max(MIN_CIRCLE_RADIUS, Math.hypot(point.x - circle.x, point.y - circle.y))
+  const oldRadius = circle.radius
+  const radiusRatio = requestedRadius < oldRadius ? requestedRadius / oldRadius : 1
+
+  if (radiusRatio < 1) {
+    const descendantCircleIds = getDescendantCircleIds(index.circles, circleId)
+    
+    // Temporarily update root circle's radius
+    circle.radius = requestedRadius
+
+    // Process descendant circles in tree order starting from circleId
+    const queue = [circleId]
+    const circlesById = index.circlesById
+    
+    while (queue.length > 0) {
+      const parentId = queue.shift()!
+      const parent = circlesById.get(parentId)!
+
+      const children = index.circles.filter((c) => c.parentId === parentId)
+      for (const child of children) {
+        const dx = child.x - parent.x
+        const dy = child.y - parent.y
+        const d = Math.hypot(dx, dy)
+
+        const maxAllowed = parent.radius - child.radius - CIRCLE_CONTAINMENT_PADDING
+        if (d > maxAllowed) {
+          if (maxAllowed < 0) {
+            const newRadius = Math.max(MIN_CIRCLE_RADIUS, parent.radius - CIRCLE_CONTAINMENT_PADDING)
+            child.radius = newRadius
+            child.minRadius = Math.max(MIN_CIRCLE_RADIUS, child.minRadius * radiusRatio)
+            child.x = parent.x
+            child.y = parent.y
+          } else {
+            if (d > 0.0001) {
+              child.x = parent.x + (dx / d) * maxAllowed
+              child.y = parent.y + (dy / d) * maxAllowed
+            } else {
+              child.x = parent.x
+              child.y = parent.y
+            }
+          }
+        }
+        queue.push(child.id)
+      }
+    }
+
+    const containedCircleIds = new Set(descendantCircleIds)
+    containedCircleIds.add(circleId)
+
+    for (const person of index.people) {
+      if (containedCircleIds.has(person.circleId)) {
+        const parent = circlesById.get(person.circleId)
+        if (!parent) continue
+
+        const dx = person.x - parent.x
+        const dy = person.y - parent.y
+        const d = Math.hypot(dx, dy)
+
+        const maxAllowed = parent.radius - PERSON_CONTAINMENT_RADIUS
+        if (d > maxAllowed) {
+          const targetD = Math.max(0, maxAllowed)
+          if (d > 0.0001) {
+            person.x = parent.x + (dx / d) * targetD
+            person.y = parent.y + (dy / d) * targetD
+          } else {
+            person.x = parent.x
+            person.y = parent.y
+          }
+        }
+      }
+    }
+  }
+
+  circle.minRadius = requestedRadius
+  circle.radius = requestedRadius
 }

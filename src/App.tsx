@@ -60,13 +60,15 @@ import { getCircleColors, hexToHsv, hsvToHex, getReadableColor } from './lib/boa
 import { clamp } from './lib/board/geometry'
 import {
   ensureContainment,
-  resizeCircleFromPoint,
   createFreshGraph,
   findFreeSpaceInCircle,
   getDescendantCircleIds,
   personPackOffset,
   packedCircleRadius,
   packCirclesInRings,
+  resolveCircleOnlyLayoutInPlace,
+  movePersonInPlace,
+  resizeCircleFromPointInPlace,
 } from './lib/board/layout'
 import { createBoardIndex, hitTestBoard, readAnimFrame, drawBoardLayer, setBoardRepaintCallback } from './lib/board/render'
 import { makeInitials } from './lib/board/text'
@@ -162,6 +164,7 @@ type MoveCircleState = {
   circleOrigins?: Record<string, { x: number; y: number }>
   personOrigins?: Record<string, { x: number; y: number }>
   disconnectedCircleIds?: string[]
+  graphSnapshot?: GraphState
 }
 
 type MovePersonState = {
@@ -174,11 +177,13 @@ type MovePersonState = {
   selectedOrigins?: Record<string, { x: number; y: number }>
   // Mixed selection: zones (and their contents) dragged along with the people.
   circleOrigins?: Record<string, { x: number; y: number }>
+  graphSnapshot?: GraphState
 }
 
 type ResizeCircleState = {
   pointerId: number
   circleId: string
+  graphSnapshot?: GraphState
 }
 
 function inferLinkService(rawValue: string): PersonLinkService {
@@ -1524,6 +1529,10 @@ function App() {
     () => createBoardIndex(sortedCircles, displayPeople, displayConnections),
     [sortedCircles, displayPeople, displayConnections],
   )
+  const boardIndexRef = useRef(boardIndex)
+  useLayoutEffect(() => {
+    boardIndexRef.current = boardIndex
+  }, [boardIndex])
 
 
 
@@ -1800,17 +1809,7 @@ function App() {
     })
   }
 
-  // Cancel the pending frame and return the last pending graph updater (if any),
-  // so pointer-up can apply the final position immediately (plus containment).
-  function takePendingGraphUpdate() {
-    if (dragRafRef.current != null) {
-      window.cancelAnimationFrame(dragRafRef.current)
-      dragRafRef.current = null
-    }
-    const update = pendingGraphRef.current
-    pendingGraphRef.current = null
-    return update
-  }
+
 
   // Set the board cursor imperatively (avoids a re-render). The hand only shows
   // while a real pan/drag is happening; resting and clicking keep the arrow, and
@@ -2125,21 +2124,34 @@ function App() {
       ensureGestureSnapshot()
       const deltaX = (event.clientX - moving.startX) / camera.scale
       const deltaY = (event.clientY - moving.startY) / camera.scale
-      const { circleOrigins, personOrigins } = moving
-      pendingGraphRef.current = (current) => ({
-        ...current,
-        circles: current.circles.map((c) =>
-          circleOrigins && c.id in circleOrigins
-            ? { ...c, x: circleOrigins[c.id].x + deltaX, y: circleOrigins[c.id].y + deltaY }
-            : c
-        ),
-        people: current.people.map((p) =>
-          personOrigins && p.id in personOrigins
-            ? { ...p, x: personOrigins[p.id].x + deltaX, y: personOrigins[p.id].y + deltaY }
-            : p
-        ),
-      })
-      scheduleDrag()
+      const base = moving.graphSnapshot || graph
+      const targets = moving.disconnectedCircleIds || [moving.circleId]
+
+      const subtreeIds = new Set<string>()
+      for (const cid of targets) {
+        subtreeIds.add(cid)
+        for (const descId of getDescendantCircleIds(base.circles, cid)) {
+          subtreeIds.add(descId)
+        }
+      }
+
+      const draggedPersonIds = new Set<string>()
+      if (moving.personOrigins) {
+        for (const pid in moving.personOrigins) {
+          draggedPersonIds.add(pid)
+        }
+      }
+
+      resolveCircleOnlyLayoutInPlace(
+        boardIndexRef.current,
+        base.circles,
+        base.people,
+        subtreeIds,
+        draggedPersonIds,
+        deltaX,
+        deltaY,
+      )
+      paintBoard()
     }
 
     const movingPerson = movePersonRef.current
@@ -2147,33 +2159,38 @@ function App() {
       ensureGestureSnapshot()
       const deltaX = (event.clientX - movingPerson.startX) / camera.scale
       const deltaY = (event.clientY - movingPerson.startY) / camera.scale
+      const base = movingPerson.graphSnapshot || graph
       const { selectedOrigins, circleOrigins } = movingPerson
-      pendingGraphRef.current = (current) => ({
-        ...current,
-        circles: current.circles.map((c) =>
-          circleOrigins && c.id in circleOrigins
-            ? { ...c, x: circleOrigins[c.id].x + deltaX, y: circleOrigins[c.id].y + deltaY }
-            : c
-        ),
-        people: current.people.map((person) => {
-          if (selectedOrigins && person.id in selectedOrigins) {
-            const origin = selectedOrigins[person.id]
-            return { ...person, x: origin.x + deltaX, y: origin.y + deltaY }
-          } else if (person.id === movingPerson.personId) {
-            return { ...person, x: movingPerson.originX + deltaX, y: movingPerson.originY + deltaY }
-          }
-          return person
-        }),
-      })
-      scheduleDrag()
+
+      movePersonInPlace(
+        boardIndexRef.current,
+        base.circles,
+        base.people,
+        selectedOrigins || null,
+        circleOrigins || null,
+        movingPerson.personId,
+        movingPerson.originX,
+        movingPerson.originY,
+        deltaX,
+        deltaY,
+      )
+      paintBoard()
     }
 
     const resizing = resizeCircleRef.current
     if (resizing?.pointerId === event.pointerId) {
       ensureGestureSnapshot()
+      const base = resizing.graphSnapshot || graph
       const world = screenToWorld({ x: event.clientX, y: event.clientY })
-      pendingGraphRef.current = (current) => resizeCircleFromPoint(current, resizing.circleId, world, { resolveLayout: false })
-      scheduleDrag()
+
+      resizeCircleFromPointInPlace(
+        boardIndexRef.current,
+        base.circles,
+        base.people,
+        resizing.circleId,
+        world,
+      )
+      paintBoard()
     }
 
     if (connector) {
@@ -2300,10 +2317,19 @@ function App() {
       if (wasResize) notifyOnboarding('resize')
       else if (wasNodeMove) notifyOnboarding('move')
 
-      // Apply the final dragged position immediately, including any queued layout pass.
-      const pending = takePendingGraphUpdate()
-      setGraph((prev) => {
-        let next = pending ? pending(prev) : prev
+      const nextResolved = {
+        ...graph,
+        circles: graph.circles.map((c) => {
+          const indexC = boardIndexRef.current.circlesById.get(c.id)
+          return indexC ? { ...c, x: indexC.x, y: indexC.y, radius: indexC.radius, minRadius: indexC.minRadius } : c
+        }),
+        people: graph.people.map((p) => {
+          const indexP = boardIndexRef.current.peopleById.get(p.id)
+          return indexP ? { ...p, x: indexP.x, y: indexP.y } : p
+        }),
+      }
+      setGraph(() => {
+        let next = nextResolved
         if (wasRightClickDrag) {
           if (movingPersonId) {
             const draggedIds = selectedOrigins ? Object.keys(selectedOrigins) : [movingPersonId]
@@ -2522,6 +2548,7 @@ function App() {
       circleOrigins,
       personOrigins,
       disconnectedCircleIds: targets,
+      graphSnapshot: graph,
     }
   }
 
@@ -2572,6 +2599,7 @@ function App() {
       originY: person.y,
       selectedOrigins,
       circleOrigins,
+      graphSnapshot: graph,
     }
   }
 
@@ -2584,6 +2612,7 @@ function App() {
     resizeCircleRef.current = {
       pointerId: event.pointerId,
       circleId: circle.id,
+      graphSnapshot: graph,
     }
   }
 
