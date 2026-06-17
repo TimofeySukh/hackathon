@@ -835,21 +835,23 @@ export function hitTestBoard(index: BoardIndex, camera: Camera, selectedItem: Se
   const scale = camera.scale
   const handleHit = HANDLE_HIT_RADIUS / scale
 
-  if (selectedItem?.type === 'person') {
-    const person = index.peopleById.get(selectedItem.id)
-    if (person) {
-      for (const handle of connectorHandlesFor(person)) {
-        if (Math.hypot(point.x - handle.x, point.y - handle.y) <= handleHit) {
-          return { type: 'connector-handle', sourceId: person.id, sourceType: 'person', x: person.x, y: person.y }
+  if (scale >= ZONE_ONLY_SCALE) {
+    if (selectedItem?.type === 'person') {
+      const person = index.peopleById.get(selectedItem.id)
+      if (person) {
+        for (const handle of connectorHandlesFor(person)) {
+          if (Math.hypot(point.x - handle.x, point.y - handle.y) <= handleHit) {
+            return { type: 'connector-handle', sourceId: person.id, sourceType: 'person', x: person.x, y: person.y }
+          }
         }
       }
-    }
-  } else if (selectedItem?.type === 'circle') {
-    const circle = index.circlesById.get(selectedItem.id)
-    if (circle) {
-      for (const handle of connectorHandlesFor(circle)) {
-        if (Math.hypot(point.x - handle.x, point.y - handle.y) <= handleHit) {
-          return { type: 'connector-handle', sourceId: circle.id, sourceType: 'circle', x: circle.x, y: circle.y }
+    } else if (selectedItem?.type === 'circle') {
+      const circle = index.circlesById.get(selectedItem.id)
+      if (circle) {
+        for (const handle of connectorHandlesFor(circle)) {
+          if (Math.hypot(point.x - handle.x, point.y - handle.y) <= handleHit) {
+            return { type: 'connector-handle', sourceId: circle.id, sourceType: 'circle', x: circle.x, y: circle.y }
+          }
         }
       }
     }
@@ -861,20 +863,23 @@ export function hitTestBoard(index: BoardIndex, camera: Camera, selectedItem: Se
     top: point.y - 28 / scale,
     bottom: point.y + 28 / scale,
   }
-  const people = queryPeople(index, hitRect)
-  let bestPerson: PersonNode | null = null
-  let bestDist = (PERSON_VISUAL_RADIUS + 8 / scale) ** 2
-  for (const person of people) {
-    const d = (person.x - point.x) ** 2 + (person.y - point.y) ** 2
-    if (d < bestDist) {
-      bestDist = d
-      bestPerson = person
-    }
-  }
-  if (bestPerson) return { type: 'person', person: bestPerson }
 
-  const connection = findConnectionNearPoint(index, point, 10 / scale)
-  if (connection) return { type: 'connection', connection }
+  if (scale >= ZONE_ONLY_SCALE) {
+    const people = queryPeople(index, hitRect)
+    let bestPerson: PersonNode | null = null
+    let bestDist = (PERSON_VISUAL_RADIUS + 8 / scale) ** 2
+    for (const person of people) {
+      const d = (person.x - point.x) ** 2 + (person.y - point.y) ** 2
+      if (d < bestDist) {
+        bestDist = d
+        bestPerson = person
+      }
+    }
+    if (bestPerson) return { type: 'person', person: bestPerson }
+
+    const connection = findConnectionNearPoint(index, point, 10 / scale)
+    if (connection) return { type: 'connection', connection }
+  }
 
   const circles = queryCircles(index, hitRect).reverse()
   for (const circle of circles) {
