@@ -14,7 +14,6 @@ import {
   PERSON_COLLISION_RADIUS,
   PERSON_CONTAINMENT_RADIUS,
   PERSON_PACK_SPACING,
-  RESIZE_COLLISION_LIMIT,
 } from './constants'
 import { getSeparation } from './geometry'
 
@@ -210,18 +209,13 @@ export function resizeCircleFromPoint(state: GraphState, circleId: string, point
   const requestedRadius = Math.max(MIN_CIRCLE_RADIUS, Math.hypot(point.x - circle.x, point.y - circle.y))
   const radiusRatio = requestedRadius < circle.radius ? requestedRadius / circle.radius : 1
   const resizedState = radiusRatio < 1 ? pullCircleContentsTowardCenter(state, circleId, circle, radiusRatio) : state
-  const nextState = {
+
+  return ensureContainment({
     ...resizedState,
     circles: resizedState.circles.map((candidate) =>
       candidate.id === circleId ? { ...candidate, minRadius: requestedRadius, radius: requestedRadius } : candidate,
     ),
-  }
-
-  if (nextState.circles.length + nextState.people.length > RESIZE_COLLISION_LIMIT) {
-    return fitCircleAndAncestors(nextState, circleId)
-  }
-
-  return ensureContainment(nextState, { activeCircleId: circleId })
+  }, { activeCircleId: circleId })
 }
 
 export function ensureContainment(state: GraphState, context: LayoutContext = {}): GraphState {
@@ -245,28 +239,6 @@ function fitContainment(state: GraphState): GraphState {
 
     circles = nextCircles
     if (!changed) break
-  }
-
-  return { ...state, circles }
-}
-
-function fitCircleAndAncestors(state: GraphState, circleId: string): GraphState {
-  let circles = state.circles
-  const circlesById = new Map(circles.map((circle) => [circle.id, circle]))
-  let currentId: string | null = circleId
-
-  while (currentId) {
-    const circle = circlesById.get(currentId)
-    if (!circle) break
-
-    const requiredRadius = getRequiredCircleRadius(circle, circles, circlesById, state.people)
-    if (requiredRadius !== circle.radius) {
-      const updatedCircle = { ...circle, radius: requiredRadius }
-      circles = circles.map((candidate) => (candidate.id === currentId ? updatedCircle : candidate))
-      circlesById.set(currentId, updatedCircle)
-    }
-
-    currentId = circlesById.get(currentId)?.parentId ?? null
   }
 
   return { ...state, circles }

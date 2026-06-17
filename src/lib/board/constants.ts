@@ -26,9 +26,6 @@ export const CIRCLE_CENTER_COLLISION_RADIUS = 24
 export const PERSON_CIRCLE_COLLISION_GAP = 8
 export const CIRCLE_COLLISION_GAP = 4
 export const COLLISION_PASSES = 10
-// Above this many board nodes, pointer-driven resize must avoid the global
-// O(n^2) collision relaxer. The resize path keeps containment local instead.
-export const RESIZE_COLLISION_LIMIT = 1500
 
 // Sunflower (phyllotaxis) packing spacing for people laid out inside a circle on
 // import. The golden-angle spiral's minimum nearest-neighbour distance is ~1.657x

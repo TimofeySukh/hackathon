@@ -720,12 +720,10 @@ function App() {
   const [newNoteBody, setNewNoteBody] = useState('')
   const [isAddingNote, setIsAddingNote] = useState(false)
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
-  const [editingNoteBody, setEditingNoteBody] = useState('')
   const [newLinkValue, setNewLinkValue] = useState('')
   const [newLinkService, setNewLinkService] = useState<PersonLinkService>('website')
   const [showLinkServicePicker, setShowLinkServicePicker] = useState(false)
   const noteInputRef = useRef<HTMLTextAreaElement>(null)
-  const skipNextNoteBlurRef = useRef(false)
 
   const settingsButtonRef = useRef<HTMLButtonElement>(null)
   const settingsPanelRef = useRef<HTMLDivElement>(null)
@@ -994,30 +992,6 @@ function App() {
         return p
       }),
     }))
-  }
-
-  function startEditingNote(note: PersonNote) {
-    skipNextNoteBlurRef.current = false
-    setEditingNoteId(note.id)
-    setEditingNoteBody(note.body)
-  }
-
-  function saveEditingNote(personId: string, noteId: string) {
-    const body = editingNoteBody
-    updatePersonNote(
-      personId,
-      noteId,
-      body.split('\n')[0].substring(0, 30) || 'Untitled note',
-      body,
-    )
-    setEditingNoteId(null)
-    setEditingNoteBody('')
-  }
-
-  function cancelEditingNote() {
-    skipNextNoteBlurRef.current = true
-    setEditingNoteId(null)
-    setEditingNoteBody('')
   }
 
   function deletePersonNote(personId: string, noteId: string) {
@@ -3820,22 +3794,22 @@ function App() {
                             <textarea
                               className="trello-card__editor-textarea"
                               autoFocus
-                              value={editingNoteBody}
-                              onChange={(e) => setEditingNoteBody(e.target.value)}
-                              onBlur={() => {
-                                if (skipNextNoteBlurRef.current) {
-                                  skipNextNoteBlurRef.current = false
-                                  return
-                                }
-                                saveEditingNote(selectedPerson.id, note.id)
+                              value={note.body}
+                              onChange={(e) => {
+                                updatePersonNote(
+                                  selectedPerson.id,
+                                  note.id,
+                                  e.target.value.split('\n')[0].substring(0, 30) || 'Untitled note',
+                                  e.target.value
+                                )
                               }}
+                              onBlur={() => setEditingNoteId(null)}
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter' && !e.shiftKey) {
                                   e.preventDefault()
-                                  skipNextNoteBlurRef.current = true
-                                  saveEditingNote(selectedPerson.id, note.id)
+                                  setEditingNoteId(null)
                                 } else if (e.key === 'Escape') {
-                                  cancelEditingNote()
+                                  setEditingNoteId(null)
                                 }
                               }}
                               style={{
@@ -3846,7 +3820,7 @@ function App() {
                         ) : (
                           <div
                             className="trello-card"
-                            onClick={() => startEditingNote(note)}
+                            onClick={() => setEditingNoteId(note.id)}
                           >
                             <div className="trello-card__body">{note.body}</div>
                             <button

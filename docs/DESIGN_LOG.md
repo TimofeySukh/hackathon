@@ -17,22 +17,6 @@ rediscover, write it here.
 
 ## Entries
 
-### 2026-06-16 — Large-board resize and note editing avoid full-board churn
-
-- Decision: circle resize on graphs above `RESIZE_COLLISION_LIMIT` skips the global
-  `ensureContainment` collision relaxer. The resize path still pulls contained contents
-  inward and fits the resized circle plus ancestors, but it does not run the O(n²)
-  same-level collision pass on every pointer frame.
-- Decision: inline note editing now keeps textarea changes in a local draft and writes
-  back to the graph only on blur or Enter. Escape cancels the draft.
-- Decision: membership edges render only for visible people. A visible imported company
-  circle can contain thousands of offscreen people, and drawing that whole fan-out on
-  every repaint made unrelated UI interactions feel stuck.
-- Why: large LinkedIn imports already avoid the global relaxer after import, but resizing
-  a circle re-entered the same expensive collision path. Note typing also changed the whole
-  `graph.people` array per keystroke, rebuilding the board index and repainting the canvas
-  even though no geometry changed.
-
 ### 2026-06-15 — Circles load transparent and clean by default
 
 - Decision: fresh graph circles, newly created circles, imported LinkedIn company

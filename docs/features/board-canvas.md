@@ -17,8 +17,7 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
 - **Resize**: drag a circle's edge; parent circles auto-fit (expand and shrink back to a
   minimum) as their contents move. Shrinking a circle pulls its contained people and subset
   circles toward the center, and nested subset circles shrink with the parent when position
-  packing alone cannot fit them. On large boards, resize keeps this containment local and
-  skips the global collision relaxer so a dense import cannot freeze every resize frame.
+  packing alone cannot fit them.
 - **Create**: right-click a circle to open the create menu, which now offers two actions —
   add person and add circle. "Add circle" auto-detects containment from the target point:
   inside the source circle it nests a subset blob, outside it spawns a connected circle.
@@ -47,9 +46,6 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
 - **Labels**: Settings includes separate toggles for circle labels and person names.
   Circle-center icon text scales with the world transform like people avatars; labels use
   the same screen-readable label treatment as person names.
-- **Membership edges**: person-to-circle membership lines render for people in the current
-  viewport only. This keeps large imported company circles from drawing thousands of
-  offscreen lines during unrelated UI updates.
 - **Seed icons**: default country and region circles use geographic icons or flags in
   their center handles. Company circles may still use short text initials.
 - **Circle design**: newly loaded and newly created circles default to transparent clean
@@ -99,8 +95,6 @@ This is the most Material-3-aligned part of the app today; keep it that way.
   - `getNodePath` — wavy/polygon/circle shape generation.
   - `createBoardIndex`, `queryPeople`, `queryCircles` — the spatial grid used for
     viewport rendering and hit testing.
-  - `resizeCircleFromPoint` — circle edge resize; uses a large-board containment-only
-    path above `RESIZE_COLLISION_LIMIT`.
   - `drawBoardLayer` — Canvas 2D renderer for circles, people, labels, edges, selected
     handles, and the draft connector.
   - `hitTestBoard` plus `handleSurfacePointerDown/Move/Up` — canvas interaction model
