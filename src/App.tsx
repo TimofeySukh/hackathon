@@ -80,7 +80,6 @@ export type { CircleNode, PersonNode, Connection, GraphState, CircleTone } from 
 // mount in this app, so a plain stack is enough; one snapshot per user action.
 const MAX_UNDO_STEPS = 100
 const undoHistory: GraphState[] = []
-const CLEAR_GRAPH_CONFIRMATION_TEXT = 'IREALLYWANTTODELETEMYDATA'
 
 const prefersReducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -482,8 +481,6 @@ function App() {
   // Sign-in dialog: a single "Sign in" button opens this; it holds every
   // sign-in option so the Settings panel itself stays compact.
   const [showSignInModal, setShowSignInModal] = useState(false)
-  const [showClearGraphDialog, setShowClearGraphDialog] = useState(false)
-  const [clearGraphConfirmation, setClearGraphConfirmation] = useState('')
   const [emailInput, setEmailInput] = useState('')
   const [passwordInput, setPasswordInput] = useState('')
   const [emailAuthMode, setEmailAuthMode] = useState<'signin' | 'signup'>('signin')
@@ -995,18 +992,8 @@ function App() {
   }
 
   function handleClearGraph() {
-    setClearGraphConfirmation('')
-    setShowSettings(false)
-    setShowClearGraphDialog(true)
-  }
-
-  function closeClearGraphDialog() {
-    setShowClearGraphDialog(false)
-    setClearGraphConfirmation('')
-  }
-
-  function confirmClearGraph() {
-    if (clearGraphConfirmation !== CLEAR_GRAPH_CONFIRMATION_TEXT) return
+    const confirmed = window.confirm('Clear the current graph? This removes all circles, people, notes, and connections.')
+    if (!confirmed) return
     const nextGraph = auth.status === 'authenticated' && auth.session
       ? stampYouIdentity(createFreshGraph(), auth.session.user)
       : createFreshGraph()
@@ -1015,7 +1002,6 @@ function App() {
     setSelectedItem(null)
     setSelectedPeopleIds([])
     setCreateMenu(null)
-    closeClearGraphDialog()
   }
 
   function deletePerson(personId: string) {
@@ -4389,59 +4375,6 @@ function App() {
           </div>
         </div>
       )}
-
-      <div
-        className={`auth-overlay ${showClearGraphDialog ? 'is-open' : ''}`}
-        onClick={closeClearGraphDialog}
-      >
-        <div
-          className="clear-graph-card"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="clear-graph-title"
-          onClick={(event) => event.stopPropagation()}
-        >
-          <button
-            type="button"
-            className="auth-card__close"
-            aria-label="Close"
-            onClick={closeClearGraphDialog}
-          >
-            ×
-          </button>
-          <h2 id="clear-graph-title">Clear graph</h2>
-          <p>
-            This permanently removes every circle, person, note, and connection from the current board.
-          </p>
-          <label className="clear-graph-card__field">
-            <span>Type {CLEAR_GRAPH_CONFIRMATION_TEXT} to confirm</span>
-            <input
-              type="text"
-              autoComplete="off"
-              spellCheck={false}
-              value={clearGraphConfirmation}
-              onChange={(event) => setClearGraphConfirmation(event.target.value)}
-            />
-          </label>
-          <div className="clear-graph-card__actions">
-            <button
-              type="button"
-              className="m3-primary-button m3-primary-button--tonal"
-              onClick={closeClearGraphDialog}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="m3-primary-button m3-primary-button--danger"
-              disabled={clearGraphConfirmation !== CLEAR_GRAPH_CONFIRMATION_TEXT}
-              onClick={confirmClearGraph}
-            >
-              Clear graph
-            </button>
-          </div>
-        </div>
-      </div>
 
       {auth.status === 'anonymous' && (
         <div className="local-save-hint" role="note">
