@@ -3308,7 +3308,7 @@ function App() {
               <div className="settings-graph-actions">
                 <button
                   type="button"
-                  className="m3-primary-button m3-primary-button--tonal"
+                  className="m3-primary-button"
                   onClick={() => graphFileInputRef.current?.click()}
                 >
                   <UploadIcon />
@@ -3316,7 +3316,7 @@ function App() {
                 </button>
                 <button
                   type="button"
-                  className="m3-primary-button m3-primary-button--tonal"
+                  className="m3-primary-button"
                   onClick={handleGraphExport}
                 >
                   <DownloadIcon />

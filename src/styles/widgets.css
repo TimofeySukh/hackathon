@@ -117,16 +117,16 @@
 }
 
 .m3-primary-button--danger {
-  background: var(--md-error-container);
-  color: var(--md-on-error-container);
+  background: var(--md-error);
+  color: var(--md-on-error);
 }
 
 .m3-primary-button--danger:hover {
-  background: color-mix(in srgb, var(--md-error) 8%, var(--md-error-container));
+  background: color-mix(in srgb, var(--md-on-error) 8%, var(--md-error));
 }
 
 .m3-primary-button--danger:active {
-  background: color-mix(in srgb, var(--md-error) 10%, var(--md-error-container));
+  background: color-mix(in srgb, var(--md-on-error) 10%, var(--md-error));
 }
 
 /* Bottom-left hint shown to signed-out visitors: their work is saved locally

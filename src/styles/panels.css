@@ -52,8 +52,13 @@
   gap: 8px;
 }
 
-.settings-graph-actions .m3-primary-button {
-  min-height: 40px;
+.settings-panel .m3-primary-button:hover {
+  box-shadow: none;
+  transform: none;
+}
+
+.settings-panel .m3-primary-button:active {
+  transform: scale(0.985);
 }
 
 /* Small "?" help button next to the LinkedIn Data Import label. Opens the
