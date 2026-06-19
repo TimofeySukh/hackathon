@@ -311,20 +311,22 @@
   transform: scale(1.06);
 }
 
-/* The palette / "more colors" entry is a same-size member of the swatch row. */
 .quick-circle-color--more {
-  background: var(--md-surface-container-highest);
-  color: var(--md-on-surface-variant);
+  background: var(--palette-bg, var(--md-surface-container-highest));
+  color: var(--palette-color, var(--md-on-surface-variant));
+  border-color: color-mix(in srgb, var(--palette-color, #000000) 20%, transparent);
 }
 
 .quick-circle-color--more:hover {
-  background: color-mix(in srgb, var(--md-on-surface) 8%, var(--md-surface-container-highest));
+  background: color-mix(in srgb, var(--md-on-surface) 8%, var(--palette-bg, var(--md-surface-container-highest)));
 }
 
 .quick-circle-color--more.is-open {
-  background: var(--md-secondary-container);
-  color: var(--md-on-secondary-container);
+  background: var(--palette-bg, var(--md-secondary-container));
+  color: var(--palette-color, var(--md-on-secondary-container));
+  border-color: var(--palette-color, var(--md-outline));
 }
+
 
 .quick-circle-color--more svg {
   width: 16px;

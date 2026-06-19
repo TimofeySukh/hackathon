@@ -56,7 +56,7 @@ import {
   CIRCLE_COLOR_PRESETS,
   LINK_SERVICE_OPTIONS,
 } from './lib/board/constants'
-import { getCircleColors, hexToHsv, hsvToHex, getReadableColor } from './lib/board/colors'
+import { getCircleColors, hexToHsv, hsvToHex } from './lib/board/colors'
 import { clamp } from './lib/board/geometry'
 import {
   ensureContainment,
@@ -3424,14 +3424,10 @@ function App() {
                           <button
                             type="button"
                             className={`quick-circle-color quick-circle-color--more ${selectedCircle.customColor ? 'is-selected is-custom-color' : ''} ${showCircleStylePanel ? 'is-open' : ''}`}
-                            style={
-                              selectedCircle.customColor
-                                ? {
-                                    backgroundColor: selectedCircleColors.centerBg,
-                                    color: getReadableColor(selectedCircleColors.centerBg),
-                                  }
-                                : undefined
-                            }
+                            style={{
+                              '--palette-bg': selectedCircleColors.fill,
+                              '--palette-color': selectedCircleColors.border,
+                            } as React.CSSProperties}
                             onClick={() => setShowCircleStylePanel(!showCircleStylePanel)}
                             title="Customize circle"
                             aria-label="Customize circle"
