@@ -22,8 +22,3 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-
-# Data files
-hackathon-board-migrated.json
-hackathon-board-export*.json
-
