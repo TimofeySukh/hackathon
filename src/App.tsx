@@ -5026,13 +5026,54 @@ function PaletteIcon() {
 
 function TransparencyIcon() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="8" />
-      <path d="M8 6.9v10.2" />
-      <path d="M12 4v16" />
-      <path d="M16 6.9v10.2" />
-      <path d="M5.4 10h13.2" />
-      <path d="M5.4 14h13.2" />
+    <svg
+      className="eraser-icon"
+      viewBox="0 0 12 10"
+      aria-hidden="true"
+    >
+      <path
+        d="M4.94975 9.19239C4.55922 9.58291 3.92606 9.58291 3.53553 9.19239L0.707108 6.36396C0.316583 5.97344 0.316583 5.34027 0.707108 4.94975L4.94975 0.707108C5.34027 0.316584 5.97344 0.316584 6.36396 0.707108L9.19239 3.53553C9.58291 3.92606 9.58291 4.55922 9.19239 4.94975L4.94975 9.19239Z"
+        fill="#595959"
+      />
+      <path
+        d="M10 6L9.2758 7.30357C9.10958 7.60275 9.14445 7.97335 9.36356 8.23627C9.69477 8.63373 10.3052 8.63373 10.6364 8.23627C10.8555 7.97335 10.8904 7.60275 10.7242 7.30357L10 6Z"
+        fill="#1F1F1F"
+        stroke="#1F1F1F"
+      />
+      <mask
+        id="mask0_5_7"
+        style={{ maskType: 'alpha' }}
+        maskUnits="userSpaceOnUse"
+        x="0"
+        y="0"
+        width="10"
+        height="10"
+      >
+        <path
+          d="M4.94975 9.19239C4.55922 9.58291 3.92606 9.58291 3.53553 9.19239L0.707108 6.36396C0.316583 5.97344 0.316583 5.34027 0.707108 4.94975L4.94975 0.707108C5.34027 0.316584 5.97344 0.316584 6.36396 0.707108L9.19239 3.53553C9.58291 3.92606 9.58291 4.55922 9.19239 4.94975L4.94975 9.19239Z"
+          fill="#595959"
+        />
+      </mask>
+      <g mask="url(#mask0_5_7)">
+        <g filter="url(#filter0_f_5_7)">
+          <rect y="6" width="9" height="5" fill="black" />
+        </g>
+      </g>
+      <defs>
+        <filter
+          id="filter0_f_5_7"
+          x="-4"
+          y="2"
+          width="17"
+          height="13"
+          filterUnits="userSpaceOnUse"
+          colorInterpolationFilters="sRGB"
+        >
+          <feFlood floodOpacity={0} result="BackgroundImageFix" />
+          <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
+          <feGaussianBlur stdDeviation="2" result="effect1_foregroundBlur_5_7" />
+        </filter>
+      </defs>
     </svg>
   )
 }

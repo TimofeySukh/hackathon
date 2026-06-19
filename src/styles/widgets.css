@@ -383,6 +383,16 @@
   stroke-linejoin: round;
 }
 
+.circle-fill-toggle svg.eraser-icon {
+  width: 18px;
+  height: 15px;
+  fill: initial;
+  stroke: initial;
+  stroke-width: initial;
+  stroke-linecap: initial;
+  stroke-linejoin: initial;
+}
+
 .circle-fill-toggle {
   display: grid;
   width: 34px;
