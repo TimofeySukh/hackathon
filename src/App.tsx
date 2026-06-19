@@ -92,6 +92,16 @@ function settleInteractionGraph(state: GraphState) {
   return shouldRunGlobalInteractionLayout(state) ? ensureContainment(state) : state
 }
 
+function isGraphState(value: unknown): value is GraphState {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<GraphState>
+  return (
+    Array.isArray(candidate.circles) &&
+    Array.isArray(candidate.people) &&
+    Array.isArray(candidate.connections)
+  )
+}
+
 type CreateMenu = {
   sourceCircleId: string
   x: number
@@ -743,6 +753,7 @@ function App() {
   const settingsPanelRef = useRef<HTMLDivElement>(null)
   const linkedInGuidePanelRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const graphFileInputRef = useRef<HTMLInputElement>(null)
 
   // Search: a pill in the top toolbar that finds people (by name/role) and
   // circles (the "tags"), then flies the camera to the picked node.
@@ -936,6 +947,61 @@ function App() {
       setIsImportingLinkedInZip(false)
       event.target.value = ''
     }
+  }
+
+  async function handleGraphImport(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    try {
+      const parsed = JSON.parse(await file.text()) as unknown
+      if (!isGraphState(parsed)) {
+        alert('Could not import graph: the file is not a valid board graph JSON.')
+        return
+      }
+
+      const importedGraph = sanitizeDefaultCircleStyles(parsed)
+      pushHistory()
+      setGraph(auth.status === 'authenticated' && auth.session
+        ? stampYouIdentity(importedGraph, auth.session.user)
+        : importedGraph)
+      setSelectedItem(null)
+      setSelectedPeopleIds([])
+      setCreateMenu(null)
+      alert('Graph imported successfully.')
+    } catch (err) {
+      console.error(err)
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      alert(`Failed to import graph: ${errorMessage}`)
+    } finally {
+      event.target.value = ''
+    }
+  }
+
+  function handleGraphExport() {
+    const date = new Date().toISOString().slice(0, 10)
+    const blob = new Blob([`${JSON.stringify(graph, null, 2)}\n`], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `social-datanode-graph-${date}.json`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  function handleClearGraph() {
+    const confirmed = window.confirm('Clear the current graph? This removes all circles, people, notes, and connections.')
+    if (!confirmed) return
+    const nextGraph = auth.status === 'authenticated' && auth.session
+      ? stampYouIdentity(createFreshGraph(), auth.session.user)
+      : createFreshGraph()
+    pushHistory()
+    setGraph(nextGraph)
+    setSelectedItem(null)
+    setSelectedPeopleIds([])
+    setCreateMenu(null)
   }
 
   function deletePerson(personId: string) {
@@ -3235,6 +3301,44 @@ function App() {
                 </button>
               </div>
             )}
+            <div className="settings-graph-section">
+              <label className="settings-section-label">
+                Graph
+              </label>
+              <div className="settings-graph-actions">
+                <button
+                  type="button"
+                  className="m3-primary-button m3-primary-button--tonal"
+                  onClick={() => graphFileInputRef.current?.click()}
+                >
+                  <UploadIcon />
+                  <span>Import graph</span>
+                </button>
+                <button
+                  type="button"
+                  className="m3-primary-button m3-primary-button--tonal"
+                  onClick={handleGraphExport}
+                >
+                  <DownloadIcon />
+                  <span>Export graph</span>
+                </button>
+                <button
+                  type="button"
+                  className="m3-primary-button m3-primary-button--danger"
+                  onClick={handleClearGraph}
+                >
+                  <TrashIcon />
+                  <span>Clear graph</span>
+                </button>
+              </div>
+              <input
+                ref={graphFileInputRef}
+                type="file"
+                accept="application/json,.json"
+                style={{ display: 'none' }}
+                onChange={handleGraphImport}
+              />
+            </div>
 
           </div>
         </div>
@@ -4994,6 +5098,52 @@ function UploadIcon() {
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
       <polyline points="17 8 12 3 7 8" />
       <line x1="12" y1="3" x2="12" y2="15" />
+    </svg>
+  )
+}
+
+function DownloadIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      style={{
+        width: '16px',
+        height: '16px',
+        fill: 'none',
+        stroke: 'currentColor',
+        strokeWidth: 2,
+        strokeLinecap: 'round',
+        strokeLinejoin: 'round',
+      }}
+    >
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  )
+}
+
+function TrashIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      style={{
+        width: '16px',
+        height: '16px',
+        fill: 'none',
+        stroke: 'currentColor',
+        strokeWidth: 2,
+        strokeLinecap: 'round',
+        strokeLinejoin: 'round',
+      }}
+    >
+      <path d="M3 6h18" />
+      <path d="M8 6V4h8v2" />
+      <path d="M19 6l-1 15H6L5 6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
     </svg>
   )
 }

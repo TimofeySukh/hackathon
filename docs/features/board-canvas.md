@@ -52,6 +52,11 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   Backspace/Delete. Connector handles stay visible. Dragging a circle/person connector to
   an existing node creates a link; dragging to empty space opens the create menu so users
   can add a person or a circle without leaving demo mode.
+- **Graph file actions**: the bottom of Settings includes graph import, export, and
+  clear actions. Export downloads the current board as a JSON file. Import accepts a
+  board graph JSON with `circles`, `people`, and `connections` arrays, then replaces the
+  current board and keeps the action undoable. Clear resets the board to a fresh single
+  `You` circle after confirmation and is also undoable.
 - **Labels**: Settings includes separate toggles for circle labels and person names.
   Circle-center icon text scales with the world transform like people avatars; labels use
   the same screen-readable label treatment as person names.

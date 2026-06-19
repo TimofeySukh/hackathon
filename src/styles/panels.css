@@ -32,6 +32,30 @@
   pointer-events: auto;
 }
 
+.settings-section-label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--md-on-surface-variant);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.settings-graph-section {
+  display: grid;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--md-outline-variant);
+}
+
+.settings-graph-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-graph-actions .m3-primary-button {
+  min-height: 40px;
+}
+
 /* Small "?" help button next to the LinkedIn Data Import label. Opens the
    step-by-step sync guide. */
 .linkedin-guide-help {

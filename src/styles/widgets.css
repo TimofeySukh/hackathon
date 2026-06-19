@@ -96,6 +96,39 @@
   transform: scale(0.96);
 }
 
+.m3-primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+  transform: none;
+  box-shadow: none;
+}
+
+.m3-primary-button--tonal {
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+}
+
+.m3-primary-button--tonal:hover {
+  background: color-mix(in srgb, var(--md-primary) 8%, var(--md-primary-container));
+}
+
+.m3-primary-button--tonal:active {
+  background: color-mix(in srgb, var(--md-primary) 10%, var(--md-primary-container));
+}
+
+.m3-primary-button--danger {
+  background: var(--md-error-container);
+  color: var(--md-on-error-container);
+}
+
+.m3-primary-button--danger:hover {
+  background: color-mix(in srgb, var(--md-error) 8%, var(--md-error-container));
+}
+
+.m3-primary-button--danger:active {
+  background: color-mix(in srgb, var(--md-error) 10%, var(--md-error-container));
+}
+
 /* Bottom-left hint shown to signed-out visitors: their work is saved locally
    until they sign in. */
 .local-save-hint {
