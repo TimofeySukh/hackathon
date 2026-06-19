@@ -413,19 +413,11 @@
 }
 
 .circle-fill-toggle.is-transparent {
-  background:
-    linear-gradient(45deg, rgba(67, 71, 78, 0.16) 25%, transparent 25% 75%, rgba(67, 71, 78, 0.16) 75%),
-    linear-gradient(45deg, rgba(67, 71, 78, 0.16) 25%, transparent 25% 75%, rgba(67, 71, 78, 0.16) 75%),
-    var(--md-surface);
-  background-position: 0 0, 5px 5px, 0 0;
-  background-size: 10px 10px, 10px 10px, auto;
   color: var(--md-primary);
 }
 
 .circle-fill-toggle.is-solid {
-  background: var(--md-primary);
   color: var(--md-on-primary);
-  border-color: var(--md-primary);
 }
 
 .circle-fill-toggle.is-pressing {

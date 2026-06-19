@@ -3439,15 +3439,26 @@ function App() {
                             <PaletteIcon />
                           </button>
                         </div>
-                        <button
-                          type="button"
-                          className={`circle-fill-toggle ${(selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'is-transparent' : 'is-solid'}`}
-                          onClick={() => updateCircleStyleAndCreationDefaults(selectedCircle.id, { fillMode: (selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'solid' : 'transparent' })}
-                          title={(selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'Switch to solid fill' : 'Switch to transparent fill'}
-                          aria-label={(selectedCircle.fillMode ?? circleFillMode) === 'transparent' ? 'Switch to solid fill' : 'Switch to transparent fill'}
-                        >
-                          <TransparencyIcon />
-                        </button>
+                        {(() => {
+                          const isTransparent = (selectedCircle.fillMode ?? circleFillMode) === 'transparent';
+                          const buttonBg = isTransparent ? selectedCircleColors.fill : selectedCircleColors.centerBg;
+                          const buttonBorderColor = isTransparent ? 'var(--md-outline-variant)' : selectedCircleColors.centerBg;
+                          return (
+                            <button
+                              type="button"
+                              className={`circle-fill-toggle ${isTransparent ? 'is-transparent' : 'is-solid'}`}
+                              style={{
+                                backgroundColor: buttonBg,
+                                borderColor: buttonBorderColor,
+                              }}
+                              onClick={() => updateCircleStyleAndCreationDefaults(selectedCircle.id, { fillMode: isTransparent ? 'solid' : 'transparent' })}
+                              title={isTransparent ? 'Switch to solid fill' : 'Switch to transparent fill'}
+                              aria-label={isTransparent ? 'Switch to solid fill' : 'Switch to transparent fill'}
+                            >
+                              <TransparencyIcon />
+                            </button>
+                          );
+                        })()}
                         <div className={`circle-style-popover ${showCircleStylePanel ? 'is-open' : ''}`}>
                           <div className="circle-style-theme-tabs">
                             <SelectionIndicator
