@@ -13,6 +13,7 @@
     "test:db-load": "node ./scripts/test-database-load.mjs",
     "test:ui-import": "node ./scripts/test-ui-import-responsiveness.mjs",
     "test:load": "npm run test:db-load -- --people 3000 --connections 3000 && npm run test:ui-import -- --people 3000",
+    "migrate-board": "node ./scripts/migrate-board.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
