@@ -553,6 +553,69 @@
   transform: scale(1) translateY(0);
 }
 
+.clear-graph-card {
+  position: relative;
+  display: grid;
+  gap: 14px;
+  width: min(360px, calc(100vw - 32px));
+  padding: 24px;
+  border-radius: var(--md-r-lg);
+  background: var(--md-surface-container);
+  box-shadow: var(--md-elev-3);
+  color: var(--md-on-surface);
+  transform: scale(0.95) translateY(10px);
+  transition: transform var(--md-dur-medium) var(--md-ease-spring-gentle);
+}
+
+.auth-overlay.is-open .clear-graph-card {
+  transform: scale(1) translateY(0);
+}
+
+.clear-graph-card h2 {
+  margin: 0;
+  padding-right: 28px;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.clear-graph-card p {
+  margin: 0;
+  color: var(--md-on-surface-variant);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.clear-graph-card__field {
+  display: grid;
+  gap: 8px;
+  color: var(--md-on-surface-variant);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.clear-graph-card__field input {
+  width: 100%;
+  box-sizing: border-box;
+  border: none;
+  border-radius: var(--md-r-sm);
+  background: var(--md-surface-container-highest);
+  color: var(--md-on-surface);
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 400;
+  outline: none;
+}
+
+.clear-graph-card__field input:focus {
+  background: color-mix(in srgb, var(--md-primary) 5%, var(--md-surface-container-highest));
+}
+
+.clear-graph-card__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
 .auth-card__close {
   position: absolute;
   top: 12px;
