@@ -25,6 +25,8 @@ rediscover, write it here.
   project URL as the visible sign-in destination.
 - Fallback: if the Google client id is missing or the GIS script cannot load, the app keeps
   using the existing Supabase redirect OAuth flow so sign-in does not break.
+- Production: nginx CSP allows `https://accounts.google.com` for the GIS script, iframe,
+  and token exchange requests; otherwise the browser blocks GIS and forces the fallback.
 
 ### 2026-06-20 — Replace Social Datanode brand mark
 
