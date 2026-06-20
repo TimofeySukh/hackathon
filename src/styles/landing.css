@@ -122,35 +122,9 @@
 .landing-logo-mark {
   width: 34px;
   height: 34px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, var(--lp-primary), var(--lp-secondary));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 12px rgba(0, 98, 157, 0.15);
-  position: relative;
-  overflow: hidden;
-}
-
-.landing-logo-mark::before {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: linear-gradient(45deg, transparent, rgba(255,255,255,0.4), transparent);
-  transform: rotate(45deg);
-  animation: shimmer-logo 4s infinite linear;
-}
-
-.landing-logo-mark::after {
-  content: '';
-  width: 10px;
-  height: 10px;
   border-radius: 50%;
-  background-color: #ffffff;
-  z-index: 1;
+  display: block;
+  object-fit: contain;
 }
 
 .landing-logo-text {
@@ -765,8 +739,9 @@
 .footer-logo-mark {
   width: 26px;
   height: 26px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, var(--lp-primary), var(--lp-secondary));
+  border-radius: 50%;
+  display: block;
+  object-fit: contain;
 }
 
 .footer-copyright {
@@ -785,11 +760,6 @@
   to {
     stroke-dashoffset: -1000;
   }
-}
-
-@keyframes shimmer-logo {
-  from { transform: translate(-50%, -50%) rotate(45deg) translateX(-150%); }
-  to { transform: translate(-50%, -50%) rotate(45deg) translateX(150%); }
 }
 
 @keyframes pulse-success {

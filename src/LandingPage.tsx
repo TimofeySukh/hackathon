@@ -1,4 +1,5 @@
 import { useState, useEffect, type MouseEvent, type CSSProperties } from 'react'
+import sdnLogo from './assets/sdn-logo.svg'
 
 
 
@@ -153,7 +154,7 @@ export default function LandingPage() {
       <header className="landing-header">
         <nav className="landing-nav">
           <a href="#" className="landing-logo" onClick={(e) => e.preventDefault()}>
-            <div className="landing-logo-mark" />
+            <img className="landing-logo-mark" src={sdnLogo} alt="" aria-hidden="true" />
             <span className="landing-logo-text">Social Datanode</span>
           </a>
           <div className="landing-nav-actions">
@@ -441,7 +442,7 @@ export default function LandingPage() {
       <footer className="landing-footer">
         <div className="footer-content">
           <a href="#" className="footer-logo" onClick={(e) => e.preventDefault()}>
-            <div className="footer-logo-mark" />
+            <img className="footer-logo-mark" src={sdnLogo} alt="" aria-hidden="true" />
             <span>Social Datanode</span>
           </a>
           <span className="footer-copyright">

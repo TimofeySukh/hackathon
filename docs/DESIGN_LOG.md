@@ -17,6 +17,17 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-20 — Replace Social Datanode brand mark
+
+- Decision: replaced the legacy purple lightning favicon and CSS-generated landing marks
+  with the provided SDN concentric-node SVG.
+- Scope: the shared SVG now lives in [`src/assets/sdn-logo.svg`](../src/assets/sdn-logo.svg),
+  the browser favicon uses the same artwork via [`public/favicon.svg`](../public/favicon.svg),
+  and the landing header/footer plus auth loading mark render it as an image.
+- Why: the product should show a single brand mark across the browser chrome and in-app
+  surfaces instead of mixing the old lightning, generated gradient blocks, and text-only
+  placeholders.
+
 ### 2026-06-17 — Grow imported company circles by final member count
 
 - Decision: LinkedIn ZIP re-imports and single-profile enrichment now grow existing

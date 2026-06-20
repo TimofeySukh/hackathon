@@ -10,6 +10,7 @@ import whatsappIcon from './assets/brands/whatsapp.svg'
 import xIcon from './assets/brands/x.svg'
 import websiteIcon from './assets/brands/website.svg'
 import googleIcon from './assets/brands/google.svg'
+import sdnLogo from './assets/sdn-logo.svg'
 
 zip.configure({ useWebWorkers: false })
 import { useAuth } from './lib/useAuth'
@@ -4258,7 +4259,7 @@ function App() {
       {showAuthOverlay && (
         <div style={authOverlayStyle}>
           <div style={authCardStyle}>
-            <span className="brand__mark">DN</span>
+            <img className="brand__mark" src={sdnLogo} alt="" aria-hidden="true" />
             <p style={{ margin: 0, color: 'var(--md-on-surface-variant)' }}>Loading your board…</p>
           </div>
         </div>
