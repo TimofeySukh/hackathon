@@ -73,7 +73,6 @@ Required Vite variables:
 
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_PUBLISHABLE_KEY` or `VITE_SUPABASE_ANON_KEY`
-- `VITE_GOOGLE_CLIENT_ID` for Google Identity Services sign-in
 
 Recommended teammate setup:
 
@@ -81,13 +80,10 @@ Recommended teammate setup:
 VITE_SUPABASE_URL=https://lxnrpdeahoglgiocowsh.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_l_x_y5rxdhL8Sd1ZE3QXag_lOCtr_M9
 VITE_SUPABASE_ANON_KEY=
-VITE_GOOGLE_CLIENT_ID=<google-oauth-web-client-id>
 ```
 
 If `VITE_SUPABASE_PUBLISHABLE_KEY` is present, `VITE_SUPABASE_ANON_KEY` may stay empty.
 `VITE_SUPABASE_ANON_KEY` is still supported for older local setups, but new local environments should use the Supabase publishable key.
-If `VITE_GOOGLE_CLIENT_ID` is empty, the app falls back to Supabase's redirect-based Google OAuth flow.
-When it is set, the Google button uses Google Identity Services and passes the returned ID token to Supabase with `signInWithIdToken`.
 
 Everything else the teammate needs is already in the repository:
 
@@ -220,7 +216,6 @@ cat > ~/apps/social-datanode-live-autodeploy/deploy.env <<'EOF'
 VITE_SUPABASE_URL=https://lxnrpdeahoglgiocowsh.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=<publishable-key-from-supabase>
 VITE_SUPABASE_ANON_KEY=
-VITE_GOOGLE_CLIENT_ID=<google-oauth-web-client-id>
 EOF
 ```
 

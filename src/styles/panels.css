@@ -605,14 +605,3 @@
 .auth-card__switch:active {
   transform: scale(0.96);
 }
-
-.google-identity-button {
-  display: grid;
-  place-items: center;
-  width: 100%;
-  min-height: 40px;
-}
-
-.google-identity-button > div {
-  max-width: 100%;
-}

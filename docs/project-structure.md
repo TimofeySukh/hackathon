@@ -154,7 +154,7 @@ Synthetic persistence load test for the current `user_graphs.graph` blob model. 
 
 Playwright-based browser responsiveness check for large LinkedIn ZIP imports. It starts or targets a local Vite server, uploads a generated `Connections.csv` ZIP through the real UI, and fails when measured event-loop lag exceeds the threshold.
 
-Supabase browser configuration reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`. The older `VITE_SUPABASE_ANON_KEY` variable remains supported for compatibility. Google Identity Services sign-in additionally reads `VITE_GOOGLE_CLIENT_ID`; without it the app falls back to Supabase redirect OAuth.
+Supabase browser configuration reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`. The older `VITE_SUPABASE_ANON_KEY` variable remains supported for compatibility.
 
 ### `src/index.css`
 
