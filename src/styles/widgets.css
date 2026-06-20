@@ -911,14 +911,6 @@
   object-fit: contain;
 }
 
-.google-icon {
-  width: 18px;
-  height: 18px;
-  display: block;
-  flex-shrink: 0;
-  object-fit: contain;
-}
-
 .connection-composer {
   display: grid;
   grid-template-columns: 1fr auto;

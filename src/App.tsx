@@ -9,7 +9,6 @@ import facebookIcon from './assets/brands/facebook.svg'
 import whatsappIcon from './assets/brands/whatsapp.svg'
 import xIcon from './assets/brands/x.svg'
 import websiteIcon from './assets/brands/website.svg'
-import googleIcon from './assets/brands/google.svg'
 import sdnLogo from './assets/sdn-logo.svg'
 
 zip.configure({ useWebWorkers: false })
@@ -20,6 +19,7 @@ import { enrichLinkedInProfile } from './lib/linkedinEnrichment'
 import { OnboardingCoach } from './Onboarding'
 import { SelectionIndicator } from './components/SelectionIndicator'
 import { M3Slider } from './components/M3Slider'
+import { GoogleIdentityButton } from './components/GoogleIdentityButton'
 import { ONBOARDING_STEPS, ONBOARDING_DONE_STEP } from './onboardingSteps'
 import type { OnboardingAction } from './onboardingSteps'
 // STRESS TEST — dev-only performance harness. See src/lib/stressTest.ts.
@@ -75,6 +75,8 @@ import { createBoardIndex, hitTestBoard, readAnimFrame, drawBoardLayer, setBoard
 import { makeInitials } from './lib/board/text'
 
 export type { CircleNode, PersonNode, Connection, GraphState, CircleTone } from './lib/board/types'
+
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
 
 // Undo history kept at module scope (not useRef) so the mutating helpers that
 // read/write it aren't analyzed as accessing React refs during render. Single
@@ -4289,14 +4291,13 @@ function App() {
             <p style={{ margin: '0 0 16px', fontSize: '13px', color: 'var(--md-on-surface-variant)' }}>
               Save your board across devices.
             </p>
-            <button
-              type="button"
-              className="m3-primary-button"
-              onClick={() => void auth.signInWithGoogle()}
-            >
-              <GoogleIcon />
-              Continue with Google
-            </button>
+            <GoogleIdentityButton
+              clientId={googleClientId}
+              onCredential={(credential) => {
+                void auth.signInWithGoogleIdToken(credential)
+              }}
+              onFallbackClick={() => void auth.signInWithGoogle()}
+            />
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '16px 0' }}>
               <span style={{ flex: 1, height: '1px', background: 'var(--md-outline-variant)' }} />
               <span style={{ fontSize: '12px', color: 'var(--md-on-surface-variant)' }}>or</span>
@@ -5270,9 +5271,6 @@ function ConnectionServiceIcon({ service }: { service: PersonLinkService }) {
   return <img className="service-icon" src={SERVICE_ICONS[service]} alt="" aria-hidden="true" />
 }
 
-function GoogleIcon() {
-  return <img className="google-icon" src={googleIcon} alt="" aria-hidden="true" />
-}
 
 function getResizeCursor(point: { x: number; y: number }, circle: { x: number; y: number }): string {
   const dx = point.x - circle.x

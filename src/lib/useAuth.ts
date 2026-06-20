@@ -114,6 +114,22 @@ export function useAuth() {
     }
   }
 
+  const signInWithGoogleIdToken = async (token: string) => {
+    if (!supabase) return { error: 'Auth is not configured.' as string | null }
+
+    const { error } = await supabase.auth.signInWithIdToken({
+      provider: 'google',
+      token,
+    })
+
+    if (error) {
+      setAuthState((currentState) => ({ ...currentState, error: error.message }))
+      return { error: error.message }
+    }
+
+    return { error: null }
+  }
+
   const signInWithEmail = async (email: string, password: string) => {
     if (!supabase) return { error: 'Auth is not configured.' as string | null }
 
@@ -188,6 +204,7 @@ export function useAuth() {
   return {
     ...authState,
     signInWithGoogle,
+    signInWithGoogleIdToken,
     signInWithEmail,
     signUpWithEmail,
     resendConfirmation,

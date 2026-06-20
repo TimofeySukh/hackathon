@@ -49,9 +49,14 @@ Recommended local env format:
 VITE_SUPABASE_URL=https://lxnrpdeahoglgiocowsh.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_l_x_y5rxdhL8Sd1ZE3QXag_lOCtr_M9
 VITE_SUPABASE_ANON_KEY=
+VITE_GOOGLE_CLIENT_ID=<google-oauth-web-client-id>
 ```
 
 `VITE_SUPABASE_ANON_KEY` can stay empty when the publishable key is used.
+`VITE_GOOGLE_CLIENT_ID` enables the Google Identity Services button, which signs
+in through `supabase.auth.signInWithIdToken` without showing the Supabase project
+URL during Google sign-in. If it is empty, the app falls back to Supabase's
+redirect-based Google OAuth flow.
 
 ## Teammate Setup
 
@@ -70,7 +75,7 @@ Teammates only need to:
 
 1. Pull the latest `main` and install dependencies with `npm ci`.
 2. Create `.env.local` from `.env.example`.
-3. Fill in `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`.
+3. Fill in `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and `VITE_GOOGLE_CLIENT_ID`.
 4. Run `npm run dev`.
 5. Open the local Vite URL shown in the terminal, or the network URL from another device on the same LAN.
 6. Optional for MCP data tools: create `.env.mcp.local` from `.env.mcp.example` and add the service-role key.

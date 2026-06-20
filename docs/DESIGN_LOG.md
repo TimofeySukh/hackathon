@@ -17,6 +17,15 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-20 — Google sign-in uses ID tokens when configured
+
+- Decision: the auth modal now renders Google Identity Services when `VITE_GOOGLE_CLIENT_ID`
+  is configured and signs in to Supabase with `signInWithIdToken`.
+- Why: the Google flow starts from the product domain and avoids showing the Supabase
+  project URL as the visible sign-in destination.
+- Fallback: if the Google client id is missing or the GIS script cannot load, the app keeps
+  using the existing Supabase redirect OAuth flow so sign-in does not break.
+
 ### 2026-06-20 — Replace Social Datanode brand mark
 
 - Decision: replaced the legacy purple lightning favicon and CSS-generated landing marks
