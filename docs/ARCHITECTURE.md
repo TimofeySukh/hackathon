@@ -10,7 +10,8 @@ Runtime boundaries:
 - Vite owns local development and production bundling.
 - CSS owns the visual board surface, graph styling, panel styling, and responsive layout.
 - The browser owns in-memory graph state for the current session.
-- Supabase owns Google authentication and user-owned graph records.
+- Supabase owns Google authentication, email/password authentication, password recovery,
+  and user-owned graph records.
 - Supabase Edge Functions own server-side AI provider calls for AI note enrichment and people search.
 - Supabase Edge Functions own server-side Bright Data calls for manual LinkedIn profile enrichment.
 - Gemini owns the primary LLM execution path for structured summary generation and natural-language people search ranking.
@@ -37,7 +38,8 @@ circle) — there is no demo seed.
 - `src/lib/graphPersistence.ts` loads/saves the graph blob (Supabase for
   signed-in users, `localStorage` for anonymous sessions).
 - `src/lib/supabase.ts` creates the browser Supabase client from Vite environment variables.
-- `src/lib/useAuth.ts` owns session loading, Google sign-in, and sign-out.
+- `src/lib/useAuth.ts` owns session loading, Google sign-in, email/password sign-in,
+  registration, confirmation resend, password recovery, and sign-out.
 - `src/lib/useBoardGraph.ts` owns board graph loading, frontend mutation state, and debounced AI note refresh scheduling.
 - `src/lib/graphStorage.ts` owns Supabase CRUD for graph data, `person_ai_notes`, and Edge Function invocation.
 - `src/lib/userWorkspace.ts` upserts the user profile and ensures a single personal board plus root node.
@@ -62,7 +64,8 @@ Current scope:
 - circle resizing, automatic containment fit / shrink-back through nested chains
 - merge selected people and zones into a new subset
 - pan, cursor-centered wheel/pinch zoom, and a "zones only" far-zoom view
-- Google sign-in; per-user graph persistence in Supabase with debounced autosave
+- Google and email/password sign-in; per-user graph persistence in Supabase with
+  debounced autosave
 - anonymous editing persisted to `localStorage`
 - LinkedIn import (Connections.csv ZIP + single-profile Bright Data enrichment)
 - per-person notes, tags, and connections; debounced AI note generation
@@ -86,7 +89,7 @@ Out of scope (still not built):
 - Keep Gemini, OpenRouter, and Bright Data API keys out of the browser and only inside Supabase Edge Function secrets.
 - Keep `SUPABASE_SERVICE_ROLE_KEY` out of browser-exposed `VITE_` variables and only in local MCP env files or shell env.
 - Keep the root person immutable in position and deletion semantics.
-- Keep Google OAuth redirect/origin configuration aligned with the real deployed frontend origins.
+- Keep Google OAuth and Supabase email redirect/origin configuration aligned with the real deployed frontend origins.
 
 ## When The Repo Grows
 

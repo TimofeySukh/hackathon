@@ -337,10 +337,14 @@ These are the canonical patterns. Reach for one of these before writing a new co
   `--md-surface-container-high` list container. Hover/focus may lift from `--md-elev-1`
   to `--md-elev-2`; press scales down slightly (`~0.985`) with the spring token.
 
-### Text fields
+### Text inputs
 
-- Material 3 **filled** text field: `--md-surface-container-highest` background, no top
-  border, focus shows a 2px `--md-primary` underline. Label in `--md-on-surface-variant`.
+- Default app text inputs use the existing rounded tonal shell pattern from search,
+  notes, and connection composers: `--md-surface-container` / `--md-surface-container-highest`
+  fill, no visible border, no bottom rule, and pill or established local radius to match
+  the surrounding control group.
+- Focus uses a subtle tonal deepen or soft primary halo. Do not introduce bottom-rule
+  text fields into new UI.
 
 ### Side sheet (inspector)
 

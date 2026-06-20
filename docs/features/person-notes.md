@@ -27,7 +27,7 @@ Connections feature, not in notes.
 
 - **Surfaces / elevation**: The list uses `--md-surface-container-high`; cards use
   `--md-surface-container-low` with `--md-elev-1` and lift to `--md-elev-2` on hover/focus.
-- **Components used**: Filled note cards, filled text field behavior, filled button,
+- **Components used**: Filled note cards, borderless note composer, filled button,
   icon button, and Material state layers.
 - **Color roles used**: Neutral surface container colors plus `--md-primary` and
   `--md-error` roles for actions.

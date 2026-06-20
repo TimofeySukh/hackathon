@@ -17,6 +17,21 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-20 — Make email auth a recovery-capable Material 3 dialog
+
+- Decision: email/password auth stays minimal: registration asks only for email and
+  password, keeps confirmation, and adds resend confirmation plus password reset/recovery.
+- Decision: password reset request copy is generic so the dialog does not reveal whether an
+  email address is registered; recovery links open the app directly into a new-password
+  state via Supabase's `PASSWORD_RECOVERY` event.
+- Decision: the auth surface is now a Material 3 dialog on desktop and a compact bottom
+  sheet on mobile, using rounded tonal input shells, tonal notices, and password-manager
+  friendly autocomplete attributes.
+- Decision: bottom-rule text fields are not an app pattern. Auth inputs use the same
+  rounded family as search and existing composers.
+- Follow-up: Supabase confirmation and recovery email templates still need Dashboard
+  customization for a fully branded email experience.
+
 ### 2026-06-20 — Replace Social Datanode brand mark
 
 - Decision: replaced the legacy purple lightning favicon and CSS-generated landing marks

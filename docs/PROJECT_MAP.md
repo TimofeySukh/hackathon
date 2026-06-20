@@ -16,8 +16,10 @@ It is a live product, not a local-only prototype:
   direct dragging, right-click marquee multi-select, group dragging, circle
   resize, containment fit, and merge-into-subset
 - pan, cursor-centered wheel/pinch zoom, and a simplified far-zoom "zones only" view
-- Google sign-in with per-user graph persistence in Supabase (debounced autosave);
-  anonymous editing persisted to `localStorage`. A new board starts blank (no demo seed)
+- Google and email/password sign-in with per-user graph persistence in Supabase
+  (debounced autosave); anonymous editing persisted to `localStorage`. Email registration
+  requires only email and password, supports confirmation resend and password reset, and a
+  new board starts blank (no demo seed)
 - LinkedIn import (Connections.csv ZIP + single-profile Bright Data enrichment),
   per-person notes/tags/connections, debounced AI note generation, and
   local + AI-ranked board search
@@ -70,7 +72,7 @@ Completed tasks can remain listed here when they explain repository history. Liv
 - `src/App.tsx`: React shell + interaction host for the board (chrome, panels, pointer interaction, persisted-graph wiring, paint loop). Delegates canvas logic to `src/lib/board/`.
 - `src/lib/board/`: framework-free board engine — `types`, `constants`, `colors`, `geometry`, `layout` (containment/collision), `render` (spatial index, hit-test, Canvas 2D draw layer).
 - `src/lib/supabase.ts`: browser Supabase client configuration.
-- `src/lib/useAuth.ts`: session and Google sign-in state.
+- `src/lib/useAuth.ts`: session, Google sign-in, email/password sign-in, confirmation resend, and password reset state.
 - `src/lib/useBoardGraph.ts`: board graph loading and mutation state.
 - `src/lib/graphPersistence.ts`: load/save the graph blob (Supabase signed-in, `localStorage` anonymous).
 - `src/lib/graphStorage.ts`: Supabase CRUD layer for people, tags, notes, `person_ai_notes`, and AI Edge Functions.

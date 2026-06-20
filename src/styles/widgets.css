@@ -925,7 +925,7 @@
   gap: 6px;
 }
 
-/* Filled rounded-rectangle field: tonal fill, no border, no underline, no focus ring.
+/* Tonal rounded field: no visible border or focus ring.
    Rounded corners (r-sm) but still reads as a rectangle. Focus is a subtle fill deepen. */
 .connection-composer input {
   min-width: 0;

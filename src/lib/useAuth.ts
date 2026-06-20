@@ -9,6 +9,7 @@ type AuthState = {
   session: Session | null
   status: AuthStatus
   error: string | null
+  isPasswordRecovery: boolean
 }
 
 const getStatus = (session: Session | null): AuthStatus => (session ? 'authenticated' : 'anonymous')
@@ -18,6 +19,7 @@ export function useAuth() {
     session: null,
     status: supabase ? 'loading' : 'unconfigured',
     error: null,
+    isPasswordRecovery: false,
   }))
 
   useEffect(() => {
@@ -32,17 +34,19 @@ export function useAuth() {
             session: null,
             status: 'anonymous',
             error: null,
+            isPasswordRecovery: false,
           })
         }
         return
       }
 
       if (isMounted) {
-        setAuthState({
+        setAuthState((current) => ({
           session,
           status: getStatus(session),
           error: null,
-        })
+          isPasswordRecovery: current.isPasswordRecovery,
+        }))
       }
     }
 
@@ -55,6 +59,7 @@ export function useAuth() {
               session: null,
               status: 'anonymous',
               error: 'Session fetch timed out',
+              isPasswordRecovery: false,
             }
           }
           return current
@@ -71,6 +76,7 @@ export function useAuth() {
           session: null,
           status: 'anonymous',
           error: error.message,
+          isPasswordRecovery: false,
         })
         return
       }
@@ -84,12 +90,24 @@ export function useAuth() {
         session: null,
         status: 'anonymous',
         error: err instanceof Error ? err.message : String(err),
+        isPasswordRecovery: false,
       })
     })
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setAuthState((current) => ({
+          ...current,
+          session,
+          status: getStatus(session),
+          error: null,
+          isPasswordRecovery: true,
+        }))
+        return
+      }
+
       void loadWorkspace(session)
     })
 
@@ -175,6 +193,43 @@ export function useAuth() {
     return { error: null }
   }
 
+  const sendPasswordReset = async (email: string) => {
+    if (!supabase) return { error: 'Auth is not configured.' as string | null }
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    })
+
+    if (error) {
+      setAuthState((currentState) => ({ ...currentState, error: error.message }))
+      return { error: error.message }
+    }
+
+    return { error: null }
+  }
+
+  const updatePassword = async (password: string) => {
+    if (!supabase) return { error: 'Auth is not configured.' as string | null }
+
+    const { error } = await supabase.auth.updateUser({ password })
+
+    if (error) {
+      setAuthState((currentState) => ({ ...currentState, error: error.message }))
+      return { error: error.message }
+    }
+
+    setAuthState((currentState) => ({ ...currentState, error: null, isPasswordRecovery: false }))
+    return { error: null }
+  }
+
+  const dismissPasswordRecovery = () => {
+    setAuthState((currentState) => ({ ...currentState, isPasswordRecovery: false }))
+  }
+
+  const clearError = () => {
+    setAuthState((currentState) => ({ ...currentState, error: null }))
+  }
+
   const signOut = async () => {
     if (!supabase) return
 
@@ -191,6 +246,10 @@ export function useAuth() {
     signInWithEmail,
     signUpWithEmail,
     resendConfirmation,
+    sendPasswordReset,
+    updatePassword,
+    dismissPasswordRecovery,
+    clearError,
     signOut,
   }
 }

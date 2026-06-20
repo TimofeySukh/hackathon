@@ -484,30 +484,77 @@ function App() {
   const [showSignInModal, setShowSignInModal] = useState(false)
   const [emailInput, setEmailInput] = useState('')
   const [passwordInput, setPasswordInput] = useState('')
-  const [emailAuthMode, setEmailAuthMode] = useState<'signin' | 'signup'>('signin')
+  const [newPasswordInput, setNewPasswordInput] = useState('')
+  const [emailAuthMode, setEmailAuthMode] = useState<'signin' | 'signup' | 'reset'>('signin')
   const [emailAuthBusy, setEmailAuthBusy] = useState(false)
+  const [emailAuthAction, setEmailAuthAction] = useState<'submit' | 'resend' | null>(null)
   const [emailAuthNotice, setEmailAuthNotice] = useState<string | null>(null)
+  const [emailAuthError, setEmailAuthError] = useState<string | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
 
   const openSignInModal = () => {
     setEmailAuthMode('signin')
     setEmailAuthNotice(null)
+    setEmailAuthError(null)
+    auth.clearError()
     setShowSignInModal(true)
   }
 
   const handleEmailAuthSubmit = async () => {
     const email = emailInput.trim()
-    if (!email || !passwordInput || emailAuthBusy) return
+    const isRecoveryUpdate = auth.isPasswordRecovery
+
+    if (emailAuthBusy) return
+    if (isRecoveryUpdate) {
+      if (passwordInput.length < 8 || passwordInput !== newPasswordInput) return
+    } else if (emailAuthMode === 'reset') {
+      if (!email) return
+    } else if (!email || !passwordInput) {
+      return
+    }
+    if (emailAuthMode === 'signup' && passwordInput.length < 8) return
+
     setEmailAuthBusy(true)
+    setEmailAuthAction('submit')
     setEmailAuthNotice(null)
+    setEmailAuthError(null)
+    auth.clearError()
     try {
-      if (emailAuthMode === 'signup') {
+      if (isRecoveryUpdate) {
+        const { error } = await auth.updatePassword(passwordInput)
+        if (error) {
+          setEmailAuthError('Could not update the password. Try again from a fresh reset link.')
+          return
+        }
+        setEmailAuthNotice('Password updated. You are signed in.')
+        setPasswordInput('')
+        setNewPasswordInput('')
+      } else if (emailAuthMode === 'signup') {
         const { error, needsConfirmation } = await auth.signUpWithEmail(email, passwordInput)
+        if (error) {
+          setEmailAuthError(error)
+          return
+        }
         if (!error && needsConfirmation) {
-          setEmailAuthNotice('Check your email to confirm your account, then sign in.')
+          setEmailAuthNotice('Check your email to confirm your account. You can close this and keep editing locally.')
           setPasswordInput('')
+          return
+        }
+        setShowSignInModal(false)
+        setPasswordInput('')
+      } else if (emailAuthMode === 'reset') {
+        const { error } = await auth.sendPasswordReset(email)
+        if (error) {
+          setEmailAuthNotice('If that email can receive a reset link, we will send one. Try again in a few minutes if it does not arrive.')
+        } else {
+          setEmailAuthNotice('If an account exists for that email, a reset link is on the way.')
         }
       } else {
         const { error } = await auth.signInWithEmail(email, passwordInput)
+        if (error) {
+          setEmailAuthError('Email or password is incorrect.')
+          return
+        }
         if (!error) {
           setShowSignInModal(false)
           setPasswordInput('')
@@ -515,6 +562,27 @@ function App() {
       }
     } finally {
       setEmailAuthBusy(false)
+      setEmailAuthAction(null)
+    }
+  }
+
+  const handleResendConfirmation = async () => {
+    const email = emailInput.trim()
+    if (!email || emailAuthBusy) return
+    setEmailAuthBusy(true)
+    setEmailAuthAction('resend')
+    setEmailAuthError(null)
+    auth.clearError()
+    try {
+      const { error } = await auth.resendConfirmation(email)
+      if (error) {
+        setEmailAuthError('Could not resend the confirmation email. Try again in a few minutes.')
+      } else {
+        setEmailAuthNotice('Confirmation email sent again.')
+      }
+    } finally {
+      setEmailAuthBusy(false)
+      setEmailAuthAction(null)
     }
   }
   // True once we've pulled this user's saved graph (or confirmed they have none).
@@ -3064,6 +3132,41 @@ function App() {
   const showAuthOverlay =
     auth.status !== 'unconfigured' &&
     (auth.status === 'loading' || (auth.status === 'authenticated' && !graphLoaded))
+  const showAuthDialog = auth.isPasswordRecovery || (auth.status === 'anonymous' && showSignInModal)
+  const authDialogMode = auth.isPasswordRecovery ? 'update' : emailAuthMode
+  const authDialogTitle =
+    authDialogMode === 'signup'
+      ? 'Create account'
+      : authDialogMode === 'reset'
+        ? 'Reset password'
+        : authDialogMode === 'update'
+          ? 'Choose a new password'
+          : 'Sign in'
+  const authDialogSubtitle =
+    authDialogMode === 'signup'
+      ? 'Use only email and password. No username, no profile setup.'
+      : authDialogMode === 'reset'
+        ? 'Enter your email and we will send a reset link.'
+        : authDialogMode === 'update'
+          ? 'Set a new password to finish the reset.'
+          : 'Save your board across devices.'
+  const authSubmitDisabled =
+    emailAuthBusy ||
+    (authDialogMode === 'update'
+      ? passwordInput.length < 8 || passwordInput !== newPasswordInput
+      : authDialogMode === 'reset'
+        ? !emailInput.trim()
+        : !emailInput.trim() || !passwordInput || (authDialogMode === 'signup' && passwordInput.length < 8))
+  const authSubmitLabel =
+    emailAuthBusy && emailAuthAction === 'submit'
+      ? 'Please wait...'
+      : authDialogMode === 'signup'
+        ? 'Create account'
+        : authDialogMode === 'reset'
+          ? 'Send reset link'
+          : authDialogMode === 'update'
+            ? 'Update password'
+            : 'Sign in with email'
 
   // Keep references to unused features so they remain in codebase for future use and satisfy TS/ESLint checks
   if (false as boolean) {
@@ -4265,113 +4368,178 @@ function App() {
         </div>
       )}
 
-      {auth.status === 'anonymous' && (
+      {showAuthDialog && (
         <div
-          className={`auth-overlay ${showSignInModal ? 'is-open' : ''}`}
-          onClick={() => setShowSignInModal(false)}
+          className={`auth-overlay ${showAuthDialog ? 'is-open' : ''}`}
+          onClick={() => {
+            if (auth.isPasswordRecovery) {
+              auth.dismissPasswordRecovery()
+              setPasswordInput('')
+              setNewPasswordInput('')
+            }
+            setShowSignInModal(false)
+          }}
         >
           <div
             className="auth-card"
-            style={{ alignItems: 'stretch', gap: '0', width: '320px', position: 'relative' }}
             onClick={(event) => event.stopPropagation()}
           >
             <button
               type="button"
               className="auth-card__close"
               aria-label="Close"
-              onClick={() => setShowSignInModal(false)}
+              onClick={() => {
+                if (auth.isPasswordRecovery) {
+                  auth.dismissPasswordRecovery()
+                  setPasswordInput('')
+                  setNewPasswordInput('')
+                }
+                setShowSignInModal(false)
+              }}
             >
               ×
             </button>
-            <h2 style={{ margin: '0 0 4px', fontSize: '18px', fontWeight: 500, color: 'var(--md-on-surface)' }}>
-              {emailAuthMode === 'signup' ? 'Create account' : 'Sign in'}
-            </h2>
-            <p style={{ margin: '0 0 16px', fontSize: '13px', color: 'var(--md-on-surface-variant)' }}>
-              Save your board across devices.
-            </p>
-            <button
-              type="button"
-              className="m3-primary-button"
-              onClick={() => void auth.signInWithGoogle()}
-            >
-              <GoogleIcon />
-              Continue with Google
-            </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '16px 0' }}>
-              <span style={{ flex: 1, height: '1px', background: 'var(--md-outline-variant)' }} />
-              <span style={{ fontSize: '12px', color: 'var(--md-on-surface-variant)' }}>or</span>
-              <span style={{ flex: 1, height: '1px', background: 'var(--md-outline-variant)' }} />
+            <div className="auth-card__header">
+              <img className="auth-card__brand-mark" src={sdnLogo} alt="" aria-hidden="true" />
+              <div>
+                <h2>{authDialogTitle}</h2>
+                <p>{authDialogSubtitle}</p>
+              </div>
             </div>
+            {authDialogMode !== 'update' && (
+              <>
+                <button
+                  type="button"
+                  className="m3-primary-button auth-card__google"
+                  onClick={() => void auth.signInWithGoogle()}
+                >
+                  <GoogleIcon />
+                  Continue with Google
+                </button>
+                <div className="auth-card__divider">
+                  <span />
+                  <small>or</small>
+                  <span />
+                </div>
+              </>
+            )}
             <form
               onSubmit={(event) => {
                 event.preventDefault()
                 void handleEmailAuthSubmit()
               }}
-              style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
+              className="auth-card__form"
             >
-              <input
-                type="email"
-                autoComplete="email"
-                placeholder="Email"
-                value={emailInput}
-                onChange={(event) => setEmailInput(event.target.value)}
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  padding: '10px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--md-outline, rgba(28, 37, 40, 0.24))',
-                  fontSize: '14px',
-                  background: 'var(--md-surface, #fff)',
-                  color: 'var(--md-on-surface, #1c2528)',
-                }}
-              />
-              <input
-                type="password"
-                autoComplete={emailAuthMode === 'signup' ? 'new-password' : 'current-password'}
-                placeholder="Password"
-                value={passwordInput}
-                onChange={(event) => setPasswordInput(event.target.value)}
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  padding: '10px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--md-outline, rgba(28, 37, 40, 0.24))',
-                  fontSize: '14px',
-                  background: 'var(--md-surface, #fff)',
-                  color: 'var(--md-on-surface, #1c2528)',
-                }}
-              />
+              {authDialogMode !== 'update' && (
+                <label className="auth-input-group">
+                  <span>Email</span>
+                  <input
+                    className="auth-input"
+                    type="email"
+                    autoComplete="email"
+                    inputMode="email"
+                    placeholder="you@example.com"
+                    value={emailInput}
+                    onChange={(event) => setEmailInput(event.target.value)}
+                  />
+                </label>
+              )}
+              {authDialogMode !== 'reset' && (
+                <label className="auth-input-group">
+                  <span>{authDialogMode === 'update' ? 'New password' : 'Password'}</span>
+                  <div className="auth-input-shell">
+                    <input
+                      className="auth-input"
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete={authDialogMode === 'signin' ? 'current-password' : 'new-password'}
+                      placeholder={authDialogMode === 'signin' ? 'Your password' : 'At least 8 characters'}
+                      value={passwordInput}
+                      onChange={(event) => setPasswordInput(event.target.value)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((current) => !current)}
+                    >
+                      {showPassword ? 'Hide' : 'Show'}
+                    </button>
+                  </div>
+                </label>
+              )}
+              {authDialogMode === 'update' && (
+                <label className="auth-input-group">
+                  <span>Confirm password</span>
+                  <input
+                    className="auth-input"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    placeholder="Repeat new password"
+                    value={newPasswordInput}
+                    onChange={(event) => setNewPasswordInput(event.target.value)}
+                  />
+                </label>
+              )}
+              {(authDialogMode === 'signup' || authDialogMode === 'update') && (
+                <p className="auth-card__helper">Use at least 8 characters. Passphrases are welcome.</p>
+              )}
               <button
                 type="submit"
-                className="m3-primary-button"
-                disabled={emailAuthBusy || !emailInput.trim() || !passwordInput}
+                className="m3-primary-button auth-card__submit"
+                disabled={authSubmitDisabled}
               >
-                {emailAuthBusy
-                  ? 'Please wait…'
-                  : emailAuthMode === 'signup'
-                    ? 'Create account'
-                    : 'Sign in with email'}
+                {authSubmitLabel}
               </button>
             </form>
-            <button
-              type="button"
-              className="auth-card__switch"
-              onClick={() => {
-                setEmailAuthMode((mode) => (mode === 'signup' ? 'signin' : 'signup'))
-                setEmailAuthNotice(null)
-              }}
-            >
-              {emailAuthMode === 'signup'
-                ? 'Already have an account? Sign in'
-                : "Don't have an account? Sign up"}
-            </button>
-            {emailAuthNotice && (
-              <p style={{ margin: '12px 0 0', color: 'var(--md-on-surface-variant)', fontSize: '13px', textAlign: 'center' }}>{emailAuthNotice}</p>
+            {authDialogMode !== 'update' && (
+              <div className="auth-card__links">
+                {authDialogMode !== 'reset' && (
+                  <button
+                    type="button"
+                    className="auth-card__switch"
+                    onClick={() => {
+                      setEmailAuthMode('reset')
+                      setPasswordInput('')
+                      setEmailAuthNotice(null)
+                      setEmailAuthError(null)
+                      auth.clearError()
+                    }}
+                  >
+                    Forgot password?
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="auth-card__switch"
+                  onClick={() => {
+                    setEmailAuthMode((mode) => (mode === 'signup' ? 'signin' : 'signup'))
+                    setPasswordInput('')
+                    setEmailAuthNotice(null)
+                    setEmailAuthError(null)
+                    auth.clearError()
+                  }}
+                >
+                  {authDialogMode === 'signup'
+                    ? 'Already have an account? Sign in'
+                    : "Don't have an account? Create one"}
+                </button>
+              </div>
             )}
-            {auth.error && (
-              <p style={{ margin: '12px 0 0', color: 'var(--md-error, #b3261e)', fontSize: '13px', textAlign: 'center' }}>{auth.error}</p>
+            {emailAuthNotice && (
+              <div className="auth-card__notice" role="status">
+                <p>{emailAuthNotice}</p>
+                {authDialogMode === 'signup' && emailInput.trim() && (
+                  <button
+                    type="button"
+                    className="auth-card__switch"
+                    disabled={emailAuthBusy}
+                    onClick={() => void handleResendConfirmation()}
+                  >
+                    {emailAuthBusy && emailAuthAction === 'resend' ? 'Sending...' : 'Resend email'}
+                  </button>
+                )}
+              </div>
+            )}
+            {(emailAuthError || auth.error) && (
+              <p className="auth-card__error" role="alert">{emailAuthError || auth.error}</p>
             )}
           </div>
         </div>

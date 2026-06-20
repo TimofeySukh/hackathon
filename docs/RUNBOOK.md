@@ -331,7 +331,7 @@ AI note sync and AI people search now run inside Supabase Edge Functions through
 
 The browser never calls Gemini, OpenRouter, or Bright Data directly. It invokes Edge Functions, and those functions authenticate the user, load user-owned graph context when needed, call providers with server-side API keys, and return or persist structured output.
 
-Configure Google as an auth provider in Supabase Auth. Add redirect URLs for each app URL used by the team, including:
+Configure Supabase Auth redirect URLs for each app URL used by the team, including:
 
 - `http://localhost:5173`
 - `http://localhost:5174`
@@ -344,7 +344,8 @@ Configure Google as an auth provider in Supabase Auth. Add redirect URLs for eac
 - `http://10.29.0.117:5175`
 - the deployed production URL
 
-The app redirects Google OAuth back to `window.location.origin`, so each origin must be allowlisted in Supabase.
+The app redirects Google OAuth, email confirmation, and password recovery back to
+`window.location.origin`, so each origin must be allowlisted in Supabase.
 For a stable multi-device login flow, prefer one deployed frontend origin on your server instead of ad-hoc local ports.
 
 If a teammate runs Vite on a different port such as `5173`, `5174`, or `5175`, or opens the app through a LAN IP instead of `localhost`, that exact origin must be in the Supabase Auth URL configuration.
@@ -362,6 +363,16 @@ https://lxnrpdeahoglgiocowsh.supabase.co/auth/v1/callback
 The Supabase Google provider also needs the Google OAuth Client ID and Client Secret before `Sign in with Google` can complete.
 
 If the Google OAuth app is still in Testing mode, add each teammate email to Test users in the Google Cloud OAuth consent screen.
+
+Email/password auth setup:
+
+- Enable email/password signups in Supabase Auth.
+- Keep email confirmation enabled for production accounts.
+- Customize the Supabase confirmation and recovery email templates in the Supabase
+  Dashboard so they match Social Datanode's tone and link back to the allowlisted frontend
+  origin.
+- If password recovery links open the app but do not show the new-password dialog, verify
+  that the recovery redirect URL exactly matches the frontend origin.
 
 ## Dependency Workflow
 
@@ -432,27 +443,31 @@ Manual verification:
 7. Confirm the zoom indicator in the bottom-right updates smoothly.
 8. Toggle the theme.
 9. Reload the page and confirm the selected theme is preserved.
-10. Sign in with Google and confirm the account state appears.
-11. Confirm the signed-in account gets a root node at `0,0`.
-12. Drag out from a node to create a new connected person and confirm it persists after reload.
-13. Drag a non-root person to a new position, confirm connected lines follow it, then reload and confirm the coordinates persist.
-14. Click a person near a viewport edge and confirm the board pans enough to keep the inspector visible, and that the inspector opens at a consistent size regardless of the current zoom.
-15. Start trackpad panning on the board, pass over the inspector, and confirm panning continues; then start a trackpad gesture on the inspector and confirm it does not begin board panning.
-16. Confirm the inspector opens as a compact panel with only a large name field, the tag picker, notes, and the delete-person action.
-17. Type `#` inside the inspector name field, confirm the tag dropdown opens, choose a tag with ArrowUp/ArrowDown plus Enter, and verify the applied tag is removed from the saved name text.
-18. Use the tag chip or `+ add tag` ghost button to open the inspector tag dropdown, create a new tag from the same field, delete an unused tag with the `x` confirmation flow, and confirm the single selected tag persists after reload.
-19. Open the top-bar tag menu, toggle a tag color palette from its swatch, change the color, and confirm the selected person inspector still shows the chosen tag with a visible color accent after the picker closes.
-20. Create a new person, confirm the inspector opens automatically, confirm an empty person focuses the name field, then fill the note capture textarea and save a new note both with `Cmd/Ctrl + Enter` and by blurring the textarea.
-21. Create a note by typing into the `Create new note` field, confirm saved notes start collapsed by default, expand one with the chevron, press Enter in the title to open the body, delete a note from the icon button, reload, and confirm note changes persist.
-22. Create a connection between two existing people, confirm reload preserves it, then click the widened line target and confirm `Delete connection` or Backspace removes it.
-23. Open the top-left Tags menu, create enough tags to overflow the panel, scroll to the lower tags, adjust a lower tag color, and confirm the palette remains reachable.
-24. Open the top-left Tags menu, create a tag, adjust its color, toggle one tag off with the visibility checkbox, and confirm both tagged nodes and their connections disappear. Use `Select all` and `Clear all` to confirm bulk visibility controls work.
-25. Open the search layer and verify that typing a person name, tag, or note text returns local matching people.
-26. Press Enter with a natural-language query and verify AI search returns ranked people with reasons.
-27. Click a search result and verify the board recenters on that person and opens the inspector.
-28. After creating a note, wait at least 3 seconds and confirm a `person_ai_notes` row for that person reaches `status = 'created'`.
-29. Edit an existing note, blur the input, wait at least 3 seconds, and confirm the same `person_ai_notes` row updates its `updated_at`, `summary`, and `structured_summary`.
-30. Sign out and confirm the anonymous board state returns.
+10. Open the sign-in dialog and confirm Google, email sign-in, create account, forgot password, and resend confirmation controls fit on desktop and mobile widths.
+11. Sign in with Google and confirm the account state appears.
+12. Create an account with only email and password, confirm the confirmation notice appears, and confirm resend confirmation does not clear the local board.
+13. Request a password reset and confirm the UI shows a generic success message.
+14. Open a Supabase password recovery link and confirm the app shows the new-password state.
+15. Confirm the signed-in account gets a root node at `0,0`.
+16. Drag out from a node to create a new connected person and confirm it persists after reload.
+17. Drag a non-root person to a new position, confirm connected lines follow it, then reload and confirm the coordinates persist.
+18. Click a person near a viewport edge and confirm the board pans enough to keep the inspector visible, and that the inspector opens at a consistent size regardless of the current zoom.
+19. Start trackpad panning on the board, pass over the inspector, and confirm panning continues; then start a trackpad gesture on the inspector and confirm it does not begin board panning.
+20. Confirm the inspector opens as a compact panel with only a large name field, the tag picker, notes, and the delete-person action.
+21. Type `#` inside the inspector name field, confirm the tag dropdown opens, choose a tag with ArrowUp/ArrowDown plus Enter, and verify the applied tag is removed from the saved name text.
+22. Use the tag chip or `+ add tag` ghost button to open the inspector tag dropdown, create a new tag from the same field, delete an unused tag with the `x` confirmation flow, and confirm the single selected tag persists after reload.
+23. Open the top-bar tag menu, toggle a tag color palette from its swatch, change the color, and confirm the selected person inspector still shows the chosen tag with a visible color accent after the picker closes.
+24. Create a new person, confirm the inspector opens automatically, confirm an empty person focuses the name field, then fill the note capture textarea and save a new note both with `Cmd/Ctrl + Enter` and by blurring the textarea.
+25. Create a note by typing into the `Create new note` field, confirm saved notes start collapsed by default, expand one with the chevron, press Enter in the title to open the body, delete a note from the icon button, reload, and confirm note changes persist.
+26. Create a connection between two existing people, confirm reload preserves it, then click the widened line target and confirm `Delete connection` or Backspace removes it.
+27. Open the top-left Tags menu, create enough tags to overflow the panel, scroll to the lower tags, adjust a lower tag color, and confirm the palette remains reachable.
+28. Open the top-left Tags menu, create a tag, adjust its color, toggle one tag off with the visibility checkbox, and confirm both tagged nodes and their connections disappear. Use `Select all` and `Clear all` to confirm bulk visibility controls work.
+29. Open the search layer and verify that typing a person name, tag, or note text returns local matching people.
+30. Press Enter with a natural-language query and verify AI search returns ranked people with reasons.
+31. Click a search result and verify the board recenters on that person and opens the inspector.
+32. After creating a note, wait at least 3 seconds and confirm a `person_ai_notes` row for that person reaches `status = 'created'`.
+33. Edit an existing note, blur the input, wait at least 3 seconds, and confirm the same `person_ai_notes` row updates its `updated_at`, `summary`, and `structured_summary`.
+34. Sign out and confirm the anonymous board state returns.
 
 Supabase verification:
 
