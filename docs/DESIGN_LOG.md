@@ -25,6 +25,9 @@ rediscover, write it here.
   the browser favicon uses the same artwork via [`public/sdn-favicon.svg`](../public/sdn-favicon.svg)
   so production browsers request a new icon path instead of reusing stale `/favicon.svg`
   tab-icon caches, and the landing header/footer plus auth loading mark render it as an image.
+- Follow-up: added PNG/ICO/apple-touch/manifest favicon variants and no-cache nginx handling
+  for icon files because browsers may ignore SVG favicons or keep favicon resources in a
+  separate long-lived cache.
 - Why: the product should show a single brand mark across the browser chrome and in-app
   surfaces instead of mixing the old lightning, generated gradient blocks, and text-only
   placeholders.
