@@ -3132,8 +3132,19 @@ function App() {
   const showAuthOverlay =
     auth.status !== 'unconfigured' &&
     (auth.status === 'loading' || (auth.status === 'authenticated' && !graphLoaded))
-  const showAuthDialog = auth.isPasswordRecovery || (auth.status === 'anonymous' && showSignInModal)
-  const authDialogMode = auth.isPasswordRecovery ? 'update' : emailAuthMode
+  const showPasswordUpdatedDialog =
+    auth.status === 'authenticated' &&
+    !auth.isPasswordRecovery &&
+    emailAuthNotice === 'Password updated. You are signed in.'
+  const showAuthDialog =
+    auth.isPasswordRecovery ||
+    showPasswordUpdatedDialog ||
+    (auth.status === 'anonymous' && showSignInModal)
+  const authDialogMode = showPasswordUpdatedDialog
+    ? 'updated'
+    : auth.isPasswordRecovery
+      ? 'update'
+      : emailAuthMode
   const authDialogTitle =
     authDialogMode === 'signup'
       ? 'Create account'
@@ -3141,6 +3152,8 @@ function App() {
         ? 'Reset password'
         : authDialogMode === 'update'
           ? 'Choose a new password'
+          : authDialogMode === 'updated'
+            ? 'Password updated'
           : 'Sign in'
   const authDialogSubtitle =
     authDialogMode === 'signup'
@@ -3149,6 +3162,8 @@ function App() {
         ? 'Enter your email and we will send a reset link.'
         : authDialogMode === 'update'
           ? 'Set a new password to finish the reset.'
+          : authDialogMode === 'updated'
+            ? 'You are signed in with your new password.'
           : 'Save your board across devices.'
   const authSubmitDisabled =
     emailAuthBusy ||
@@ -4377,6 +4392,7 @@ function App() {
               setPasswordInput('')
               setNewPasswordInput('')
             }
+            setEmailAuthNotice(null)
             setShowSignInModal(false)
           }}
         >
@@ -4394,6 +4410,7 @@ function App() {
                   setPasswordInput('')
                   setNewPasswordInput('')
                 }
+                setEmailAuthNotice(null)
                 setShowSignInModal(false)
               }}
             >
@@ -4406,7 +4423,7 @@ function App() {
                 <p>{authDialogSubtitle}</p>
               </div>
             </div>
-            {authDialogMode !== 'update' && (
+            {authDialogMode !== 'update' && authDialogMode !== 'updated' && (
               <>
                 <button
                   type="button"
@@ -4423,73 +4440,75 @@ function App() {
                 </div>
               </>
             )}
-            <form
-              onSubmit={(event) => {
-                event.preventDefault()
-                void handleEmailAuthSubmit()
-              }}
-              className="auth-card__form"
-            >
-              {authDialogMode !== 'update' && (
-                <label className="auth-input-group">
-                  <span>Email</span>
-                  <input
-                    className="auth-input"
-                    type="email"
-                    autoComplete="email"
-                    inputMode="email"
-                    placeholder="you@example.com"
-                    value={emailInput}
-                    onChange={(event) => setEmailInput(event.target.value)}
-                  />
-                </label>
-              )}
-              {authDialogMode !== 'reset' && (
-                <label className="auth-input-group">
-                  <span>{authDialogMode === 'update' ? 'New password' : 'Password'}</span>
-                  <div className="auth-input-shell">
+            {authDialogMode !== 'updated' && (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  void handleEmailAuthSubmit()
+                }}
+                className="auth-card__form"
+              >
+                {authDialogMode !== 'update' && (
+                  <label className="auth-input-group">
+                    <span>Email</span>
+                    <input
+                      className="auth-input"
+                      type="email"
+                      autoComplete="email"
+                      inputMode="email"
+                      placeholder="you@example.com"
+                      value={emailInput}
+                      onChange={(event) => setEmailInput(event.target.value)}
+                    />
+                  </label>
+                )}
+                {authDialogMode !== 'reset' && (
+                  <label className="auth-input-group">
+                    <span>{authDialogMode === 'update' ? 'New password' : 'Password'}</span>
+                    <div className="auth-input-shell">
+                      <input
+                        className="auth-input"
+                        type={showPassword ? 'text' : 'password'}
+                        autoComplete={authDialogMode === 'signin' ? 'current-password' : 'new-password'}
+                        placeholder={authDialogMode === 'signin' ? 'Your password' : 'At least 8 characters'}
+                        value={passwordInput}
+                        onChange={(event) => setPasswordInput(event.target.value)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((current) => !current)}
+                      >
+                        {showPassword ? 'Hide' : 'Show'}
+                      </button>
+                    </div>
+                  </label>
+                )}
+                {authDialogMode === 'update' && (
+                  <label className="auth-input-group">
+                    <span>Confirm password</span>
                     <input
                       className="auth-input"
                       type={showPassword ? 'text' : 'password'}
-                      autoComplete={authDialogMode === 'signin' ? 'current-password' : 'new-password'}
-                      placeholder={authDialogMode === 'signin' ? 'Your password' : 'At least 8 characters'}
-                      value={passwordInput}
-                      onChange={(event) => setPasswordInput(event.target.value)}
+                      autoComplete="new-password"
+                      placeholder="Repeat new password"
+                      value={newPasswordInput}
+                      onChange={(event) => setNewPasswordInput(event.target.value)}
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword((current) => !current)}
-                    >
-                      {showPassword ? 'Hide' : 'Show'}
-                    </button>
-                  </div>
-                </label>
-              )}
-              {authDialogMode === 'update' && (
-                <label className="auth-input-group">
-                  <span>Confirm password</span>
-                  <input
-                    className="auth-input"
-                    type={showPassword ? 'text' : 'password'}
-                    autoComplete="new-password"
-                    placeholder="Repeat new password"
-                    value={newPasswordInput}
-                    onChange={(event) => setNewPasswordInput(event.target.value)}
-                  />
-                </label>
-              )}
-              {(authDialogMode === 'signup' || authDialogMode === 'update') && (
-                <p className="auth-card__helper">Use at least 8 characters. Passphrases are welcome.</p>
-              )}
-              <button
-                type="submit"
-                className="m3-primary-button auth-card__submit"
-                disabled={authSubmitDisabled}
-              >
-                {authSubmitLabel}
-              </button>
-            </form>
-            {authDialogMode !== 'update' && (
+                  </label>
+                )}
+                {(authDialogMode === 'signup' || authDialogMode === 'update') && (
+                  <p className="auth-card__helper">Use at least 8 characters. Passphrases are welcome.</p>
+                )}
+                <button
+                  type="submit"
+                  className="m3-primary-button auth-card__submit"
+                  disabled={authSubmitDisabled}
+                >
+                  {authSubmitLabel}
+                </button>
+              </form>
+            )}
+            {authDialogMode !== 'update' && authDialogMode !== 'updated' && (
               <div className="auth-card__links">
                 {authDialogMode !== 'reset' && (
                   <button

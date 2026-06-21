@@ -17,6 +17,17 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-21 — Keep password recovery success visible
+
+- Decision: password recovery now has a final `Password updated` dialog state after
+  `supabase.auth.updateUser({ password })` succeeds, instead of immediately hiding the
+  auth dialog as soon as the recovery session becomes a normal authenticated session.
+- Why: e2e testing through Mailtrap confirmed the recovery link, `PUT /auth/v1/user`, and
+  new-password sign-in all work, but the previous UI jumped straight back to the board and
+  hid the success notice.
+- Test setup: local Mailtrap Sandbox credentials live in ignored `.env.auth-test.local` so
+  future sessions can rerun auth email e2e without recreating the inbox credentials.
+
 ### 2026-06-20 — Make email auth a recovery-capable Material 3 dialog
 
 - Decision: email/password auth stays minimal: registration asks only for email and

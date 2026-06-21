@@ -20,6 +20,8 @@ password so a database user is created without forcing profile setup.
   an email address is registered.
 - Password recovery links are handled by Supabase URL session detection. When the app sees
   the `PASSWORD_RECOVERY` auth event, it opens the dialog directly in the new-password state.
+- After a successful password update, the dialog stays open in a final success state so the
+  user sees that the password changed and the session is active.
 - New passwords require at least 8 characters, with no composition rule.
 
 ## Design
