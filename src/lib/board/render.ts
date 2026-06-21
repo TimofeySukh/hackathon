@@ -46,6 +46,7 @@ import { makeInitials } from './text'
 const personSpriteCache = new Map<string, HTMLCanvasElement>()
 const imageCache = new Map<string, HTMLImageElement>()
 const SPRITE_TIERS = [64, 128, 256]
+const MAX_CIRCLE_PATH_CACHE_SIZE = 20000
 const circlePathCache = new Map<string, Path2D>()
 const customConnCandidates = new Map<string, Connection>()
 const stressBatch: { source: { x: number; y: number }; target: { x: number; y: number } }[] = []
@@ -587,10 +588,10 @@ function getCirclePath(
   const key = `${circle.id}|${circle.x}|${circle.y}|${circle.radius}|${sides}|${amplitude}|${shapeType}|${shapeModeVal}`
   let cached = circlePathCache.get(key)
   if (!cached) {
-    if (circlePathCache.size > 2000) {
+    if (circlePathCache.size > MAX_CIRCLE_PATH_CACHE_SIZE) {
       circlePathCache.clear()
     }
-    cached = new Path2D(getCircleRenderPath(circle, circleShapeMode, undefined))
+    cached = getCircleRenderPath(circle, circleShapeMode, undefined)
     circlePathCache.set(key, cached)
   }
   return cached
@@ -614,7 +615,7 @@ function getCircleRenderPath(
   circle: CircleNode,
   circleShapeMode: CircleShapeMode,
   morph?: CircleMorph & { t: number },
-) {
+): Path2D {
   // Smooth-enough point count; from/to use the same count so points correspond.
   const n = Math.max(120, Math.round(circle.radius * 2))
 
@@ -627,7 +628,7 @@ function getCircleRenderPath(
       from[i].x += (to[i].x - from[i].x) * morph.t
       from[i].y += (to[i].y - from[i].y) * morph.t
     }
-    return outlinePath(from)
+    return new Path2D(outlinePath(from))
   }
 
   const amplitude = circle.amplitude ?? 0
@@ -636,10 +637,12 @@ function getCircleRenderPath(
   const isCustomShape = circle.shapeCustom === true && (shapeType !== 'circle' || amplitude > 0 || sides < 25)
   // "circles" mode keeps *untouched* circles as clean circles (so a fresh board
   // never shows stray shapes), but always honors a shape the user explicitly set.
-  if (circleShapeMode === 'circles' && !isCustomShape) {
-    return outlinePath(sampleCircleOutline(circle.x, circle.y, circle.radius, 25, 0, n, 'circle'))
+  if ((circleShapeMode === 'circles' && !isCustomShape) || (shapeType === 'circle' && amplitude === 0 && sides >= 25)) {
+    const path = new Path2D()
+    path.arc(circle.x, circle.y, circle.radius, 0, Math.PI * 2)
+    return path
   }
-  return outlinePath(sampleCircleOutline(circle.x, circle.y, circle.radius, sides, amplitude, n, shapeType))
+  return new Path2D(outlinePath(sampleCircleOutline(circle.x, circle.y, circle.radius, sides, amplitude, n, shapeType)))
 }
 
 function drawCircleCenter(ctx: CanvasRenderingContext2D, circle: CircleNode, _scale: number, circleFillMode: CircleFillMode, nodeScale = 1) {

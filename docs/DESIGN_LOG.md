@@ -532,6 +532,15 @@ rediscover, write it here.
   few and cheap): circle culling made circles pop in late during a long pan because the DOM
   layer only re-culls on settle while the people canvas repaints live every frame.
 
+### 2026-06-21 — Render Dense Clean Circles with Native Canvas Arcs
+
+- Decision: clean board circles use a native Canvas `Path2D.arc` fast path, while wavy,
+  polygon, and morphing circles keep the sampled-outline path. The circle path cache now
+  holds enough entries for dense visible boards instead of clearing around 2,000 paths.
+- Why: dense boards with thousands of empty circles were still slow because each clean
+  circle was drawn as a 120+ segment sampled polyline, and the path cache could thrash
+  during a single repaint when the visible circle count exceeded its old limit.
+
 ### 2026-06-15 — Keep Chrome Button Hover Pill-Shaped
 
 - Decision: ordinary chrome buttons keep their Material 3 pill/circle shape on hover.

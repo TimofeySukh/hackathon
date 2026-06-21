@@ -37,6 +37,10 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
 - **Membership edges**: person-to-circle membership lines render only for people in the
   current viewport, so a visible imported company circle does not draw thousands of
   offscreen contact lines during unrelated repaints.
+- **Circle rendering performance**: clean circles render with the native Canvas `arc`
+  path instead of a sampled polyline. Wavy and polygon circles still use sampled paths,
+  and circle paths are cached at a large-board-friendly size so dense imports do not
+  rebuild every visible circle path on each repaint.
 - **Select**: click a circle, person, or connection to load it into the inspector for
   rename / styling / notes / delete.
 - **Undo**: Ctrl/Cmd+Z reverts the last graph-mutating action — create, delete, move,
@@ -113,7 +117,8 @@ This is the most Material-3-aligned part of the app today; keep it that way.
     drag/resize/create/delete interactions from running the global O(n²) layout on dense
     boards.
   - `drawBoardLayer` — Canvas 2D renderer for circles, people, labels, edges, selected
-    handles, and the draft connector.
+    handles, and the draft connector. Clean circles use native `Path2D.arc`; sampled
+    outline paths are reserved for wavy/polygon/morph states.
   - `hitTestBoard` plus `handleSurfacePointerDown/Move/Up` — canvas interaction model
     for selecting, dragging, resizing, connecting, and context menus.
   - create-menu rendering; inspector `<aside className="inspector">`.
