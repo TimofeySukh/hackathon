@@ -91,6 +91,13 @@ function normalizeEnrichment(value: unknown, fallbackUrl: string): LinkedInProfi
   return profile
 }
 
+function getLocalTestHeaders() {
+  const secret = import.meta.env.DEV ? import.meta.env.VITE_LINKEDIN_ENRICHMENT_TEST_SECRET : ''
+  return typeof secret === 'string' && secret.trim()
+    ? { 'x-linkedin-enrichment-test-secret': secret.trim() }
+    : undefined
+}
+
 export async function enrichLinkedInProfile(url: string): Promise<LinkedInProfileEnrichment | null> {
   const cached = getCachedLinkedInProfile(url)
   if (cached) return cached
@@ -98,6 +105,7 @@ export async function enrichLinkedInProfile(url: string): Promise<LinkedInProfil
 
   const { data, error } = await supabase.functions.invoke('enrich-linkedin-profile', {
     body: { url },
+    headers: getLocalTestHeaders(),
   })
 
   if (error) {

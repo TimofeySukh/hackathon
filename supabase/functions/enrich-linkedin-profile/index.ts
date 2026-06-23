@@ -6,7 +6,7 @@ const LINKEDIN_PROFILE_DATASET_ID = 'gd_l1viktl72bvl7bjuj0'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-linkedin-enrichment-test-secret',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
@@ -40,6 +40,25 @@ function getRequiredEnv(name: string) {
 
 function getLinkedInEnrichmentApiKey() {
   return Deno.env.get('LINKEDIN_ENRICHMENT_API_KEY') ?? getRequiredEnv('BRIGHTDATA_API_KEY')
+}
+
+function isLocalUrl(value: string | null) {
+  if (!value) return false
+  try {
+    const url = new URL(value)
+    return ['localhost', '127.0.0.1', '::1'].includes(url.hostname)
+  } catch {
+    return false
+  }
+}
+
+function isAuthorizedLocalTestRequest(req: Request) {
+  if (Deno.env.get('LINKEDIN_ENRICHMENT_ALLOW_TEST_AUTH') !== 'true') return false
+  const expectedSecret = Deno.env.get('LINKEDIN_ENRICHMENT_TEST_SECRET')
+  if (!expectedSecret) return false
+  const actualSecret = req.headers.get('x-linkedin-enrichment-test-secret')
+  if (actualSecret !== expectedSecret) return false
+  return isLocalUrl(req.headers.get('Origin')) || isLocalUrl(req.headers.get('Referer'))
 }
 
 function normalizeLinkedInProfileUrl(rawValue: string): string | null {
@@ -258,12 +277,13 @@ Deno.serve(async (req) => {
   }
 
   const authHeader = req.headers.get('Authorization')
-  if (!authHeader) {
-    return jsonResponse({ error: 'Missing authorization header.' }, 401)
-  }
-
   try {
-    await requireUser(authHeader)
+    if (!isAuthorizedLocalTestRequest(req)) {
+      if (!authHeader) {
+        return jsonResponse({ error: 'Missing authorization header.' }, 401)
+      }
+      await requireUser(authHeader)
+    }
 
     const body = (await req.json()) as { url?: unknown }
     const url = typeof body.url === 'string' ? normalizeLinkedInProfileUrl(body.url) : null

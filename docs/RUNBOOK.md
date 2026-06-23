@@ -340,6 +340,23 @@ supabase secrets set OPENROUTER_API_KEY=your-openrouter-api-key
 supabase secrets set LINKEDIN_ENRICHMENT_API_KEY=your-linkedin-enrichment-provider-api-key
 ```
 
+For local manual LinkedIn profile import testing without signing in, set a throwaway
+secret in local Vite and in the Edge Function environment:
+
+```bash
+# .env.local only, never production
+VITE_LINKEDIN_ENRICHMENT_TEST_SECRET=dev-only-random-secret
+
+# local Supabase Edge Function env, or a non-production test function deployment
+LINKEDIN_ENRICHMENT_ALLOW_TEST_AUTH=true
+LINKEDIN_ENRICHMENT_TEST_SECRET=dev-only-random-secret
+```
+
+The test bypass is accepted only when the request comes from `localhost`, `127.0.0.1`,
+or `::1`, has the matching `x-linkedin-enrichment-test-secret` header, and the Edge
+Function has `LINKEDIN_ENRICHMENT_ALLOW_TEST_AUTH=true`. Production must leave these
+test variables unset so unauthenticated enrichment still fails.
+
 Optional AI model overrides:
 
 ```bash

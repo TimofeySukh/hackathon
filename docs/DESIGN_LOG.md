@@ -29,6 +29,16 @@ rediscover, write it here.
   Empty-load states must be treated as suspicious during migrations, not as data to write
   immediately.
 
+### 2026-06-23 — Local-only LinkedIn enrichment test bypass
+
+- Decision: local Vite can send `x-linkedin-enrichment-test-secret` for manual
+  LinkedIn profile import testing when `VITE_LINKEDIN_ENRICHMENT_TEST_SECRET` is set.
+- Decision: the Edge Function accepts that bypass only when
+  `LINKEDIN_ENRICHMENT_ALLOW_TEST_AUTH=true`, the matching test secret is configured,
+  and the request origin/referrer is localhost.
+- Why: local UI tests need to exercise the full import path without depending on a
+  personal browser login, while production must keep unauthenticated enrichment blocked.
+
 ### 2026-06-23 — LinkedIn profile enrichment stays provider-neutral in product surfaces
 
 - Decision: manual LinkedIn profile import UI, docs, and generated person notes describe

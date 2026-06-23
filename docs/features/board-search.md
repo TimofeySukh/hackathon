@@ -25,6 +25,8 @@ selects the node and flies the camera to it at a comfortable zoom.
 - Manual LinkedIn enrichment checks the existing graph first and then a local per-URL
   cache before calling the server, so repeated imports of the same profile avoid another
   provider request. LinkedIn ZIP import does not use server-side profile enrichment.
+- Local development can opt into an unauthenticated enrichment test path with a matching
+  local Vite secret and Edge Function test secret. Production must not set that test flag.
 - The result list is keyboard navigable. `ArrowDown` / `ArrowUp` move the active
   option, `Home` / `End` jump to the first or last option, and `Enter` picks the active
   option. Moving the pointer over a row also updates the active option.
