@@ -59,10 +59,27 @@ export function getCachedLinkedInProfile(url: string): LinkedInProfileEnrichment
       url: 'https://www.linkedin.com/in/velizar-seleznev/',
       name: 'Velizar Seleznev',
       company: 'SocialDataNode',
-      companyLogoUrl: '/Users/velizard/Downloads/socialdatanode_logo.jpeg',
+      companyLogoUrl: '/socialdatanode_logo.jpeg',
       headline: 'Software Developer | SocialDataNode',
       description: "Making sure this product actually makes sense to you, while fighting my co-founder daily to protect our UX from his 'brilliant' ideas",
-      avatarUrl: '/Users/velizard/Downloads/1731328063840.jpeg',
+      avatarUrl: '/velizar_avatar.jpeg',
+      source: 'cache'
+    }
+  }
+
+  if (
+    normalizedUrl === 'https://www.linkedin.com/in/timofey-sukhov-775b38404' ||
+    normalizedUrl === 'https://linkedin.com/in/timofey-sukhov-775b38404' ||
+    normalizedUrl === 'www.linkedin.com/in/timofey-sukhov-775b38404'
+  ) {
+    return {
+      url: 'https://www.linkedin.com/in/timofey-sukhov-775b38404/',
+      name: 'Timofey Sukhov',
+      company: 'SocialDataNode',
+      companyLogoUrl: '/socialdatanode_logo.jpeg',
+      headline: 'Co-founder & Chief Shit-Eater',
+      description: "Co-founder & Chief Shit-Eater.",
+      avatarUrl: '/timofey_avatar.jpeg',
       source: 'cache'
     }
   }

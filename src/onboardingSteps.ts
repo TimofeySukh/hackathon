@@ -53,7 +53,7 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     trigger: 'import',
     eyebrow: 'Step 5 of 5',
     title: 'Bring in real people',
-    body: 'Paste a LinkedIn profile URL into Search to import a contact. Try importing my profile: www.linkedin.com/in/velizar-seleznev',
+    body: 'Paste a LinkedIn profile URL into Search to import a contact. Try importing one of the creators: www.linkedin.com/in/velizar-seleznev or www.linkedin.com/in/timofey-sukhov-775b38404/',
     cta: 'open-search',
   },
   {
