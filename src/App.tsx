@@ -97,6 +97,31 @@ function settleInteractionGraph(state: GraphState) {
   return shouldRunGlobalInteractionLayout(state) ? ensureContainment(state) : state
 }
 
+function graphHasConnectionBetween(state: GraphState, fromId: string, toId: string) {
+  if (fromId === toId) return true
+  const matchesPair = (a: string | null | undefined, b: string | null | undefined) =>
+    (a === fromId && b === toId) || (a === toId && b === fromId)
+
+  if ((state.connections || []).some((conn) => matchesPair(conn.fromId, conn.toId))) return true
+  if (state.people.some((person) => matchesPair(person.id, person.circleId))) return true
+  return state.circles.some((circle) => matchesPair(circle.id, circle.connectedTo))
+}
+
+function appendGraphConnection(state: GraphState, fromId: string, toId: string): GraphState {
+  if (graphHasConnectionBetween(state, fromId, toId)) return state
+  return {
+    ...state,
+    connections: [
+      ...(state.connections || []),
+      {
+        id: `conn-${Date.now()}`,
+        fromId,
+        toId,
+      },
+    ],
+  }
+}
+
 function isGraphState(value: unknown): value is GraphState {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Partial<GraphState>
@@ -2610,56 +2635,30 @@ function App() {
       const targetCircle = graph.circles.find((c) => Math.hypot(c.x - conn.endX, c.y - conn.endY) < 30)
 
       if (targetPerson && targetPerson.id !== conn.sourceId) {
-        pushHistory()
-        setGraph((current) => ({
-          ...current,
-          connections: [
-            ...(current.connections || []),
-            {
-              id: `conn-${Date.now()}`,
-              fromId: conn.sourceId,
-              toId: targetPerson.id,
-            },
-          ],
-        }))
+        if (!graphHasConnectionBetween(graph, conn.sourceId, targetPerson.id)) {
+          pushHistory()
+          setGraph((current) => appendGraphConnection(current, conn.sourceId, targetPerson.id))
+        }
       } else if (targetCircle && targetCircle.id !== conn.sourceId) {
-        pushHistory()
-        if (conn.sourceType === 'circle') {
-          setGraph((current) => {
-            const srcCircle = current.circles.find((c) => c.id === conn.sourceId)
-            if (srcCircle && !srcCircle.connectedTo) {
-              return {
-                ...current,
-                circles: current.circles.map((c) =>
-                  c.id === conn.sourceId ? { ...c, connectedTo: targetCircle.id } : c
-                ),
+        if (!graphHasConnectionBetween(graph, conn.sourceId, targetCircle.id)) {
+          pushHistory()
+          if (conn.sourceType === 'circle') {
+            setGraph((current) => {
+              const srcCircle = current.circles.find((c) => c.id === conn.sourceId)
+              if (srcCircle && !srcCircle.connectedTo) {
+                return {
+                  ...current,
+                  circles: current.circles.map((c) =>
+                    c.id === conn.sourceId ? { ...c, connectedTo: targetCircle.id } : c
+                  ),
+                }
+              } else {
+                return appendGraphConnection(current, conn.sourceId, targetCircle.id)
               }
-            } else {
-              return {
-                ...current,
-                connections: [
-                  ...(current.connections || []),
-                  {
-                    id: `conn-${Date.now()}`,
-                    fromId: conn.sourceId,
-                    toId: targetCircle.id,
-                  },
-                ],
-              }
-            }
-          })
-        } else {
-          setGraph((current) => ({
-            ...current,
-            connections: [
-              ...(current.connections || []),
-              {
-                id: `conn-${Date.now()}`,
-                fromId: conn.sourceId,
-                toId: targetCircle.id,
-              },
-            ],
-          }))
+            })
+          } else {
+            setGraph((current) => appendGraphConnection(current, conn.sourceId, targetCircle.id))
+          }
         }
       } else {
         if (conn.sourceType === 'circle') {
@@ -3038,17 +3037,7 @@ function App() {
         ],
       }
       if (createMenu.dragSourceType === 'person' && createMenu.dragSourceId) {
-        return {
-          ...nextGraph,
-          connections: [
-            ...(nextGraph.connections || []),
-            {
-              id: `conn-${Date.now()}`,
-              fromId: createMenu.dragSourceId,
-              toId: id,
-            },
-          ],
-        }
+        return appendGraphConnection(nextGraph, createMenu.dragSourceId, id)
       }
       return nextGraph
     })
@@ -3104,17 +3093,7 @@ function App() {
         ],
       })
       if (createMenu.dragSourceType === 'person' && createMenu.dragSourceId) {
-        return {
-          ...nextGraph,
-          connections: [
-            ...(nextGraph.connections || []),
-            {
-              id: `conn-${Date.now()}`,
-              fromId: createMenu.dragSourceId,
-              toId: id,
-            },
-          ],
-        }
+        return appendGraphConnection(nextGraph, createMenu.dragSourceId, id)
       }
       return nextGraph
     })

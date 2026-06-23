@@ -500,8 +500,7 @@ function drawPersonEdges(
     const virtualId = `${MEMBERSHIP_CONNECTION_PREFIX}${person.id}`
     if (selectedItem?.type === 'connection' && selectedItem.id === virtualId) return
     if (hoveredConnId === virtualId) return
-    ctx.moveTo(circle.x, circle.y)
-    ctx.lineTo(person.x, person.y)
+    drawCurvePath(ctx, circle, person)
   }
   for (const person of people) addEdge(person)
   ctx.stroke()
@@ -517,8 +516,7 @@ function drawPersonEdges(
     ctx.beginPath()
     ctx.strokeStyle = isSelected ? '#00629d' : '#64748b'
     ctx.lineWidth = Math.max((isSelected ? 4 : 3) / scale, isSelected ? 2 : 1.5)
-    ctx.moveTo(circle.x, circle.y)
-    ctx.lineTo(person.x, person.y)
+    drawCurvePath(ctx, circle, person)
     ctx.stroke()
     ctx.restore()
   }
@@ -958,6 +956,9 @@ export function hitTestBoard(index: BoardIndex, camera: Camera, selectedItem: Se
     }
     if (bestPerson) return { type: 'person', person: bestPerson }
 
+    const centerCircle = findCircleCenterAtPoint(index, hitRect, point, scale)
+    if (centerCircle) return { type: 'circle-center', circle: centerCircle }
+
     const connection = findConnectionNearPoint(index, point, 10 / scale)
     if (connection) return { type: 'connection', connection }
   }
@@ -972,6 +973,20 @@ export function hitTestBoard(index: BoardIndex, camera: Camera, selectedItem: Se
     if (d <= circle.radius) return { type: 'circle-body', circle }
   }
 
+  return null
+}
+
+function findCircleCenterAtPoint(
+  index: BoardIndex,
+  hitRect: WorldRect,
+  point: { x: number; y: number },
+  scale: number,
+) {
+  const circles = queryCircles(index, hitRect).reverse()
+  for (const circle of circles) {
+    const d = Math.hypot(point.x - circle.x, point.y - circle.y)
+    if (d <= CIRCLE_CENTER_RADIUS + 6 / scale) return circle
+  }
   return null
 }
 

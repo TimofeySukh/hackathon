@@ -34,6 +34,8 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   Links render as adaptive quadratic curves: longer and more diagonal links get a little
   more shape, while short links stay close to direct. Hover and selection hit-testing uses
   the same curve geometry as rendering, not the straight line between endpoints.
+  The board keeps one relationship edge per pair of endpoints; drawing the same pair again
+  is a no-op, including reversed endpoint order.
   In the far-zoom zones-only view, hidden centers, people, and connector handles are not
   interactive, so dragging from a hidden center cannot open the create menu.
 - **Center fan-out**: automatic circle links whose source is the central `You` circle are
@@ -43,10 +45,12 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   current viewport, so a visible imported company circle does not draw thousands of
   offscreen contact lines during unrelated repaints. Membership lines are selectable like
   authored connections; deleting one detaches the person from the circle without deleting
-  either node.
+  either node. They use the same adaptive curved geometry as custom connections.
 - **Connected-circle edges**: circle-to-circle edges created through `connectedTo` share
   the same hover, selection, and delete behavior as custom connections. Deleting one clears
   that circle's connected parent without deleting the circle.
+- **Hit priority**: circle center handles own their visible hit area. A relationship line
+  passing underneath a center does not hover or select while the pointer is on the center.
 - **Circle rendering performance**: clean circles render with the native Canvas `arc`
   path instead of a sampled polyline. Wavy and polygon circles still use sampled paths,
   and circle paths are cached at a large-board-friendly size so dense imports do not
