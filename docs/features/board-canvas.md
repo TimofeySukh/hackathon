@@ -61,6 +61,11 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   board graph JSON with `circles`, `people`, and `connections` arrays, then replaces the
   current board and keeps the action undoable. Clear resets the board to a fresh single
   `You` circle after confirmation and is also undoable.
+- **Persistence safety**: signed-in boards load from the `user_graphs` blob first. If that
+  row is missing because an older deployment still has the normalized `boards` / `people`
+  / `notes` tables, the app falls back to that legacy shape and migrates it into the blob
+  model. A brand-new empty graph is not immediately autosaved on load, so a temporary
+  backend/schema mismatch cannot overwrite an existing board with a single `You` circle.
 - **Labels**: Settings includes separate toggles for circle labels and person names.
   Circle-center icon text scales with the world transform like people avatars; labels use
   the same screen-readable label treatment as person names.
@@ -78,7 +83,8 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   parent circle, so a parent-level person cannot visually sit inside a subset they do not
   belong to. People use a tight collision and containment radius only slightly larger than
   the visual avatar, while larger region/company circles keep their normal spacing.
-- State is browser-session-only in this prototype screen (no backend writes from here).
+- Signed-in state autosaves to Supabase after edits; anonymous state stays in
+  `localStorage`.
 
 ## Design
 

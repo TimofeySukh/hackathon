@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Local graph exports/recovery files may contain personal user data.
+hackathon-board-migrated.json
+restored-graph-*.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

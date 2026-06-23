@@ -17,6 +17,18 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-23 — Protect Graph Persistence During Backend Migrations
+
+- Decision: signed-in graph loading now records whether data came from the current
+  `user_graphs` blob, the legacy normalized tables, or a truly empty account. A truly
+  empty fresh graph is not immediately autosaved back to Supabase until the user changes
+  it, and missing `user_graphs` data falls back to legacy `boards` / `people` / `notes`
+  when those tables exist.
+- Why: a backend/project/schema mismatch can otherwise make a real user's board appear as
+  a single fresh `You` circle and then persist that empty graph via debounced autosave.
+  Empty-load states must be treated as suspicious during migrations, not as data to write
+  immediately.
+
 ### 2026-06-21 — Keep password recovery success visible
 
 - Decision: password recovery now has a final `Password updated` dialog state after

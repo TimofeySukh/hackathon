@@ -36,7 +36,9 @@ circle) — there is no demo seed.
   `colors.ts`, `geometry.ts`, `layout.ts` (containment/collision), and
   `render.ts` (spatial index, hit-testing, the Canvas 2D draw layer).
 - `src/lib/graphPersistence.ts` loads/saves the graph blob (Supabase for
-  signed-in users, `localStorage` for anonymous sessions).
+  signed-in users, `localStorage` for anonymous sessions). It also contains the
+  legacy normalized-table fallback used when a user has older `boards` / `people`
+  / `notes` data but no `user_graphs` row yet.
 - `src/lib/supabase.ts` creates the browser Supabase client from Vite environment variables.
 - `src/lib/useAuth.ts` owns session loading, Google sign-in, email/password sign-in,
   registration, confirmation resend, password recovery, and sign-out.
@@ -85,6 +87,8 @@ Out of scope (still not built):
 - Link implementation work back to the relevant Linear issue.
 - Preserve the clean-board product principle from `docs/product-vision.md`.
 - Keep all graph rows user-owned and protected by RLS keyed to `auth.uid()`.
+- Never let a missing graph row silently overwrite a user's server data with a blank
+  fresh graph; fallback or fail visibly before autosave.
 - Keep unsigned local graph data out of Supabase until the user signs in and an explicit migration path exists.
 - Keep Gemini, OpenRouter, and Bright Data API keys out of the browser and only inside Supabase Edge Function secrets.
 - Keep `SUPABASE_SERVICE_ROLE_KEY` out of browser-exposed `VITE_` variables and only in local MCP env files or shell env.

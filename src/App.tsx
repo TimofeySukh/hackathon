@@ -15,7 +15,7 @@ import sdnLogo from './assets/sdn-logo.svg'
 zip.configure({ useWebWorkers: false })
 import { useAuth } from './lib/useAuth'
 import LandingPage from './LandingPage'
-import { loadGraph, saveGraph, loadLocalGraph, saveLocalGraph } from './lib/graphPersistence'
+import { loadGraphRecord, saveGraph, loadLocalGraph, saveLocalGraph } from './lib/graphPersistence'
 import { enrichLinkedInProfile } from './lib/linkedinEnrichment'
 import { OnboardingCoach } from './Onboarding'
 import { SelectionIndicator } from './components/SelectionIndicator'
@@ -464,6 +464,8 @@ function App() {
   // pan/zoom gesture) so a move event flood doesn't trigger a re-render storm.
   const dragRafRef = useRef<number | null>(null)
   const pendingGraphRef = useRef<((current: GraphState) => GraphState) | null>(null)
+  const loadedGraphSourceRef = useRef<'saved' | 'legacy' | 'empty' | 'local'>('empty')
+  const loadedGraphSnapshotRef = useRef<string | null>(null)
   const pendingConnectorRef = useRef<DragConnector | null>(null)
   // Start from a blank board (just the "you" circle), never the old demo seed.
   // The real graph replaces this once loaded; keeping demo data here caused it to
@@ -605,17 +607,23 @@ function App() {
     let cancelled = false
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setGraphLoaded(false)
-    loadGraph(userId)
-      .then((saved) => {
+    loadGraphRecord(userId)
+      .then((loaded) => {
         if (cancelled) return
-        const base = sanitizeDefaultCircleStyles(saved ?? createFreshGraph())
-        setGraph(stampYouIdentity(base, auth.session!.user))
+        const base = sanitizeDefaultCircleStyles(loaded.graph ?? createFreshGraph())
+        const stamped = stampYouIdentity(base, auth.session!.user)
+        loadedGraphSourceRef.current = loaded.source
+        loadedGraphSnapshotRef.current = JSON.stringify(stamped)
+        setGraph(stamped)
         setGraphLoaded(true)
       })
       .catch((error) => {
         console.error('Failed to load graph', error)
         if (!cancelled) {
-          setGraph(stampYouIdentity(createFreshGraph(), auth.session!.user))
+          const stamped = stampYouIdentity(createFreshGraph(), auth.session!.user)
+          loadedGraphSourceRef.current = 'empty'
+          loadedGraphSnapshotRef.current = JSON.stringify(stamped)
+          setGraph(stamped)
           setGraphLoaded(true)
         }
       })
@@ -628,6 +636,9 @@ function App() {
   // Debounced autosave: a flood of drags or a bulk import collapses into one write.
   useEffect(() => {
     if (!graphLoaded || auth.status !== 'authenticated' || !userId) return
+    if (loadedGraphSourceRef.current === 'empty' && loadedGraphSnapshotRef.current === JSON.stringify(graph)) {
+      return
+    }
     const timer = window.setTimeout(() => {
       void saveGraph(userId, graph).catch((error) => console.error('Failed to save graph', error))
     }, 800)
@@ -645,7 +656,13 @@ function App() {
     setGraphLoaded(false)
     const saved = loadLocalGraph()
     if (saved) {
-      setGraph(sanitizeDefaultCircleStyles(saved))
+      const sanitized = sanitizeDefaultCircleStyles(saved)
+      loadedGraphSourceRef.current = 'local'
+      loadedGraphSnapshotRef.current = JSON.stringify(sanitized)
+      setGraph(sanitized)
+    } else {
+      loadedGraphSourceRef.current = 'empty'
+      loadedGraphSnapshotRef.current = JSON.stringify(graph)
     }
     setGraphLoaded(true)
   }, [isLocalMode])
