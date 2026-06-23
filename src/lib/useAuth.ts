@@ -186,7 +186,6 @@ export function useAuth() {
     })
 
     if (error) {
-      setAuthState((currentState) => ({ ...currentState, error: error.message }))
       return { error: error.message }
     }
 

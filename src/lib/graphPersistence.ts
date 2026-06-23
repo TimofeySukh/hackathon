@@ -68,7 +68,12 @@ export async function saveGraph(userId: string, graph: GraphState): Promise<void
 
 function isMissingTableError(error: { code?: string; message?: string }) {
   const message = error.message?.toLowerCase() ?? ''
-  return error.code === '42P01' || message.includes('relation') && message.includes('does not exist')
+  return (
+    error.code === '42P01' ||
+    error.code === 'PGRST205' ||
+    (message.includes('relation') && message.includes('does not exist')) ||
+    (message.includes('could not find the table') && message.includes('schema cache'))
+  )
 }
 
 function isOptionalLegacyTableError(error: { code?: string; message?: string } | null) {
