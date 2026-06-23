@@ -212,10 +212,9 @@ export function drawCurvePath(
   from: { x: number; y: number },
   to: { x: number; y: number },
 ) {
-  const mx = (from.x + to.x) / 2
-  const my = (from.y + to.y) / 2 - 40
+  const control = getAdaptiveCurveControlPoint(from, to)
   ctx.moveTo(from.x, from.y)
-  ctx.quadraticCurveTo(mx, my, to.x, to.y)
+  ctx.quadraticCurveTo(control.x, control.y, to.x, to.y)
 }
 
 export function roundedRect(
@@ -264,6 +263,64 @@ export function distanceToSegment(
   const x = a.x + vx * t
   const y = a.y + vy * t
   return Math.hypot(point.x - x, point.y - y)
+}
+
+function getAdaptiveCurveControlPoint(
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+) {
+  const dx = to.x - from.x
+  const dy = to.y - from.y
+  const distance = Math.hypot(dx, dy)
+  const mx = (from.x + to.x) / 2
+  const my = (from.y + to.y) / 2
+  if (distance < 1) return { x: mx, y: my }
+
+  const normalX = -dy / distance
+  const normalY = dx / distance
+  const distanceCurve = clamp(distance * 0.12, 10, 68)
+  const directionCurve = Math.min(Math.abs(dx), Math.abs(dy)) * 0.08
+  const offset = Math.min(76, distanceCurve + directionCurve)
+
+  return {
+    x: mx + normalX * offset,
+    y: my + normalY * offset,
+  }
+}
+
+function quadraticPoint(
+  from: { x: number; y: number },
+  control: { x: number; y: number },
+  to: { x: number; y: number },
+  t: number,
+) {
+  const inv = 1 - t
+  return {
+    x: inv * inv * from.x + 2 * inv * t * control.x + t * t * to.x,
+    y: inv * inv * from.y + 2 * inv * t * control.y + t * t * to.y,
+  }
+}
+
+export function distanceToCurvePath(
+  point: { x: number; y: number },
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+) {
+  const distance = Math.hypot(to.x - from.x, to.y - from.y)
+  if (distance < 1) return Math.hypot(point.x - from.x, point.y - from.y)
+
+  const control = getAdaptiveCurveControlPoint(from, to)
+  const samples = Math.ceil(clamp(distance / 36, 10, 28))
+  let best = Number.POSITIVE_INFINITY
+  let previous = from
+
+  for (let i = 1; i <= samples; i += 1) {
+    const current = quadraticPoint(from, control, to, i / samples)
+    best = Math.min(best, distanceToSegment(point, previous, current))
+    previous = current
+  }
+
+  return best
 }
 
 // Push vector to separate two points so they sit at least minDistance apart.

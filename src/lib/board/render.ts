@@ -35,7 +35,7 @@ import {
 } from './constants'
 import { colorMix, getCircleColors } from './colors'
 import {
-  distanceToSegment,
+  distanceToCurvePath,
   drawCurvePath,
   ellipsize,
   getNodePath,
@@ -979,7 +979,7 @@ function findConnectionNearPoint(index: BoardIndex, point: { x: number; y: numbe
   let best: Connection | null = null
   let bestDist = tolerance
   const consider = (connection: Connection, source: { x: number; y: number }, target: { x: number; y: number }) => {
-    const dist = distanceToSegment(point, source, target)
+    const dist = distanceToCurvePath(point, source, target)
     if (dist < bestDist) {
       bestDist = dist
       best = connection

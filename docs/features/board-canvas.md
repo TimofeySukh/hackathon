@@ -31,6 +31,9 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   or jumps. This replaces the older Shift-drag-from-center shortcut.
 - **Connect**: with the "Draw Connection" center behavior, drag from a circle center to
   another node to draw a relationship link. A dashed draft edge previews the connection.
+  Links render as adaptive quadratic curves: longer and more diagonal links get a little
+  more shape, while short links stay close to direct. Hover and selection hit-testing uses
+  the same curve geometry as rendering, not the straight line between endpoints.
   In the far-zoom zones-only view, hidden centers, people, and connector handles are not
   interactive, so dragging from a hidden center cannot open the create menu.
 - **Center fan-out**: automatic circle links whose source is the central `You` circle are
