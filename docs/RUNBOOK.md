@@ -181,24 +181,23 @@ than the configured threshold.
 
 ## Auth Email E2E
 
-Local auth email testing uses Supabase custom SMTP pointed at Mailtrap Sandbox. Keep the
-private Mailtrap credentials in `.env.auth-test.local`; the file is ignored by git.
+Production auth email uses Supabase custom SMTP pointed at Resend. Keep the Resend API
+key only in the Supabase Dashboard SMTP password field; do not commit it to the repo.
 
-Expected local variables:
+Current SMTP settings:
 
-```bash
-MAILTRAP_ACCOUNT_ID=<account-id>
-MAILTRAP_INBOX_ID=<inbox-id>
-MAILTRAP_API_TOKEN=<api-token>
-MAILTRAP_SMTP_HOST=sandbox.smtp.mailtrap.io
-MAILTRAP_SMTP_PORT=2525
-MAILTRAP_SMTP_USERNAME=<smtp-username>
-MAILTRAP_SMTP_PASSWORD=<smtp-password>
+```text
+Sender email: noreply@datanode.live
+Sender name: DataNode
+Host: smtp.resend.com
+Port: 465
+Username: resend
+Password: <Resend API key>
 ```
 
 When testing reset emails, wait at least 60 seconds before requesting a second email for
-the same user. The current Supabase Auth SMTP settings enforce 30 emails per hour and a
-60-second interval between emails sent to the same recipient.
+the same user. The current Supabase Auth SMTP settings enforce a 60-second interval
+between emails sent to the same recipient.
 
 Useful UI responsiveness overrides:
 
