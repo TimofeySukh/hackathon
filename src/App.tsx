@@ -157,6 +157,7 @@ type LinkedInProfileImport = {
   slug: string
   name: string
   company: string
+  companyLogoUrl?: string
   headline: string
   description?: string
   avatarUrl?: string
@@ -391,6 +392,7 @@ async function buildLinkedInProfileImport(rawValue: string): Promise<LinkedInPro
     slug,
     name,
     company,
+    companyLogoUrl: enrichment?.companyLogoUrl,
     headline,
     description,
     avatarUrl: enrichment?.avatarUrl || metadata.avatarUrl,
@@ -4678,9 +4680,13 @@ function App() {
           onNext={onboardingNext}
           onBack={onboardingBack}
           onSkip={finishOnboarding}
-          onOpenSearch={() => {
+          onOpenSearch={(query) => {
             setShowSettings(false)
             setSearchOpen(true)
+            if (query) {
+              setSearchQuery(query)
+              setActiveSearchIndex(0)
+            }
             window.requestAnimationFrame(() => searchInputRef.current?.focus())
           }}
         />
@@ -5074,6 +5080,7 @@ function ensureLinkedInCompanyCircle(current: GraphState, profile: LinkedInProfi
       id: companyId,
       name: companyName,
       icon: makeInitials(companyName),
+      imageUrl: profile.companyLogoUrl,
       x: youX + Math.cos(angle) * placementRadius,
       y: youY + Math.sin(angle) * placementRadius,
       radius: 90,
@@ -5088,9 +5095,16 @@ function ensureLinkedInCompanyCircle(current: GraphState, profile: LinkedInProfi
       amplitude: 0,
     }
     nextCircles.push(companyCircle)
+  } else if (companyCircle && profile.companyLogoUrl && !companyCircle.imageUrl) {
+    companyCircle = {
+      ...companyCircle,
+      imageUrl: profile.companyLogoUrl,
+    }
+    const idx = nextCircles.findIndex((c) => c.id === companyCircle!.id)
+    if (idx !== -1) nextCircles[idx] = companyCircle
   }
 
-  return { nextCircles, companyCircle }
+  return { nextCircles, companyCircle: companyCircle as CircleNode }
 }
 
 function buildLinkedInProfileNotes(profile: LinkedInProfileImport, existingNotes: PersonNote[] = []) {

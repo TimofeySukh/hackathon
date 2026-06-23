@@ -15,7 +15,7 @@ type OnboardingCoachProps = {
   onNext: () => void
   onBack: () => void
   onSkip: () => void
-  onOpenSearch: () => void
+  onOpenSearch: (query?: string) => void
 }
 
 export function OnboardingCoach({ step, celebrating, onNext, onBack, onSkip, onOpenSearch }: OnboardingCoachProps) {
@@ -45,7 +45,7 @@ export function OnboardingCoach({ step, celebrating, onNext, onBack, onSkip, onO
         )
       case 'open-search':
         return (
-          <button type="button" className="onboarding-coach__primary" onClick={onOpenSearch}>
+          <button type="button" className="onboarding-coach__primary" onClick={() => onOpenSearch()}>
             Open search
           </button>
         )
@@ -61,6 +61,37 @@ export function OnboardingCoach({ step, celebrating, onNext, onBack, onSkip, onO
     }
   }
 
+  function renderBodyText(text: string) {
+    const urlPattern = /(https?:\/\/[^\s]+|www\.[^\s]+)/g
+    const parts = text.split(urlPattern)
+    return parts.map((part, index) => {
+      if (urlPattern.test(part)) {
+        const cleanUrl = part.replace(/[),.;]+$/, '')
+        return (
+          <button
+            key={index}
+            type="button"
+            className="onboarding-coach__link-btn"
+            onClick={() => onOpenSearch(cleanUrl)}
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              color: 'var(--md-primary, #6366f1)',
+              textDecoration: 'underline',
+              cursor: 'pointer',
+              font: 'inherit',
+              display: 'inline',
+            }}
+          >
+            {part}
+          </button>
+        )
+      }
+      return part
+    })
+  }
+
   return (
     <div className="onboarding-coach" role="dialog" aria-label="Getting started" aria-live="polite">
       <button
@@ -73,7 +104,7 @@ export function OnboardingCoach({ step, celebrating, onNext, onBack, onSkip, onO
       </button>
       {current.eyebrow && <span className="onboarding-coach__eyebrow">{current.eyebrow}</span>}
       <strong className="onboarding-coach__title">{current.title}</strong>
-      <p className="onboarding-coach__body">{current.body}</p>
+      <p className="onboarding-coach__body">{renderBodyText(current.body)}</p>
 
       <div className="onboarding-coach__footer">
         {showProgress ? (
