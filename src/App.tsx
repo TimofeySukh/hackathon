@@ -4653,7 +4653,7 @@ function App() {
                 )}
               </div>
             )}
-            {(emailAuthError || auth.error) && (
+            {(emailAuthError || (authDialogMode !== 'reset' ? auth.error : null)) && (
               <p className="auth-card__error" role="alert">{emailAuthError || auth.error}</p>
             )}
           </div>
