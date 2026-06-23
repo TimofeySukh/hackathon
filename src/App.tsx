@@ -673,6 +673,7 @@ function App() {
   useEffect(() => {
     if (!graphLoaded || auth.status !== 'authenticated' || !userId) return
     if (loadedGraphSourceRef.current === 'error') return
+    if (loadedGraphSourceRef.current === 'local') return
     if (loadedGraphSourceRef.current === 'empty' && loadedGraphSnapshotRef.current === JSON.stringify(graph)) {
       return
     }
@@ -3528,7 +3529,12 @@ function App() {
                   onClick={async () => {
                     // Flush the latest graph before the debounced autosave would have
                     // fired, so edits made right before logout aren't lost.
-                    if (userId) {
+                    const canSave =
+                      loadedGraphSourceRef.current !== 'error' &&
+                      loadedGraphSourceRef.current !== 'local' &&
+                      !(loadedGraphSourceRef.current === 'empty' && loadedGraphSnapshotRef.current === JSON.stringify(graph))
+
+                    if (userId && canSave) {
                       try {
                         await saveGraph(userId, graph)
                       } catch (error) {
