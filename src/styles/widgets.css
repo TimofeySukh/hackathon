@@ -133,8 +133,8 @@
    until they sign in. */
 .local-save-hint {
   position: fixed;
-  top: 16px;
-  left: 16px;
+  bottom: 24px;
+  left: 24px;
   z-index: 90;
   display: flex;
   align-items: center;
@@ -1250,9 +1250,13 @@
 }
 
 @media (max-width: 720px) {
-  .onboarding-coach {
+  .onboarding-coach.onboarding-coach--top {
     bottom: auto;
     top: 76px;
+  }
+  .onboarding-coach.onboarding-coach--bottom {
+    top: auto;
+    bottom: 16px;
   }
 }
 

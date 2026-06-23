@@ -16,15 +16,26 @@ type OnboardingCoachProps = {
   onBack: () => void
   onSkip: () => void
   onOpenSearch: (query?: string) => void
+  position?: 'top' | 'bottom'
 }
 
-export function OnboardingCoach({ step, celebrating, onNext, onBack, onSkip, onOpenSearch }: OnboardingCoachProps) {
+export function OnboardingCoach({
+  step,
+  celebrating,
+  onNext,
+  onBack,
+  onSkip,
+  onOpenSearch,
+  position = 'bottom',
+}: OnboardingCoachProps) {
   const current = ONBOARDING_STEPS[step]
   if (!current) return null
 
+  const positionClass = position === 'top' ? 'onboarding-coach--top' : 'onboarding-coach--bottom'
+
   if (celebrating) {
     return (
-      <div className="onboarding-coach onboarding-coach--cheer" role="status" aria-live="polite">
+      <div className={`onboarding-coach onboarding-coach--cheer ${positionClass}`} role="status" aria-live="polite">
         <span className="onboarding-coach__cheer-check" aria-hidden="true">✓</span>
         <strong className="onboarding-coach__cheer-text">Great!</strong>
       </div>
@@ -93,7 +104,7 @@ export function OnboardingCoach({ step, celebrating, onNext, onBack, onSkip, onO
   }
 
   return (
-    <div className="onboarding-coach" role="dialog" aria-label="Getting started" aria-live="polite">
+    <div className={`onboarding-coach ${positionClass}`} role="dialog" aria-label="Getting started" aria-live="polite">
       <button
         type="button"
         className="onboarding-coach__close"

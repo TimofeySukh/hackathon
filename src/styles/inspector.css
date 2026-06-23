@@ -345,11 +345,18 @@
      .app-shell prefix lifts specificity above the base .local-save-hint rule,
      which is declared later in the file. */
   .app-shell .local-save-hint {
-    max-width: calc(100vw - 132px);
+    position: fixed;
+    top: auto;
+    bottom: 16px;
+    left: 16px;
+    right: 16px;
+    max-width: none;
+    width: auto;
   }
 
   .app-shell.is-search-open .local-save-hint,
-  .app-shell.is-settings-open .local-save-hint {
+  .app-shell.is-settings-open .local-save-hint,
+  .app-shell.is-inspector-open .local-save-hint {
     display: none;
   }
 

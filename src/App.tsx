@@ -3301,7 +3301,7 @@ function App() {
   }
 
   return (
-    <main className={`app-shell ${demoMode ? 'is-demo-mode' : ''} ${searchOpen ? 'is-search-open' : ''} ${showSettings ? 'is-settings-open' : ''}`}>
+    <main className={`app-shell ${demoMode ? 'is-demo-mode' : ''} ${searchOpen ? 'is-search-open' : ''} ${showSettings ? 'is-settings-open' : ''} ${selectedItem ? 'is-inspector-open' : ''}`}>
       {graphLoadError && (
         <div style={{
           position: 'absolute',
@@ -4738,6 +4738,7 @@ function App() {
             }
             window.requestAnimationFrame(() => searchInputRef.current?.focus())
           }}
+          position={selectedItem ? 'top' : 'bottom'}
         />
       )}
     </main>

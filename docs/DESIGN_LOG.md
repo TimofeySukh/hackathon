@@ -660,3 +660,11 @@ rediscover, write it here.
   screen is one palette.
 - Why: visual coherence with the already-Material canvas, and a single token system new
   features can build on instead of re-deriving styles each time.
+
+### 2026-06-24 — Onboarding Step Reordering and Context-Aware Mobile Layout
+
+- Decision: Rearranged the onboarding flow step order so that adding a person/circle (`'create'`) is Step 2 (right after panned/zoomed canvas gestures in Step 1). Moving (`'move'`) and resizing (`'resize'`) steps are shifted to Steps 3 and 4, respectively.
+- Why: Users shouldn't be asked to move or resize elements before having created any. Putting the creation step first ensures they have elements on the canvas to interact with.
+- Decision: Implemented context-aware positioning for the onboarding coach card on mobile. The card dynamically floats at the top if the inspector (notes) is open (`selectedItem !== null`) to avoid overlapping notes, and at the bottom if the search panel is open (preventing overlap with search) or by default.
+- Decision: Repositioned the anonymous sign-in banner (`.local-save-hint`) from top-left to bottom-left on desktop, and bottom-stretch on mobile. It is hidden completely on mobile when search, settings, or the inspector panel are open.
+- Why: Having the banner at the top-left caused it to overlap the brand logo/settings buttons. Positioning it at the bottom keeps it clean, and hiding it when panels are open avoids any screen clutter on small devices.
