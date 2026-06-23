@@ -337,7 +337,7 @@ Required AI function secrets:
 ```bash
 supabase secrets set GEMINI_API_KEY=your-gemini-api-key
 supabase secrets set OPENROUTER_API_KEY=your-openrouter-api-key
-supabase secrets set BRIGHTDATA_API_KEY=your-bright-data-api-key
+supabase secrets set LINKEDIN_ENRICHMENT_API_KEY=your-linkedin-enrichment-provider-api-key
 ```
 
 Optional AI model overrides:
@@ -347,9 +347,9 @@ supabase secrets set GEMINI_MODEL=gemini-2.5-flash
 supabase secrets set OPENROUTER_MODEL=openrouter/free
 ```
 
-AI note sync and AI people search now run inside Supabase Edge Functions through direct provider API calls. The functions try Gemini first and fall back to OpenRouter for provider quota or availability errors. Manual one-profile LinkedIn search imports call Bright Data through `enrich-linkedin-profile`; LinkedIn ZIP import does not call Bright Data.
+AI note sync and AI people search now run inside Supabase Edge Functions through direct provider API calls. The functions try Gemini first and fall back to OpenRouter for provider quota or availability errors. Manual one-profile LinkedIn search imports call the profile enrichment Edge Function; LinkedIn ZIP import stays local to the uploaded archive.
 
-The browser never calls Gemini, OpenRouter, or Bright Data directly. It invokes Edge Functions, and those functions authenticate the user, load user-owned graph context when needed, call providers with server-side API keys, and return or persist structured output.
+The browser never calls Gemini, OpenRouter, or the LinkedIn enrichment provider directly. It invokes Edge Functions, and those functions authenticate the user, load user-owned graph context when needed, call providers with server-side API keys, and return or persist structured output.
 
 Configure Supabase Auth redirect URLs for each app URL used by the team, including:
 

@@ -191,9 +191,21 @@ function getCanvasImage(src: string): HTMLImageElement | null {
     personSpriteCache.clear()
     requestBoardRepaint?.()
   }
+  image.onerror = () => {
+    personSpriteCache.clear()
+    requestBoardRepaint?.()
+  }
   image.src = src
   imageCache.set(src, image)
   return image.complete && image.naturalWidth > 0 ? image : null
+}
+
+function drawPersonInitials(ctx: CanvasRenderingContext2D, avatar: string, size: number, scale: number) {
+  ctx.fillStyle = '#ffffff'
+  ctx.font = `500 ${(11 * scale).toFixed(1)}px Inter, system-ui, sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(avatar, size / 2, size / 2 + scale)
 }
 
 // Draw `image` filling the dest box while preserving aspect ratio (CSS object-fit:
@@ -220,7 +232,7 @@ function drawImageCover(
 function getPersonSprite(person: PersonNode, fillColor: string, size: number, stroke: string, strokeWidth: number): HTMLCanvasElement {
   // Always derive the letters from the current name so they stay in sync with any rename.
   const avatar = makeInitials(person.name)
-  const imageKey = person.imageUrl ? `img:${person.imageUrl.length}` : avatar
+  const imageKey = person.imageUrl ? `img:${person.imageUrl}` : avatar
   const key = `${fillColor}|${imageKey}|${person.shapeType ?? 'wavy'}|${person.sides ?? 8}|${person.amplitude ?? 1}|${stroke}|${strokeWidth}|${size}`
   const cached = personSpriteCache.get(key)
   if (cached) return cached
@@ -245,13 +257,11 @@ function getPersonSprite(person: PersonNode, fillColor: string, size: number, st
     if (image) {
       ctx.clip(path)
       drawImageCover(ctx, image, 0, 0, size, size)
+    } else {
+      drawPersonInitials(ctx, avatar, size, scale)
     }
   } else {
-    ctx.fillStyle = '#ffffff'
-    ctx.font = `500 ${(11 * scale).toFixed(1)}px Inter, system-ui, sans-serif`
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(avatar, size / 2, size / 2 + scale)
+    drawPersonInitials(ctx, avatar, size, scale)
   }
   ctx.restore()
 

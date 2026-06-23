@@ -29,6 +29,18 @@ rediscover, write it here.
   Empty-load states must be treated as suspicious during migrations, not as data to write
   immediately.
 
+### 2026-06-23 — LinkedIn profile enrichment stays provider-neutral in product surfaces
+
+- Decision: manual LinkedIn profile import UI, docs, and generated person notes describe
+  the flow as server-side profile enrichment without naming the underlying provider.
+- Decision: imported remote avatar URLs draw person initials while loading or after
+  image failure, then repaint to the photo if it successfully loads.
+- Data mapping: the enrichment function accepts more provider field variants for current
+  company, avatar URL, headline, and About/profile description so profile notes are
+  created when the upstream payload includes that data.
+- Why: the provider is infrastructure, while users need stable profile data and readable
+  board nodes even when a remote photo URL is blocked or expired.
+
 ### 2026-06-21 — Keep password recovery success visible
 
 - Decision: password recovery now has a final `Password updated` dialog state after
@@ -312,17 +324,18 @@ rediscover, write it here.
   badges; the package was added then removed. Also rejected hand-authoring brand paths,
   which produced thick, off-color results.
 
-### 2026-06-14 — Manual LinkedIn enrichment uses Bright Data behind Supabase
+### 2026-06-14 — Manual LinkedIn enrichment runs behind Supabase
 
 - Decision: single-profile LinkedIn imports from board search call a Supabase Edge
-  Function that validates the user's session and then calls Bright Data's LinkedIn
-  profile scraper. ZIP import remains local CSV processing and never calls Bright Data.
+  Function that validates the user's session and then calls the configured profile
+  provider. ZIP import remains local CSV processing and never uses server-side
+  profile enrichment.
 - Quota control: the frontend first checks whether the normalized LinkedIn URL already
-  exists in the graph, then checks a local 30-day per-URL enrichment cache. Bright Data is
-  only called for uncached manual one-profile imports.
-- Data mapping: Bright Data fields normalize into person name, current company circle,
+  exists in the graph, then checks a local 30-day per-URL enrichment cache. The provider
+  is only called for uncached manual one-profile imports.
+- Data mapping: provider fields normalize into person name, current company circle,
   headline/role, avatar image, and a "Profile" note containing the profile description.
-- Why: the Bright Data API key must stay server-side, and the free monthly request budget
+- Why: the provider API key must stay server-side, and the request budget
   should only be spent on explicit manual enrichments.
 
 ### 2026-06-14 — Isolated load tests for large imports

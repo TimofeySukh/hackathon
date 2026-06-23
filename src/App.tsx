@@ -135,7 +135,7 @@ type LinkedInProfileImport = {
   headline: string
   description?: string
   avatarUrl?: string
-  source: 'brightdata' | 'cache' | 'preview' | 'fallback'
+  source: 'provider' | 'cache' | 'preview' | 'fallback'
 }
 
 type LinkedInConnectionsImportResult = {
@@ -1660,7 +1660,7 @@ function App() {
       ? [{
           kind: 'linkedin-profile',
           id: linkedInUrl,
-          name: isImportingLinkedInProfile ? 'Enriching with Bright Data...' : 'Add LinkedIn profile',
+          name: isImportingLinkedInProfile ? 'Importing profile...' : 'Add LinkedIn profile',
           sub: isImportingLinkedInProfile ? linkedInUrl : linkedInUrl,
         }]
       : []
@@ -5073,13 +5073,6 @@ function buildLinkedInProfileNotes(profile: LinkedInProfileImport, existingNotes
       id: `note-profile-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
       title: 'Profile',
       body: profile.description,
-    })
-  }
-  if (profile.source === 'brightdata') {
-    notes.push({
-      id: `note-enriched-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
-      title: 'Enrichment',
-      body: 'Imported with Bright Data LinkedIn enrichment.',
     })
   }
   return notes

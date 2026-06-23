@@ -48,7 +48,7 @@ Supabase database migrations for profiles, personal boards, persisted graph data
 
 ### `supabase/functions/`
 
-Supabase Edge Functions. `sync-person-ai-note` sends person note context through the shared Gemini/OpenRouter AI provider layer and upserts `person_ai_notes`. `search-people-ai` sends graph candidates through the same provider layer and returns ranked natural-language search results. `enrich-linkedin-profile` calls Bright Data for signed-in manual one-profile LinkedIn imports.
+Supabase Edge Functions. `sync-person-ai-note` sends person note context through the shared Gemini/OpenRouter AI provider layer and upserts `person_ai_notes`. `search-people-ai` sends graph candidates through the same provider layer and returns ranked natural-language search results. `enrich-linkedin-profile` calls the configured profile provider for signed-in manual one-profile LinkedIn imports.
 
 ### `src/`
 
@@ -116,7 +116,7 @@ Shared low-level helpers and the Supabase data layer.
 - `useBoardGraph.ts` owns board graph loading, mutation state, and debounced AI note refresh scheduling per person.
 - `graphStorage.ts` owns Supabase CRUD calls for persisted graph data, `person_ai_notes`, and AI Edge Function invocation.
 - `graphPersistence.ts` owns the load/save of the whole graph blob (`loadGraph`/`saveGraph` for signed-in users, `loadLocalGraph`/`saveLocalGraph` for anonymous browser sessions).
-- `linkedinEnrichment.ts` calls the Bright Data enrichment Edge Function for single-profile LinkedIn imports.
+- `linkedinEnrichment.ts` calls the profile enrichment Edge Function for single-profile LinkedIn imports.
 - `tagPalette.ts` holds the shared tag color palette.
 - `stressTest.ts` is the dev-only performance harness that generates large synthetic graphs.
 - `graphTypes.ts` defines shared profile, board, person, note, AI note, tag, and connection interfaces, including the structured AI summary shape.

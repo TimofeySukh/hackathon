@@ -18,13 +18,13 @@ selects the node and flies the camera to it at a comfortable zoom.
 - LinkedIn profile import normalizes the URL, tries to read public Open Graph metadata
   for name, headline/company, and avatar, then falls back to the URL slug when no
   backend enrichment is available.
-- Signed-in users get a server-side Bright Data enrichment call for manual one-profile
+- Signed-in users get server-side LinkedIn profile enrichment for manual one-profile
   imports only. The result provides name, current company, headline, avatar, and profile
-  description when Bright Data returns those fields. The description is saved as a
-  regular person note titled "Profile".
+  description when those fields are available. The description is saved as a regular
+  person note titled "Profile".
 - Manual LinkedIn enrichment checks the existing graph first and then a local per-URL
-  cache before calling Bright Data, so repeated imports of the same profile avoid another
-  paid request. LinkedIn ZIP import does not call Bright Data.
+  cache before calling the server, so repeated imports of the same profile avoid another
+  provider request. LinkedIn ZIP import does not use server-side profile enrichment.
 - The result list is keyboard navigable. `ArrowDown` / `ArrowUp` move the active
   option, `Home` / `End` jump to the first or last option, and `Enter` picks the active
   option. Moving the pointer over a row also updates the active option.
@@ -63,8 +63,8 @@ Reuses the Material 3 chrome language (see [`../DESIGN_SYSTEM.md`](../DESIGN_SYS
   `driveCamera`), `handleSelectSearchResult`, `handleImportLinkedInProfileFromSearch`,
   `closeSearch`, `SearchIcon`; the `searchResults` memo builds the matches and injects
   the LinkedIn import action when the query is a profile URL.
-- Backend: `supabase/functions/enrich-linkedin-profile/index.ts` calls Bright Data's
-  LinkedIn profile scraper with the `BRIGHTDATA_API_KEY` secret after validating the
+- Backend: `supabase/functions/enrich-linkedin-profile/index.ts` calls the server-side
+  LinkedIn profile provider with `LINKEDIN_ENRICHMENT_API_KEY` after validating the
   user's Supabase session.
 - Related state / hooks: `searchOpen`, `searchQuery`, `activeSearchIndex`, `searchInputRef`,
   `searchPanelRef`, `focusAnimRef`; the shared outside-click effect handles dismissal.

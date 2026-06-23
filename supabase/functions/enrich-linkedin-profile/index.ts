@@ -17,7 +17,7 @@ type EnrichedProfile = {
   headline?: string
   description?: string
   avatarUrl?: string
-  source: 'brightdata'
+  source: 'provider'
 }
 
 function jsonResponse(body: unknown, status = 200) {
@@ -38,6 +38,10 @@ function getRequiredEnv(name: string) {
   return value
 }
 
+function getLinkedInEnrichmentApiKey() {
+  return Deno.env.get('LINKEDIN_ENRICHMENT_API_KEY') ?? getRequiredEnv('BRIGHTDATA_API_KEY')
+}
+
 function normalizeLinkedInProfileUrl(rawValue: string): string | null {
   const value = rawValue.trim()
   if (!value) return null
@@ -56,28 +60,64 @@ function normalizeLinkedInProfileUrl(rawValue: string): string | null {
 
 function pickString(...values: unknown[]) {
   for (const value of values) {
-    if (typeof value === 'string' && value.trim()) return value.trim()
+    if (typeof value === 'string' && value.trim()) return value.trim().replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ')
+    if (Array.isArray(value)) {
+      const picked = pickString(...value)
+      if (picked) return picked
+    }
   }
   return undefined
 }
 
-function pickNestedString(value: unknown, key: string) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
-  return pickString((value as Record<string, unknown>)[key])
+function pickObjectString(value: unknown, keys: string[]) {
+  if (typeof value === 'string') return pickString(value)
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const picked = pickObjectString(item, keys)
+      if (picked) return picked
+    }
+  }
+  if (!value || typeof value !== 'object') return undefined
+  const record = value as Record<string, unknown>
+  return pickString(...keys.map((key) => record[key]))
+}
+
+function pickUrl(...values: unknown[]) {
+  const value = pickString(...values)
+  if (!value) return undefined
+  return /^(https?:|data:image\/)/i.test(value) ? value : undefined
+}
+
+function pickCompanyFromExperience(value: unknown) {
+  const records = Array.isArray(value) ? value : value ? [value] : []
+  for (const item of records) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue
+    const record = item as Record<string, unknown>
+    const isCurrent = !pickString(record.end_date, record.ends_at, record.date_to, record.duration_to)
+    if (!isCurrent) continue
+    const company = pickObjectString(record.company, ['name', 'company_name']) ?? pickString(record.company_name, record.organization)
+    if (company) return company
+  }
+  return undefined
 }
 
 function pickCompanyName(record: Record<string, unknown>) {
   return pickString(
-    pickNestedString(record.current_company, 'name'),
-    pickNestedString(record.company, 'name'),
+    pickObjectString(record.current_company, ['name', 'company_name']),
+    pickObjectString(record.company, ['name', 'company_name']),
+    pickObjectString(record.current_company_info, ['name', 'company_name']),
+    pickCompanyFromExperience(record.current_positions),
+    pickCompanyFromExperience(record.experience),
+    pickCompanyFromExperience(record.experiences),
     record.current_company_name,
     record.company_name,
     record.organization,
+    record.company,
   )
 }
 
 function pickAvatarUrl(record: Record<string, unknown>) {
-  return pickString(
+  return pickUrl(
     record.avatar,
     record.avatar_url,
     record.image,
@@ -86,17 +126,28 @@ function pickAvatarUrl(record: Record<string, unknown>) {
     record.picture_url,
     record.profile_image,
     record.profile_image_url,
+    record.profile_image_url_https,
     record.profile_picture,
     record.profile_picture_url,
+    pickObjectString(record.avatar, ['url', 'src']),
+    pickObjectString(record.image, ['url', 'src']),
+    pickObjectString(record.picture, ['url', 'src']),
+    pickObjectString(record.profile_image, ['url', 'src']),
+    pickObjectString(record.profile_picture, ['url', 'src']),
   )
 }
 
 function pickDescription(record: Record<string, unknown>) {
   return pickString(
     record.about,
+    record.about_section,
+    record.about_text,
     record.description,
     record.summary,
+    record.profile_summary,
     record.bio,
+    pickObjectString(record.about, ['text', 'value', 'description']),
+    pickObjectString(record.summary, ['text', 'value', 'description']),
   )
 }
 
@@ -112,13 +163,13 @@ function buildProfileDetails(record: Record<string, unknown>, company: string | 
   return lines.length ? lines.join('\n') : undefined
 }
 
-function normalizeBrightDataProfile(payload: unknown, url: string): EnrichedProfile | null {
+function normalizeProviderProfile(payload: unknown, url: string): EnrichedProfile | null {
   const record = Array.isArray(payload) ? payload[0] : payload
   if (!record || typeof record !== 'object' || Array.isArray(record)) return null
   const candidate = record as Record<string, unknown>
-  const name = pickString(candidate.name, candidate.full_name)
+  const name = pickString(candidate.name, candidate.full_name, candidate.fullName)
   const company = pickCompanyName(candidate)
-  const headline = pickString(candidate.position, candidate.headline, candidate.title)
+  const headline = pickString(candidate.position, candidate.headline, candidate.title, candidate.job_title, candidate.current_title)
   const description = pickDescription(candidate) ?? buildProfileDetails(candidate, company)
   const avatarUrl = pickAvatarUrl(candidate)
 
@@ -131,7 +182,7 @@ function normalizeBrightDataProfile(payload: unknown, url: string): EnrichedProf
     headline,
     description,
     avatarUrl,
-    source: 'brightdata',
+    source: 'provider',
   }
 }
 
@@ -162,13 +213,13 @@ async function downloadSnapshot(apiKey: string, snapshotId: string) {
 
     if (!response.ok) {
       const message = await response.text()
-      throw new Error(message || `Bright Data snapshot returned ${response.status}.`)
+      throw new Error(message || `LinkedIn profile snapshot returned ${response.status}.`)
     }
 
     return await response.json()
   }
 
-  throw new Error('Bright Data profile scrape is still running. Try again in a few seconds.')
+  throw new Error('LinkedIn profile import is still running. Try again in a few seconds.')
 }
 
 async function requireUser(authHeader: string) {
@@ -220,7 +271,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'A valid LinkedIn profile URL is required.' }, 400)
     }
 
-    const apiKey = getRequiredEnv('BRIGHTDATA_API_KEY')
+    const apiKey = getLinkedInEnrichmentApiKey()
     const endpoint = new URL('https://api.brightdata.com/datasets/v3/scrape')
     endpoint.searchParams.set('dataset_id', LINKEDIN_PROFILE_DATASET_ID)
     endpoint.searchParams.set('format', 'json')
@@ -236,7 +287,7 @@ Deno.serve(async (req) => {
 
     if (!response.ok && response.status !== 202) {
       const message = await response.text()
-      return jsonResponse({ error: message || `Bright Data returned ${response.status}.` }, 502)
+      return jsonResponse({ error: message || `LinkedIn profile provider returned ${response.status}.` }, 502)
     }
 
     let payload = await response.json()
@@ -245,9 +296,9 @@ Deno.serve(async (req) => {
       payload = await downloadSnapshot(apiKey, snapshotId)
     }
 
-    const profile = normalizeBrightDataProfile(payload, url)
+    const profile = normalizeProviderProfile(payload, url)
     if (!profile) {
-      return jsonResponse({ error: 'Bright Data did not return profile data.' }, 502)
+      return jsonResponse({ error: 'LinkedIn profile provider did not return profile data.' }, 502)
     }
 
     return jsonResponse(profile)

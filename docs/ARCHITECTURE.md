@@ -13,7 +13,7 @@ Runtime boundaries:
 - Supabase owns Google authentication, email/password authentication, password recovery,
   and user-owned graph records.
 - Supabase Edge Functions own server-side AI provider calls for AI note enrichment and people search.
-- Supabase Edge Functions own server-side Bright Data calls for manual LinkedIn profile enrichment.
+- Supabase Edge Functions own server-side LinkedIn profile enrichment calls.
 - Gemini owns the primary LLM execution path for structured summary generation and natural-language people search ranking.
 - OpenRouter owns the fallback LLM execution path when Gemini quota or availability errors occur.
 - The local MCP server owns agent-facing project documentation resources plus service-role scoped board graph tooling.
@@ -49,7 +49,7 @@ circle) — there is no demo seed.
 - `supabase/functions/_shared/ai.ts` calls Gemini first and falls back to OpenRouter for structured AI responses.
 - `supabase/functions/sync-person-ai-note/index.ts` authenticates the caller, loads person context, calls the shared AI provider layer, and upserts `person_ai_notes`.
 - `supabase/functions/search-people-ai/index.ts` authenticates the caller, builds candidate context, calls the shared AI provider layer, and returns ranked people.
-- `supabase/functions/enrich-linkedin-profile/index.ts` authenticates the caller, calls Bright Data for one manually pasted LinkedIn profile URL, and returns normalized profile fields.
+- `supabase/functions/enrich-linkedin-profile/index.ts` authenticates the caller, calls the configured profile provider for one manually pasted LinkedIn profile URL, and returns normalized profile fields.
 - `src/index.css` contains the visible circle graph prototype styling, including the grid board, creation menu, toolbar, and inspector.
 
 The board's hot visual path is rendered on a single Canvas 2D layer: circle fills and labels, center controls, people avatars and labels, curved links, selected handles, hover states, and the draft connector. React still owns the surrounding chrome, menus, inspector, and persisted graph state. Pointer events land on the board surface and use canvas hit testing against a lightweight spatial grid instead of DOM/SVG nodes.
@@ -69,7 +69,7 @@ Current scope:
 - Google and email/password sign-in; per-user graph persistence in Supabase with
   debounced autosave
 - anonymous editing persisted to `localStorage`
-- LinkedIn import (Connections.csv ZIP + single-profile Bright Data enrichment)
+- LinkedIn import (Connections.csv ZIP + single-profile enrichment)
 - per-person notes, tags, and connections; debounced AI note generation
 - local + AI-ranked board search
 
@@ -90,7 +90,7 @@ Out of scope (still not built):
 - Never let a missing graph row silently overwrite a user's server data with a blank
   fresh graph; fallback or fail visibly before autosave.
 - Keep unsigned local graph data out of Supabase until the user signs in and an explicit migration path exists.
-- Keep Gemini, OpenRouter, and Bright Data API keys out of the browser and only inside Supabase Edge Function secrets.
+- Keep Gemini, OpenRouter, and LinkedIn enrichment provider API keys out of the browser and only inside Supabase Edge Function secrets.
 - Keep `SUPABASE_SERVICE_ROLE_KEY` out of browser-exposed `VITE_` variables and only in local MCP env files or shell env.
 - Keep the root person immutable in position and deletion semantics.
 - Keep Google OAuth and Supabase email redirect/origin configuration aligned with the real deployed frontend origins.

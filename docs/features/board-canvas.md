@@ -85,6 +85,8 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   the selected circle; new circles keep the clean transparent default.
 - **Favorite**: a person can be starred; favorited people get a thicker neon-yellow
   outline on the canvas.
+- **Avatar fallback**: remote person avatar URLs render initials until the image loads,
+  and keep initials if the image fails, so imported profiles never draw as empty chips.
 - **Collision rules**: people repel other people in their owning circle and the center
   handle of that circle. Nested subset circles repel people that belong directly to the
   parent circle, so a parent-level person cannot visually sit inside a subset they do not

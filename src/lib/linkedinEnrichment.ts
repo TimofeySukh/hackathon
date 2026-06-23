@@ -7,7 +7,7 @@ export type LinkedInProfileEnrichment = {
   headline?: string
   description?: string
   avatarUrl?: string
-  source: 'brightdata' | 'cache'
+  source: 'provider' | 'cache'
 }
 
 const CACHE_KEY = 'hackathon-board:linkedin-profile-enrichment-cache:v1'
@@ -75,7 +75,7 @@ function pickString(value: unknown) {
 function normalizeEnrichment(value: unknown, fallbackUrl: string): LinkedInProfileEnrichment | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const candidate = value as Record<string, unknown>
-  const source: LinkedInProfileEnrichment['source'] = candidate.source === 'cache' ? 'cache' : 'brightdata'
+  const source: LinkedInProfileEnrichment['source'] = candidate.source === 'cache' ? 'cache' : 'provider'
   const profile: LinkedInProfileEnrichment = {
     url: pickString(candidate.url) ?? fallbackUrl,
     name: pickString(candidate.name),

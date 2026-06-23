@@ -20,7 +20,7 @@ It is a live product, not a local-only prototype:
   (debounced autosave); anonymous editing persisted to `localStorage`. Email registration
   requires only email and password, supports confirmation resend and password reset, and a
   new board starts blank (no demo seed)
-- LinkedIn import (Connections.csv ZIP + single-profile Bright Data enrichment),
+- LinkedIn import (Connections.csv ZIP + single-profile enrichment),
   per-person notes/tags/connections, debounced AI note generation, and
   local + AI-ranked board search
 - settings controls for demo mode, labels, global circle shape, and fill style
