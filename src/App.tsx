@@ -497,7 +497,7 @@ function App() {
   // pan/zoom gesture) so a move event flood doesn't trigger a re-render storm.
   const dragRafRef = useRef<number | null>(null)
   const pendingGraphRef = useRef<((current: GraphState) => GraphState) | null>(null)
-  const loadedGraphSourceRef = useRef<'saved' | 'legacy' | 'empty' | 'local'>('empty')
+  const loadedGraphSourceRef = useRef<'saved' | 'legacy' | 'empty' | 'local' | 'error'>('empty')
   const loadedGraphSnapshotRef = useRef<string | null>(null)
   const pendingConnectorRef = useRef<DragConnector | null>(null)
   // Start from a blank board (just the "you" circle), never the old demo seed.
@@ -623,6 +623,7 @@ function App() {
   // True once we've pulled this user's saved graph (or confirmed they have none).
   // The board stays hidden until then so the demo seed never flashes or gets saved.
   const [graphLoaded, setGraphLoaded] = useState(false)
+  const [graphLoadError, setGraphLoadError] = useState<string | null>(null)
   // Bumped when an avatar image finishes decoding, to force a board repaint.
   const [imageEpoch, setImageEpoch] = useState(0)
 
@@ -640,6 +641,7 @@ function App() {
     let cancelled = false
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setGraphLoaded(false)
+    setGraphLoadError(null)
     loadGraphRecord(userId)
       .then((loaded) => {
         if (cancelled) return
@@ -654,8 +656,9 @@ function App() {
         console.error('Failed to load graph', error)
         if (!cancelled) {
           const stamped = stampYouIdentity(createFreshGraph(), auth.session!.user)
-          loadedGraphSourceRef.current = 'empty'
+          loadedGraphSourceRef.current = 'error'
           loadedGraphSnapshotRef.current = JSON.stringify(stamped)
+          setGraphLoadError('Failed to load your board from the database. To protect your data, changes will not be saved. Please reload the page.')
           setGraph(stamped)
           setGraphLoaded(true)
         }
@@ -669,6 +672,7 @@ function App() {
   // Debounced autosave: a flood of drags or a bulk import collapses into one write.
   useEffect(() => {
     if (!graphLoaded || auth.status !== 'authenticated' || !userId) return
+    if (loadedGraphSourceRef.current === 'error') return
     if (loadedGraphSourceRef.current === 'empty' && loadedGraphSnapshotRef.current === JSON.stringify(graph)) {
       return
     }
@@ -687,6 +691,7 @@ function App() {
     if (!isLocalMode) return
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setGraphLoaded(false)
+    setGraphLoadError(null)
     const saved = loadLocalGraph()
     if (saved) {
       const sanitized = sanitizeDefaultCircleStyles(saved)
@@ -698,6 +703,7 @@ function App() {
       loadedGraphSnapshotRef.current = JSON.stringify(graph)
     }
     setGraphLoaded(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLocalMode])
 
   // Debounced local autosave for signed-out visitors.
@@ -3294,6 +3300,42 @@ function App() {
 
   return (
     <main className={`app-shell ${demoMode ? 'is-demo-mode' : ''} ${searchOpen ? 'is-search-open' : ''} ${showSettings ? 'is-settings-open' : ''}`}>
+      {graphLoadError && (
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 1000,
+          background: 'var(--md-error-container, #f9dedc)',
+          color: 'var(--md-on-error-container, #410e0b)',
+          padding: '12px 24px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          borderBottom: '1px solid var(--md-error, #b3261e)',
+          fontSize: '14px',
+          fontWeight: 500,
+        }}>
+          <span>{graphLoadError}</span>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            style={{
+              background: 'var(--md-error, #b3261e)',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '100px',
+              padding: '6px 16px',
+              cursor: 'pointer',
+              fontWeight: 500,
+              fontSize: '14px',
+            }}
+          >
+            Reload Page
+          </button>
+        </div>
+      )}
       <div className="toolbar" aria-label="Graph controls" style={{ justifyContent: 'flex-end' }}>
         <div
           ref={searchPanelRef}

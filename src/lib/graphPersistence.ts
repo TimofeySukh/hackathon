@@ -5,7 +5,7 @@ import { ensureContainment, makeCircle, packedCircleRadius, personPackOffset } f
 // The whole canvas graph lives in a single jsonb column keyed by user id.
 // Reads and writes are one round-trip each — no per-node N+1, no rate-limiting.
 
-export type LoadedGraphSource = 'saved' | 'legacy' | 'empty'
+export type LoadedGraphSource = 'saved' | 'legacy' | 'empty' | 'error'
 
 export type LoadedGraphRecord = {
   graph: GraphState | null
