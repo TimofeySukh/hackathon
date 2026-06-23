@@ -16,8 +16,8 @@ selects the node and flies the camera to it at a comfortable zoom.
   shows an "Add LinkedIn profile" action at the top of results. Clicking it, or
   pressing Enter while it is first, imports the profile into the board.
 - LinkedIn profile import normalizes the URL, tries to read public Open Graph metadata
-  for name, headline/company, and avatar, then falls back to the URL slug when no
-  backend enrichment is available.
+  for name, headline/company, and avatar only when server-side enrichment misses core
+  fields, then falls back to the URL slug when no backend enrichment is available.
 - Signed-in users get server-side LinkedIn profile enrichment for manual one-profile
   imports only. The result provides name, current company, headline, avatar, and profile
   description when those fields are available. The description is saved as a regular

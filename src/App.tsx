@@ -376,7 +376,7 @@ async function buildLinkedInProfileImport(rawValue: string): Promise<LinkedInPro
   if (!url) return null
   const slug = getLinkedInSlug(url)
   const enrichment = await enrichLinkedInProfile(url)
-  const needsPreviewFallback = !enrichment?.name || !enrichment?.company || !enrichment?.headline || !enrichment?.avatarUrl
+  const needsPreviewFallback = !enrichment || !enrichment.name || (!enrichment.company && !enrichment.headline) || !enrichment.avatarUrl
   const metadata = needsPreviewFallback ? await fetchLinkedInProfileMetadata(url) : {}
   const fallbackName = titleCaseSlug(slug)
   const name = (enrichment?.name || metadata.name || fallbackName || 'LinkedIn Connection').trim()
