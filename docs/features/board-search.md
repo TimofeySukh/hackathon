@@ -27,6 +27,8 @@ selects the node and flies the camera to it at a comfortable zoom.
   provider request. LinkedIn ZIP import does not use server-side profile enrichment.
 - Local development can opt into an unauthenticated enrichment test path with a matching
   local Vite secret and Edge Function test secret. Production must not set that test flag.
+- If server-side enrichment explicitly fails, the import shows an error and does not
+  create a fallback person with `Unknown Company`.
 - The result list is keyboard navigable. `ArrowDown` / `ArrowUp` move the active
   option, `Home` / `End` jump to the first or last option, and `Enter` picks the active
   option. Moving the pointer over a row also updates the active option.

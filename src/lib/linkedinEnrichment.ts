@@ -98,6 +98,33 @@ function getLocalTestHeaders() {
     : undefined
 }
 
+async function getFunctionErrorMessage(error: unknown) {
+  const context = error && typeof error === 'object' && 'context' in error
+    ? (error as { context?: unknown }).context
+    : null
+
+  if (context instanceof Response) {
+    try {
+      const body = await context.clone().json() as unknown
+      if (body && typeof body === 'object' && !Array.isArray(body)) {
+        const message = pickString((body as Record<string, unknown>).error)
+        if (message) return message
+      }
+    } catch {
+      try {
+        const text = await context.clone().text()
+        if (text.trim()) return text.trim()
+      } catch {
+        // Fall back to the generic Error message below.
+      }
+    }
+  }
+
+  return error instanceof Error && error.message
+    ? error.message
+    : 'LinkedIn profile enrichment failed.'
+}
+
 export async function enrichLinkedInProfile(url: string): Promise<LinkedInProfileEnrichment | null> {
   const cached = getCachedLinkedInProfile(url)
   if (cached) return cached
@@ -109,11 +136,13 @@ export async function enrichLinkedInProfile(url: string): Promise<LinkedInProfil
   })
 
   if (error) {
-    return null
+    throw new Error(await getFunctionErrorMessage(error))
   }
 
   const profile = normalizeEnrichment(data, url)
-  if (!profile) return null
+  if (!profile) {
+    throw new Error('LinkedIn profile provider did not return profile data.')
+  }
   setCachedLinkedInProfile(profile)
   return profile
 }
