@@ -2891,6 +2891,7 @@ function App() {
   function handleSurfaceDoubleClick(event: React.MouseEvent<HTMLDivElement>) {
     if (event.button !== 0) return
     if (demoMode) return
+    if (cameraRef.current.scale < ZONE_ONLY_SCALE) return
     const hit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
       x: event.clientX,
       y: event.clientY,
