@@ -568,6 +568,14 @@ rediscover, write it here.
   few and cheap): circle culling made circles pop in late during a long pan because the DOM
   layer only re-culls on settle while the people canvas repaints live every frame.
 
+### 2026-06-23 — Reset Inspector Drafts on Selection Change
+
+- Decision: transient inspector state is scoped to the current selection key and resets
+  whenever the user selects a different person, circle, connection, or empty canvas.
+- Why: note composers, inline note editors, connection input, and service pickers are
+  drafts for the visible inspector only. Keeping them globally caused unsaved note/link
+  state to appear on another person after closing the menu or selecting a different node.
+
 ### 2026-06-21 — Render Dense Clean Circles with Native Canvas Arcs
 
 - Decision: clean board circles use a native Canvas `Path2D.arc` fast path, while wavy,

@@ -479,15 +479,16 @@ Manual verification:
 23. Open the top-bar tag menu, toggle a tag color palette from its swatch, change the color, and confirm the selected person inspector still shows the chosen tag with a visible color accent after the picker closes.
 24. Create a new person, confirm the inspector opens automatically, confirm an empty person focuses the name field, then fill the note capture textarea and save a new note both with `Cmd/Ctrl + Enter` and by blurring the textarea.
 25. Create a note by typing into the `Create new note` field, confirm saved notes start collapsed by default, expand one with the chevron, press Enter in the title to open the body, delete a note from the icon button, reload, and confirm note changes persist.
-26. Create a connection between two existing people, confirm reload preserves it, then click the widened line target and confirm `Delete connection` or Backspace removes it.
-27. Open the top-left Tags menu, create enough tags to overflow the panel, scroll to the lower tags, adjust a lower tag color, and confirm the palette remains reachable.
-28. Open the top-left Tags menu, create a tag, adjust its color, toggle one tag off with the visibility checkbox, and confirm both tagged nodes and their connections disappear. Use `Select all` and `Clear all` to confirm bulk visibility controls work.
-29. Open the search layer and verify that typing a person name, tag, or note text returns local matching people.
-30. Press Enter with a natural-language query and verify AI search returns ranked people with reasons.
-31. Click a search result and verify the board recenters on that person and opens the inspector.
-32. After creating a note, wait at least 3 seconds and confirm a `person_ai_notes` row for that person reaches `status = 'created'`.
-33. Edit an existing note, blur the input, wait at least 3 seconds, and confirm the same `person_ai_notes` row updates its `updated_at`, `summary`, and `structured_summary`.
-34. Sign out and confirm the anonymous board state returns.
+26. Start a new unsaved note and a new unsaved connection on one person, click empty canvas, then open another person and confirm the note composer, note editor, connection input, and service picker all start clean.
+27. Create a connection between two existing people, confirm reload preserves it, then click the widened line target and confirm `Delete connection` or Backspace removes it.
+28. Open the top-left Tags menu, create enough tags to overflow the panel, scroll to the lower tags, adjust a lower tag color, and confirm the palette remains reachable.
+29. Open the top-left Tags menu, create a tag, adjust its color, toggle one tag off with the visibility checkbox, and confirm both tagged nodes and their connections disappear. Use `Select all` and `Clear all` to confirm bulk visibility controls work.
+30. Open the search layer and verify that typing a person name, tag, or note text returns local matching people.
+31. Press Enter with a natural-language query and verify AI search returns ranked people with reasons.
+32. Click a search result and verify the board recenters on that person and opens the inspector.
+33. After creating a note, wait at least 3 seconds and confirm a `person_ai_notes` row for that person reaches `status = 'created'`.
+34. Edit an existing note, blur the input, wait at least 3 seconds, and confirm the same `person_ai_notes` row updates its `updated_at`, `summary`, and `structured_summary`.
+35. Sign out and confirm the anonymous board state returns.
 
 Supabase verification:
 

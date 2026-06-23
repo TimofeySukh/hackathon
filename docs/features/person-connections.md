@@ -17,6 +17,7 @@ Provides a compact links menu for person nodes inside the inspector. Connections
 - URL-like input is normalized into an openable `https://` link when needed.
 - `@handle` input opens a quick service picker for Telegram, Instagram, or X before saving.
 - Phone-like input opens a quick service picker for WhatsApp, Telegram, or a custom website before saving.
+- Unsaved connection input and the service picker are discarded whenever the inspector selection changes or closes, so draft link state never carries from one person to another.
 - Existing connections render with a service icon, label, external-open action, and delete control.
 
 ## Design

@@ -856,7 +856,24 @@ function App() {
   const searchPanelRef = useRef<HTMLDivElement>(null)
   const focusAnimRef = useRef<number | null>(null)
 
+  function resetInspectorDraftState() {
+    setOpenNotesPersonId(null)
+    setNewNoteBody('')
+    setIsAddingNote(false)
+    setEditingNoteId(null)
+    setNewLinkValue('')
+    setNewLinkService('website')
+    setShowLinkServicePicker(false)
+    if (noteInputRef.current) {
+      noteInputRef.current.style.height = 'auto'
+    }
+  }
+
   function selectItem(item: SelectedItem) {
+    const isSameSelection = selectedItem?.type === item?.type && selectedItem?.id === item?.id
+    if (!isSameSelection) {
+      resetInspectorDraftState()
+    }
     setShowCircleStylePanel(false)
     setSelectedItem(item)
   }
@@ -977,10 +994,15 @@ function App() {
     }
     pendingGraphRef.current = null
     setGraph(previous)
-    setSelectedItem(null)
+    selectItem(null)
     setSelectedPeopleIds([])
     setCreateMenu(null)
   }
+
+  const undoRef = useRef<() => void>(() => {})
+  useEffect(() => {
+    undoRef.current = undo
+  })
 
   // Global Ctrl/Cmd+Z, so undo works regardless of board focus. Ignored while
   // typing in a field so it doesn't fight the input's own native undo.
@@ -992,7 +1014,7 @@ function App() {
       const tag = target?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return
       event.preventDefault()
-      undo()
+      undoRef.current()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -1055,7 +1077,7 @@ function App() {
       setGraph(auth.status === 'authenticated' && auth.session
         ? stampYouIdentity(importedGraph, auth.session.user)
         : importedGraph)
-      setSelectedItem(null)
+      selectItem(null)
       setSelectedPeopleIds([])
       setCreateMenu(null)
       alert('Graph imported successfully.')
@@ -1089,7 +1111,7 @@ function App() {
       : createFreshGraph()
     pushHistory()
     setGraph(nextGraph)
-    setSelectedItem(null)
+    selectItem(null)
     setSelectedPeopleIds([])
     setCreateMenu(null)
   }
@@ -2874,7 +2896,7 @@ function App() {
       ],
     }))
     setSelectedPeopleIds([])
-    setSelectedItem({ type: 'person', id })
+    selectItem({ type: 'person', id })
     // Grow the new person in so it feels placed, not blinked into existence.
     startBoardAnim('pop:' + id, 360)
     notifyOnboarding('create')

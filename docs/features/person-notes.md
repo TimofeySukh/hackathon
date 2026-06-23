@@ -17,6 +17,7 @@ Connections feature, not in notes.
   - Toggled by clicking `+ Add note` at the bottom of the list.
   - Contains a borderless textarea in the same filled-card footprint.
   - Controls row at the bottom with a blue `Save note` button and a discard `✕` button (cancellation cross icon).
+  - Unsaved composer text and the open composer are discarded whenever the inspector selection changes or closes, so draft note state never carries from one person to another.
 - **Keyboard Shortcuts**:
   - `Enter` (without Shift) in the composer: immediately saves the note, clears the text, and maintains input focus so the user can quickly type multiple notes in a row.
   - `Escape` in the composer: cancels card creation and closes the composer.
@@ -47,6 +48,7 @@ Connections feature, not in notes.
   - `newNoteBody` (current input content)
   - `isAddingNote` (composer toggle)
   - `editingNoteId` (active inline editor tracking)
+  - The inspector selection key resets transient note state on person/circle/connection changes.
 
 ## Open questions / TODO
 
