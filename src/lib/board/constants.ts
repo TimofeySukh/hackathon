@@ -15,6 +15,8 @@ export const EDGE_RESIZE_HIT_SIZE = 18
 export const PERSON_VISUAL_RADIUS = 20
 export const CIRCLE_CENTER_RADIUS = 20
 export const HANDLE_HIT_RADIUS = 16
+export const CIRCLE_LINK_CONNECTION_PREFIX = 'circle-link:'
+export const MEMBERSHIP_CONNECTION_PREFIX = 'membership:'
 export const PERSON_CONTAINMENT_RADIUS = 28
 export const CIRCLE_CONTAINMENT_PADDING = 28
 // Above this many merged items, skip the O(n^2) containment relax so a huge merge

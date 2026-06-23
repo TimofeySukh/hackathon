@@ -31,12 +31,19 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   or jumps. This replaces the older Shift-drag-from-center shortcut.
 - **Connect**: with the "Draw Connection" center behavior, drag from a circle center to
   another node to draw a relationship link. A dashed draft edge previews the connection.
+  In the far-zoom zones-only view, hidden centers, people, and connector handles are not
+  interactive, so dragging from a hidden center cannot open the create menu.
 - **Center fan-out**: automatic circle links whose source is the central `You` circle are
   not rendered. Dense imports otherwise create a starburst of non-authored lines from the
   center to every company circle. Explicit user-created connections still render.
 - **Membership edges**: person-to-circle membership lines render only for people in the
   current viewport, so a visible imported company circle does not draw thousands of
-  offscreen contact lines during unrelated repaints.
+  offscreen contact lines during unrelated repaints. Membership lines are selectable like
+  authored connections; deleting one detaches the person from the circle without deleting
+  either node.
+- **Connected-circle edges**: circle-to-circle edges created through `connectedTo` share
+  the same hover, selection, and delete behavior as custom connections. Deleting one clears
+  that circle's connected parent without deleting the circle.
 - **Circle rendering performance**: clean circles render with the native Canvas `arc`
   path instead of a sampled polyline. Wavy and polygon circles still use sampled paths,
   and circle paths are cached at a large-board-friendly size so dense imports do not

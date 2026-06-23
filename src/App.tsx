@@ -42,10 +42,12 @@ import type {
   SelectedItem,
   HsvColor,
   BoardAnim,
+  Connection,
 } from './lib/board/types'
 import {
   MIN_SCALE,
   MAX_SCALE,
+  ZONE_ONLY_SCALE,
   CONNECT_THRESHOLD,
   PERSON_CONTAINMENT_RADIUS,
   CIRCLE_CONTAINMENT_PADDING,
@@ -53,6 +55,8 @@ import {
   MERGE_LAYOUT_LIMIT,
   IMPORT_LAYOUT_LIMIT,
   BOARD_INTERACTION_LAYOUT_LIMIT,
+  CIRCLE_LINK_CONNECTION_PREFIX,
+  MEMBERSHIP_CONNECTION_PREFIX,
   MATERIAL_TONES,
   CIRCLE_COLOR_PRESETS,
   LINK_SERVICE_OPTIONS,
@@ -1444,10 +1448,28 @@ function App() {
 
   function deleteConnection(connId: string) {
     pushHistory()
-    setGraph((current) => ({
-      ...current,
-      connections: (current.connections || []).filter((conn) => conn.id !== connId),
-    }))
+    setGraph((current) => {
+      if (connId.startsWith(MEMBERSHIP_CONNECTION_PREFIX)) {
+        const personId = connId.slice(MEMBERSHIP_CONNECTION_PREFIX.length)
+        return {
+          ...current,
+          people: current.people.map((person) => person.id === personId ? { ...person, circleId: '' } : person),
+        }
+      }
+
+      if (connId.startsWith(CIRCLE_LINK_CONNECTION_PREFIX)) {
+        const circleId = connId.slice(CIRCLE_LINK_CONNECTION_PREFIX.length)
+        return {
+          ...current,
+          circles: current.circles.map((circle) => circle.id === circleId ? { ...circle, connectedTo: null } : circle),
+        }
+      }
+
+      return {
+        ...current,
+        connections: (current.connections || []).filter((conn) => conn.id !== connId),
+      }
+    })
     selectItem(null)
   }
 
@@ -1692,7 +1714,30 @@ function App() {
 
   const selectedCircle = selectedItem?.type === 'circle' ? circlesById.get(selectedItem.id) ?? null : null
   const selectedPerson = selectedItem?.type === 'person' ? graph.people.find((person) => person.id === selectedItem.id) ?? null : null
-  const selectedConnection = selectedItem?.type === 'connection' ? (graph.connections || []).find((conn) => conn.id === selectedItem.id) ?? null : null
+  const selectedConnection = useMemo<Connection | null>(() => {
+    if (selectedItem?.type !== 'connection') return null
+
+    const stored = (graph.connections || []).find((conn) => conn.id === selectedItem.id)
+    if (stored) return stored
+
+    if (selectedItem.id.startsWith(MEMBERSHIP_CONNECTION_PREFIX)) {
+      const personId = selectedItem.id.slice(MEMBERSHIP_CONNECTION_PREFIX.length)
+      const person = peopleById.get(personId)
+      if (person?.circleId && circlesById.has(person.circleId)) {
+        return { id: selectedItem.id, fromId: person.circleId, toId: person.id }
+      }
+    }
+
+    if (selectedItem.id.startsWith(CIRCLE_LINK_CONNECTION_PREFIX)) {
+      const circleId = selectedItem.id.slice(CIRCLE_LINK_CONNECTION_PREFIX.length)
+      const circle = circlesById.get(circleId)
+      if (circle?.connectedTo && circlesById.has(circle.connectedTo)) {
+        return { id: selectedItem.id, fromId: circle.connectedTo, toId: circle.id }
+      }
+    }
+
+    return null
+  }, [circlesById, graph.connections, peopleById, selectedItem])
 
 
 
@@ -2531,6 +2576,11 @@ function App() {
       dragRafRef.current = null
     }
     if (!conn) return
+
+    if (cameraRef.current.scale < ZONE_ONLY_SCALE) {
+      setConnector(null)
+      return
+    }
 
     const distance = Math.hypot(conn.endX - conn.startX, conn.endY - conn.startY)
     if (distance > CONNECT_THRESHOLD) {

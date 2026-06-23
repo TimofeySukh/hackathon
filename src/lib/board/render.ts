@@ -23,10 +23,12 @@ import type {
 } from './types'
 import {
   BOARD_GRID_SIZE,
+  CIRCLE_LINK_CONNECTION_PREFIX,
   CIRCLE_CENTER_RADIUS,
   EDGE_RESIZE_HIT_SIZE,
   EMPTY_ANIM_FRAME,
   HANDLE_HIT_RADIUS,
+  MEMBERSHIP_CONNECTION_PREFIX,
   MATERIAL_TONES,
   PERSON_VISUAL_RADIUS,
   ZONE_ONLY_SCALE,
@@ -372,8 +374,8 @@ export function drawBoardLayer(
       }
     }
   } else {
-    drawCircleEdges(ctx, visibleCircles, index, camera.scale)
-    drawPersonEdges(ctx, visiblePeople, index, camera.scale)
+    drawCircleEdges(ctx, visibleCircles, index, camera.scale, selectedItem, hoveredConnId)
+    drawPersonEdges(ctx, visiblePeople, index, camera.scale, selectedItem, hoveredConnId)
     drawCustomConnections(ctx, visiblePeopleIds, visibleCircleIds, index, selectedItem, hoveredConnId, camera.scale)
     drawCircleDetails(ctx, visibleCircles, camera.scale, circleFillMode, showCircleLabels, anim.scales)
     drawPeople(ctx, visiblePeople, index, selectedItem, hoveredPersonId, camera.scale, dpr, showPersonLabels, selectedPeopleIds, anim.scales)
@@ -399,7 +401,14 @@ export function drawBoardLayer(
   }
 }
 
-function drawCircleEdges(ctx: CanvasRenderingContext2D, circles: CircleNode[], index: BoardIndex, scale: number) {
+function drawCircleEdges(
+  ctx: CanvasRenderingContext2D,
+  circles: CircleNode[],
+  index: BoardIndex,
+  scale: number,
+  selectedItem: SelectedItem,
+  hoveredConnId: string | null,
+) {
   ctx.beginPath()
   ctx.strokeStyle = 'rgba(71, 85, 105, 0.24)'
   ctx.lineWidth = Math.max(1.6 / scale, 0.8)
@@ -415,6 +424,9 @@ function drawCircleEdges(ctx: CanvasRenderingContext2D, circles: CircleNode[], i
     if (!source) return
     if (source.id === 'you') return
     drawn.add(child.id)
+    const virtualId = `${CIRCLE_LINK_CONNECTION_PREFIX}${child.id}`
+    if (selectedItem?.type === 'connection' && selectedItem.id === virtualId) return
+    if (hoveredConnId === virtualId) return
     drawCurvePath(ctx, source, child)
   }
   for (const circle of circles) {
@@ -423,9 +435,45 @@ function drawCircleEdges(ctx: CanvasRenderingContext2D, circles: CircleNode[], i
     if (children) for (const child of children) addEdge(child)
   }
   ctx.stroke()
+
+  for (const circle of circles) {
+    drawHighlightedCircleLink(ctx, circle, index, scale, selectedItem, hoveredConnId)
+    const children = index.circleChildren.get(circle.id)
+    if (children) for (const child of children) drawHighlightedCircleLink(ctx, child, index, scale, selectedItem, hoveredConnId)
+  }
 }
 
-function drawPersonEdges(ctx: CanvasRenderingContext2D, people: PersonNode[], index: BoardIndex, scale: number) {
+function drawHighlightedCircleLink(
+  ctx: CanvasRenderingContext2D,
+  child: CircleNode,
+  index: BoardIndex,
+  scale: number,
+  selectedItem: SelectedItem,
+  hoveredConnId: string | null,
+) {
+  const virtualId = `${CIRCLE_LINK_CONNECTION_PREFIX}${child.id}`
+  const isSelected = selectedItem?.type === 'connection' && selectedItem.id === virtualId
+  const isHovered = hoveredConnId === virtualId
+  if (!isSelected && !isHovered) return
+  const source = child.connectedTo ? index.circlesById.get(child.connectedTo) : null
+  if (!source || source.id === 'you') return
+  ctx.save()
+  ctx.beginPath()
+  ctx.strokeStyle = isSelected ? '#00629d' : '#64748b'
+  ctx.lineWidth = Math.max((isSelected ? 4 : 3) / scale, isSelected ? 2 : 1.5)
+  drawCurvePath(ctx, source, child)
+  ctx.stroke()
+  ctx.restore()
+}
+
+function drawPersonEdges(
+  ctx: CanvasRenderingContext2D,
+  people: PersonNode[],
+  index: BoardIndex,
+  scale: number,
+  selectedItem: SelectedItem,
+  hoveredConnId: string | null,
+) {
   ctx.beginPath()
   ctx.strokeStyle = 'rgba(71, 85, 105, 0.16)'
   ctx.lineWidth = Math.max(1.15 / scale, 0.7)
@@ -439,11 +487,31 @@ function drawPersonEdges(ctx: CanvasRenderingContext2D, people: PersonNode[], in
     const circle = index.circlesById.get(person.circleId)
     if (!circle) return
     drawn.add(person.id)
+    const virtualId = `${MEMBERSHIP_CONNECTION_PREFIX}${person.id}`
+    if (selectedItem?.type === 'connection' && selectedItem.id === virtualId) return
+    if (hoveredConnId === virtualId) return
     ctx.moveTo(circle.x, circle.y)
     ctx.lineTo(person.x, person.y)
   }
   for (const person of people) addEdge(person)
   ctx.stroke()
+
+  for (const person of people) {
+    const virtualId = `${MEMBERSHIP_CONNECTION_PREFIX}${person.id}`
+    const isSelected = selectedItem?.type === 'connection' && selectedItem.id === virtualId
+    const isHovered = hoveredConnId === virtualId
+    if (!isSelected && !isHovered) continue
+    const circle = index.circlesById.get(person.circleId)
+    if (!circle) continue
+    ctx.save()
+    ctx.beginPath()
+    ctx.strokeStyle = isSelected ? '#00629d' : '#64748b'
+    ctx.lineWidth = Math.max((isSelected ? 4 : 3) / scale, isSelected ? 2 : 1.5)
+    ctx.moveTo(circle.x, circle.y)
+    ctx.lineTo(person.x, person.y)
+    ctx.stroke()
+    ctx.restore()
+  }
 }
 
 function drawCustomConnections(
@@ -887,7 +955,7 @@ export function hitTestBoard(index: BoardIndex, camera: Camera, selectedItem: Se
   const circles = queryCircles(index, hitRect).reverse()
   for (const circle of circles) {
     const d = Math.hypot(point.x - circle.x, point.y - circle.y)
-    if (d <= CIRCLE_CENTER_RADIUS + 6 / scale) return { type: 'circle-center', circle }
+    if (scale >= ZONE_ONLY_SCALE && d <= CIRCLE_CENTER_RADIUS + 6 / scale) return { type: 'circle-center', circle }
     if (scale >= ZONE_ONLY_SCALE && Math.abs(d - circle.radius) <= EDGE_RESIZE_HIT_SIZE / scale) {
       return { type: 'circle-edge', circle }
     }
@@ -900,16 +968,41 @@ export function hitTestBoard(index: BoardIndex, camera: Camera, selectedItem: Se
 function findConnectionNearPoint(index: BoardIndex, point: { x: number; y: number }, tolerance: number) {
   let best: Connection | null = null
   let bestDist = tolerance
+  const consider = (connection: Connection, source: { x: number; y: number }, target: { x: number; y: number }) => {
+    const dist = distanceToSegment(point, source, target)
+    if (dist < bestDist) {
+      bestDist = dist
+      best = connection
+    }
+  }
+
   for (const conn of index.connections) {
     if (conn.id.startsWith('stress-link-')) continue
     const source = index.peopleById.get(conn.fromId) || index.circlesById.get(conn.fromId)
     const target = index.peopleById.get(conn.toId) || index.circlesById.get(conn.toId)
     if (!source || !target) continue
-    const dist = distanceToSegment(point, source, target)
-    if (dist < bestDist) {
-      bestDist = dist
-      best = conn
-    }
+    consider(conn, source, target)
+  }
+
+  for (const person of index.people) {
+    const circle = index.circlesById.get(person.circleId)
+    if (!circle) continue
+    consider(
+      { id: `${MEMBERSHIP_CONNECTION_PREFIX}${person.id}`, fromId: circle.id, toId: person.id },
+      circle,
+      person,
+    )
+  }
+
+  for (const circle of index.circles) {
+    if (!circle.connectedTo) continue
+    const source = index.circlesById.get(circle.connectedTo)
+    if (!source || source.id === 'you') continue
+    consider(
+      { id: `${CIRCLE_LINK_CONNECTION_PREFIX}${circle.id}`, fromId: source.id, toId: circle.id },
+      source,
+      circle,
+    )
   }
   return best
 }
