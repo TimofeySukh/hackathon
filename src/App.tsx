@@ -4561,7 +4561,7 @@ function App() {
                 <p>{authDialogSubtitle}</p>
               </div>
             </div>
-            {authDialogMode !== 'update' && authDialogMode !== 'updated' && (
+            {authDialogMode !== 'update' && authDialogMode !== 'updated' && authDialogMode !== 'reset' && (
               <>
                 <button
                   type="button"
