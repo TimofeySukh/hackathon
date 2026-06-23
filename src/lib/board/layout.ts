@@ -509,6 +509,57 @@ function getRequiredCircleRadius(
   return Math.ceil(requiredRadius)
 }
 
+function getRequiredCircleRadiusFromIndex(index: BoardIndex, circle: CircleNode) {
+  let requiredRadius = Math.max(MIN_CIRCLE_RADIUS, circle.minRadius)
+
+  for (const person of index.people) {
+    if (person.circleId !== circle.id) continue
+    requiredRadius = Math.max(requiredRadius, Math.hypot(person.x - circle.x, person.y - circle.y) + PERSON_CONTAINMENT_RADIUS)
+  }
+
+  for (const childCircle of index.circles) {
+    if (childCircle.parentId !== circle.id) continue
+    requiredRadius = Math.max(
+      requiredRadius,
+      Math.hypot(childCircle.x - circle.x, childCircle.y - circle.y) + childCircle.radius + CIRCLE_CONTAINMENT_PADDING,
+    )
+  }
+
+  return Math.ceil(requiredRadius)
+}
+
+function growContainingCirclesForLiveDragInPlace(
+  index: BoardIndex,
+  personIds: Set<string>,
+  circleIds: Set<string>,
+) {
+  const pending = new Set<string>()
+
+  for (const personId of personIds) {
+    const person = index.peopleById.get(personId)
+    if (person?.circleId) pending.add(person.circleId)
+  }
+
+  for (const circleId of circleIds) {
+    const circle = index.circlesById.get(circleId)
+    if (circle?.parentId) pending.add(circle.parentId)
+  }
+
+  while (pending.size > 0) {
+    const circleId = pending.values().next().value as string
+    pending.delete(circleId)
+
+    const circle = index.circlesById.get(circleId)
+    if (!circle) continue
+
+    const requiredRadius = getRequiredCircleRadiusFromIndex(index, circle)
+    if (requiredRadius > circle.radius) {
+      circle.radius = requiredRadius
+      if (circle.parentId) pending.add(circle.parentId)
+    }
+  }
+}
+
 export function getDescendantCircleIds(circles: CircleNode[], circleId: string) {
   const descendants = new Set<string>()
   const pending = [circleId]
@@ -550,6 +601,8 @@ export function resolveCircleOnlyLayoutInPlace(
       p.y += deltaY
     }
   }
+
+  growContainingCirclesForLiveDragInPlace(index, draggedPersonIds, subtreeIds)
 }
 
 export function movePersonInPlace(
@@ -583,6 +636,8 @@ export function movePersonInPlace(
       indexP.y += deltaY
     }
   }
+
+  growContainingCirclesForLiveDragInPlace(index, draggedIds, new Set(circleIds))
 
   // 3. Pre-group people by circleId to resolve collisions inside circles
   const peopleByCircle = new Map<string, PersonNode[]>()

@@ -13,9 +13,10 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
 - **Move**: drag a person to reposition inside its owning circle; nearby people in the
   same circle are pushed aside instead of overlapping. Drag a circle center or body to move
   the whole circle and everything it contains. Live pointer frames never run the global
-  collision solver. On small boards, the final drop still runs containment/collision
-  cleanup; on large boards, final cleanup is skipped so one interaction cannot reflow or
-  freeze a dense import.
+  collision solver, but they do grow parent circles in-place when the dragged person or
+  nested circle crosses the current parent boundary. On small boards, the final drop still
+  runs containment/collision cleanup; on large boards, final cleanup is skipped so one
+  interaction cannot reflow or freeze a dense import.
 - **Resize**: drag a circle's edge; parent circles auto-fit (expand and shrink back to a
   minimum) as their contents move. Shrinking a circle pulls its contained people and subset
   circles toward the center, and nested subset circles shrink with the parent when position
