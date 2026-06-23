@@ -227,6 +227,8 @@ type MovePersonState = {
 type ResizeCircleState = {
   pointerId: number
   circleId: string
+  startX?: number
+  startY?: number
   graphSnapshot?: GraphState
 }
 
@@ -2020,7 +2022,7 @@ function App() {
           y: currentCamera.y - event.deltaY,
         })
       }
-      notifyOnboarding('move')
+      notifyOnboarding('pan')
     }
 
     surface.addEventListener('wheel', handleWheel, { passive: false })
@@ -2528,22 +2530,29 @@ function App() {
       settleGesture()
     }
 
-    if (panRef.current?.pointerId === event.pointerId) {
+    const activePan = panRef.current?.pointerId === event.pointerId ? panRef.current : null
+    if (activePan) {
+      const dx = event.clientX - activePan.startX
+      const dy = event.clientY - activePan.startY
       panRef.current = null
       settleGesture()
-      notifyOnboarding('move')
+      if (Math.hypot(dx, dy) > 5) {
+        notifyOnboarding('pan')
+      }
     }
 
-    const movingPersonId = movePersonRef.current?.pointerId === event.pointerId ? movePersonRef.current.personId : null
-    const movingCircleId = moveCircleRef.current?.pointerId === event.pointerId ? moveCircleRef.current.circleId : null
-    const selectedOrigins = movePersonRef.current?.pointerId === event.pointerId ? movePersonRef.current.selectedOrigins : null
-    const disconnectedCircleIds = moveCircleRef.current?.pointerId === event.pointerId ? moveCircleRef.current.disconnectedCircleIds : null
+    const activeMoveCircle = moveCircleRef.current?.pointerId === event.pointerId ? moveCircleRef.current : null
+    const activeMovePerson = movePersonRef.current?.pointerId === event.pointerId ? movePersonRef.current : null
+    const activeResizeCircle = resizeCircleRef.current?.pointerId === event.pointerId ? resizeCircleRef.current : null
+
+    const movingPersonId = activeMovePerson ? activeMovePerson.personId : null
+    const movingCircleId = activeMoveCircle ? activeMoveCircle.circleId : null
+    const selectedOrigins = activeMovePerson ? activeMovePerson.selectedOrigins : null
+    const disconnectedCircleIds = activeMoveCircle ? activeMoveCircle.disconnectedCircleIds : null
     const wasRightClickDrag = isRightClickDragRef.current
 
-    const wasResize = resizeCircleRef.current?.pointerId === event.pointerId
-    const wasNodeMove =
-      moveCircleRef.current?.pointerId === event.pointerId ||
-      movePersonRef.current?.pointerId === event.pointerId
+    const wasResize = activeResizeCircle !== null
+    const wasNodeMove = activeMoveCircle !== null || activeMovePerson !== null
 
     const endingMove = wasNodeMove || wasResize
 
@@ -2552,8 +2561,23 @@ function App() {
     if (resizeCircleRef.current?.pointerId === event.pointerId) resizeCircleRef.current = null
 
     if (endingMove) {
-      if (wasResize) notifyOnboarding('resize')
-      else if (wasNodeMove) notifyOnboarding('move')
+      if (wasResize) {
+        const dx = activeResizeCircle.startX !== undefined ? event.clientX - activeResizeCircle.startX : 0
+        const dy = activeResizeCircle.startY !== undefined ? event.clientY - activeResizeCircle.startY : 0
+        if (Math.hypot(dx, dy) > 5) {
+          notifyOnboarding('resize')
+        }
+      } else if (wasNodeMove) {
+        let nodeMoveDist = 0
+        if (activeMoveCircle) {
+          nodeMoveDist = Math.hypot(event.clientX - activeMoveCircle.startX, event.clientY - activeMoveCircle.startY)
+        } else if (activeMovePerson) {
+          nodeMoveDist = Math.hypot(event.clientX - activeMovePerson.startX, event.clientY - activeMovePerson.startY)
+        }
+        if (nodeMoveDist > 5) {
+          notifyOnboarding('move')
+        }
+      }
 
       const nextResolved = {
         ...graph,
@@ -2841,6 +2865,8 @@ function App() {
     resizeCircleRef.current = {
       pointerId: event.pointerId,
       circleId: circle.id,
+      startX: event.clientX,
+      startY: event.clientY,
       graphSnapshot: {
         ...graph,
         circles: graph.circles.map((c) => ({ ...c })),

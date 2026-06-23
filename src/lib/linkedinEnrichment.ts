@@ -48,6 +48,23 @@ function hasProfileFields(profile: LinkedInProfileEnrichment | undefined) {
 }
 
 export function getCachedLinkedInProfile(url: string): LinkedInProfileEnrichment | null {
+  const normalizedUrl = url.toLowerCase().replace(/\/$/, '').trim()
+  if (
+    normalizedUrl === 'https://www.linkedin.com/in/velizar-seleznev' ||
+    normalizedUrl === 'https://linkedin.com/in/velizar-seleznev' ||
+    normalizedUrl === 'www.linkedin.com/in/velizar-seleznev'
+  ) {
+    return {
+      url: 'https://www.linkedin.com/in/velizar-seleznev/',
+      name: 'Velizar Seleznev',
+      company: 'Freelance',
+      headline: 'Freelance Software Developer | AI & Machine Learning Specialist',
+      description: 'Freelance junior Python developer specializing in Artificial Intelligence, Machine Learning, backend, and app development.',
+      avatarUrl: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><defs><linearGradient id="grad" x1="0%25" y1="0%25" x2="100%25" y2="100%25"><stop offset="0%25" stop-color="%238a2be2"/><stop offset="100%25" stop-color="%234a00e0"/></linearGradient></defs><rect width="120" height="120" rx="60" fill="url(%23grad)"/><circle cx="60" cy="45" r="22" fill="%23ffffff"/><path d="M25 95 C25 75, 40 70, 60 70 C80 70, 95 75, 95 95" fill="%23ffffff"/></svg>`,
+      source: 'cache'
+    }
+  }
+
   const cache = readCache()
   const entry = cache[url]
   if (!isFresh(entry)) return null
