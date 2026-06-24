@@ -17,6 +17,12 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-24 — Universal MCP Server Execution and Height Stability
+
+- Decision: the agent settings dialog `.agent-settings-dialog` is given a stable height of `height: min(680px, calc(100vh - 64px))` on desktop and `height: min(680px, calc(100vh - 24px))` on mobile.
+- Decision: the MCP server package name is renamed to `datanode-mcp` and exposed as a `bin` executable script in `package.json`, allowing the MCP server to be run universally via `npx -y github:TimofeySukh/hackathon` anywhere.
+- Why: switching tabs in settings was causing vertical dialog height shifts depending on the tab's content. Universal `npx` execution allows any remote AI agent to install and launch the MCP server without requiring a local clone.
+
 ### 2026-06-24 — API Writes Are Revision-Checked
 
 - Decision: signed-in autosave, CLI, and MCP/API writes use `user_graphs.revision` as an

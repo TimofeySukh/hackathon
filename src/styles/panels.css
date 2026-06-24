@@ -534,7 +534,7 @@
   display: grid;
   grid-template-columns: 190px minmax(0, 1fr);
   width: min(1080px, calc(100vw - 64px));
-  max-height: min(760px, calc(100vh - 64px));
+  height: min(680px, calc(100vh - 64px));
   overflow: hidden;
   border-radius: var(--md-r-xl);
   background: var(--md-surface-container-low);
@@ -1107,7 +1107,7 @@
   .agent-settings-dialog {
     grid-template-columns: 1fr;
     width: calc(100vw - 24px);
-    max-height: calc(100vh - 24px);
+    height: min(680px, calc(100vh - 24px));
   }
 
   .agent-settings-sidebar {

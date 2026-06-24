@@ -3460,8 +3460,19 @@ Use this configuration:
 DATANODE_API_URL=${agentApiUrl}
 DATANODE_API_TOKEN=${agentTokenForInstructions}
 
-MCP server command:
-npm --prefix /Users/velizard/Projects/hackathon run datanode:mcp
+MCP server config:
+{
+  "mcpServers": {
+    "datanode": {
+      "command": "npx",
+      "args": ["-y", "github:TimofeySukh/hackathon"],
+      "env": {
+        "DATANODE_API_URL": "${agentApiUrl}",
+        "DATANODE_API_TOKEN": "${agentTokenForInstructions}"
+      }
+    }
+  }
+}
 
 Available actions:
 - search people, circles, notes, and saved links
@@ -3473,8 +3484,8 @@ Never ask for a user_id. The token already resolves to the correct user. If an A
   const mcpConfigSnippet = `{
   "mcpServers": {
     "datanode": {
-      "command": "npm",
-      "args": ["--prefix", "/Users/velizard/Projects/hackathon", "run", "datanode:mcp"],
+      "command": "npx",
+      "args": ["-y", "github:TimofeySukh/hackathon"],
       "env": {
         "DATANODE_API_URL": "${agentApiUrl}",
         "DATANODE_API_TOKEN": "${agentTokenForInstructions}"

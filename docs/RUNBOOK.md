@@ -115,9 +115,8 @@ MCP config:
 {
   "mcpServers": {
     "datanode": {
-      "command": "npm",
-      "args": ["run", "datanode:mcp", "--"],
-      "cwd": "/Users/velizard/Projects/hackathon",
+      "command": "npx",
+      "args": ["-y", "github:TimofeySukh/hackathon"],
       "env": {
         "DATANODE_API_URL": "https://<project-ref>.supabase.co/functions/v1/graph-api/v1",
         "DATANODE_API_TOKEN": "dn_live_<token>"
