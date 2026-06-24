@@ -535,6 +535,7 @@ function App() {
   const [newAgentToken, setNewAgentToken] = useState<string | null>(null)
   const [agentTokenStatus, setAgentTokenStatus] = useState<string | null>(null)
   const [agentTokensBusy, setAgentTokensBusy] = useState(false)
+  const [agentSettingsTab, setAgentSettingsTab] = useState<'quick' | 'mcp' | 'cli' | 'api' | 'keys'>('quick')
 
   const defaultAgentScopes: AgentScope[] = ['graph:read', 'search:read', 'people:write', 'notes:write', 'links:write', 'connections:write']
 
@@ -543,7 +544,8 @@ function App() {
     setAgentTokensBusy(true)
     setAgentTokenStatus(null)
     try {
-      setAgentTokens(await listAgentTokens(auth.session))
+      const tokens = await listAgentTokens(auth.session)
+      setAgentTokens(tokens.filter((token) => !token.revoked_at))
     } catch (error) {
       setAgentTokenStatus(error instanceof Error ? error.message : 'Could not load agent tokens.')
     } finally {
@@ -574,13 +576,20 @@ function App() {
     setAgentTokenStatus(null)
     try {
       await revokeAgentToken(auth.session, tokenId)
-      setAgentTokens((current) => current.map((token) =>
-        token.id === tokenId ? { ...token, revoked_at: new Date().toISOString() } : token
-      ))
+      setAgentTokens((current) => current.filter((token) => token.id !== tokenId))
     } catch (error) {
       setAgentTokenStatus(error instanceof Error ? error.message : 'Could not revoke agent token.')
     } finally {
       setAgentTokensBusy(false)
+    }
+  }
+
+  const handleCopyAgentText = async (value: string, notice: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setAgentTokenStatus(notice)
+    } catch {
+      setAgentTokenStatus('Could not copy automatically. Select the text and copy it manually.')
     }
   }
 
@@ -3442,6 +3451,56 @@ function App() {
           : authDialogMode === 'update'
             ? 'Update password'
             : 'Sign in with email'
+  const agentApiUrl = getGraphApiBaseUrl() ?? ''
+  const agentTokenForInstructions = newAgentToken ?? '<create-a-key-first>'
+  const agentCopyInstruction = `You are allowed to connect to my DataNode graph through MCP.
+
+Use this configuration:
+
+DATANODE_API_URL=${agentApiUrl}
+DATANODE_API_TOKEN=${agentTokenForInstructions}
+
+MCP server command:
+npm --prefix /Users/velizard/Projects/hackathon run datanode:mcp
+
+Available actions:
+- search people, circles, notes, and saved links
+- list circles and choose the correct circleId
+- add people to exactly one direct circle
+- add notes, links, and relationship connections
+
+Never ask for a user_id. The token already resolves to the correct user. If an API write returns 409 Conflict, reload graph metadata and retry the intended operation once.`
+  const mcpConfigSnippet = `{
+  "mcpServers": {
+    "datanode": {
+      "command": "npm",
+      "args": ["--prefix", "/Users/velizard/Projects/hackathon", "run", "datanode:mcp"],
+      "env": {
+        "DATANODE_API_URL": "${agentApiUrl}",
+        "DATANODE_API_TOKEN": "${agentTokenForInstructions}"
+      }
+    }
+  }
+}`
+  const cliSnippet = `export DATANODE_API_URL=${agentApiUrl}
+export DATANODE_API_TOKEN=${agentTokenForInstructions}
+
+npm run datanode:cli -- search "Alice"
+npm run datanode:cli -- circles
+npm run datanode:cli -- people:add <circle-id> "Alice Chen" "Met at conference"`
+  const apiSnippet = `GET ${agentApiUrl}/search?q=alice
+Authorization: Bearer ${agentTokenForInstructions}
+
+POST ${agentApiUrl}/people
+Authorization: Bearer ${agentTokenForInstructions}
+Content-Type: application/json
+
+{
+  "expectedRevision": 42,
+  "circleId": "<circle-id>",
+  "name": "Alice Chen",
+  "notes": [{ "body": "Met at conference" }]
+}`
 
   // Keep references to unused features so they remain in codebase for future use and satisfy TS/ESLint checks
   if (false as boolean) {
@@ -4728,10 +4787,23 @@ function App() {
             onClick={(event) => event.stopPropagation()}
           >
             <aside className="agent-settings-sidebar">
-              <div className="agent-settings-sidebar__section">Settings</div>
-              <button type="button" className="agent-settings-sidebar__item is-active">
-                Agent API
-              </button>
+              <div className="agent-settings-sidebar__section">Agent access</div>
+              {[
+                ['quick', 'Quick setup'],
+                ['mcp', 'MCP'],
+                ['cli', 'CLI'],
+                ['api', 'API'],
+                ['keys', 'Keys'],
+              ].map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={`agent-settings-sidebar__item ${agentSettingsTab === id ? 'is-active' : ''}`}
+                  onClick={() => setAgentSettingsTab(id as typeof agentSettingsTab)}
+                >
+                  {label}
+                </button>
+              ))}
             </aside>
             <div className="agent-settings-content">
               <button
@@ -4744,106 +4816,211 @@ function App() {
               </button>
               <header className="agent-settings-header">
                 <div>
-                  <h2 id="agent-settings-title">Agent API keys</h2>
-                  <p>Create revocable keys for MCP servers, CLI tools, and AI agents.</p>
+                  <h2 id="agent-settings-title">
+                    {agentSettingsTab === 'quick' ? 'Quick setup' : agentSettingsTab === 'mcp' ? 'MCP setup' : agentSettingsTab === 'cli' ? 'CLI setup' : agentSettingsTab === 'api' ? 'API reference' : 'API keys'}
+                  </h2>
+                  <p>
+                    {agentSettingsTab === 'quick'
+                      ? 'Create one key and copy the instruction into an AI agent.'
+                      : agentSettingsTab === 'mcp'
+                        ? 'Connect DataNode as an MCP server.'
+                        : agentSettingsTab === 'cli'
+                          ? 'Use the same key from a terminal.'
+                          : agentSettingsTab === 'api'
+                            ? 'Call the graph API directly.'
+                            : 'Create and revoke agent keys.'}
+                  </p>
                 </div>
               </header>
 
-              <section className="agent-settings-section">
-                <div className="agent-settings-section__header">
-                  <div>
-                    <h3>Create key</h3>
-                    <p>Default keys can search and add people, notes, links, and graph connections.</p>
-                  </div>
-                </div>
-                <div className="agent-settings-create-row">
-                  <input
-                    type="text"
-                    value={agentTokenName}
-                    onChange={(event) => setAgentTokenName(event.target.value)}
-                    className="m3-input-field agent-settings-name-input"
-                    placeholder="Token name"
-                  />
-                  <button
-                    type="button"
-                    className="m3-primary-button agent-settings-action"
-                    disabled={agentTokensBusy}
-                    onClick={handleCreateAgentToken}
-                  >
-                    Create token
-                  </button>
-                </div>
-                {agentTokenStatus && (
-                  <p className="agent-settings-status">
-                    {agentTokenStatus}
-                  </p>
-                )}
-                {newAgentToken && (
-                  <div className="agent-settings-secret">
+              {agentSettingsTab === 'quick' && (
+                <section className="agent-settings-section agent-settings-flow">
+                  <div className="agent-settings-step">
                     <div>
-                      <h4>Copy this token now</h4>
-                      <p>It is stored as a hash and will not be shown again.</p>
+                      <h3>1. Create a key</h3>
+                      <p>This creates a revocable key with the default agent permissions.</p>
                     </div>
-                    <input
-                      type="text"
-                      readOnly
-                      value={newAgentToken}
-                      className="m3-input-field"
-                      onFocus={(event) => event.currentTarget.select()}
-                    />
-                    <textarea
-                      readOnly
-                      className="m3-input-field"
-                      value={`DATANODE_API_URL=${getGraphApiBaseUrl() ?? ''}\nDATANODE_API_TOKEN=${newAgentToken}`}
-                      rows={3}
-                      onFocus={(event) => event.currentTarget.select()}
-                    />
-                  </div>
-                )}
-              </section>
-
-              <section className="agent-settings-section">
-                <div className="agent-settings-section__header">
-                  <div>
-                    <h3>Existing keys</h3>
-                    <p>Revoke a key immediately if it was shared or copied somewhere unsafe.</p>
-                  </div>
-                  <button
-                    type="button"
-                    className="m3-primary-button m3-primary-button--tonal agent-settings-refresh"
-                    disabled={agentTokensBusy}
-                    onClick={() => void refreshAgentTokens()}
-                  >
-                    Refresh
-                  </button>
-                </div>
-                <div className="agent-token-list">
-                  {agentTokens.length === 0 && (
-                    <div className="agent-token-empty">
-                      No agent tokens yet.
-                    </div>
-                  )}
-                  {agentTokens.map((token) => (
-                    <div key={token.id} className="agent-token-row">
-                      <div className="agent-token-row__main">
-                        <div className="agent-token-row__name">{token.name}</div>
-                        <div className="agent-token-row__meta">
-                          {token.token_prefix} · {token.revoked_at ? 'revoked' : 'active'}
-                          {token.last_used_at ? ` · last used ${new Date(token.last_used_at).toLocaleDateString()}` : ''}
-                        </div>
-                      </div>
+                    <div className="agent-settings-create-row">
+                      <input
+                        type="text"
+                        value={agentTokenName}
+                        onChange={(event) => setAgentTokenName(event.target.value)}
+                        className="m3-input-field agent-settings-name-input"
+                        placeholder="Token name"
+                      />
                       <button
                         type="button"
-                        className="m3-primary-button m3-primary-button--danger agent-settings-revoke"
-                        disabled={agentTokensBusy || Boolean(token.revoked_at)}
-                        onClick={() => handleRevokeAgentToken(token.id)}
+                        className="m3-primary-button agent-settings-action"
+                        disabled={agentTokensBusy}
+                        onClick={handleCreateAgentToken}
                       >
-                        Revoke
+                        Create key
                       </button>
                     </div>
-                  ))}
-                </div>
-              </section>
+                  </div>
+                  <div className="agent-settings-step">
+                    <div>
+                      <h3>2. Copy this for the AI agent</h3>
+                      <p>Paste it as-is. The agent does not need to understand the key internals.</p>
+                    </div>
+                    <textarea
+                      readOnly
+                      className="m3-input-field agent-settings-copybox"
+                      value={agentCopyInstruction}
+                      rows={13}
+                      onFocus={(event) => event.currentTarget.select()}
+                    />
+                    <button
+                      type="button"
+                      className="m3-primary-button agent-settings-copy-action"
+                      disabled={!newAgentToken}
+                      onClick={() => void handleCopyAgentText(agentCopyInstruction, 'Instruction copied.')}
+                    >
+                      Copy instruction
+                    </button>
+                  </div>
+                  {agentTokenStatus && <p className="agent-settings-status">{agentTokenStatus}</p>}
+                </section>
+              )}
+
+              {agentSettingsTab === 'mcp' && (
+                <section className="agent-settings-section agent-settings-flow">
+                  <div className="agent-settings-step">
+                    <h3>MCP config</h3>
+                    <p>Use this when an AI app asks for MCP server JSON.</p>
+                    <textarea
+                      readOnly
+                      className="m3-input-field agent-settings-copybox"
+                      value={mcpConfigSnippet}
+                      rows={12}
+                      onFocus={(event) => event.currentTarget.select()}
+                    />
+                    <button
+                      type="button"
+                      className="m3-primary-button agent-settings-copy-action"
+                      onClick={() => void handleCopyAgentText(mcpConfigSnippet, 'MCP config copied.')}
+                    >
+                      Copy MCP config
+                    </button>
+                  </div>
+                </section>
+              )}
+
+              {agentSettingsTab === 'cli' && (
+                <section className="agent-settings-section agent-settings-flow">
+                  <div className="agent-settings-step">
+                    <h3>CLI commands</h3>
+                    <p>Use these commands from this repository checkout.</p>
+                    <textarea
+                      readOnly
+                      className="m3-input-field agent-settings-copybox"
+                      value={cliSnippet}
+                      rows={8}
+                      onFocus={(event) => event.currentTarget.select()}
+                    />
+                    <button
+                      type="button"
+                      className="m3-primary-button agent-settings-copy-action"
+                      onClick={() => void handleCopyAgentText(cliSnippet, 'CLI snippet copied.')}
+                    >
+                      Copy CLI snippet
+                    </button>
+                  </div>
+                </section>
+              )}
+
+              {agentSettingsTab === 'api' && (
+                <section className="agent-settings-section agent-settings-flow">
+                  <div className="agent-settings-step">
+                    <h3>Direct API</h3>
+                    <p>All writes use the current graph revision and return 409 when another client saved first.</p>
+                    <textarea
+                      readOnly
+                      className="m3-input-field agent-settings-copybox"
+                      value={apiSnippet}
+                      rows={15}
+                      onFocus={(event) => event.currentTarget.select()}
+                    />
+                    <button
+                      type="button"
+                      className="m3-primary-button agent-settings-copy-action"
+                      onClick={() => void handleCopyAgentText(apiSnippet, 'API example copied.')}
+                    >
+                      Copy API example
+                    </button>
+                  </div>
+                </section>
+              )}
+
+              {agentSettingsTab === 'keys' && (
+                <section className="agent-settings-section agent-settings-flow">
+                  <div className="agent-settings-step">
+                    <div>
+                      <h3>Create key</h3>
+                      <p>Use this if you need another key for a different agent or machine.</p>
+                    </div>
+                    <div className="agent-settings-create-row">
+                      <input
+                        type="text"
+                        value={agentTokenName}
+                        onChange={(event) => setAgentTokenName(event.target.value)}
+                        className="m3-input-field agent-settings-name-input"
+                        placeholder="Token name"
+                      />
+                      <button
+                        type="button"
+                        className="m3-primary-button agent-settings-action"
+                        disabled={agentTokensBusy}
+                        onClick={handleCreateAgentToken}
+                      >
+                        Create key
+                      </button>
+                    </div>
+                  </div>
+                  {newAgentToken && (
+                    <div className="agent-settings-secret">
+                      <div>
+                        <h4>New key</h4>
+                        <p>Copy it now. It is stored as a hash and will not be shown again.</p>
+                      </div>
+                      <input
+                        type="text"
+                        readOnly
+                        value={newAgentToken}
+                        className="m3-input-field"
+                        onFocus={(event) => event.currentTarget.select()}
+                      />
+                    </div>
+                  )}
+                  {agentTokenStatus && <p className="agent-settings-status">{agentTokenStatus}</p>}
+                  <div className="agent-token-list">
+                    {agentTokens.length === 0 && (
+                      <div className="agent-token-empty">
+                        No active agent keys.
+                      </div>
+                    )}
+                    {agentTokens.map((token) => (
+                      <div key={token.id} className="agent-token-row">
+                        <div className="agent-token-row__main">
+                          <div className="agent-token-row__name">{token.name}</div>
+                          <div className="agent-token-row__meta">
+                            {token.token_prefix} · active
+                            {token.last_used_at ? ` · last used ${new Date(token.last_used_at).toLocaleDateString()}` : ''}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="m3-primary-button m3-primary-button--danger agent-settings-revoke"
+                          disabled={agentTokensBusy}
+                          onClick={() => handleRevokeAgentToken(token.id)}
+                        >
+                          Revoke
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
             </div>
           </section>
         </div>

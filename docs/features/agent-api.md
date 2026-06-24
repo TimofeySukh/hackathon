@@ -9,6 +9,10 @@ Supabase project secrets or allowing access to another user's graph.
 
 - Signed-in users open Agent API key management from Settings. The key manager is a
   large modal overlay; opening it closes the compact Settings panel.
+- The first tab is **Quick setup** for non-technical users: create a key and copy one
+  ready-to-paste instruction for an AI agent.
+- Sidebar tabs split advanced material into **MCP**, **CLI**, **API**, and **Keys**.
+- Revoked keys disappear from the active key list immediately.
 - Tokens are shown once, stored server-side only as SHA-256 hashes, and can be revoked.
 - Agent tokens identify exactly one user. API requests never accept `user_id` from the
   caller.
@@ -24,11 +28,13 @@ Supabase project secrets or allowing access to another user's graph.
 
 - Surfaces / elevation used: a full-screen overlay with a large Material 3 dialog,
   sidebar, and content surface.
-- Components used: text field, filled buttons, small list rows, and status text.
+- Components used: sidebar tabs, text fields, copy textareas, filled buttons, small list
+  rows, and status text.
 - Color roles used: existing Settings panel neutral roles plus danger button styling for
   revoke.
-- Anything feature-specific: plaintext tokens appear in a one-time copy area with the
-  `DATANODE_API_URL` and `DATANODE_API_TOKEN` environment snippet.
+- Anything feature-specific: plaintext tokens appear in a one-time copy area and the
+  Quick setup tab generates a full instruction block that can be pasted directly into an
+  AI agent.
 - Known gaps vs. the Material 3 target: the token list is intentionally compact and can
   be extracted into reusable settings components when the panel grows.
 
