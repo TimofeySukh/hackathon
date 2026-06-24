@@ -493,18 +493,31 @@ function parseBody(body: unknown): Record<string, unknown> {
 }
 
 async function readJson(req: Request) {
-  if (req.method === 'GET' || req.method === 'DELETE') return {}
+  if (req.method === 'GET') return {}
   return parseBody(await req.json().catch(() => ({})))
 }
 
-function getExpectedRevision(body: Record<string, unknown>) {
-  return typeof body.expectedRevision === 'number' ? body.expectedRevision : null
+function getExpectedRevision(req: Request, body: Record<string, unknown>) {
+  if (typeof body.expectedRevision === 'number') return body.expectedRevision
+
+  try {
+    const url = new URL(req.url)
+    const param = url.searchParams.get('expectedRevision')
+    if (param !== null && !isNaN(Number(param))) return Number(param)
+  } catch {
+    // Ignore URL parse error
+  }
+
+  const header = req.headers.get('x-expected-revision')
+  if (header !== null && !isNaN(Number(header))) return Number(header)
+
+  return null
 }
 
 async function mutateGraph(req: Request, auth: AuthContext, body: Record<string, unknown>, mutate: (graph: GraphState) => unknown) {
   const current = await readGraph(auth.userId)
   if (!current.graph) return jsonResponse({ error: 'No graph exists yet.' }, 404)
-  const expectedRevision = getExpectedRevision(body)
+  const expectedRevision = getExpectedRevision(req, body)
   if (current.revision !== expectedRevision) return jsonResponse({ error: 'Revision conflict.', revision: current.revision }, 409)
   const result = mutate(current.graph)
   const response = await writeGraph(auth.userId, current.graph, expectedRevision)

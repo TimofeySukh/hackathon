@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { addLink, addNote, createConnection, createPerson, getMeta, listCircles, search, importLinkedInPerson } from './datanode-api-client.mjs'
+import { addLink, addNote, createConnection, createPerson, getMeta, listCircles, search, importLinkedInPerson, deletePerson, deleteNote, deleteLink, deleteConnection } from './datanode-api-client.mjs'
 
 function usage() {
   console.log(`Usage:
@@ -12,6 +12,10 @@ function usage() {
   datanode notes:add <personId> <body>
   datanode links:add <personId> <service> <url> [label]
   datanode connections:add <fromId> <toId>
+  datanode people:delete <personId>
+  datanode notes:delete <personId> <noteId>
+  datanode links:delete <personId> <linkId>
+  datanode connections:delete <connectionId>
 
 Environment:
   DATANODE_API_URL=https://.../functions/v1/graph-api/v1
@@ -98,6 +102,38 @@ async function main() {
       expectedRevision: meta.revision,
       fromId: getArg(3, 'fromId'),
       toId: getArg(4, 'toId'),
+    }), null, 2))
+    return
+  }
+
+  if (command === 'people:delete') {
+    const meta = await getMeta()
+    console.log(JSON.stringify(await deletePerson(getArg(3, 'personId'), {
+      expectedRevision: meta.revision,
+    }), null, 2))
+    return
+  }
+
+  if (command === 'notes:delete') {
+    const meta = await getMeta()
+    console.log(JSON.stringify(await deleteNote(getArg(3, 'personId'), getArg(4, 'noteId'), {
+      expectedRevision: meta.revision,
+    }), null, 2))
+    return
+  }
+
+  if (command === 'links:delete') {
+    const meta = await getMeta()
+    console.log(JSON.stringify(await deleteLink(getArg(3, 'personId'), getArg(4, 'linkId'), {
+      expectedRevision: meta.revision,
+    }), null, 2))
+    return
+  }
+
+  if (command === 'connections:delete') {
+    const meta = await getMeta()
+    console.log(JSON.stringify(await deleteConnection(getArg(3, 'connectionId'), {
+      expectedRevision: meta.revision,
     }), null, 2))
     return
   }

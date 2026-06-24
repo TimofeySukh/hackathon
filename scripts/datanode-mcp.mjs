@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { addLink, addNote, createConnection, createPerson, getMeta, listCircles, search, importLinkedInPerson } from './datanode-api-client.mjs'
+import { addLink, addNote, createConnection, createPerson, getMeta, listCircles, search, importLinkedInPerson, deletePerson, deleteNote, deleteLink, deleteConnection } from './datanode-api-client.mjs'
 
 const tools = [
   {
@@ -84,6 +84,52 @@ const tools = [
       required: ['url'],
     },
   },
+  {
+    name: 'delete_person',
+    description: 'Delete a person node from the graph.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        personId: { type: 'string', description: 'The ID of the person to delete.' },
+      },
+      required: ['personId'],
+    },
+  },
+  {
+    name: 'delete_note',
+    description: 'Delete a specific note from a person.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        personId: { type: 'string', description: 'The ID of the person who owns the note.' },
+        noteId: { type: 'string', description: 'The ID of the note to delete.' },
+      },
+      required: ['personId', 'noteId'],
+    },
+  },
+  {
+    name: 'delete_link',
+    description: 'Delete a specific link/social connection from a person.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        personId: { type: 'string', description: 'The ID of the person who owns the link.' },
+        linkId: { type: 'string', description: 'The ID of the link to delete.' },
+      },
+      required: ['personId', 'linkId'],
+    },
+  },
+  {
+    name: 'delete_connection',
+    description: 'Delete a relationship connection between two nodes.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        connectionId: { type: 'string', description: 'The ID of the connection to delete.' },
+      },
+      required: ['connectionId'],
+    },
+  },
 ]
 
 function send(message) {
@@ -121,6 +167,22 @@ async function callTool(name, args = {}) {
     case 'import_linkedin_person': {
       const meta = await getMeta()
       return textResult(await importLinkedInPerson({ expectedRevision: meta.revision, url: args.url }))
+    }
+    case 'delete_person': {
+      const meta = await getMeta()
+      return textResult(await deletePerson(args.personId, { expectedRevision: meta.revision }))
+    }
+    case 'delete_note': {
+      const meta = await getMeta()
+      return textResult(await deleteNote(args.personId, args.noteId, { expectedRevision: meta.revision }))
+    }
+    case 'delete_link': {
+      const meta = await getMeta()
+      return textResult(await deleteLink(args.personId, args.linkId, { expectedRevision: meta.revision }))
+    }
+    case 'delete_connection': {
+      const meta = await getMeta()
+      return textResult(await deleteConnection(args.connectionId, { expectedRevision: meta.revision }))
     }
     default:
       throw new Error(`Unknown tool: ${name}`)

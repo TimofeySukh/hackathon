@@ -74,3 +74,31 @@ export async function createConnection(input) {
     body: JSON.stringify(input),
   })
 }
+
+export async function deletePerson(personId, input) {
+  return await datanodeFetch(`/people/${encodeURIComponent(personId)}`, {
+    method: 'DELETE',
+    body: JSON.stringify(input),
+  })
+}
+
+export async function deleteNote(personId, noteId, input) {
+  return await datanodeFetch(`/people/${encodeURIComponent(personId)}/notes/${encodeURIComponent(noteId)}`, {
+    method: 'DELETE',
+    body: JSON.stringify(input),
+  })
+}
+
+export async function deleteLink(personId, linkId, input) {
+  return await datanodeFetch(`/people/${encodeURIComponent(personId)}/links/${encodeURIComponent(linkId)}`, {
+    method: 'DELETE',
+    body: JSON.stringify(input),
+  })
+}
+
+export async function deleteConnection(connectionId, input) {
+  return await datanodeFetch(`/connections/${encodeURIComponent(connectionId)}`, {
+    method: 'DELETE',
+    body: JSON.stringify(input),
+  })
+}

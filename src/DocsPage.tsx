@@ -152,6 +152,22 @@ export default function DocsPage() {
                   <td className="docs-param-name">create_connection</td>
                   <td>Create a relationship connection (line) between two node IDs.</td>
                 </tr>
+                <tr>
+                  <td className="docs-param-name">delete_person</td>
+                  <td>Delete a person node from the graph.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">delete_note</td>
+                  <td>Delete a specific note from a person.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">delete_link</td>
+                  <td>Delete a specific link/social connection from a person.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">delete_connection</td>
+                  <td>Delete a relationship connection between two nodes.</td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -254,6 +270,26 @@ ${npxCmd}`}</code>
                   <td className="docs-param-name">connections:add</td>
                   <td><code>&lt;fromId&gt; &lt;toId&gt;</code></td>
                   <td>Create a connector link between two nodes.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">people:delete</td>
+                  <td><code>&lt;personId&gt;</code></td>
+                  <td>Delete a person node.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">notes:delete</td>
+                  <td><code>&lt;personId&gt; &lt;noteId&gt;</code></td>
+                  <td>Delete a note from a person.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">links:delete</td>
+                  <td><code>&lt;personId&gt; &lt;linkId&gt;</code></td>
+                  <td>Delete a social link from a person.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">connections:delete</td>
+                  <td><code>&lt;connectionId&gt;</code></td>
+                  <td>Delete a connector link.</td>
                 </tr>
               </tbody>
             </table>
@@ -805,6 +841,226 @@ ${npxCmd}`}</code>
               <li><code>note.create</code> — add a note to a person</li>
               <li><code>link.create</code> — add a link to a person</li>
             </ul>
+
+            <h3>Request Example</h3>
+            <div className="docs-code-container">
+              <div className="docs-code-header">
+                <span>cURL</span>
+                <button className="docs-code-copy-btn" onClick={() => copy(curl, 'cURL copied!')}>Copy</button>
+              </div>
+              <pre className="docs-code-pre">
+                <code className="docs-code">{curl}</code>
+              </pre>
+            </div>
+          </div>
+        )
+      }
+    },
+    {
+      id: 'delete-person',
+      category: 'api',
+      title: 'DELETE /people/:id',
+      badge: 'delete',
+      keywords: ['delete', '/people', 'remove person', 'delete person'],
+      render: (copy) => {
+        const curl = `curl -X DELETE "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/people/person-123" \\
+  -H "Authorization: Bearer dn_live_your_token" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "expectedRevision": 12
+  }'`
+        return (
+          <div>
+            <div className="docs-endpoint-title">
+              <span className="docs-method-badge delete">DELETE</span>
+              <span className="docs-endpoint-path">/people/:personId</span>
+            </div>
+            <p>Deletes a person node from the graph and cleans up any connection lines associated with them.</p>
+
+            <h3>Request Parameters</h3>
+            <table className="docs-table">
+              <thead>
+                <tr>
+                  <th>Field</th>
+                  <th>Type</th>
+                  <th>Required</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="docs-param-name">expectedRevision</td>
+                  <td className="docs-param-type">number | null</td>
+                  <td><span className="docs-param-required">Required</span></td>
+                  <td>Current expected revision. Can also be supplied in the URL query parameter <code>?expectedRevision=12</code> or header <code>x-expected-revision</code>.</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <h3>Request Example</h3>
+            <div className="docs-code-container">
+              <div className="docs-code-header">
+                <span>cURL</span>
+                <button className="docs-code-copy-btn" onClick={() => copy(curl, 'cURL copied!')}>Copy</button>
+              </div>
+              <pre className="docs-code-pre">
+                <code className="docs-code">{curl}</code>
+              </pre>
+            </div>
+          </div>
+        )
+      }
+    },
+    {
+      id: 'delete-notes',
+      category: 'api',
+      title: 'DELETE /people/:id/notes/:noteId',
+      badge: 'delete',
+      keywords: ['delete', 'note', '/people/notes', 'remove note'],
+      render: (copy) => {
+        const curl = `curl -X DELETE "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/people/person-123/notes/note-456" \\
+  -H "Authorization: Bearer dn_live_your_token" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "expectedRevision": 13
+  }'`
+        return (
+          <div>
+            <div className="docs-endpoint-title">
+              <span className="docs-method-badge delete">DELETE</span>
+              <span className="docs-endpoint-path">/people/:personId/notes/:noteId</span>
+            </div>
+            <p>Deletes a specific note card from a person.</p>
+
+            <h3>Request Parameters</h3>
+            <table className="docs-table">
+              <thead>
+                <tr>
+                  <th>Field</th>
+                  <th>Type</th>
+                  <th>Required</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="docs-param-name">expectedRevision</td>
+                  <td className="docs-param-type">number | null</td>
+                  <td><span className="docs-param-required">Required</span></td>
+                  <td>Current expected revision. Can also be supplied in the URL query parameter <code>?expectedRevision=13</code> or header <code>x-expected-revision</code>.</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <h3>Request Example</h3>
+            <div className="docs-code-container">
+              <div className="docs-code-header">
+                <span>cURL</span>
+                <button className="docs-code-copy-btn" onClick={() => copy(curl, 'cURL copied!')}>Copy</button>
+              </div>
+              <pre className="docs-code-pre">
+                <code className="docs-code">{curl}</code>
+              </pre>
+            </div>
+          </div>
+        )
+      }
+    },
+    {
+      id: 'delete-links',
+      category: 'api',
+      title: 'DELETE /people/:id/links/:linkId',
+      badge: 'delete',
+      keywords: ['delete', 'link', '/people/links', 'remove link'],
+      render: (copy) => {
+        const curl = `curl -X DELETE "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/people/person-123/links/link-456" \\
+  -H "Authorization: Bearer dn_live_your_token" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "expectedRevision": 14
+  }'`
+        return (
+          <div>
+            <div className="docs-endpoint-title">
+              <span className="docs-method-badge delete">DELETE</span>
+              <span className="docs-endpoint-path">/people/:personId/links/:linkId</span>
+            </div>
+            <p>Deletes a specific social link connection from a person.</p>
+
+            <h3>Request Parameters</h3>
+            <table className="docs-table">
+              <thead>
+                <tr>
+                  <th>Field</th>
+                  <th>Type</th>
+                  <th>Required</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="docs-param-name">expectedRevision</td>
+                  <td className="docs-param-type">number | null</td>
+                  <td><span className="docs-param-required">Required</span></td>
+                  <td>Current expected revision. Can also be supplied in the URL query parameter <code>?expectedRevision=14</code> or header <code>x-expected-revision</code>.</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <h3>Request Example</h3>
+            <div className="docs-code-container">
+              <div className="docs-code-header">
+                <span>cURL</span>
+                <button className="docs-code-copy-btn" onClick={() => copy(curl, 'cURL copied!')}>Copy</button>
+              </div>
+              <pre className="docs-code-pre">
+                <code className="docs-code">{curl}</code>
+              </pre>
+            </div>
+          </div>
+        )
+      }
+    },
+    {
+      id: 'delete-connection',
+      category: 'api',
+      title: 'DELETE /connections/:id',
+      badge: 'delete',
+      keywords: ['delete', '/connections', 'remove connection', 'delete connection'],
+      render: (copy) => {
+        const curl = `curl -X DELETE "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/connections/connection-123" \\
+  -H "Authorization: Bearer dn_live_your_token" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "expectedRevision": 15
+  }'`
+        return (
+          <div>
+            <div className="docs-endpoint-title">
+              <span className="docs-method-badge delete">DELETE</span>
+              <span className="docs-endpoint-path">/connections/:connectionId</span>
+            </div>
+            <p>Deletes a connector line between two nodes.</p>
+
+            <h3>Request Parameters</h3>
+            <table className="docs-table">
+              <thead>
+                <tr>
+                  <th>Field</th>
+                  <th>Type</th>
+                  <th>Required</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="docs-param-name">expectedRevision</td>
+                  <td className="docs-param-type">number | null</td>
+                  <td><span className="docs-param-required">Required</span></td>
+                  <td>Current expected revision. Can also be supplied in the URL query parameter <code>?expectedRevision=15</code> or header <code>x-expected-revision</code>.</td>
+                </tr>
+              </tbody>
+            </table>
 
             <h3>Request Example</h3>
             <div className="docs-code-container">
