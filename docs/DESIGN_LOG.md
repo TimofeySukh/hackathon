@@ -17,6 +17,22 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-24 — API Writes Are Revision-Checked
+
+- Decision: signed-in autosave, CLI, and MCP/API writes use `user_graphs.revision` as an
+  optimistic concurrency guard. Stale writers are rejected with a conflict and must reload
+  before saving again.
+- Why: multiple browser tabs or remote agents can otherwise overwrite a newer graph blob
+  with older local state.
+
+### 2026-06-24 — Agent Access Uses Revocable Scoped Tokens
+
+- Decision: remote agent access goes through the `graph-api` Edge Function and hashed
+  `agent_tokens`, not direct Supabase credentials. Tokens resolve to one owner user and
+  carry explicit scopes.
+- Why: MCP/CLI clients need copy-paste setup, revocation, and user isolation without
+  exposing service-role keys or accepting caller-provided user ids.
+
 ### 2026-06-24 — Person Data Has No Hidden Role Field
 
 - Decision: `PersonNode.role` was removed from the app model. People expose name,

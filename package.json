@@ -10,7 +10,9 @@
     "test:db-load": "node ./scripts/test-database-load.mjs",
     "test:ui-import": "node ./scripts/test-ui-import-responsiveness.mjs",
     "test:load": "npm run test:db-load -- --people 3000 --connections 3000 && npm run test:ui-import -- --people 3000",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "datanode:cli": "node ./scripts/datanode-cli.mjs",
+    "datanode:mcp": "node ./scripts/datanode-mcp.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.103.3",

@@ -65,6 +65,14 @@ VITE_SUPABASE_ANON_KEY=
 If `VITE_SUPABASE_PUBLISHABLE_KEY` is present, `VITE_SUPABASE_ANON_KEY` may stay empty.
 `VITE_SUPABASE_ANON_KEY` is still supported for older local setups, but new local environments should use the Supabase publishable key.
 
+Required Supabase Edge Function secret for the graph API:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Keep it only in Supabase Edge Function secrets or local Supabase function env files. It is
+used by `graph-api` to verify hashed agent tokens and apply graph writes for the resolved
+owner user.
+
 Everything else the teammate needs is already in the repository:
 
 - application code
@@ -79,6 +87,49 @@ Start the development server:
 ```bash
 npm run dev
 ```
+
+## Agent API, CLI, and MCP
+
+Signed-in users can create revocable agent tokens from Settings -> Agent API. The token is
+shown once and maps to that user's graph only.
+
+Use the generated values like this:
+
+```bash
+export DATANODE_API_URL=https://<project-ref>.supabase.co/functions/v1/graph-api/v1
+export DATANODE_API_TOKEN=dn_live_<token>
+```
+
+CLI examples:
+
+```bash
+npm run datanode:cli -- meta
+npm run datanode:cli -- search "alice"
+npm run datanode:cli -- circles
+npm run datanode:cli -- people:add <circle-id> "Alice Chen" "Met at conference"
+```
+
+MCP config:
+
+```json
+{
+  "mcpServers": {
+    "datanode": {
+      "command": "npm",
+      "args": ["run", "datanode:mcp", "--"],
+      "cwd": "/Users/velizard/Projects/hackathon",
+      "env": {
+        "DATANODE_API_URL": "https://<project-ref>.supabase.co/functions/v1/graph-api/v1",
+        "DATANODE_API_TOKEN": "dn_live_<token>"
+      }
+    }
+  }
+}
+```
+
+All writes require the current graph revision. The CLI and MCP server read it before
+writing; if another tab or agent saves first, the API returns `409 Conflict` instead of
+overwriting data.
 
 ## Import Load Testing
 

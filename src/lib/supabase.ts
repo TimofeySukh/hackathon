@@ -6,6 +6,11 @@ const supabaseKey =
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseKey)
 
+export function getSupabaseFunctionUrl(functionName: string) {
+  if (!supabaseUrl) return null
+  return `${supabaseUrl.replace(/\/$/, '')}/functions/v1/${functionName}`
+}
+
 export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseKey, {
       auth: {

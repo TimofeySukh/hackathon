@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react'
 import type { User } from '@supabase/supabase-js'
 import * as zip from '@zip.js/zip.js'
@@ -15,7 +15,9 @@ import sdnLogo from './assets/sdn-logo.svg'
 zip.configure({ useWebWorkers: false })
 import { useAuth } from './lib/useAuth'
 import LandingPage from './LandingPage'
-import { loadGraphRecord, saveGraph, loadLocalGraph, saveLocalGraph } from './lib/graphPersistence'
+import { createAgentToken, getGraphApiBaseUrl, listAgentTokens, revokeAgentToken } from './lib/agentApi'
+import type { AgentScope, AgentTokenRecord } from './lib/agentApi'
+import { GraphRevisionConflictError, loadGraphRecord, saveGraph, loadLocalGraph, saveLocalGraph } from './lib/graphPersistence'
 import { enrichLinkedInProfile } from './lib/linkedinEnrichment'
 import { OnboardingCoach } from './Onboarding'
 import { SelectionIndicator } from './components/SelectionIndicator'
@@ -497,8 +499,10 @@ function App() {
   // pan/zoom gesture) so a move event flood doesn't trigger a re-render storm.
   const dragRafRef = useRef<number | null>(null)
   const pendingGraphRef = useRef<((current: GraphState) => GraphState) | null>(null)
-  const loadedGraphSourceRef = useRef<'saved' | 'legacy' | 'empty' | 'local' | 'error'>('empty')
+  const loadedGraphSourceRef = useRef<'saved' | 'empty' | 'local' | 'error'>('empty')
   const loadedGraphSnapshotRef = useRef<string | null>(null)
+  const loadedGraphRevisionRef = useRef<number | null>(null)
+  const graphChannelId = useId()
   const pendingConnectorRef = useRef<DragConnector | null>(null)
   // Start from a blank board (just the "you" circle), never the old demo seed.
   // The real graph replaces this once loaded; keeping demo data here caused it to
@@ -526,6 +530,59 @@ function App() {
   const [emailAuthNotice, setEmailAuthNotice] = useState<string | null>(null)
   const [emailAuthError, setEmailAuthError] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
+  const [agentTokens, setAgentTokens] = useState<AgentTokenRecord[]>([])
+  const [agentTokenName, setAgentTokenName] = useState('AI agent')
+  const [newAgentToken, setNewAgentToken] = useState<string | null>(null)
+  const [agentTokenStatus, setAgentTokenStatus] = useState<string | null>(null)
+  const [agentTokensBusy, setAgentTokensBusy] = useState(false)
+
+  const defaultAgentScopes: AgentScope[] = ['graph:read', 'search:read', 'people:write', 'notes:write', 'links:write', 'connections:write']
+
+  const refreshAgentTokens = async () => {
+    if (!auth.session) return
+    setAgentTokensBusy(true)
+    setAgentTokenStatus(null)
+    try {
+      setAgentTokens(await listAgentTokens(auth.session))
+    } catch (error) {
+      setAgentTokenStatus(error instanceof Error ? error.message : 'Could not load agent tokens.')
+    } finally {
+      setAgentTokensBusy(false)
+    }
+  }
+
+  const handleCreateAgentToken = async () => {
+    if (!auth.session || agentTokensBusy) return
+    setAgentTokensBusy(true)
+    setAgentTokenStatus(null)
+    setNewAgentToken(null)
+    try {
+      const created = await createAgentToken(auth.session, agentTokenName.trim() || 'AI agent', defaultAgentScopes)
+      setNewAgentToken(created.token)
+      setAgentTokens((current) => [created.record, ...current])
+      setAgentTokenStatus('Token created. Copy it now; it will not be shown again.')
+    } catch (error) {
+      setAgentTokenStatus(error instanceof Error ? error.message : 'Could not create agent token.')
+    } finally {
+      setAgentTokensBusy(false)
+    }
+  }
+
+  const handleRevokeAgentToken = async (tokenId: string) => {
+    if (!auth.session || agentTokensBusy) return
+    setAgentTokensBusy(true)
+    setAgentTokenStatus(null)
+    try {
+      await revokeAgentToken(auth.session, tokenId)
+      setAgentTokens((current) => current.map((token) =>
+        token.id === tokenId ? { ...token, revoked_at: new Date().toISOString() } : token
+      ))
+    } catch (error) {
+      setAgentTokenStatus(error instanceof Error ? error.message : 'Could not revoke agent token.')
+    } finally {
+      setAgentTokensBusy(false)
+    }
+  }
 
   const openSignInModal = () => {
     setEmailAuthMode('signin')
@@ -634,6 +691,30 @@ function App() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!('BroadcastChannel' in window)) return undefined
+    if (auth.status !== 'authenticated' || !userId) return undefined
+    const channel = new BroadcastChannel(`social-datanode-graph:${userId}`)
+    channel.onmessage = (event: MessageEvent<{ sourceId?: string; revision?: number }>) => {
+      if (event.data?.sourceId === graphChannelId) return
+      const incomingRevision = event.data?.revision
+      if (typeof incomingRevision !== 'number') return
+      const currentRevision = loadedGraphRevisionRef.current
+      if (currentRevision !== null && incomingRevision > currentRevision) {
+        loadedGraphSourceRef.current = 'error'
+        setGraphLoadError('This board changed in another tab or through an agent. To protect your data, reload before making more changes.')
+      }
+    }
+    return () => channel.close()
+  }, [auth.status, graphChannelId, userId])
+
+  const broadcastGraphRevision = useCallback((userIdValue: string, revision: number | null) => {
+    if (!('BroadcastChannel' in window) || revision === null) return
+    const channel = new BroadcastChannel(`social-datanode-graph:${userIdValue}`)
+    channel.postMessage({ sourceId: graphChannelId, revision })
+    channel.close()
+  }, [graphChannelId])
+
   // Load the signed-in user's graph; a brand-new account starts from a blank
   // canvas with only their "you" circle — the local demo data is never persisted.
   useEffect(() => {
@@ -649,6 +730,7 @@ function App() {
         const stamped = stampYouIdentity(base, auth.session!.user)
         loadedGraphSourceRef.current = loaded.source
         loadedGraphSnapshotRef.current = JSON.stringify(stamped)
+        loadedGraphRevisionRef.current = loaded.revision
         setGraph(stamped)
         setGraphLoaded(true)
       })
@@ -658,6 +740,7 @@ function App() {
           const stamped = stampYouIdentity(createFreshGraph(), auth.session!.user)
           loadedGraphSourceRef.current = 'error'
           loadedGraphSnapshotRef.current = JSON.stringify(stamped)
+          loadedGraphRevisionRef.current = null
           setGraphLoadError('Failed to load your board from the database. To protect your data, changes will not be saved. Please reload the page.')
           setGraph(stamped)
           setGraphLoaded(true)
@@ -678,10 +761,24 @@ function App() {
       return
     }
     const timer = window.setTimeout(() => {
-      void saveGraph(userId, graph).catch((error) => console.error('Failed to save graph', error))
+      void saveGraph(userId, graph, loadedGraphRevisionRef.current)
+        .then((nextRevision) => {
+          loadedGraphRevisionRef.current = nextRevision
+          loadedGraphSourceRef.current = 'saved'
+          loadedGraphSnapshotRef.current = JSON.stringify(graph)
+          broadcastGraphRevision(userId, nextRevision)
+        })
+        .catch((error) => {
+          if (error instanceof GraphRevisionConflictError) {
+            loadedGraphSourceRef.current = 'error'
+            setGraphLoadError('This board changed in another tab or through an agent. To protect your data, reload before making more changes.')
+            return
+          }
+          console.error('Failed to save graph', error)
+        })
     }, 800)
     return () => window.clearTimeout(timer)
-  }, [graph, graphLoaded, auth.status, userId])
+  }, [graph, graphLoaded, auth.status, broadcastGraphRevision, userId])
 
   // Signed-out visitors aren't blocked: their board is restored from (and saved
   // to) localStorage so work survives a reload without an account. Signing in
@@ -698,10 +795,12 @@ function App() {
       const sanitized = sanitizeDefaultCircleStyles(saved)
       loadedGraphSourceRef.current = 'local'
       loadedGraphSnapshotRef.current = JSON.stringify(sanitized)
+      loadedGraphRevisionRef.current = null
       setGraph(sanitized)
     } else {
       loadedGraphSourceRef.current = 'empty'
       loadedGraphSnapshotRef.current = JSON.stringify(graph)
+      loadedGraphRevisionRef.current = null
     }
     setGraphLoaded(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -765,6 +864,52 @@ function App() {
   useEffect(() => {
     onboardingStepRef.current = onboardingStep
   }, [onboardingStep])
+
+  const [onboardingOffset, setOnboardingOffset] = useState(0)
+
+  useEffect(() => {
+    const updateOffset = () => {
+      if (window.innerWidth > 720) {
+        setOnboardingOffset(0)
+        return
+      }
+
+      const inspectorEl = document.querySelector('.inspector')
+      const popoverEl = document.querySelector('.circle-style-popover.is-open')
+
+      let maxBottom = 0
+
+      if (inspectorEl) {
+        const rect = inspectorEl.getBoundingClientRect()
+        maxBottom = Math.max(maxBottom, rect.height + 16)
+      }
+
+      if (popoverEl) {
+        const rect = popoverEl.getBoundingClientRect()
+        maxBottom = Math.max(maxBottom, rect.height + 96)
+      }
+
+      setOnboardingOffset(maxBottom)
+    }
+
+    updateOffset()
+    const timer1 = setTimeout(updateOffset, 50)
+    const timer2 = setTimeout(updateOffset, 150)
+    const timer3 = setTimeout(updateOffset, 300)
+
+    window.addEventListener('resize', updateOffset)
+
+    const observer = new MutationObserver(updateOffset)
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true })
+
+    return () => {
+      clearTimeout(timer1)
+      clearTimeout(timer2)
+      clearTimeout(timer3)
+      window.removeEventListener('resize', updateOffset)
+      observer.disconnect()
+    }
+  }, [selectedItem, showCircleStylePanel, onboardingStep])
 
   // True during the brief "Great!" beat that plays after a gesture, before the
   // card advances to the next step.
@@ -880,6 +1025,13 @@ function App() {
   const linkedInGuidePanelRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const graphFileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (auth.status !== 'authenticated' || !auth.session || !showSettings) return
+    const timer = window.setTimeout(() => void refreshAgentTokens(), 0)
+    return () => window.clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth.status, auth.session, showSettings])
 
   // Search: a pill in the top toolbar that finds people and circles and
   // circles (the "tags"), then flies the camera to the picked node.
@@ -3459,9 +3611,34 @@ function App() {
             style={{
               background: showSettings ? 'var(--md-secondary-container)' : 'transparent',
               color: showSettings ? 'var(--md-on-secondary-container)' : 'var(--md-on-surface-variant)',
+              position: 'relative',
             }}
           >
             <SettingsIcon />
+            {auth.status === 'anonymous' && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '4px',
+                  right: '4px',
+                  width: '14px',
+                  height: '14px',
+                  borderRadius: '50%',
+                  backgroundColor: 'var(--md-error, #ba1a1a)',
+                  color: '#ffffff',
+                  fontSize: '10px',
+                  fontWeight: 'bold',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '1.5px solid var(--md-surface-container, #ecedf2)',
+                  lineHeight: 1,
+                }}
+                aria-hidden="true"
+              >
+                !
+              </span>
+            )}
           </button>
         </div>
       </div>
@@ -3539,8 +3716,16 @@ function App() {
 
                     if (userId && canSave) {
                       try {
-                        await saveGraph(userId, graph)
+                        const nextRevision = await saveGraph(userId, graph, loadedGraphRevisionRef.current)
+                        loadedGraphRevisionRef.current = nextRevision
+                        loadedGraphSourceRef.current = 'saved'
+                        loadedGraphSnapshotRef.current = JSON.stringify(graph)
+                        broadcastGraphRevision(userId, nextRevision)
                       } catch (error) {
+                        if (error instanceof GraphRevisionConflictError) {
+                          setGraphLoadError('This board changed in another tab or through an agent. To protect your data, reload before signing out.')
+                          return
+                        }
                         console.error('Failed to save before sign-out', error)
                       }
                     }
@@ -3549,6 +3734,96 @@ function App() {
                 >
                   Sign out
                 </button>
+              </div>
+            )}
+            {auth.status === 'authenticated' && (
+              <div style={{ borderTop: '1px solid var(--md-outline-variant)', paddingTop: '16px', display: 'grid', gap: '10px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--md-on-surface-variant)' }}>
+                  Agent API
+                </label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    type="text"
+                    value={agentTokenName}
+                    onChange={(event) => setAgentTokenName(event.target.value)}
+                    className="m3-input-field"
+                    placeholder="Token name"
+                    style={{ minWidth: 0, flex: 1 }}
+                  />
+                  <button
+                    type="button"
+                    className="m3-primary-button"
+                    disabled={agentTokensBusy}
+                    onClick={handleCreateAgentToken}
+                  >
+                    Create token
+                  </button>
+                </div>
+                {agentTokenStatus && (
+                  <p style={{ margin: 0, fontSize: '12px', color: 'var(--md-on-surface-variant)' }}>
+                    {agentTokenStatus}
+                  </p>
+                )}
+                {newAgentToken && (
+                  <div style={{ display: 'grid', gap: '8px', padding: '10px', borderRadius: '8px', background: 'var(--md-surface-container-low)' }}>
+                    <p style={{ margin: 0, fontSize: '12px', color: 'var(--md-on-surface-variant)' }}>
+                      Copy this token now. It will not be shown again.
+                    </p>
+                    <input
+                      type="text"
+                      readOnly
+                      value={newAgentToken}
+                      className="m3-input-field"
+                      onFocus={(event) => event.currentTarget.select()}
+                    />
+                    <textarea
+                      readOnly
+                      className="m3-input-field"
+                      value={`DATANODE_API_URL=${getGraphApiBaseUrl() ?? ''}\nDATANODE_API_TOKEN=${newAgentToken}`}
+                      rows={3}
+                      onFocus={(event) => event.currentTarget.select()}
+                      style={{ resize: 'vertical' }}
+                    />
+                  </div>
+                )}
+                <div style={{ display: 'grid', gap: '6px' }}>
+                  {agentTokens.length === 0 && (
+                    <p style={{ margin: 0, fontSize: '12px', color: 'var(--md-on-surface-variant)' }}>
+                      No agent tokens yet.
+                    </p>
+                  )}
+                  {agentTokens.map((token) => (
+                    <div
+                      key={token.id}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr auto',
+                        gap: '8px',
+                        alignItems: 'center',
+                        padding: '8px',
+                        border: '1px solid var(--md-outline-variant)',
+                        borderRadius: '8px',
+                      }}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: '13px', color: 'var(--md-on-surface)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {token.name}
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--md-on-surface-variant)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {token.token_prefix} · {token.revoked_at ? 'revoked' : 'active'}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="m3-primary-button m3-primary-button--danger"
+                        disabled={agentTokensBusy || Boolean(token.revoked_at)}
+                        onClick={() => handleRevokeAgentToken(token.id)}
+                      >
+                        Revoke
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
             {auth.status === 'anonymous' && (
@@ -4691,19 +4966,6 @@ function App() {
         </div>
       )}
 
-      {auth.status === 'anonymous' && (
-        <div className="local-save-hint" role="note">
-          <span>Sign in to save your data — your board is kept locally for now.</span>
-          <button
-            type="button"
-            className="local-save-hint__action"
-            onClick={() => openSignInModal()}
-          >
-            Sign in
-          </button>
-        </div>
-      )}
- 
       {graphLoaded && !demoMode && onboardingStep >= 0 && (
         <OnboardingCoach
           step={onboardingStep}
@@ -4720,7 +4982,7 @@ function App() {
             }
             window.requestAnimationFrame(() => searchInputRef.current?.focus())
           }}
-          position={selectedItem ? 'top' : 'bottom'}
+          offset={onboardingOffset}
         />
       )}
     </main>

@@ -63,6 +63,8 @@ Completed tasks can remain listed here when they explain repository history. Liv
 - `README.md`: top-level overview and local development commands.
 - `scripts/test-database-load.mjs`: dry-run by default synthetic `user_graphs` payload generator, with guarded staging write/read/cleanup support.
 - `scripts/test-ui-import-responsiveness.mjs`: Playwright-driven large LinkedIn ZIP import check that measures browser event-loop lag.
+- `scripts/datanode-cli.mjs`: local CLI client for the agent graph API.
+- `scripts/datanode-mcp.mjs`: stdio MCP server for AI agents, backed by the graph API.
 - `src/main.tsx`: React entry point.
 - `src/App.tsx`: React shell + interaction host for the board (chrome, panels, pointer interaction, persisted-graph wiring, paint loop). Delegates canvas logic to `src/lib/board/`.
 - `src/lib/board/`: framework-free board engine — `types`, `constants`, `colors`, `geometry`, `layout` (containment/collision), `render` (spatial index, hit-test, Canvas 2D draw layer).
@@ -72,7 +74,7 @@ Completed tasks can remain listed here when they explain repository history. Liv
 - `src/index.css` + `src/styles/`: visual system, split into `@import`ed partials (cascade order = import order).
 - `skills-lock.json`: lockfile for installed project agent skills.
 - `supabase/migrations/`: database schema and row-level security migrations.
-- `supabase/functions/`: server-side Supabase Edge Function for LinkedIn profile enrichment.
+- `supabase/functions/`: server-side Supabase Edge Functions for LinkedIn profile enrichment and the agent graph API.
 
 ## Ownership
 

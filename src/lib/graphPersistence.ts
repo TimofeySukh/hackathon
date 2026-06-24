@@ -8,7 +8,15 @@ export type LoadedGraphSource = 'saved' | 'empty' | 'error'
 
 export type LoadedGraphRecord = {
   graph: GraphState | null
+  revision: number | null
   source: LoadedGraphSource
+}
+
+export class GraphRevisionConflictError extends Error {
+  constructor() {
+    super('Your board changed somewhere else. Reload before saving again.')
+    this.name = 'GraphRevisionConflictError'
+  }
 }
 
 function isGraphState(value: unknown): value is GraphState {
@@ -31,35 +39,58 @@ export async function loadGraph(userId: string): Promise<GraphState | null> {
 }
 
 export async function loadGraphRecord(userId: string): Promise<LoadedGraphRecord> {
-  if (!supabase) return { graph: null, source: 'empty' }
+  if (!supabase) return { graph: null, revision: null, source: 'empty' }
 
   const { data, error } = await supabase
     .from('user_graphs')
-    .select('graph')
+    .select('graph, revision')
     .eq('user_id', userId)
     .maybeSingle()
 
   if (!error && data && isGraphState(data.graph)) {
-    return { graph: data.graph, source: 'saved' }
+    return { graph: data.graph, revision: typeof data.revision === 'number' ? data.revision : 1, source: 'saved' }
   }
 
   if (error) throw error
 
-  return { graph: null, source: 'empty' }
+  return { graph: null, revision: null, source: 'empty' }
 }
 
 /**
- * Persists the entire graph in one upsert. Safe to call after a bulk import of
- * thousands of nodes — it is still a single request.
+ * Persists the entire graph with optimistic concurrency. Safe to call after a
+ * bulk import of thousands of nodes — it is still a single request. A stale
+ * tab gets GraphRevisionConflictError instead of overwriting newer data.
  */
-export async function saveGraph(userId: string, graph: GraphState): Promise<void> {
-  if (!supabase) return
+export async function saveGraph(userId: string, graph: GraphState, expectedRevision: number | null): Promise<number | null> {
+  if (!supabase) return expectedRevision
 
-  const { error } = await supabase
+  if (expectedRevision === null) {
+    const { data, error } = await supabase
+      .from('user_graphs')
+      .insert({ user_id: userId, graph })
+      .select('revision')
+      .single()
+
+    if (error) {
+      if (error.code === '23505') throw new GraphRevisionConflictError()
+      throw error
+    }
+
+    return typeof data.revision === 'number' ? data.revision : 1
+  }
+
+  const { data, error } = await supabase
     .from('user_graphs')
-    .upsert({ user_id: userId, graph }, { onConflict: 'user_id' })
+    .update({ graph })
+    .eq('user_id', userId)
+    .eq('revision', expectedRevision)
+    .select('revision')
+    .maybeSingle()
 
   if (error) throw error
+  if (!data) throw new GraphRevisionConflictError()
+
+  return typeof data.revision === 'number' ? data.revision : expectedRevision + 1
 }
 
 // ---- Local (signed-out) persistence ----------------------------------------
