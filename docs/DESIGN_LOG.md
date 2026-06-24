@@ -21,7 +21,8 @@ rediscover, write it here.
 
 - Decision: the agent settings dialog `.agent-settings-dialog` is given a stable height of `height: min(680px, calc(100vh - 64px))` on desktop and `height: min(680px, calc(100vh - 24px))` on mobile.
 - Decision: the package name is renamed to `datanode-mcp` and two `bin` executables are exposed in `package.json` (`datanode-mcp` and `datanode-cli`), allowing both the MCP server and CLI tool to be run/installed universally via `npx` or `npm install -g` anywhere.
-- Why: switching tabs in settings was causing vertical dialog height shifts depending on the tab's content. Universal `npx` execution allows any remote AI agent or user to install and launch the MCP server/CLI without requiring a local clone.
+- Decision: keeping the public web developer documentation (`src/DocsPage.tsx`) synchronized with any API, CLI, or MCP modifications is added as an explicit rule in `AGENTS.md`.
+- Why: switching tabs in settings was causing vertical dialog height shifts depending on the tab's content. Universal `npx` execution allows any remote AI agent or user to install and launch the MCP server/CLI without requiring a local clone. Keeping public docs synchronized ensures that remote agents or external builders can always read accurate API schemas on the live site.
 
 ### 2026-06-24 — API Writes Are Revision-Checked
 

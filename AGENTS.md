@@ -16,6 +16,7 @@ This repo follows the harness guidance in `docs/`.
 - Keep all application user-facing text, comments, documentation, and codebase elements in English. Chat responses to the user can be in the user's preferred language.
 - Treat `docs/` as the source of truth for project knowledge.
 - Update the relevant doc when behavior, structure, or commands change.
+- When modifying API endpoints, CLI commands, or MCP tools, always update the public developer documentation in `src/DocsPage.tsx` to keep the website docs synchronized.
 - Follow `docs/DESIGN_SYSTEM.md` (Material 3) for any UI. New UI ships Material 3 from the start; do not copy the old chrome style.
 - Document each new feature under `docs/features/` (copy `_TEMPLATE.md`), and record durable design decisions in `docs/DESIGN_LOG.md`.
 - Always create a commit after making changes.
