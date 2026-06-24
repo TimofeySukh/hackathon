@@ -3483,13 +3483,22 @@ MCP server config:
   }
 }
 
+Developer Wiki & Docs:
+Full API reference, CLI usage guide, and interactive docs are available publicly at:
+${window.location.origin}/#docs
+
+CLI Client:
+To run the CLI on-the-fly or install globally:
+- Run via npx: npx -y --package github:TimofeySukh/hackathon datanode-cli <command>
+- Install globally: npm install -g github:TimofeySukh/hackathon
+
 Available actions:
 - search people, circles, notes, and saved links
 - list circles and choose the correct circleId
 - add people to exactly one direct circle
 - add notes, links, and relationship connections
 
-Never ask for a user_id. The token already resolves to the correct user. If an API write returns 409 Conflict, reload graph metadata and retry the intended operation once.`
+If an API write returns 409 Conflict, reload graph metadata and retry the intended operation once.`
   const mcpConfigSnippet = `{
   "mcpServers": {
     "datanode": {
