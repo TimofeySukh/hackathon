@@ -15,6 +15,7 @@ import sdnLogo from './assets/sdn-logo.svg'
 zip.configure({ useWebWorkers: false })
 import { useAuth } from './lib/useAuth'
 import LandingPage from './LandingPage'
+import DocsPage from './DocsPage'
 import { createAgentToken, getGraphApiBaseUrl, listAgentTokens, revokeAgentToken } from './lib/agentApi'
 import type { AgentScope, AgentTokenRecord } from './lib/agentApi'
 import { GraphRevisionConflictError, loadGraphRecord, saveGraph, loadLocalGraph, saveLocalGraph } from './lib/graphPersistence'
@@ -469,16 +470,24 @@ function markOnboardingSeen() {
 }
 
 function App() {
-  const [viewMode, setViewMode] = useState<'landing' | 'board'>(() => {
-    // Show landing page only if #landing is explicitly requested in the URL
-    return window.location.hash === '#landing' ? 'landing' : 'board';
+  const [viewMode, setViewMode] = useState<'landing' | 'board' | 'docs'>(() => {
+    // Show landing/docs page if explicitly requested in the URL hash
+    if (window.location.hash === '#landing') return 'landing';
+    if (window.location.hash === '#docs') return 'docs';
+    return 'board';
   });
 
 
   useEffect(() => {
     const handleHashChange = () => {
-      const isLanding = window.location.hash === '#landing';
-      setViewMode(isLanding ? 'landing' : 'board');
+      const hash = window.location.hash;
+      if (hash === '#landing') {
+        setViewMode('landing');
+      } else if (hash === '#docs') {
+        setViewMode('docs');
+      } else {
+        setViewMode('board');
+      }
     };
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
@@ -3539,6 +3548,10 @@ Content-Type: application/json
     )
   }
 
+  if (viewMode === 'docs') {
+    return <DocsPage />
+  }
+
   return (
     <main className={`app-shell ${demoMode ? 'is-demo-mode' : ''} ${searchOpen ? 'is-search-open' : ''} ${showSettings ? 'is-settings-open' : ''} ${selectedItem ? 'is-inspector-open' : ''}`}>
       {graphLoadError && (
@@ -4828,6 +4841,19 @@ Content-Type: application/json
                   {label}
                 </button>
               ))}
+              <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid var(--md-outline-variant)' }}>
+                <button
+                  type="button"
+                  className="agent-settings-sidebar__item"
+                  style={{ color: 'var(--md-primary)', gap: '8px' }}
+                  onClick={() => {
+                    setShowAgentSettings(false)
+                    window.location.hash = '#docs'
+                  }}
+                >
+                  <span style={{ fontSize: '16px' }}>📖</span> Full Wiki & Docs
+                </button>
+              </div>
             </aside>
             <div className="agent-settings-content">
               <button
