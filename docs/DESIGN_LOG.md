@@ -702,3 +702,10 @@ rediscover, write it here.
 - Decision: Implemented context-aware positioning for the onboarding coach card on mobile. The card dynamically floats at the top if the inspector (notes) is open (`selectedItem !== null`) to avoid overlapping notes, and at the bottom if the search panel is open (preventing overlap with search) or by default.
 - Decision: Repositioned the anonymous sign-in banner (`.local-save-hint`) from top-left to bottom-left on desktop, and bottom-stretch on mobile. It is hidden completely on mobile when search, settings, or the inspector panel are open.
 - Why: Having the banner at the top-left caused it to overlap the brand logo/settings buttons. Positioning it at the bottom keeps it clean, and hiding it when panels are open avoids any screen clutter on small devices.
+
+### 2026-06-24 — Remove Sign-in Popup, Add Settings Alert Badge, and Dynamic Onboarding Offset
+
+- Decision: Removed the floating anonymous sign-in banner (`.local-save-hint`) completely. Instead, added an alert exclamation badge (`!`) on the Settings gear button for anonymous users, which prompts them to open settings where the account sign-in block is located.
+- Why: The popup banner was intrusive, cluttered mobile viewports, and clashed/overlapped with logo and onboarding controls. The badge is much quieter, spec-compliant, and cleanly guides users to their settings.
+- Decision: Replaced fixed top/bottom classes for the mobile onboarding coach with a dynamic JS offset measurement. A MutationObserver and window listeners monitor the height of the bottom inspector and the circle style popover, setting an inline `bottom` offset so the coach card dynamically glides up and down, floating exactly 12px above whichever bottom sheet is active.
+- Why: Pushing the onboarding coach to the top of the screen on mobile avoided the bottom notes but ended up covering the search dropdown and other top-level elements. Pushing it up just enough to float above bottom sheets keeps the top area completely clear.

@@ -340,25 +340,7 @@
     width: min(280px, calc(100vw - 32px));
   }
 
-  /* Keep the "sign in to save" banner clear of the top-right toolbar buttons,
-     and get it out of the way entirely while a chrome panel is open. The
-     .app-shell prefix lifts specificity above the base .local-save-hint rule,
-     which is declared later in the file. */
-  .app-shell .local-save-hint {
-    position: fixed;
-    top: auto;
-    bottom: 16px;
-    left: 16px;
-    right: 16px;
-    max-width: none;
-    width: auto;
-  }
 
-  .app-shell.is-search-open .local-save-hint,
-  .app-shell.is-settings-open .local-save-hint,
-  .app-shell.is-inspector-open .local-save-hint {
-    display: none;
-  }
 
   .circle-style-popover {
     position: fixed;
