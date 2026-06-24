@@ -418,6 +418,7 @@ async function mutateGraph(req: Request, auth: AuthContext, body: Record<string,
 }
 
 async function handleTokenRoutes(req: Request, path: string, auth: AuthContext, body: Record<string, unknown>) {
+  if (path !== '/v1/agent-tokens' && !path.startsWith('/v1/agent-tokens/')) return null
   if (auth.authType !== 'session') return jsonResponse({ error: 'User session required.' }, 403)
   const service = getServiceClient()
 

@@ -1,2 +1,5 @@
 [functions.enrich-linkedin-profile]
 verify_jwt = false
+
+[functions.graph-api]
+verify_jwt = false
