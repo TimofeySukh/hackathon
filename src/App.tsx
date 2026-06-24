@@ -1002,6 +1002,7 @@ function App() {
   const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight })
 
   const [showSettings, setShowSettings] = useState(false)
+  const [showAgentSettings, setShowAgentSettings] = useState(false)
   const [showLinkedInGuide, setShowLinkedInGuide] = useState(false)
   const [demoMode, setDemoMode] = useState(false)
   const [showCircleLabels, setShowCircleLabels] = useState(true)
@@ -1027,11 +1028,11 @@ function App() {
   const graphFileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (auth.status !== 'authenticated' || !auth.session || !showSettings) return
+    if (auth.status !== 'authenticated' || !auth.session || !showAgentSettings) return
     const timer = window.setTimeout(() => void refreshAgentTokens(), 0)
     return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auth.status, auth.session, showSettings])
+  }, [auth.status, auth.session, showAgentSettings])
 
   // Search: a pill in the top toolbar that finds people and circles and
   // circles (the "tags"), then flies the camera to the picked node.
@@ -3737,93 +3738,22 @@ function App() {
               </div>
             )}
             {auth.status === 'authenticated' && (
-              <div style={{ borderTop: '1px solid var(--md-outline-variant)', paddingTop: '16px', display: 'grid', gap: '10px' }}>
-                <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--md-on-surface-variant)' }}>
+              <div className="settings-graph-section">
+                <label className="settings-section-label">
                   Agent API
                 </label>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <input
-                    type="text"
-                    value={agentTokenName}
-                    onChange={(event) => setAgentTokenName(event.target.value)}
-                    className="m3-input-field"
-                    placeholder="Token name"
-                    style={{ minWidth: 0, flex: 1 }}
-                  />
-                  <button
-                    type="button"
-                    className="m3-primary-button"
-                    disabled={agentTokensBusy}
-                    onClick={handleCreateAgentToken}
-                  >
-                    Create token
-                  </button>
-                </div>
-                {agentTokenStatus && (
-                  <p style={{ margin: 0, fontSize: '12px', color: 'var(--md-on-surface-variant)' }}>
-                    {agentTokenStatus}
-                  </p>
-                )}
-                {newAgentToken && (
-                  <div style={{ display: 'grid', gap: '8px', padding: '10px', borderRadius: '8px', background: 'var(--md-surface-container-low)' }}>
-                    <p style={{ margin: 0, fontSize: '12px', color: 'var(--md-on-surface-variant)' }}>
-                      Copy this token now. It will not be shown again.
-                    </p>
-                    <input
-                      type="text"
-                      readOnly
-                      value={newAgentToken}
-                      className="m3-input-field"
-                      onFocus={(event) => event.currentTarget.select()}
-                    />
-                    <textarea
-                      readOnly
-                      className="m3-input-field"
-                      value={`DATANODE_API_URL=${getGraphApiBaseUrl() ?? ''}\nDATANODE_API_TOKEN=${newAgentToken}`}
-                      rows={3}
-                      onFocus={(event) => event.currentTarget.select()}
-                      style={{ resize: 'vertical' }}
-                    />
-                  </div>
-                )}
-                <div style={{ display: 'grid', gap: '6px' }}>
-                  {agentTokens.length === 0 && (
-                    <p style={{ margin: 0, fontSize: '12px', color: 'var(--md-on-surface-variant)' }}>
-                      No agent tokens yet.
-                    </p>
-                  )}
-                  {agentTokens.map((token) => (
-                    <div
-                      key={token.id}
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1fr auto',
-                        gap: '8px',
-                        alignItems: 'center',
-                        padding: '8px',
-                        border: '1px solid var(--md-outline-variant)',
-                        borderRadius: '8px',
-                      }}
-                    >
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: '13px', color: 'var(--md-on-surface)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {token.name}
-                        </div>
-                        <div style={{ fontSize: '11px', color: 'var(--md-on-surface-variant)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {token.token_prefix} · {token.revoked_at ? 'revoked' : 'active'}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className="m3-primary-button m3-primary-button--danger"
-                        disabled={agentTokensBusy || Boolean(token.revoked_at)}
-                        onClick={() => handleRevokeAgentToken(token.id)}
-                      >
-                        Revoke
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                <button
+                  type="button"
+                  className="m3-primary-button"
+                  onClick={() => {
+                    setShowSettings(false)
+                    setNewAgentToken(null)
+                    setAgentTokenStatus(null)
+                    setShowAgentSettings(true)
+                  }}
+                >
+                  Manage API keys
+                </button>
               </div>
             )}
             {auth.status === 'anonymous' && (
@@ -4782,6 +4712,140 @@ function App() {
             <img className="brand__mark" src={sdnLogo} alt="" aria-hidden="true" />
             <p style={{ margin: 0, color: 'var(--md-on-surface-variant)' }}>Loading your board…</p>
           </div>
+        </div>
+      )}
+
+      {showAgentSettings && (
+        <div
+          className="agent-settings-overlay is-open"
+          onClick={() => setShowAgentSettings(false)}
+        >
+          <section
+            className="agent-settings-dialog"
+            aria-modal="true"
+            role="dialog"
+            aria-labelledby="agent-settings-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <aside className="agent-settings-sidebar">
+              <div className="agent-settings-sidebar__section">Settings</div>
+              <button type="button" className="agent-settings-sidebar__item is-active">
+                Agent API
+              </button>
+            </aside>
+            <div className="agent-settings-content">
+              <button
+                type="button"
+                className="agent-settings-close"
+                aria-label="Close"
+                onClick={() => setShowAgentSettings(false)}
+              >
+                <CloseIcon />
+              </button>
+              <header className="agent-settings-header">
+                <div>
+                  <h2 id="agent-settings-title">Agent API keys</h2>
+                  <p>Create revocable keys for MCP servers, CLI tools, and AI agents.</p>
+                </div>
+              </header>
+
+              <section className="agent-settings-section">
+                <div className="agent-settings-section__header">
+                  <div>
+                    <h3>Create key</h3>
+                    <p>Default keys can search and add people, notes, links, and graph connections.</p>
+                  </div>
+                </div>
+                <div className="agent-settings-create-row">
+                  <input
+                    type="text"
+                    value={agentTokenName}
+                    onChange={(event) => setAgentTokenName(event.target.value)}
+                    className="m3-input-field agent-settings-name-input"
+                    placeholder="Token name"
+                  />
+                  <button
+                    type="button"
+                    className="m3-primary-button agent-settings-action"
+                    disabled={agentTokensBusy}
+                    onClick={handleCreateAgentToken}
+                  >
+                    Create token
+                  </button>
+                </div>
+                {agentTokenStatus && (
+                  <p className="agent-settings-status">
+                    {agentTokenStatus}
+                  </p>
+                )}
+                {newAgentToken && (
+                  <div className="agent-settings-secret">
+                    <div>
+                      <h4>Copy this token now</h4>
+                      <p>It is stored as a hash and will not be shown again.</p>
+                    </div>
+                    <input
+                      type="text"
+                      readOnly
+                      value={newAgentToken}
+                      className="m3-input-field"
+                      onFocus={(event) => event.currentTarget.select()}
+                    />
+                    <textarea
+                      readOnly
+                      className="m3-input-field"
+                      value={`DATANODE_API_URL=${getGraphApiBaseUrl() ?? ''}\nDATANODE_API_TOKEN=${newAgentToken}`}
+                      rows={3}
+                      onFocus={(event) => event.currentTarget.select()}
+                    />
+                  </div>
+                )}
+              </section>
+
+              <section className="agent-settings-section">
+                <div className="agent-settings-section__header">
+                  <div>
+                    <h3>Existing keys</h3>
+                    <p>Revoke a key immediately if it was shared or copied somewhere unsafe.</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="m3-primary-button m3-primary-button--tonal agent-settings-refresh"
+                    disabled={agentTokensBusy}
+                    onClick={() => void refreshAgentTokens()}
+                  >
+                    Refresh
+                  </button>
+                </div>
+                <div className="agent-token-list">
+                  {agentTokens.length === 0 && (
+                    <div className="agent-token-empty">
+                      No agent tokens yet.
+                    </div>
+                  )}
+                  {agentTokens.map((token) => (
+                    <div key={token.id} className="agent-token-row">
+                      <div className="agent-token-row__main">
+                        <div className="agent-token-row__name">{token.name}</div>
+                        <div className="agent-token-row__meta">
+                          {token.token_prefix} · {token.revoked_at ? 'revoked' : 'active'}
+                          {token.last_used_at ? ` · last used ${new Date(token.last_used_at).toLocaleDateString()}` : ''}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="m3-primary-button m3-primary-button--danger agent-settings-revoke"
+                        disabled={agentTokensBusy || Boolean(token.revoked_at)}
+                        onClick={() => handleRevokeAgentToken(token.id)}
+                      >
+                        Revoke
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </div>
+          </section>
         </div>
       )}
 

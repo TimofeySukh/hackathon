@@ -7,7 +7,8 @@ Supabase project secrets or allowing access to another user's graph.
 
 ## Behavior
 
-- Signed-in users create and revoke agent tokens from Settings.
+- Signed-in users open Agent API key management from Settings. The key manager is a
+  large modal overlay; opening it closes the compact Settings panel.
 - Tokens are shown once, stored server-side only as SHA-256 hashes, and can be revoked.
 - Agent tokens identify exactly one user. API requests never accept `user_id` from the
   caller.
@@ -21,7 +22,8 @@ Supabase project secrets or allowing access to another user's graph.
 
 ## Design
 
-- Surfaces / elevation used: the Settings panel's existing Material 3 surface.
+- Surfaces / elevation used: a full-screen overlay with a large Material 3 dialog,
+  sidebar, and content surface.
 - Components used: text field, filled buttons, small list rows, and status text.
 - Color roles used: existing Settings panel neutral roles plus danger button styling for
   revoke.
