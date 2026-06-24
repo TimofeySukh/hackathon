@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "hackathon-board": {
-      "command": "node",
-      "args": ["./mcp/server.mjs"]
-    }
-  }
-}

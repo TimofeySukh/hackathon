@@ -21,8 +21,7 @@ It is a live product, not a local-only prototype:
   requires only email and password, supports confirmation resend and password reset, and a
   new board starts blank (no demo seed)
 - LinkedIn import (Connections.csv ZIP + single-profile enrichment),
-  per-person notes/tags/connections, debounced AI note generation, and
-  local + AI-ranked board search
+  per-person notes/tags/connections, and local board search
 - settings controls for demo mode, labels, global circle shape, and fill style
 
 ## Active Work
@@ -62,10 +61,6 @@ Completed tasks can remain listed here when they explain repository history. Liv
 - `docs/features/`: one document per user-facing feature (look and behavior), with a template and index.
 - `docs/DESIGN_LOG.md`: append-only log of durable design decisions.
 - `README.md`: top-level overview and local development commands.
-- `.env.mcp.example`: local-only MCP environment template for service-role access.
-- `.mcp.json`: project MCP configuration for the local Hackathon board stdio server.
-- `mcp/server.mjs`: local MCP server that exposes project docs and board graph tooling.
-- `scripts/seed-demo-user.mjs`: idempotent demo-data seed for one user's board with reusable people, notes, AI summaries, and connections.
 - `scripts/test-database-load.mjs`: dry-run by default synthetic `user_graphs` payload generator, with guarded staging write/read/cleanup support.
 - `scripts/test-ui-import-responsiveness.mjs`: Playwright-driven large LinkedIn ZIP import check that measures browser event-loop lag.
 - `src/main.tsx`: React entry point.
@@ -73,15 +68,11 @@ Completed tasks can remain listed here when they explain repository history. Liv
 - `src/lib/board/`: framework-free board engine — `types`, `constants`, `colors`, `geometry`, `layout` (containment/collision), `render` (spatial index, hit-test, Canvas 2D draw layer).
 - `src/lib/supabase.ts`: browser Supabase client configuration.
 - `src/lib/useAuth.ts`: session, Google sign-in, email/password sign-in, confirmation resend, and password reset state.
-- `src/lib/useBoardGraph.ts`: board graph loading and mutation state.
 - `src/lib/graphPersistence.ts`: load/save the graph blob (Supabase signed-in, `localStorage` anonymous).
-- `src/lib/graphStorage.ts`: Supabase CRUD layer for people, tags, notes, `person_ai_notes`, and AI Edge Functions.
-- `src/lib/graphTypes.ts`: shared graph interfaces, including the structured AI summary contract.
-- `src/lib/userWorkspace.ts`: profile, board, and root-person bootstrap.
 - `src/index.css` + `src/styles/`: visual system, split into `@import`ed partials (cascade order = import order).
 - `skills-lock.json`: lockfile for installed project agent skills.
 - `supabase/migrations/`: database schema and row-level security migrations.
-- `supabase/functions/`: server-side Supabase Edge Functions for Gemini/OpenRouter AI note sync and AI people search.
+- `supabase/functions/`: server-side Supabase Edge Function for LinkedIn profile enrichment.
 
 ## Ownership
 
@@ -94,6 +85,5 @@ Task ownership is tracked in Linear. Code ownership is not split by directory ye
 - Update `docs/product-vision.md` when product scope changes.
 - Update `docs/project-structure.md` and `docs/ARCHITECTURE.md` when source structure or boundaries change.
 - Follow `docs/DESIGN_SYSTEM.md` for UI work, keep a feature doc under `docs/features/` for each feature, and log durable design decisions in `docs/DESIGN_LOG.md`.
-- Keep the local MCP server aligned with the Supabase schema and documentation resources.
 - Keep Supabase Auth redirect URLs and Google OAuth origins aligned with every deployed frontend origin.
 - Remember that commits on `main` deploy to the primary production site within about 3 minutes after they reach GitHub.

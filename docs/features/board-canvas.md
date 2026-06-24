@@ -76,10 +76,8 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   board graph JSON with `circles`, `people`, and `connections` arrays, then replaces the
   current board and keeps the action undoable. Clear resets the board to a fresh single
   `You` circle after confirmation and is also undoable.
-- **Persistence safety**: signed-in boards load from the `user_graphs` blob first. If that
-  row is missing because an older deployment still has the normalized `boards` / `people`
-  / `notes` tables, the app falls back to that legacy shape and migrates it into the blob
-  model. A brand-new empty graph is not immediately autosaved on load, so a temporary
+- **Persistence safety**: signed-in boards load only from the `user_graphs` blob.
+  A brand-new empty graph is not immediately autosaved on load, so a temporary
   backend/schema mismatch cannot overwrite an existing board with a single `You` circle.
 - **Labels**: Settings includes separate toggles for circle labels and person names.
   Circle-center icon text scales with the world transform like people avatars; labels use

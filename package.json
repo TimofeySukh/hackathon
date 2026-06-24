@@ -7,9 +7,6 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "mcp:start": "node ./mcp/server.mjs",
-    "seed:board": "node ./scripts/seed-board.mjs",
-    "seed:demo-user": "node ./scripts/seed-demo-user.mjs",
     "test:db-load": "node ./scripts/test-database-load.mjs",
     "test:ui-import": "node ./scripts/test-ui-import-responsiveness.mjs",
     "test:load": "npm run test:db-load -- --people 3000 --connections 3000 && npm run test:ui-import -- --people 3000",
@@ -23,7 +20,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
-    "@modelcontextprotocol/sdk": "^1.29.0",
     "@types/node": "^24.12.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
@@ -36,7 +32,6 @@
     "playwright": "^1.60.0",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.0",
-    "vite": "^8.0.4",
-    "zod": "^4.3.6"
+    "vite": "^8.0.4"
   }
 }

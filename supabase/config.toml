@@ -1,8 +1,2 @@
-[functions.sync-person-ai-note]
-verify_jwt = false
-
-[functions.search-people-ai]
-verify_jwt = false
-
 [functions.enrich-linkedin-profile]
 verify_jwt = false

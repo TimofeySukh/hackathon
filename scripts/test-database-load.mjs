@@ -17,7 +17,6 @@ const productionEnv = dotenv.parse(
 )
 
 dotenv.config({ path: path.join(repoRoot, '.env.local') })
-dotenv.config({ path: path.join(repoRoot, '.env.mcp.local'), override: true })
 
 function parseArgs(argv) {
   const args = {
@@ -178,13 +177,13 @@ async function main() {
     return
   }
 
-  const supabaseUrl = process.env.HACKATHON_MCP_SUPABASE_URL ?? process.env.VITE_SUPABASE_URL
+  const supabaseUrl = process.env.HACKATHON_LOAD_TEST_SUPABASE_URL ?? process.env.VITE_SUPABASE_URL
   const serviceRoleKey =
-    process.env.HACKATHON_MCP_SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY
+    process.env.HACKATHON_LOAD_TEST_SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY
   const productionUrl = productionEnv.VITE_SUPABASE_URL
 
   if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error('Missing .env.mcp.local service-role configuration for database load testing.')
+    throw new Error('Missing load-test Supabase URL or service-role key for database load testing.')
   }
 
   if (productionUrl && supabaseUrl === productionUrl) {

@@ -17,6 +17,15 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-24 — Remove Pre-User Legacy Data Paths
+
+- Decision: the app now uses only the `user_graphs` blob for signed-in board persistence
+  and `localStorage` for signed-out editing. The old normalized-table frontend layer,
+  AI note/search Edge Functions, local MCP server, demo seed scripts, and legacy graph
+  fallback were removed.
+- Why: there are no existing production users to migrate, so keeping unused storage paths
+  and service-role tooling adds security and maintenance risk without product value.
+
 ### 2026-06-23 — Protect Graph Persistence During Backend Migrations
 
 - Decision: signed-in graph loading now records whether data came from the current
