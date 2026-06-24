@@ -119,6 +119,101 @@ function makeId(prefix: string) {
   return `${prefix}-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`
 }
 
+function slugifyId(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'item'
+}
+
+function makeUniqueId(baseId: string, existingIds: Set<string>) {
+  if (!existingIds.has(baseId)) return baseId
+  let index = 2
+  while (existingIds.has(`${baseId}-${index}`)) index += 1
+  return `${baseId}-${index}`
+}
+
+function getLinkedInSlug(profileUrl: string) {
+  try {
+    const url = new URL(profileUrl)
+    return url.pathname.split('/').filter(Boolean)[1] ?? 'profile'
+  } catch {
+    return 'profile'
+  }
+}
+
+function titleCaseSlug(slug: string) {
+  return slug
+    .replace(/[._-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+function extractLinkedInProfileUrlCandidate(rawValue: string) {
+  const value = rawValue.trim()
+  if (!value) return ''
+  const match = value.match(/(?:(?:https?|ps):\/\/)?(?:[\w-]+\.)?linkedin\.com\/(?:in|pub)\/[^\s"'<>]+/i)
+  return (match?.[0] ?? value).replace(/[),.;]+$/, '')
+}
+
+function normalizeLinkedInProfileUrl(rawValue: string): string | null {
+  const value = extractLinkedInProfileUrlCandidate(rawValue)
+  if (!value) return null
+  const withProtocol = /^https?:\/\//i.test(value)
+    ? value
+    : value.toLowerCase().startsWith('ps://')
+      ? `htt${value}`
+      : `https://${value}`
+  try {
+    const url = new URL(withProtocol)
+    const host = url.hostname.toLowerCase().replace(/^www\./, '')
+    if (host !== 'linkedin.com' && !host.endsWith('.linkedin.com')) return null
+    const pathParts = url.pathname.split('/').filter(Boolean)
+    if (!['in', 'pub'].includes(pathParts[0] ?? '') || !pathParts[1]) return null
+    return `https://www.linkedin.com/${pathParts[0]}/${pathParts[1]}/`
+  } catch {
+    return null
+  }
+}
+
+function ensureLinkedInCompanyCircle(graph: GraphState, companyName: string, companyLogoUrl?: string) {
+  const companyId = `linkedin-company-${slugifyId(companyName)}`
+  let companyCircle = graph.circles.find((circle) => circle.id === companyId)
+
+  if (!companyCircle) {
+    const youCircle = graph.circles.find((circle) => circle.id === 'you')
+    const youX = youCircle ? youCircle.x : 0
+    const youY = youCircle ? youCircle.y : 0
+    const linkedInCompanyCount = graph.circles.filter((circle) => circle.id.startsWith('linkedin-company-')).length
+    const angle = (linkedInCompanyCount / Math.max(6, linkedInCompanyCount + 1)) * 2 * Math.PI
+    const placementRadius = 680
+    companyCircle = {
+      id: companyId,
+      name: companyName,
+      icon: makeInitials(companyName),
+      imageUrl: companyLogoUrl,
+      x: youX + Math.cos(angle) * placementRadius,
+      y: youY + Math.sin(angle) * placementRadius,
+      radius: 90,
+      minRadius: 90,
+      parentId: null,
+      connectedTo: null,
+      tone: 'blue',
+      fillMode: 'transparent',
+      shapeType: 'circle',
+      shapeCustom: false,
+      sides: 25,
+      amplitude: 0,
+    }
+    graph.circles.push(companyCircle)
+  } else if (companyLogoUrl && !companyCircle.imageUrl) {
+    companyCircle.imageUrl = companyLogoUrl
+  }
+
+  return companyCircle
+}
+
 function makeInitials(name: string) {
   const initials = name
     .trim()
@@ -518,6 +613,139 @@ async function handleGraphRoutes(req: Request, path: string, auth: AuthContext, 
     const { graph, revision } = await readGraph(auth.userId)
     const people = graph?.people.filter((person) => person.circleId === circlePeopleMatch[1]) ?? []
     return jsonResponse({ people, revision })
+  }
+
+  if (req.method === 'POST' && path === '/v1/people/import-linkedin') {
+    if (!auth.scopes.has('people:write')) return jsonResponse({ error: 'Missing scope: people:write' }, 403)
+    const linkedinUrlStr = typeof body.url === 'string' ? body.url : ''
+    const normalizedUrl = normalizeLinkedInProfileUrl(linkedinUrlStr)
+    if (!normalizedUrl) return jsonResponse({ error: 'A valid LinkedIn profile URL is required.' }, 400)
+
+    const supabaseUrl = getRequiredEnv('SUPABASE_URL')
+    const serviceKey = getRequiredEnv('SUPABASE_SERVICE_ROLE_KEY')
+
+    let profileData
+    try {
+      const response = await fetch(`${supabaseUrl}/functions/v1/enrich-linkedin-profile`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${serviceKey}`,
+          'apikey': serviceKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: normalizedUrl }),
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}))
+        const message = payload?.error || `LinkedIn profile provider returned status ${response.status}.`
+        return jsonResponse({ error: message }, 502)
+      }
+      profileData = await response.json()
+    } catch (err) {
+      return jsonResponse({ error: `Failed to invoke LinkedIn enrichment: ${err instanceof Error ? err.message : String(err)}` }, 500)
+    }
+
+    return await mutateGraph(req, auth, body, (graph) => {
+      let person = graph.people.find((p) =>
+        (p.links ?? []).some((link) => link.service === 'linkedin' && normalizeLinkedInProfileUrl(link.url) === normalizedUrl)
+      )
+
+      const companyName = (profileData.company || 'Unknown Company').trim()
+      const companyCircle = ensureLinkedInCompanyCircle(graph, companyName, profileData.companyLogoUrl)
+      const slug = getLinkedInSlug(normalizedUrl)
+      const fallbackName = titleCaseSlug(slug)
+      const name = (profileData.name || fallbackName || 'LinkedIn Connection').trim()
+      const avatar = makeInitials(name)
+      const headline = profileData.headline?.trim()
+      const description = profileData.description?.trim()
+
+      if (person) {
+        person.name = name || person.name
+        person.avatar = makeInitials(person.name)
+        if (profileData.avatarUrl) person.imageUrl = profileData.avatarUrl
+
+        person.links ??= []
+        const hasLinkedinLink = person.links.some((l) => l.service === 'linkedin' && normalizeLinkedInProfileUrl(l.url) === normalizedUrl)
+        if (!hasLinkedinLink) {
+          person.links.push({
+            id: makeId('link'),
+            service: 'linkedin',
+            label: 'LinkedIn',
+            url: normalizedUrl,
+          })
+        }
+
+        person.notes = (person.notes ?? []).filter((n) => n.title !== 'Headline' && n.title !== 'Profile')
+        if (headline) {
+          person.notes.push({
+            id: makeId('note'),
+            title: 'Headline',
+            body: headline,
+          })
+        }
+        if (description) {
+          person.notes.push({
+            id: makeId('note'),
+            title: 'Profile',
+            body: description,
+          })
+        }
+
+        if (person.circleId !== companyCircle.id) {
+          person.circleId = companyCircle.id
+          const pos = findFreePersonPosition(graph, companyCircle.id)
+          person.x = pos.x
+          person.y = pos.y
+        }
+      } else {
+        const existingIds = new Set(graph.people.map((p) => p.id))
+        const personId = makeUniqueId(`linkedin-person-${slugifyId(slug || name)}`, existingIds)
+        const pos = findFreePersonPosition(graph, companyCircle.id)
+
+        const links = [{
+          id: makeId('link'),
+          service: 'linkedin' as const,
+          label: 'LinkedIn',
+          url: normalizedUrl,
+        }]
+
+        const notes = []
+        if (headline) {
+          notes.push({
+            id: makeId('note'),
+            title: 'Headline',
+            body: headline,
+          })
+        }
+        if (description) {
+          notes.push({
+            id: makeId('note'),
+            title: 'Profile',
+            body: description,
+          })
+        }
+
+        person = {
+          id: personId,
+          name,
+          x: pos.x,
+          y: pos.y,
+          circleId: companyCircle.id,
+          avatar,
+          shapeType: 'circle',
+          sides: 10,
+          amplitude: 0,
+          imageUrl: profileData.avatarUrl,
+          notes,
+          links,
+        }
+        graph.people.push(person)
+      }
+
+      refitParents(graph, companyCircle.id)
+      return person
+    })
   }
 
   if (req.method === 'POST' && path === '/v1/people') {

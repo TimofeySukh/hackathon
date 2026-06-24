@@ -282,7 +282,11 @@ Deno.serve(async (req) => {
       if (!authHeader) {
         return jsonResponse({ error: 'Missing authorization header.' }, 401)
       }
-      await requireUser(authHeader)
+      const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+      const isServiceRole = serviceRoleKey && authHeader === `Bearer ${serviceRoleKey}`
+      if (!isServiceRole) {
+        await requireUser(authHeader)
+      }
     }
 
     const body = (await req.json()) as { url?: unknown }

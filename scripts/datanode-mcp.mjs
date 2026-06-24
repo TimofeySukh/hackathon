@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { addLink, addNote, createConnection, createPerson, getMeta, listCircles, search } from './datanode-api-client.mjs'
+import { addLink, addNote, createConnection, createPerson, getMeta, listCircles, search, importLinkedInPerson } from './datanode-api-client.mjs'
 
 const tools = [
   {
@@ -73,6 +73,17 @@ const tools = [
       required: ['fromId', 'toId'],
     },
   },
+  {
+    name: 'import_linkedin_person',
+    description: 'Import or update a person by their LinkedIn profile URL.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'LinkedIn profile URL.' },
+      },
+      required: ['url'],
+    },
+  },
 ]
 
 function send(message) {
@@ -106,6 +117,10 @@ async function callTool(name, args = {}) {
     case 'create_connection': {
       const meta = await getMeta()
       return textResult(await createConnection({ expectedRevision: meta.revision, fromId: args.fromId, toId: args.toId }))
+    }
+    case 'import_linkedin_person': {
+      const meta = await getMeta()
+      return textResult(await importLinkedInPerson({ expectedRevision: meta.revision, url: args.url }))
     }
     default:
       throw new Error(`Unknown tool: ${name}`)

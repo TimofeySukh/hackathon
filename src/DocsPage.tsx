@@ -132,9 +132,13 @@ export default function DocsPage() {
                   <td className="docs-param-name">list_circles</td>
                   <td>List circles with ids, parent ids, paths, and people counts.</td>
                 </tr>
-                <tr>
+                 <tr>
                   <td className="docs-param-name">create_person</td>
                   <td>Create a person in a circle. Position is calculated automatically.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">import_linkedin_person</td>
+                  <td>Import or update a person by their LinkedIn profile URL.</td>
                 </tr>
                 <tr>
                   <td className="docs-param-name">add_note</td>
@@ -226,10 +230,15 @@ ${npxCmd}`}</code>
                   <td>None</td>
                   <td>List all circles.</td>
                 </tr>
-                <tr>
+                 <tr>
                   <td className="docs-param-name">people:add</td>
                   <td><code>&lt;circleId&gt; &lt;name&gt; [note]</code></td>
                   <td>Add a new person inside a circle.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">people:import-linkedin</td>
+                  <td><code>&lt;url&gt;</code></td>
+                  <td>Import or update a person by their LinkedIn profile URL.</td>
                 </tr>
                 <tr>
                   <td className="docs-param-name">notes:add</td>
@@ -456,6 +465,68 @@ ${npxCmd}`}</code>
                   <td className="docs-param-type">array</td>
                   <td><span className="docs-param-optional">Optional</span></td>
                   <td>An array of links (e.g. <code>{"{ \"service\": \"linkedin\", \"url\": \"https://...\" }"}</code>).</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <h3>Request Example</h3>
+            <div className="docs-code-container">
+              <div className="docs-code-header">
+                <span>cURL</span>
+                <button className="docs-code-copy-btn" onClick={() => copy(curl, 'cURL copied!')}>Copy</button>
+              </div>
+              <pre className="docs-code-pre">
+                <code className="docs-code">{curl}</code>
+              </pre>
+            </div>
+          </div>
+        )
+      }
+    },
+    {
+      id: 'post-people-import-linkedin',
+      category: 'api',
+      title: 'POST /people/import-linkedin',
+      badge: 'post',
+      keywords: ['post', '/people/import-linkedin', 'import linkedin', 'add linkedin'],
+      render: (copy) => {
+        const curl = `curl -X POST "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/people/import-linkedin" \\
+  -H "Authorization: Bearer dn_live_your_token" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "expectedRevision": 12,
+    "url": "https://www.linkedin.com/in/velizar-seleznev/"
+  }'`
+        return (
+          <div>
+            <div className="docs-endpoint-title">
+              <span className="docs-method-badge post">POST</span>
+              <span className="docs-endpoint-path">/people/import-linkedin</span>
+            </div>
+            <p>Imports or updates a person node inside a target circle by scraping their LinkedIn profile URL. The circle is automatically resolved or created based on the person\'s current company.</p>
+
+            <h3>Request Parameters</h3>
+            <table className="docs-table">
+              <thead>
+                <tr>
+                  <th>Field</th>
+                  <th>Type</th>
+                  <th>Required</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="docs-param-name">expectedRevision</td>
+                  <td className="docs-param-type">number | null</td>
+                  <td><span className="docs-param-required">Required</span></td>
+                  <td>The optimistic revision count you expect the graph to be at.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">url</td>
+                  <td className="docs-param-type">string</td>
+                  <td><span className="docs-param-required">Required</span></td>
+                  <td>The LinkedIn profile URL to import (e.g. <code>https://www.linkedin.com/in/username</code>).</td>
                 </tr>
               </tbody>
             </table>

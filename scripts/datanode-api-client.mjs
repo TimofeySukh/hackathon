@@ -47,6 +47,13 @@ export async function createPerson(input) {
   })
 }
 
+export async function importLinkedInPerson(input) {
+  return await datanodeFetch('/people/import-linkedin', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
 export async function addNote(personId, input) {
   return await datanodeFetch(`/people/${encodeURIComponent(personId)}/notes`, {
     method: 'POST',

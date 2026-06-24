@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { addLink, addNote, createConnection, createPerson, getMeta, listCircles, search } from './datanode-api-client.mjs'
+import { addLink, addNote, createConnection, createPerson, getMeta, listCircles, search, importLinkedInPerson } from './datanode-api-client.mjs'
 
 function usage() {
   console.log(`Usage:
@@ -8,6 +8,7 @@ function usage() {
   datanode search <query> [limit]
   datanode circles
   datanode people:add <circleId> <name> [note]
+  datanode people:import-linkedin <url>
   datanode notes:add <personId> <body>
   datanode links:add <personId> <service> <url> [label]
   datanode connections:add <fromId> <toId>
@@ -57,6 +58,17 @@ async function main() {
       notes: note ? [{ body: note }] : [],
     }
     console.log(JSON.stringify(await createPerson(payload), null, 2))
+    return
+  }
+
+  if (command === 'people:import-linkedin') {
+    const meta = await getMeta()
+    const url = getArg(3, 'url')
+    const payload = {
+      expectedRevision: meta.revision,
+      url,
+    }
+    console.log(JSON.stringify(await importLinkedInPerson(payload), null, 2))
     return
   }
 
