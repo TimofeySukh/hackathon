@@ -127,7 +127,6 @@ export function generateStressGraph(config: StressConfig): StressGraph {
       people.push({
         id: personId,
         name: `Member ${c + 1}.${p + 1}`,
-        role: 'member',
         x: cx + Math.cos(angle) * (r + jitter),
         y: cy + Math.sin(angle) * (r + jitter),
         circleId,

@@ -55,7 +55,7 @@ function buildConnectionsCsv({ people, companies }) {
       `https://www.linkedin.com/in/load-person-${index + 1}`,
       `load.person.${index + 1}@example.invalid`,
       `Load Company ${companyNumber}`,
-      `Synthetic Role ${index + 1}`,
+      `Synthetic Position ${index + 1}`,
       '2026-06-14',
     ])
   }
@@ -160,7 +160,7 @@ async function main() {
 
     const dialogPromise = page.waitForEvent('dialog', { timeout: 60000 })
     const startedAt = performance.now()
-    await page.locator('input[type="file"]').setInputFiles({
+    await page.locator('input[type="file"][accept=".zip"]').setInputFiles({
       name: 'linkedin-load-test.zip',
       mimeType: 'application/zip',
       buffer: zipBuffer,

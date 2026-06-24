@@ -111,7 +111,6 @@ function buildSyntheticGraph({ people, connections, companies, runId }) {
     personRows.push({
       id: `load-person-${runId}-${index}`,
       name: `Load Person ${index + 1}`,
-      role: 'Synthetic import contact',
       x: Math.round(companyCircle.x + Math.cos(angle) * ring),
       y: Math.round(companyCircle.y + Math.sin(angle) * ring),
       circleId: companyCircle.id,

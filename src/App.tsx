@@ -881,7 +881,7 @@ function App() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const graphFileInputRef = useRef<HTMLInputElement>(null)
 
-  // Search: a pill in the top toolbar that finds people (by name/role) and
+  // Search: a pill in the top toolbar that finds people and circles and
   // circles (the "tags"), then flies the camera to the picked node.
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -1707,7 +1707,8 @@ function App() {
   const circlesById = useMemo(() => new Map(displayCircles.map((circle) => [circle.id, circle])), [displayCircles])
   const peopleById = useMemo(() => new Map(displayPeople.map((person) => [person.id, person])), [displayPeople])
 
-  // Live search results: people matched on name/role, circles ("tags") on name.
+  // Live search results: people matched on name, owning circle, notes, and links;
+  // circles ("tags") match on name.
   // Capped so the dropdown stays compact; people first since finding a person is
   // the primary use, circles after.
   const searchResults = useMemo<SearchResult[]>(() => {
@@ -1723,14 +1724,19 @@ function App() {
         }]
       : []
     const people: SearchResult[] = displayPeople
-      .filter((p) => p.name.toLowerCase().includes(q) || (p.role || '').toLowerCase().includes(q))
+      .filter((p) => {
+        const circle = circlesById.get(p.circleId)
+        const noteText = (p.notes ?? []).map((note) => `${note.title} ${note.body}`).join(' ')
+        const linkText = (p.links ?? []).map((link) => `${link.label} ${link.url}`).join(' ')
+        return [p.name, circle?.name, noteText, linkText].filter(Boolean).join(' ').toLowerCase().includes(q)
+      })
       .map((p) => {
         const circle = circlesById.get(p.circleId)
         return {
           kind: 'person',
           id: p.id,
           name: p.name,
-          sub: p.role || circle?.name || '',
+          sub: circle?.name || '',
           avatarUrl: p.imageUrl,
           initials: makeInitials(p.name),
           color: circle ? getCircleColors(circle).centerBg : undefined,
@@ -2919,7 +2925,6 @@ function App() {
         {
           id,
           name: `New person ${current.people.length + 1}`,
-          role: circleId ? `Inside ${circlesById.get(circleId)?.name ?? ''}` : '',
           x: world.x,
           y: world.y,
           circleId,
@@ -3061,7 +3066,6 @@ function App() {
           {
             id,
             name: `New person ${current.people.length + 1}`,
-            role: circleId ? `Inside ${circlesById.get(circleId)?.name ?? ''}` : '',
             x: createMenu.x,
             y: createMenu.y,
             circleId,
@@ -3149,7 +3153,6 @@ function App() {
       return {
         id: `person-${Date.now()}-${index}`,
         name: ['Alex', 'Daria', 'Sam'][index],
-        role: `Added to ${source.name}`,
         x: source.x + offset,
         y: source.y + source.radius * 0.42 + index * 18,
         circleId: source.id,
@@ -4174,27 +4177,6 @@ function App() {
                   );
                 })()}
 
-                {/* Commented out Role to hide from menu, keeping in code for future use
-                <div className="inspector-field" style={{ marginTop: '4px' }}>
-                  <label>Role</label>
-                  <input
-                    type="text"
-                    value={selectedPerson.role}
-                    onChange={(e) => {
-                      const newRole = e.target.value
-                      setGraph((current) => ({
-                        ...current,
-                        people: current.people.map((p) =>
-                          p.id === selectedPerson.id ? { ...p, role: newRole } : p
-                        ),
-                      }))
-                    }}
-                    placeholder="E.g., Software Developer"
-                    className="m3-input-field"
-                  />
-                </div>
-                */}
-
                 {/* Notes Section (Trello-Style) */}
                 <div className="trello-list">
                   <div className="trello-list__header">
@@ -4982,7 +4964,6 @@ async function buildLinkedInConnectionsGraph(
       nextPeople.push({
         id: personId,
         name,
-        role: position || 'Connection',
         x: companyCircle.x + offset.x,
         y: companyCircle.y + offset.y,
         circleId: companyCircle.id,
@@ -5158,7 +5139,14 @@ function ensureLinkedInCompanyCircle(current: GraphState, profile: LinkedInProfi
 }
 
 function buildLinkedInProfileNotes(profile: LinkedInProfileImport, existingNotes: PersonNote[] = []) {
-  const notes = existingNotes.filter((note) => note.title !== 'Profile' && note.title !== 'Enrichment')
+  const notes = existingNotes.filter((note) => note.title !== 'Profile' && note.title !== 'Headline' && note.title !== 'Enrichment')
+  if (profile.headline) {
+    notes.push({
+      id: `note-headline-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+      title: 'Headline',
+      body: profile.headline,
+    })
+  }
   if (profile.description) {
     notes.push({
       id: `note-profile-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
@@ -5185,7 +5173,6 @@ function updateLinkedInProfileInGraph(
   const updatedPerson: PersonNode = {
     ...existingPerson,
     name: profile.name || existingPerson.name,
-    role: profile.headline || existingPerson.role,
     x: shouldReposition ? resizedCompanyCircle.x + offset.x : existingPerson.x,
     y: shouldReposition ? resizedCompanyCircle.y + offset.y : existingPerson.y,
     circleId: resizedCompanyCircle.id,
@@ -5235,7 +5222,6 @@ function addLinkedInProfileToGraph(
   const person: PersonNode = {
     id: personId,
     name: profile.name,
-    role: profile.headline || 'LinkedIn connection',
     x: resizedCompanyCircle.x + offset.x,
     y: resizedCompanyCircle.y + offset.y,
     circleId: resizedCompanyCircle.id,

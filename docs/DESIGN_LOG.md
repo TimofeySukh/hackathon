@@ -17,6 +17,15 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-24 — Person Data Has No Hidden Role Field
+
+- Decision: `PersonNode.role` was removed from the app model. People expose name,
+  owning circle, notes, connections, avatar, favorite state, and visual placement/style.
+  LinkedIn headlines and ZIP import positions are stored as notes instead of a hidden
+  subtitle field.
+- Why: the product UI no longer has a role/title field, and keeping an invisible field
+  made API planning and search behavior confusing.
+
 ### 2026-06-24 — Remove Pre-User Legacy Data Paths
 
 - Decision: the app now uses only the `user_graphs` blob for signed-in board persistence
