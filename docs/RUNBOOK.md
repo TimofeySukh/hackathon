@@ -102,6 +102,21 @@ export DATANODE_API_TOKEN=dn_live_<token>
 
 CLI examples:
 
+Using on-the-fly `npx` from anywhere (no clone needed):
+```bash
+npx -y --package github:TimofeySukh/hackathon datanode-cli meta
+npx -y --package github:TimofeySukh/hackathon datanode-cli search "alice"
+npx -y --package github:TimofeySukh/hackathon datanode-cli circles
+npx -y --package github:TimofeySukh/hackathon datanode-cli people:add <circle-id> "Alice Chen" "Met at conference"
+```
+
+Or install globally:
+```bash
+npm install -g github:TimofeySukh/hackathon
+datanode-cli search "alice"
+```
+
+Or from a local repository checkout:
 ```bash
 npm run datanode:cli -- meta
 npm run datanode:cli -- search "alice"

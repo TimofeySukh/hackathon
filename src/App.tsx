@@ -3493,9 +3493,22 @@ Never ask for a user_id. The token already resolves to the correct user. If an A
     }
   }
 }`
-  const cliSnippet = `export DATANODE_API_URL=${agentApiUrl}
+  const cliSnippet = `# 1. Set environment variables
+export DATANODE_API_URL=${agentApiUrl}
 export DATANODE_API_TOKEN=${agentTokenForInstructions}
 
+# Option A: Run on-the-fly via npx from anywhere
+npx -y --package github:TimofeySukh/hackathon datanode-cli search "Alice"
+npx -y --package github:TimofeySukh/hackathon datanode-cli circles
+npx -y --package github:TimofeySukh/hackathon datanode-cli people:add <circle-id> "Alice Chen" "Met at conference"
+
+# Option B: Install globally and run
+npm install -g github:TimofeySukh/hackathon
+datanode-cli search "Alice"
+datanode-cli circles
+datanode-cli people:add <circle-id> "Alice Chen" "Met at conference"
+
+# Option C: Run from the repository checkout
 npm run datanode:cli -- search "Alice"
 npm run datanode:cli -- circles
 npm run datanode:cli -- people:add <circle-id> "Alice Chen" "Met at conference"`
@@ -4921,12 +4934,12 @@ Content-Type: application/json
                 <section className="agent-settings-section agent-settings-flow">
                   <div className="agent-settings-step">
                     <h3>CLI commands</h3>
-                    <p>Use these commands from this repository checkout.</p>
+                    <p>Install globally, or run on-the-fly via npx from anywhere:</p>
                     <textarea
                       readOnly
                       className="m3-input-field agent-settings-copybox"
                       value={cliSnippet}
-                      rows={8}
+                      rows={16}
                       onFocus={(event) => event.currentTarget.select()}
                     />
                     <button

@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "bin": {
-    "datanode-mcp": "./scripts/datanode-mcp.mjs"
+    "datanode-mcp": "./scripts/datanode-mcp.mjs",
+    "datanode-cli": "./scripts/datanode-cli.mjs"
   },
   "scripts": {
     "dev": "vite",
