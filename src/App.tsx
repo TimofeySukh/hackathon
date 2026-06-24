@@ -18,6 +18,7 @@ import LandingPage from './LandingPage'
 import DocsPage from './DocsPage'
 import { createAgentToken, getGraphApiBaseUrl, listAgentTokens, revokeAgentToken } from './lib/agentApi'
 import type { AgentScope, AgentTokenRecord } from './lib/agentApi'
+import { supabase } from './lib/supabase'
 import { GraphRevisionConflictError, loadGraphRecord, saveGraph, loadLocalGraph, saveLocalGraph } from './lib/graphPersistence'
 import { enrichLinkedInProfile } from './lib/linkedinEnrichment'
 import { OnboardingCoach } from './Onboarding'
@@ -732,6 +733,71 @@ function App() {
     channel.postMessage({ sourceId: graphChannelId, revision })
     channel.close()
   }, [graphChannelId])
+
+  const graphRef = useRef(graph)
+  useEffect(() => {
+    graphRef.current = graph
+  }, [graph])
+
+  // Listen to remote changes on the user's graph row via Supabase Realtime
+  useEffect(() => {
+    if (auth.status !== 'authenticated' || !userId || !supabase || !auth.session) return
+
+    const channel = supabase
+      .channel(`user-graph-changes:${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'user_graphs',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const newRevision = payload.new?.revision
+          const newGraphData = payload.new?.graph
+
+          if (typeof newRevision !== 'number' || !newRevision || !newGraphData) return
+
+          // If the revision is equal or smaller, ignore it (it was written by this tab or is stale)
+          if (newRevision <= (loadedGraphRevisionRef.current ?? 0)) {
+            return
+          }
+
+          // Check if there are local unsaved modifications
+          const isUnsaved = (() => {
+            if (!loadedGraphSnapshotRef.current) return false
+            try {
+              const snap = JSON.parse(loadedGraphSnapshotRef.current) as GraphState
+              return !isGraphStateEqual(graphRef.current, snap)
+            } catch {
+              return true
+            }
+          })()
+
+          if (!isUnsaved) {
+            // No unsaved modifications: automatically apply the update in real-time
+            const base = sanitizeDefaultCircleStyles(newGraphData)
+            const stamped = stampYouIdentity(base, auth.session!.user)
+            loadedGraphSourceRef.current = 'saved'
+            loadedGraphSnapshotRef.current = JSON.stringify(stamped)
+            loadedGraphRevisionRef.current = newRevision
+            setGraph(stamped)
+          } else {
+            // There are unsaved changes: notify the user and enter error state to protect local edits
+            loadedGraphSourceRef.current = 'error'
+            setGraphLoadError(
+              'This board was updated elsewhere (e.g. via CLI or another tab). You have unsaved changes. To protect your data, reload the page to load the latest version.'
+            )
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      void channel.unsubscribe()
+    }
+  }, [auth.status, userId, auth.session])
 
   // Load the signed-in user's graph; a brand-new account starts from a blank
   // canvas with only their "you" circle — the local demo data is never persisted.
@@ -5811,6 +5877,58 @@ function addLinkedInProfileToGraph(
     }),
     person,
   }
+}
+
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+  if (a && b && typeof a === 'object' && typeof b === 'object') {
+    if (Array.isArray(a)) {
+      if (!Array.isArray(b) || a.length !== b.length) return false
+      for (let i = 0; i < a.length; i++) {
+        if (!deepEqual(a[i], b[i])) return false
+      }
+      return true
+    }
+    const aObj = a as Record<string, unknown>
+    const bObj = b as Record<string, unknown>
+    const keys = Object.keys(aObj)
+    if (keys.length !== Object.keys(bObj).length) return false
+    for (const key of keys) {
+      if (!Object.prototype.hasOwnProperty.call(bObj, key)) return false
+      if (!deepEqual(aObj[key], bObj[key])) return false
+    }
+    return true
+  }
+  return false
+}
+
+function isGraphStateEqual(g1: GraphState | null, g2: GraphState | null): boolean {
+  if (g1 === g2) return true
+  if (!g1 || !g2) return false
+
+  if (g1.circles.length !== g2.circles.length) return false
+  if (g1.people.length !== g2.people.length) return false
+  if (g1.connections.length !== g2.connections.length) return false
+
+  const c1 = [...g1.circles].sort((a, b) => a.id.localeCompare(b.id))
+  const c2 = [...g2.circles].sort((a, b) => a.id.localeCompare(b.id))
+  for (let i = 0; i < c1.length; i++) {
+    if (!deepEqual(c1[i], c2[i])) return false
+  }
+
+  const p1 = [...g1.people].sort((a, b) => a.id.localeCompare(b.id))
+  const p2 = [...g2.people].sort((a, b) => a.id.localeCompare(b.id))
+  for (let i = 0; i < p1.length; i++) {
+    if (!deepEqual(p1[i], p2[i])) return false
+  }
+
+  const conn1 = [...g1.connections].sort((a, b) => a.id.localeCompare(b.id))
+  const conn2 = [...g2.connections].sort((a, b) => a.id.localeCompare(b.id))
+  for (let i = 0; i < conn1.length; i++) {
+    if (!deepEqual(conn1[i], conn2[i])) return false
+  }
+
+  return true
 }
 
 // Put the signed-in user's Google avatar + name on the "you" circle. Only fills

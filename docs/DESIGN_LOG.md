@@ -17,6 +17,12 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-24 — Real-time Synchronization via Supabase Realtime
+
+- Decision: enable Supabase Realtime Database Changes on the `user_graphs` table, allowing the frontend to subscribe to the row modifications matching the logged-in user's ID.
+- Decision: when a remote change is received, the frontend checks if the user has unsaved modifications. If not, the UI is updated automatically. If yes, a conflict warning banner is displayed and autosaving is paused to protect user data from overwriting.
+- Why: allows multi-tab and multi-device/CLI/agent edits to sync automatically without requiring page reloads or polling the database, while maintaining strict optimistic concurrency control.
+
 ### 2026-06-24 — Universal MCP and CLI Execution and Height Stability
 
 - Decision: the agent settings dialog `.agent-settings-dialog` is given a stable height of `height: min(680px, calc(100vh - 64px))` on desktop and `height: min(680px, calc(100vh - 24px))` on mobile.
