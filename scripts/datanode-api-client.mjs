@@ -75,6 +75,13 @@ export async function createConnection(input) {
   })
 }
 
+export async function batchOperations(input) {
+  return await datanodeFetch('/operations', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
 export async function deletePerson(personId, input) {
   return await datanodeFetch(`/people/${encodeURIComponent(personId)}`, {
     method: 'DELETE',

@@ -55,6 +55,8 @@ Completed tasks can remain listed here when they explain repository history. Liv
 - `docs/PROJECT_MAP.md`: where the project structure is recorded.
 - `docs/RUNBOOK.md`: how to run or verify the repo.
 - `docs/ARCHITECTURE.md`: invariants and boundaries.
+- `docs/AGENT_BEST_PRACTICES.md`: local agent/MCP/API/CLI rules derived from
+  `agents-best-practices`.
 - `docs/product-vision.md`: product direction and scope.
 - `docs/project-structure.md`: file-by-file project structure notes.
 - `docs/DESIGN_SYSTEM.md`: Material 3 design language, tokens, and component recipes that all UI must follow.

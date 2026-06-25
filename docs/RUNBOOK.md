@@ -108,6 +108,7 @@ npx -y --package github:TimofeySukh/hackathon datanode-cli meta
 npx -y --package github:TimofeySukh/hackathon datanode-cli search "alice"
 npx -y --package github:TimofeySukh/hackathon datanode-cli circles
 npx -y --package github:TimofeySukh/hackathon datanode-cli people:add <circle-id> "Alice Chen" "Met at conference"
+npx -y --package github:TimofeySukh/hackathon datanode-cli operations:run ./operations.json
 ```
 
 Or install globally:
@@ -144,6 +145,13 @@ MCP config:
 All writes require the current graph revision. The CLI and MCP server read it before
 writing; if another tab or agent saves first, the API returns `409 Conflict` instead of
 overwriting data.
+
+MCP tool results are returned as a structured JSON envelope with `status`, `summary`,
+`data`, and `next_valid_actions`. The MCP tool registry exposes risk metadata and uses
+strict argument schemas. Agents can call `list_capabilities` to inspect a compact
+risk-aware tool list before choosing a detailed graph tool. For large, experimental, bulk,
+or destructive graph changes, agents should create a backup with `export_graph` or ask the
+user for confirmation before calling replacement, reset, or broad cleanup tools.
 
 ## Import Load Testing
 

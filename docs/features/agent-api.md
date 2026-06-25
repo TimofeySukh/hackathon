@@ -21,6 +21,11 @@ Supabase project secrets or allowing access to another user's graph.
   `graph:replace` scope.
 - All graph writes require `expectedRevision`. Stale writers receive `409 Conflict`
   instead of overwriting a newer board.
+- MCP tool results use a structured JSON envelope with `status`, `summary`, `data`, and
+  `next_valid_actions`; tool definitions expose risk metadata and strict argument schemas.
+- MCP includes `list_capabilities` for compact risk-aware tool discovery.
+- Large, bulk, experimental, or destructive MCP operations should be preceded by an
+  `export_graph` backup or explicit user confirmation.
 - People have exactly one direct `circleId`. Nested membership is derived from the
   target circle's parent chain.
 
@@ -50,7 +55,7 @@ Supabase project secrets or allowing access to another user's graph.
 - Key functions / components:
   - `listAgentTokens`, `createAgentToken`, `revokeAgentToken`
   - `graph-api` Edge Function token auth and graph mutation handlers
-  - `datanode:cli` and `datanode:mcp` npm scripts
+  - `datanode:cli`, `datanode:mcp`, and `operations:run` batch CLI support
 - Related state / hooks:
   - `agentTokens`, `newAgentToken`, `agentTokensBusy`, `agentTokenStatus`
   - `loadedGraphRevisionRef` for browser-side optimistic concurrency
@@ -58,4 +63,5 @@ Supabase project secrets or allowing access to another user's graph.
 ## Open questions / TODO
 
 - Add a dedicated visual token management screen if the Settings panel gets crowded.
-- Add more MCP tools when the product exposes richer circle editing behavior.
+- Add MCP tool search/deferred loading if the DataNode tool surface grows beyond the
+  current graph-focused set.

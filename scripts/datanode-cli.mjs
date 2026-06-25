@@ -3,6 +3,7 @@
 import {
   addLink,
   addNote,
+  batchOperations,
   createConnection,
   createPerson,
   getMeta,
@@ -32,6 +33,7 @@ function usage() {
   datanode notes:add <personId> <body>
   datanode links:add <personId> <service> <url> [label]
   datanode connections:add <fromId> <toId>
+  datanode operations:run <filePath>
   datanode people:delete <personId>
   datanode notes:delete <personId> <noteId>
   datanode links:delete <personId> <linkId>
@@ -129,6 +131,24 @@ async function main() {
       expectedRevision: meta.revision,
       fromId: getArg(3, 'fromId'),
       toId: getArg(4, 'toId'),
+    }), null, 2))
+    return
+  }
+
+  if (command === 'operations:run') {
+    const filePath = getArg(3, 'filePath')
+    const fs = await import('node:fs/promises')
+    const path = await import('node:path')
+    const content = await fs.readFile(path.resolve(filePath), 'utf8')
+    const payload = JSON.parse(content)
+    const operations = Array.isArray(payload) ? payload : payload.operations
+    if (!Array.isArray(operations) || operations.length === 0) {
+      throw new Error('operations:run requires a JSON file containing an operations array.')
+    }
+    const meta = await getMeta()
+    console.log(JSON.stringify(await batchOperations({
+      expectedRevision: meta.revision,
+      operations,
     }), null, 2))
     return
   }

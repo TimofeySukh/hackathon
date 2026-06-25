@@ -17,6 +17,19 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-25 — Agent Best Practices and MCP Contract Hardening
+
+- Decision: added `docs/AGENT_BEST_PRACTICES.md` as the project-local summary of the
+  local `agents-best-practices` rules for MCP tools, permissions, structured results,
+  and API/CLI/MCP parity.
+- Decision: the MCP server now exposes strict schemas, risk metadata, MCP annotations,
+  compact `list_capabilities` discovery, and structured JSON result envelopes with
+  `status`, `summary`, `data`, and `next_valid_actions`.
+- Decision: API `/operations` parity is extended to the shared API client, CLI
+  `operations:run`, and MCP `batch_operations`.
+- Why: agent-facing tools need narrow contracts, legible results, and synchronized public
+  documentation so remote agents can safely inspect and edit the user-owned graph.
+
 ### 2026-06-24 — Real-time Synchronization via Supabase Realtime
 
 - Decision: enable Supabase Realtime Database Changes on the `user_graphs` table, allowing the frontend to subscribe to the row modifications matching the logged-in user's ID.

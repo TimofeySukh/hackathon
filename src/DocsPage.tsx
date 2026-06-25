@@ -97,6 +97,7 @@ export default function DocsPage() {
             <p>
               The Model Context Protocol (MCP) allows LLM clients (such as Claude Desktop, Cursor, or Windsurf) to securely inspect and edit your social graph.
               Our MCP server runs universally via `npx` without requiring a local clone.
+              Tool calls return a structured JSON envelope with <code>status</code>, <code>summary</code>, <code>data</code>, and <code>next_valid_actions</code>.
             </p>
 
             <h3>Configuration</h3>
@@ -115,7 +116,10 @@ export default function DocsPage() {
             </div>
 
             <h3>Exposed Tools</h3>
-            <p>Once connected, the following tools are made available to the AI assistant:</p>
+            <p>
+              Once connected, the following tools are made available to the AI assistant. Large, experimental, bulk, or destructive changes should be preceded
+              by <code>export_graph</code> or explicit user confirmation.
+            </p>
             <table className="docs-table">
               <thead>
                 <tr>
@@ -124,6 +128,10 @@ export default function DocsPage() {
                 </tr>
               </thead>
               <tbody>
+                <tr>
+                  <td className="docs-param-name">list_capabilities</td>
+                  <td>List DataNode MCP capabilities with compact risk and side-effect metadata.</td>
+                </tr>
                 <tr>
                   <td className="docs-param-name">search_people_and_circles</td>
                   <td>Search the graph by person name, circle, notes, links, or circle name.</td>
@@ -151,6 +159,10 @@ export default function DocsPage() {
                 <tr>
                   <td className="docs-param-name">create_connection</td>
                   <td>Create a relationship connection (line) between two node IDs.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">batch_operations</td>
+                  <td>Run a small transactional batch of person.create, note.create, or link.create operations.</td>
                 </tr>
                 <tr>
                   <td className="docs-param-name">delete_person</td>
@@ -298,6 +310,11 @@ ${npxCmd}`}</code>
                   <td className="docs-param-name">connections:add</td>
                   <td><code>&lt;fromId&gt; &lt;toId&gt;</code></td>
                   <td>Create a connector link between two nodes.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">operations:run</td>
+                  <td><code>&lt;filePath&gt;</code></td>
+                  <td>Run a JSON file containing a batch operations array.</td>
                 </tr>
                 <tr>
                   <td className="docs-param-name">people:delete</td>

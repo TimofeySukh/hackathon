@@ -3,6 +3,7 @@
 import {
   addLink,
   addNote,
+  batchOperations,
   createConnection,
   createPerson,
   getMeta,
@@ -22,301 +23,584 @@ import {
   uploadAvatar
 } from './datanode-api-client.mjs'
 
-const tools = [
-  {
+const SERVICE_VALUES = ['linkedin', 'telegram', 'instagram', 'facebook', 'whatsapp', 'x', 'website']
+const TONE_VALUES = ['blue', 'red', 'green', 'amber', 'violet']
+const SHAPE_VALUES = ['circle', 'wavy', 'polygon']
+const FILL_MODE_VALUES = ['transparent', 'solid']
+const RISK_VALUES = ['read_only', 'search_only', 'write_internal', 'destructive']
+
+const resultEnvelopeSchema = strictObject({
+  status: { type: 'string', enum: ['success', 'error'] },
+  tool: { type: 'string' },
+  summary: { type: 'string' },
+  data: { type: ['object', 'array', 'string', 'number', 'boolean', 'null'], additionalProperties: true },
+  next_valid_actions: { type: 'array', items: { type: 'string' } },
+  guidance: { type: 'string' },
+})
+
+const noteInputSchema = strictObject({
+  id: { type: 'string' },
+  title: { type: 'string' },
+  body: { type: 'string' },
+}, ['body'])
+
+const linkInputSchema = strictObject({
+  id: { type: 'string' },
+  service: { type: 'string', enum: SERVICE_VALUES },
+  url: { type: 'string' },
+  label: { type: 'string' },
+}, ['service', 'url'])
+
+const personNoteSchema = strictObject({
+  id: { type: 'string' },
+  title: { type: 'string' },
+  body: { type: 'string' },
+}, ['id', 'title', 'body'])
+
+const personLinkSchema = strictObject({
+  id: { type: 'string' },
+  service: { type: 'string', enum: SERVICE_VALUES },
+  url: { type: 'string' },
+  label: { type: 'string' },
+}, ['id', 'service', 'url', 'label'])
+
+const circleSchema = strictObject({
+  id: { type: 'string' },
+  name: { type: 'string' },
+  icon: { type: 'string' },
+  x: { type: 'number' },
+  y: { type: 'number' },
+  radius: { type: 'number' },
+  minRadius: { type: 'number' },
+  parentId: { type: ['string', 'null'] },
+  connectedTo: { type: ['string', 'null'] },
+  tone: { type: 'string', enum: TONE_VALUES },
+  shapeType: { type: 'string', enum: SHAPE_VALUES },
+  shapeCustom: { type: 'boolean' },
+  sides: { type: 'number' },
+  amplitude: { type: 'number' },
+  imageUrl: { type: 'string' },
+  customColor: { type: 'string' },
+  fillMode: { type: 'string', enum: FILL_MODE_VALUES },
+}, ['id', 'name', 'icon', 'x', 'y', 'radius', 'minRadius', 'parentId', 'connectedTo', 'tone'])
+
+const personSchema = strictObject({
+  id: { type: 'string' },
+  name: { type: 'string' },
+  x: { type: 'number' },
+  y: { type: 'number' },
+  circleId: { type: 'string' },
+  avatar: { type: 'string' },
+  shapeType: { type: 'string', enum: SHAPE_VALUES },
+  sides: { type: 'number' },
+  amplitude: { type: 'number' },
+  imageUrl: { type: 'string' },
+  isFavorite: { type: 'boolean' },
+  notes: { type: 'array', items: personNoteSchema },
+  links: { type: 'array', items: personLinkSchema },
+}, ['id', 'name', 'x', 'y', 'circleId', 'avatar'])
+
+const connectionSchema = strictObject({
+  id: { type: 'string' },
+  fromId: { type: 'string' },
+  toId: { type: 'string' },
+}, ['id', 'fromId', 'toId'])
+
+const graphSchema = strictObject({
+  circles: { type: 'array', items: circleSchema },
+  people: { type: 'array', items: personSchema },
+  connections: { type: 'array', items: connectionSchema },
+}, ['circles', 'people', 'connections'])
+
+const operationSchema = strictObject({
+  type: { type: 'string', enum: ['person.create', 'note.create', 'link.create'] },
+  data: {
+    type: 'object',
+    description: 'Operation payload. person.create requires circleId/name; note.create requires personId/body; link.create requires personId/service/url.',
+    additionalProperties: true,
+  },
+}, ['type', 'data'])
+
+const toolDefinitions = [
+  tool({
+    name: 'list_capabilities',
+    description: 'List DataNode MCP capabilities with compact risk and side-effect metadata. Use this first when deciding which graph tool to call.',
+    riskClass: 'read_only',
+    sideEffect: 'none',
+    schema: strictObject({
+      riskClass: { type: 'string', enum: RISK_VALUES, description: 'Optional filter by risk class.' },
+    }),
+    annotations: { readOnlyHint: true },
+  }),
+  tool({
     name: 'search_people_and_circles',
-    description: 'Search the user-owned DataNode graph by person name, circle, notes, links, or circle name.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        query: { type: 'string' },
-        limit: { type: 'number', default: 10 },
-      },
-      required: ['query'],
-    },
-  },
-  {
+    description: 'Search the user-owned DataNode graph by person name, circle, notes, links, or circle name. Read-only and result-limited.',
+    riskClass: 'search_only',
+    sideEffect: 'none',
+    schema: strictObject({
+      query: { type: 'string' },
+      limit: { type: 'number', default: 10, minimum: 1, maximum: 50 },
+    }, ['query']),
+    annotations: { readOnlyHint: true },
+  }),
+  tool({
     name: 'list_circles',
-    description: 'List circles with ids, parent ids, paths, and people counts.',
-    inputSchema: { type: 'object', properties: {} },
-  },
-  {
+    description: 'List circles with ids, parent ids, paths, and people counts. Read-only.',
+    riskClass: 'read_only',
+    sideEffect: 'none',
+    schema: strictObject({}),
+    annotations: { readOnlyHint: true },
+  }),
+  tool({
     name: 'create_person',
     description: 'Create a person in a direct circle. The server chooses a safe position inside the circle.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        circleId: { type: 'string' },
-        name: { type: 'string' },
-        notes: { type: 'array', items: { type: 'object' } },
-        links: { type: 'array', items: { type: 'object' } },
-      },
-      required: ['circleId', 'name'],
-    },
-  },
-  {
+    riskClass: 'write_internal',
+    sideEffect: 'creates graph node',
+    schema: strictObject({
+      circleId: { type: 'string' },
+      name: { type: 'string' },
+      notes: { type: 'array', items: noteInputSchema },
+      links: { type: 'array', items: linkInputSchema },
+    }, ['circleId', 'name']),
+  }),
+  tool({
     name: 'add_note',
     description: 'Add a note to a person.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        personId: { type: 'string' },
-        title: { type: 'string' },
-        body: { type: 'string' },
-      },
-      required: ['personId', 'body'],
-    },
-  },
-  {
+    riskClass: 'write_internal',
+    sideEffect: 'adds note',
+    schema: strictObject({
+      personId: { type: 'string' },
+      title: { type: 'string' },
+      body: { type: 'string' },
+    }, ['personId', 'body']),
+  }),
+  tool({
     name: 'add_link',
     description: 'Add a saved connection/link to a person.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        personId: { type: 'string' },
-        service: { type: 'string', enum: ['linkedin', 'telegram', 'instagram', 'facebook', 'whatsapp', 'x', 'website'] },
-        url: { type: 'string' },
-        label: { type: 'string' },
-      },
-      required: ['personId', 'service', 'url'],
-    },
-  },
-  {
+    riskClass: 'write_internal',
+    sideEffect: 'adds link',
+    schema: strictObject({
+      personId: { type: 'string' },
+      service: { type: 'string', enum: SERVICE_VALUES },
+      url: { type: 'string' },
+      label: { type: 'string' },
+    }, ['personId', 'service', 'url']),
+  }),
+  tool({
     name: 'create_connection',
     description: 'Create a relationship connection between two node ids.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        fromId: { type: 'string' },
-        toId: { type: 'string' },
-      },
-      required: ['fromId', 'toId'],
-    },
-  },
-  {
+    riskClass: 'write_internal',
+    sideEffect: 'adds connection',
+    schema: strictObject({
+      fromId: { type: 'string' },
+      toId: { type: 'string' },
+    }, ['fromId', 'toId']),
+  }),
+  tool({
+    name: 'batch_operations',
+    description: 'Run a small transactional batch of person.create, note.create, or link.create operations. Prefer this over repeated single writes when the batch is deliberate and reviewable.',
+    riskClass: 'write_internal',
+    sideEffect: 'multiple graph writes',
+    schema: strictObject({
+      operations: { type: 'array', items: operationSchema, minItems: 1, maxItems: 25 },
+    }, ['operations']),
+  }),
+  tool({
     name: 'import_linkedin_person',
-    description: 'Import or update a person by their LinkedIn profile URL.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        url: { type: 'string', description: 'LinkedIn profile URL.' },
-      },
-      required: ['url'],
-    },
-  },
-  {
+    description: 'Import or update a person by their LinkedIn profile URL. Uses server-side enrichment.',
+    riskClass: 'write_internal',
+    sideEffect: 'creates or updates person and company circle',
+    schema: strictObject({
+      url: { type: 'string', description: 'LinkedIn profile URL.' },
+    }, ['url']),
+    annotations: { openWorldHint: true },
+  }),
+  tool({
     name: 'delete_person',
-    description: 'Delete a person node from the graph.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        personId: { type: 'string', description: 'The ID of the person to delete.' },
-      },
-      required: ['personId'],
-    },
-  },
-  {
+    description: 'Delete a person node from the graph. If this is part of a large cleanup, create a backup with export_graph or ask the user to confirm first.',
+    riskClass: 'destructive',
+    sideEffect: 'deletes person and related connections',
+    schema: strictObject({
+      personId: { type: 'string', description: 'The ID of the person to delete.' },
+    }, ['personId']),
+    annotations: { destructiveHint: true },
+  }),
+  tool({
     name: 'delete_note',
     description: 'Delete a specific note from a person.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        personId: { type: 'string', description: 'The ID of the person who owns the note.' },
-        noteId: { type: 'string', description: 'The ID of the note to delete.' },
-      },
-      required: ['personId', 'noteId'],
-    },
-  },
-  {
+    riskClass: 'destructive',
+    sideEffect: 'deletes note',
+    schema: strictObject({
+      personId: { type: 'string', description: 'The ID of the person who owns the note.' },
+      noteId: { type: 'string', description: 'The ID of the note to delete.' },
+    }, ['personId', 'noteId']),
+    annotations: { destructiveHint: true },
+  }),
+  tool({
     name: 'delete_link',
     description: 'Delete a specific link/social connection from a person.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        personId: { type: 'string', description: 'The ID of the person who owns the link.' },
-        linkId: { type: 'string', description: 'The ID of the link to delete.' },
-      },
-      required: ['personId', 'linkId'],
-    },
-  },
-  {
+    riskClass: 'destructive',
+    sideEffect: 'deletes link',
+    schema: strictObject({
+      personId: { type: 'string', description: 'The ID of the person who owns the link.' },
+      linkId: { type: 'string', description: 'The ID of the link to delete.' },
+    }, ['personId', 'linkId']),
+    annotations: { destructiveHint: true },
+  }),
+  tool({
     name: 'delete_connection',
     description: 'Delete a relationship connection between two nodes.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        connectionId: { type: 'string', description: 'The ID of the connection to delete.' },
-      },
-      required: ['connectionId'],
-    },
-  },
-  {
+    riskClass: 'destructive',
+    sideEffect: 'deletes connection',
+    schema: strictObject({
+      connectionId: { type: 'string', description: 'The ID of the connection to delete.' },
+    }, ['connectionId']),
+    annotations: { destructiveHint: true },
+  }),
+  tool({
     name: 'export_graph',
-    description: 'Retrieve the entire social graph (circles, people, connections) and its revision. RECOMMENDED: Run this tool to create a backup file locally before making any large or experimental changes to the graph.',
-    inputSchema: { type: 'object', properties: {} },
-  },
-  {
+    description: 'Retrieve the entire social graph and its revision. Use this as a backup before large, experimental, bulk, or destructive changes.',
+    riskClass: 'read_only',
+    sideEffect: 'none',
+    schema: strictObject({}),
+    annotations: { readOnlyHint: true },
+  }),
+  tool({
     name: 'import_graph',
-    description: 'Replace the entire graph with a new graph JSON.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        graph: {
-          type: 'object',
-          description: 'The complete graph state containing circles, people, and connections arrays.'
-        },
+    description: 'Replace the entire graph with a new graph JSON. For large replacements, ask the user to confirm or create a backup with export_graph first.',
+    riskClass: 'destructive',
+    sideEffect: 'replaces entire graph',
+    schema: strictObject({
+      graph: {
+        ...graphSchema,
+        description: 'The complete graph state containing circles, people, and connections arrays.',
       },
-      required: ['graph'],
-    },
-  },
-  {
+    }, ['graph']),
+    annotations: { destructiveHint: true },
+  }),
+  tool({
     name: 'clear_graph',
-    description: 'Reset the graph, deleting all circles, people, and connections, leaving only the central "You" circle.',
-    inputSchema: { type: 'object', properties: {} },
-  },
-  {
+    description: 'Reset the graph, deleting all circles, people, and connections, leaving only the central "You" circle. Ask for confirmation or create a backup first unless the user clearly requested a reset.',
+    riskClass: 'destructive',
+    sideEffect: 'deletes entire graph',
+    schema: strictObject({}),
+    annotations: { destructiveHint: true },
+  }),
+  tool({
     name: 'create_circle',
     description: 'Create a circle (standalone or nested).',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        name: { type: 'string', description: 'The name of the circle.' },
-        parentId: { type: 'string', description: 'Optional. Parent circle ID to nest this circle.' },
-        connectedTo: { type: 'string', description: 'Optional. ID of another circle to connect this one to.' },
-        tone: { type: 'string', enum: ['blue', 'red', 'green', 'amber', 'violet'], description: 'Optional color tone.' },
-      },
-      required: ['name'],
-    },
-  },
-  {
+    riskClass: 'write_internal',
+    sideEffect: 'creates circle',
+    schema: strictObject({
+      name: { type: 'string', description: 'The name of the circle.' },
+      parentId: { type: ['string', 'null'], description: 'Optional. Parent circle ID to nest this circle.' },
+      connectedTo: { type: ['string', 'null'], description: 'Optional. ID of another circle to connect this one to.' },
+      tone: { type: 'string', enum: TONE_VALUES, description: 'Optional color tone.' },
+    }, ['name']),
+  }),
+  tool({
     name: 'update_circle',
-    description: 'Update circle properties (name, parent, connections, position, color/shape style).',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        circleId: { type: 'string' },
-        name: { type: 'string' },
-        parentId: { type: 'string' },
-        connectedTo: { type: 'string' },
-        tone: { type: 'string', enum: ['blue', 'red', 'green', 'amber', 'violet'] },
-        x: { type: 'number' },
-        y: { type: 'number' },
-        radius: { type: 'number' },
-        minRadius: { type: 'number' },
-        shapeType: { type: 'string', enum: ['circle', 'wavy', 'polygon'] },
-        sides: { type: 'number' },
-        amplitude: { type: 'number' },
-      },
-      required: ['circleId'],
-    },
-  },
-  {
+    description: 'Update circle properties (name, parent, connections, position, color/shape style). Ask before broad layout rewrites.',
+    riskClass: 'write_internal',
+    sideEffect: 'updates circle',
+    schema: strictObject({
+      circleId: { type: 'string' },
+      name: { type: 'string' },
+      parentId: { type: ['string', 'null'] },
+      connectedTo: { type: ['string', 'null'] },
+      tone: { type: 'string', enum: TONE_VALUES },
+      x: { type: 'number' },
+      y: { type: 'number' },
+      radius: { type: 'number' },
+      minRadius: { type: 'number' },
+      shapeType: { type: 'string', enum: SHAPE_VALUES },
+      sides: { type: 'number' },
+      amplitude: { type: 'number' },
+    }, ['circleId']),
+  }),
+  tool({
     name: 'delete_circle',
-    description: 'Delete a circle. Its child circles/people are promoted to its parent circle.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        circleId: { type: 'string' },
-      },
-      required: ['circleId'],
-    },
-  },
-  {
+    description: 'Delete a circle. Its child circles/people are promoted to its parent circle. For large cleanups, create a backup or ask the user to confirm first.',
+    riskClass: 'destructive',
+    sideEffect: 'deletes circle and rewires children',
+    schema: strictObject({
+      circleId: { type: 'string' },
+    }, ['circleId']),
+    annotations: { destructiveHint: true },
+  }),
+  tool({
     name: 'upload_avatar',
     description: 'Upload/set a photo or avatar for a person or circle (accepts Base64 image data or URL).',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        type: { type: 'string', enum: ['person', 'circle'], description: 'Whether it is a person or a circle.' },
-        id: { type: 'string', description: 'The ID of the person or circle.' },
-        imageUrl: { type: 'string', description: 'Base64 image string (with or without MIME prefix) or a URL.' },
-      },
-      required: ['type', 'id', 'imageUrl'],
-    },
-  },
+    riskClass: 'write_internal',
+    sideEffect: 'updates avatar image',
+    schema: strictObject({
+      type: { type: 'string', enum: ['person', 'circle'], description: 'Whether it is a person or a circle.' },
+      id: { type: 'string', description: 'The ID of the person or circle.' },
+      imageUrl: { type: 'string', description: 'Base64 image string (with or without MIME prefix) or a URL.' },
+    }, ['type', 'id', 'imageUrl']),
+    annotations: { openWorldHint: true },
+  }),
 ]
+
+const tools = toolDefinitions.map(({ handler, riskClass, sideEffect, ...definition }) => definition)
+const toolRegistry = new Map(toolDefinitions.map((definition) => [definition.name, definition]))
+
+function strictObject(properties, required = []) {
+  return {
+    type: 'object',
+    properties,
+    required,
+    additionalProperties: false,
+  }
+}
+
+function tool({ name, description, schema, riskClass, sideEffect, annotations = {}, handler }) {
+  return {
+    name,
+    description,
+    inputSchema: schema,
+    outputSchema: resultEnvelopeSchema,
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+      ...annotations,
+    },
+    _meta: {
+      riskClass,
+      sideEffect,
+      resourceScope: 'current_user_graph',
+      permissionPolicy: 'server-enforced token scopes plus optimistic revision checks',
+      resultFormat: 'JSON envelope with status, summary, data, and next_valid_actions',
+    },
+    riskClass,
+    sideEffect,
+    handler,
+  }
+}
 
 function send(message) {
   process.stdout.write(`${JSON.stringify(message)}\n`)
 }
 
-function textResult(value) {
+function summarizeValue(value) {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    if (value.counts) {
+      const counts = value.counts
+      return `Graph has ${counts.people ?? 0} people, ${counts.circles ?? 0} circles, and ${counts.connections ?? 0} connections.`
+    }
+    if (value.results && Array.isArray(value.results)) return `Found ${value.results.length} result(s).`
+    if (value.circles && Array.isArray(value.circles)) return `Listed ${value.circles.length} circle(s).`
+    if (value.capabilities && Array.isArray(value.capabilities)) return `Listed ${value.capabilities.length} capability/capabilities.`
+    if (value.revision !== undefined && value.graph) {
+      const graph = value.graph
+      return `Graph export at revision ${value.revision}: ${graph?.people?.length ?? 0} people, ${graph?.circles?.length ?? 0} circles, ${graph?.connections?.length ?? 0} connections.`
+    }
+    if (value.result !== undefined && value.revision !== undefined) return `Mutation succeeded at revision ${value.revision}.`
+  }
+  return 'Tool call completed.'
+}
+
+function resultEnvelope(toolName, value, extra = {}) {
+  const envelope = {
+    status: 'success',
+    tool: toolName,
+    summary: summarizeValue(value),
+    data: value,
+    next_valid_actions: nextActionsFor(toolName),
+    ...extra,
+  }
   return {
-    content: [{ type: 'text', text: typeof value === 'string' ? value : JSON.stringify(value, null, 2) }],
+    content: [{ type: 'text', text: JSON.stringify(envelope, null, 2) }],
+    structuredContent: envelope,
   }
 }
 
+function errorEnvelope(toolName, error) {
+  const message = error instanceof Error ? error.message : String(error)
+  const envelope = {
+    status: 'error',
+    tool: toolName,
+    error: {
+      type: error?.status === 409 ? 'revision_conflict' : error?.status === 403 ? 'permission_denied' : 'tool_error',
+      message,
+    },
+    next_valid_actions: error?.status === 409 ? ['retry_after_reading_graph_meta'] : ['inspect_error_and_retry_with_valid_arguments'],
+  }
+  return {
+    content: [{ type: 'text', text: JSON.stringify(envelope, null, 2) }],
+    structuredContent: envelope,
+    isError: true,
+  }
+}
+
+function nextActionsFor(toolName) {
+  if (toolName === 'list_capabilities') return ['search_people_and_circles', 'list_circles']
+  if (toolName === 'search_people_and_circles') return ['list_circles', 'create_person', 'add_note']
+  if (toolName === 'list_circles') return ['create_person', 'create_circle', 'search_people_and_circles']
+  if (toolName === 'export_graph') return ['import_graph', 'clear_graph', 'batch_operations']
+  if (['import_graph', 'clear_graph'].includes(toolName)) return ['list_circles', 'search_people_and_circles']
+  return ['search_people_and_circles', 'list_circles']
+}
+
 async function callTool(name, args = {}) {
+  const definition = toolRegistry.get(name)
+  if (!definition) throw new Error(`Unknown tool: ${name}`)
+  validateSchema(args, definition.inputSchema, name)
+
   switch (name) {
+    case 'list_capabilities':
+      return resultEnvelope(name, {
+        capabilities: toolDefinitions
+          .filter((definition) => !args.riskClass || definition.riskClass === args.riskClass)
+          .map((definition) => ({
+            name: definition.name,
+            description: definition.description,
+            riskClass: definition.riskClass,
+            sideEffect: definition.sideEffect,
+            readOnly: definition.annotations.readOnlyHint,
+            destructive: definition.annotations.destructiveHint,
+          })),
+      })
     case 'search_people_and_circles':
-      return textResult(await search(args.query, args.limit ?? 10))
+      return resultEnvelope(name, await search(args.query, Math.min(args.limit ?? 10, 50)))
     case 'list_circles':
-      return textResult(await listCircles())
+      return resultEnvelope(name, await listCircles())
     case 'create_person': {
       const meta = await getMeta()
-      return textResult(await createPerson({ expectedRevision: meta.revision, ...args }))
+      return resultEnvelope(name, await createPerson({ expectedRevision: meta.revision, ...args }))
     }
     case 'add_note': {
       const meta = await getMeta()
-      return textResult(await addNote(args.personId, { expectedRevision: meta.revision, title: args.title, body: args.body }))
+      return resultEnvelope(name, await addNote(args.personId, { expectedRevision: meta.revision, title: args.title, body: args.body }))
     }
     case 'add_link': {
       const meta = await getMeta()
-      return textResult(await addLink(args.personId, { expectedRevision: meta.revision, service: args.service, url: args.url, label: args.label }))
+      return resultEnvelope(name, await addLink(args.personId, { expectedRevision: meta.revision, service: args.service, url: args.url, label: args.label }))
     }
     case 'create_connection': {
       const meta = await getMeta()
-      return textResult(await createConnection({ expectedRevision: meta.revision, fromId: args.fromId, toId: args.toId }))
+      return resultEnvelope(name, await createConnection({ expectedRevision: meta.revision, fromId: args.fromId, toId: args.toId }))
+    }
+    case 'batch_operations': {
+      validateOperations(args.operations)
+      const meta = await getMeta()
+      return resultEnvelope(name, await batchOperations({ expectedRevision: meta.revision, operations: args.operations }))
     }
     case 'import_linkedin_person': {
       const meta = await getMeta()
-      return textResult(await importLinkedInPerson({ expectedRevision: meta.revision, url: args.url }))
+      return resultEnvelope(name, await importLinkedInPerson({ expectedRevision: meta.revision, url: args.url }))
     }
     case 'delete_person': {
       const meta = await getMeta()
-      return textResult(await deletePerson(args.personId, { expectedRevision: meta.revision }))
+      return resultEnvelope(name, await deletePerson(args.personId, { expectedRevision: meta.revision }))
     }
     case 'delete_note': {
       const meta = await getMeta()
-      return textResult(await deleteNote(args.personId, args.noteId, { expectedRevision: meta.revision }))
+      return resultEnvelope(name, await deleteNote(args.personId, args.noteId, { expectedRevision: meta.revision }))
     }
     case 'delete_link': {
       const meta = await getMeta()
-      return textResult(await deleteLink(args.personId, args.linkId, { expectedRevision: meta.revision }))
+      return resultEnvelope(name, await deleteLink(args.personId, args.linkId, { expectedRevision: meta.revision }))
     }
     case 'delete_connection': {
       const meta = await getMeta()
-      return textResult(await deleteConnection(args.connectionId, { expectedRevision: meta.revision }))
+      return resultEnvelope(name, await deleteConnection(args.connectionId, { expectedRevision: meta.revision }))
     }
     case 'export_graph':
-      return textResult(await exportGraph())
+      return resultEnvelope(name, await exportGraph(), {
+        guidance: 'Use this payload as a backup before large, bulk, or destructive graph changes.',
+      })
     case 'import_graph': {
       const meta = await getMeta()
-      return textResult(await importGraph({ graph: args.graph, expectedRevision: meta.revision }))
+      return resultEnvelope(name, await importGraph({ graph: args.graph, expectedRevision: meta.revision }))
     }
     case 'clear_graph': {
       const meta = await getMeta()
-      return textResult(await clearGraph({ expectedRevision: meta.revision }))
+      return resultEnvelope(name, await clearGraph({ expectedRevision: meta.revision }))
     }
     case 'create_circle': {
       const meta = await getMeta()
-      return textResult(await createCircle({ expectedRevision: meta.revision, ...args }))
+      return resultEnvelope(name, await createCircle({ expectedRevision: meta.revision, ...args }))
     }
     case 'update_circle': {
       const meta = await getMeta()
       const { circleId, ...rest } = args
-      return textResult(await updateCircle(circleId, { expectedRevision: meta.revision, ...rest }))
+      return resultEnvelope(name, await updateCircle(circleId, { expectedRevision: meta.revision, ...rest }))
     }
     case 'delete_circle': {
       const meta = await getMeta()
-      return textResult(await deleteCircle(args.circleId, { expectedRevision: meta.revision }))
+      return resultEnvelope(name, await deleteCircle(args.circleId, { expectedRevision: meta.revision }))
     }
     case 'upload_avatar': {
       const meta = await getMeta()
-      return textResult(await uploadAvatar(args.type, args.id, args.imageUrl, meta.revision))
+      return resultEnvelope(name, await uploadAvatar(args.type, args.id, args.imageUrl, meta.revision))
     }
     default:
       throw new Error(`Unknown tool: ${name}`)
+  }
+}
+
+function validateOperations(operations) {
+  for (const [index, operation] of operations.entries()) {
+    if (operation.type === 'person.create') {
+      validateSchema(operation.data, strictObject({
+        circleId: { type: 'string' },
+        name: { type: 'string' },
+        notes: { type: 'array', items: noteInputSchema },
+        links: { type: 'array', items: linkInputSchema },
+      }, ['circleId', 'name']), `batch_operations.operations[${index}].data`)
+    } else if (operation.type === 'note.create') {
+      validateSchema(operation.data, strictObject({
+        personId: { type: 'string' },
+        title: { type: 'string' },
+        body: { type: 'string' },
+      }, ['personId', 'body']), `batch_operations.operations[${index}].data`)
+    } else if (operation.type === 'link.create') {
+      validateSchema(operation.data, strictObject({
+        personId: { type: 'string' },
+        service: { type: 'string', enum: SERVICE_VALUES },
+        url: { type: 'string' },
+        label: { type: 'string' },
+      }, ['personId', 'service', 'url']), `batch_operations.operations[${index}].data`)
+    }
+  }
+}
+
+function validateSchema(value, schema, path) {
+  const expectedTypes = Array.isArray(schema.type) ? schema.type : [schema.type]
+  const actualType = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value
+  if (schema.type && !expectedTypes.includes(actualType)) {
+    throw new Error(`${path} must be ${expectedTypes.join(' or ')}.`)
+  }
+
+  if (schema.enum && !schema.enum.includes(value)) {
+    throw new Error(`${path} must be one of: ${schema.enum.join(', ')}.`)
+  }
+
+  if (actualType === 'number') {
+    if (typeof schema.minimum === 'number' && value < schema.minimum) throw new Error(`${path} must be at least ${schema.minimum}.`)
+    if (typeof schema.maximum === 'number' && value > schema.maximum) throw new Error(`${path} must be at most ${schema.maximum}.`)
+  }
+
+  if (actualType === 'array') {
+    if (typeof schema.minItems === 'number' && value.length < schema.minItems) throw new Error(`${path} must include at least ${schema.minItems} item(s).`)
+    if (typeof schema.maxItems === 'number' && value.length > schema.maxItems) throw new Error(`${path} must include at most ${schema.maxItems} item(s).`)
+    if (schema.items) value.forEach((item, index) => validateSchema(item, schema.items, `${path}[${index}]`))
+  }
+
+  if (actualType === 'object' && schema.additionalProperties === false) {
+    const properties = schema.properties ?? {}
+    for (const requiredField of schema.required ?? []) {
+      if (value[requiredField] === undefined) throw new Error(`${path}.${requiredField} is required.`)
+    }
+    for (const key of Object.keys(value)) {
+      if (!Object.prototype.hasOwnProperty.call(properties, key)) throw new Error(`${path}.${key} is not allowed.`)
+    }
+    for (const [key, childSchema] of Object.entries(properties)) {
+      if (value[key] !== undefined) validateSchema(value[key], childSchema, `${path}.${key}`)
+    }
   }
 }
 
@@ -334,7 +618,14 @@ process.stdin.on('data', (chunk) => {
 })
 
 async function handleLine(line) {
-  const request = JSON.parse(line)
+  let request
+  try {
+    request = JSON.parse(line)
+  } catch (error) {
+    send({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Invalid JSON-RPC request.' } })
+    return
+  }
+
   try {
     if (request.method === 'initialize') {
       send({
@@ -343,7 +634,7 @@ async function handleLine(line) {
         result: {
           protocolVersion: request.params?.protocolVersion ?? '2024-11-05',
           capabilities: { tools: {} },
-          serverInfo: { name: 'datanode-mcp', version: '0.1.0' },
+          serverInfo: { name: 'datanode-mcp', version: '0.2.0' },
         },
       })
       return
@@ -353,16 +644,18 @@ async function handleLine(line) {
       return
     }
     if (request.method === 'tools/call') {
-      const result = await callTool(request.params?.name, request.params?.arguments ?? {})
+      const name = request.params?.name
+      const result = await callTool(name, request.params?.arguments ?? {})
       send({ jsonrpc: '2.0', id: request.id, result })
       return
     }
     if (request.id !== undefined) send({ jsonrpc: '2.0', id: request.id, result: {} })
   } catch (error) {
+    const toolName = request.params?.name ?? 'unknown'
     send({
       jsonrpc: '2.0',
       id: request.id,
-      error: { code: -32000, message: error instanceof Error ? error.message : String(error) },
+      result: errorEnvelope(toolName, error),
     })
   }
 }
