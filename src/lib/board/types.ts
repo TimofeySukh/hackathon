@@ -179,5 +179,5 @@ export type GridRipple = {
   startTime: number
   duration: number
   maxRadius: number
-  type: 'move' | 'click'
+  type: 'move' | 'click' | 'splash' | 'drag'
 }

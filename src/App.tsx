@@ -929,15 +929,27 @@ function App() {
   const gridRipplesRef = useRef<GridRipple[]>([])
   const lastMoveRippleRef = useRef<{ x: number; y: number; time: number }>({ x: 0, y: 0, time: 0 })
 
-  function addGridRipple(x: number, y: number, type: 'move' | 'click') {
-    if (prefersReducedMotion()) return
+  function addGridRipple(x: number, y: number, type: 'move' | 'click' | 'splash' | 'drag') {
+    if (!enableRipples || prefersReducedMotion()) return
     const now = getPerformanceNow()
+    let duration = 400
+    let maxRadius = 120
+    if (type === 'click') {
+      duration = 800
+      maxRadius = 400
+    } else if (type === 'splash') {
+      duration = 1200
+      maxRadius = 600
+    } else if (type === 'drag') {
+      duration = 500
+      maxRadius = 150
+    }
     const ripple: GridRipple = {
       x,
       y,
       startTime: now,
-      duration: type === 'click' ? 800 : 400,
-      maxRadius: type === 'click' ? 500 : 150,
+      duration,
+      maxRadius,
       type,
     }
     gridRipplesRef.current.push(ripple)
@@ -1110,6 +1122,24 @@ function App() {
   const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight })
 
   const [showSettings, setShowSettings] = useState(false)
+
+  const [enableRipples, setEnableRipples] = useState(() => {
+    try {
+      const val = window.localStorage.getItem('datanode_grid_ripples')
+      return val !== '0'
+    } catch {
+      return true
+    }
+  })
+
+  const handleToggleRipples = (val: boolean) => {
+    setEnableRipples(val)
+    try {
+      window.localStorage.setItem('datanode_grid_ripples', val ? '1' : '0')
+    } catch {
+      // ignore
+    }
+  }
   const [showAgentSettings, setShowAgentSettings] = useState(false)
   const [showLinkedInGuide, setShowLinkedInGuide] = useState(false)
   const showCircleLabels = true
@@ -2096,7 +2126,7 @@ function App() {
         selectedCircleIds,
         hoveredCircleEdgeId,
         EMPTY_ANIM_FRAME,
-        gridRipplesRef.current,
+        enableRipples ? gridRipplesRef.current : undefined,
         getPerformanceNow(),
       )
     }
@@ -2146,7 +2176,7 @@ function App() {
   useLayoutEffect(() => {
     driveCameraRef.current = driveCamera
     settleGestureRef.current = settleGesture
-    if (gestureActiveRef.current) applyDomCamera(cameraRef.current)
+    if (gestureActiveRef.current) applyDomCamera()
   })
 
   useEffect(() => () => {
@@ -2192,7 +2222,7 @@ function App() {
       selectedCircleIds,
       hoveredCircleEdgeId,
       frame,
-      gridRipplesRef.current,
+      enableRipples ? gridRipplesRef.current : undefined,
       getPerformanceNow(),
     )
   }
@@ -2581,14 +2611,22 @@ function App() {
       p.pointerId === event.pointerId ? event.nativeEvent : p
     )
 
+    const isDragging = !!(
+      (moveCircleRef.current && moveCircleRef.current.pointerId === event.pointerId) ||
+      (movePersonRef.current && movePersonRef.current.pointerId === event.pointerId) ||
+      (resizeCircleRef.current && resizeCircleRef.current.pointerId === event.pointerId)
+    )
+
     // Trigger grid move ripple
-    const worldPos = screenToWorld({ x: event.clientX, y: event.clientY })
-    const now = getPerformanceNow()
-    const dist = Math.hypot(worldPos.x - lastMoveRippleRef.current.x, worldPos.y - lastMoveRippleRef.current.y)
-    const timeDiff = now - lastMoveRippleRef.current.time
-    if (dist > 30 || timeDiff > 100) {
-      addGridRipple(worldPos.x, worldPos.y, 'move')
-      lastMoveRippleRef.current = { x: worldPos.x, y: worldPos.y, time: now }
+    if (!isDragging) {
+      const worldPos = screenToWorld({ x: event.clientX, y: event.clientY })
+      const now = getPerformanceNow()
+      const dist = Math.hypot(worldPos.x - lastMoveRippleRef.current.x, worldPos.y - lastMoveRippleRef.current.y)
+      const timeDiff = now - lastMoveRippleRef.current.time
+      if (dist > 30 || timeDiff > 100) {
+        addGridRipple(worldPos.x, worldPos.y, 'move')
+        lastMoveRippleRef.current = { x: worldPos.x, y: worldPos.y, time: now }
+      }
     }
 
     if (marqueeRef.current) {
@@ -2694,6 +2732,17 @@ function App() {
         deltaY,
       )
       paintBoard()
+
+      const updated = boardIndexRef.current.circlesById.get(moving.circleId)
+      if (updated) {
+        const dragNow = getPerformanceNow()
+        const dragDist = Math.hypot(updated.x - lastMoveRippleRef.current.x, updated.y - lastMoveRippleRef.current.y)
+        const dragTimeDiff = dragNow - lastMoveRippleRef.current.time
+        if (dragDist > 15 || dragTimeDiff > 50) {
+          addGridRipple(updated.x, updated.y, 'drag')
+          lastMoveRippleRef.current = { x: updated.x, y: updated.y, time: dragNow }
+        }
+      }
     }
 
     const movingPerson = movePersonRef.current
@@ -2714,6 +2763,17 @@ function App() {
         deltaY,
       )
       paintBoard()
+
+      const updated = boardIndexRef.current.peopleById.get(movingPerson.personId)
+      if (updated) {
+        const dragNow = getPerformanceNow()
+        const dragDist = Math.hypot(updated.x - lastMoveRippleRef.current.x, updated.y - lastMoveRippleRef.current.y)
+        const dragTimeDiff = dragNow - lastMoveRippleRef.current.time
+        if (dragDist > 15 || dragTimeDiff > 50) {
+          addGridRipple(updated.x, updated.y, 'drag')
+          lastMoveRippleRef.current = { x: updated.x, y: updated.y, time: dragNow }
+        }
+      }
     }
 
     const resizing = resizeCircleRef.current
@@ -2727,6 +2787,17 @@ function App() {
         world,
       )
       paintBoard()
+
+      const updated = boardIndexRef.current.circlesById.get(resizing.circleId)
+      if (updated) {
+        const dragNow = getPerformanceNow()
+        const dragDist = Math.hypot(updated.x - lastMoveRippleRef.current.x, updated.y - lastMoveRippleRef.current.y)
+        const dragTimeDiff = dragNow - lastMoveRippleRef.current.time
+        if (dragDist > 15 || dragTimeDiff > 50) {
+          addGridRipple(updated.x, updated.y, 'drag')
+          lastMoveRippleRef.current = { x: updated.x, y: updated.y, time: dragNow }
+        }
+      }
     }
 
     if (connector) {
@@ -3217,6 +3288,7 @@ function App() {
       ],
     }))
     setSelectedPeopleIds([])
+    addGridRipple(world.x, world.y, 'splash')
     selectItem({ type: 'person', id })
     // Grow the new person in so it feels placed, not blinked into existence.
     startBoardAnim('pop:' + id, 360)
@@ -3362,6 +3434,7 @@ function App() {
       }
       return nextGraph
     })
+    addGridRipple(createMenu.x, createMenu.y, 'splash')
     selectItem({ type: 'person', id })
     // Grow the new person in so it feels placed, not blinked into existence.
     startBoardAnim('pop:' + id, 360)
@@ -3386,6 +3459,7 @@ function App() {
     const source = circlesById.get(createMenu.sourceCircleId)
     if (!source) return
 
+    // eslint-disable-next-line react-hooks/purity -- created from a pointer event, not during render.
     const id = `circle-${Date.now()}`
     const isNested = mode === 'nested'
     pushHistory()
@@ -3418,6 +3492,7 @@ function App() {
       }
       return nextGraph
     })
+    addGridRipple(createMenu.x, createMenu.y, 'splash')
     selectItem({ type: 'circle', id })
     setCreateMenu(null)
     notifyOnboarding('create')
@@ -3987,6 +4062,21 @@ Content-Type: application/json
                 style={{ display: 'none' }}
                 onChange={handleGraphImport}
               />
+            </div>
+
+            <div style={{ borderTop: '1px solid var(--md-outline-variant)', paddingTop: '16px' }}>
+              <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--md-on-surface-variant)', display: 'block', marginBottom: '8px' }}>
+                Display Options
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px', color: 'var(--md-on-surface)' }}>
+                <span>Grid Ripple Effects</span>
+                <input
+                  type="checkbox"
+                  checked={enableRipples}
+                  onChange={(e) => handleToggleRipples(e.target.checked)}
+                  style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                />
+              </div>
             </div>
 
           </div>

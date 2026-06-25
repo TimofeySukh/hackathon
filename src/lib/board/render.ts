@@ -426,10 +426,28 @@ function drawGridDots(
         for (const rip of ripples) {
           const age = animTime - rip.startTime
           if (age < 0 || age > rip.duration) continue
-          const R = rip.maxRadius * (age / rip.duration)
+
+          let maxRadiusScreen = 120
+          let crestWidthScreen = 40
+          let peakIntensity = 0.3
+          if (rip.type === 'click') {
+            maxRadiusScreen = 400
+            crestWidthScreen = 80
+            peakIntensity = 0.6
+          } else if (rip.type === 'splash') {
+            maxRadiusScreen = 600
+            crestWidthScreen = 120
+            peakIntensity = 0.8
+          } else if (rip.type === 'drag') {
+            maxRadiusScreen = 150
+            crestWidthScreen = 50
+            peakIntensity = 0.4
+          }
+
+          const R_world = (maxRadiusScreen / scale) * (age / rip.duration)
+          const W_world = crestWidthScreen / scale
           const d = Math.hypot(wx - rip.x, wy - rip.y)
-          const W = rip.type === 'click' ? 120 : 60
-          const intensity = Math.exp(-Math.pow((d - R) / W, 2)) * (1 - age / rip.duration)
+          const intensity = Math.exp(-Math.pow((d - R_world) / W_world, 2)) * (1 - age / rip.duration) * peakIntensity
           if (intensity > maxIntensity) maxIntensity = intensity
         }
 
@@ -474,10 +492,28 @@ function drawGridDots(
           for (const rip of ripples) {
             const age = animTime - rip.startTime
             if (age < 0 || age > rip.duration) continue
-            const R = rip.maxRadius * (age / rip.duration)
+
+            let maxRadiusScreen = 120
+            let crestWidthScreen = 40
+            let peakIntensity = 0.3
+            if (rip.type === 'click') {
+              maxRadiusScreen = 400
+              crestWidthScreen = 80
+              peakIntensity = 0.6
+            } else if (rip.type === 'splash') {
+              maxRadiusScreen = 600
+              crestWidthScreen = 120
+              peakIntensity = 0.8
+            } else if (rip.type === 'drag') {
+              maxRadiusScreen = 150
+              crestWidthScreen = 50
+              peakIntensity = 0.4
+            }
+
+            const R_world = (maxRadiusScreen / scale) * (age / rip.duration)
+            const W_world = crestWidthScreen / scale
             const d = Math.hypot(wx - rip.x, wy - rip.y)
-            const W = rip.type === 'click' ? 120 : 60
-            const intensity = Math.exp(-Math.pow((d - R) / W, 2)) * (1 - age / rip.duration)
+            const intensity = Math.exp(-Math.pow((d - R_world) / W_world, 2)) * (1 - age / rip.duration) * peakIntensity
             if (intensity > maxIntensity) maxIntensity = intensity
           }
 
