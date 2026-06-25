@@ -345,189 +345,90 @@ function drawGridDots(
   ripples: GridRipple[] | undefined,
   animTime: number | undefined,
 ) {
-  const L_start = Math.max(-4, Math.floor(Math.log2(0.5 / scale)))
-
-  const L_fade = L_start + 1
-  const fadeOpacity = Math.max(0, Math.min(1, 2 * (Math.pow(2, L_fade) * scale) - 1))
-
   const hasRipples = ripples && ripples.length > 0 && animTime !== undefined
+  if (!hasRipples) return
 
-  // 1. Draw base minor dots (fast batched path)
-  const minorRadius = 1.0 / scale
+  // Collect candidate dots from the bounding boxes of all active ripples
+  const candidates = new Map<string, { c: number; r: number }>()
 
-  // Draw fading minor dots (opacity = 0.04 * fadeOpacity)
-  if (fadeOpacity > 0.01) {
-    ctx.beginPath()
-    ctx.fillStyle = `rgba(61, 71, 78, ${0.04 * fadeOpacity})`
-    const spacingFade = 20 * Math.pow(2, L_fade)
-    const colMinF = Math.floor(rect.left / spacingFade)
-    const colMaxF = Math.ceil(rect.right / spacingFade)
-    const rowMinF = Math.floor(rect.top / spacingFade)
-    const rowMaxF = Math.ceil(rect.bottom / spacingFade)
+  for (const rip of ripples) {
+    const age = animTime - rip.startTime
+    if (age < 0 || age > rip.duration) continue
 
-    for (let c = colMinF; c <= colMaxF; c++) {
-      for (let r = rowMinF; r <= rowMaxF; r++) {
-        if (c % 2 === 0 && r % 2 === 0) continue
-        const wx = c * spacingFade
-        const wy = r * spacingFade
+    let maxRadiusScreen = 150
+    if (rip.type === 'click') maxRadiusScreen = 450
+    else if (rip.type === 'splash') maxRadiusScreen = 650
+    else if (rip.type === 'drag') maxRadiusScreen = 180
 
-        ctx.moveTo(wx + minorRadius, wy)
-        ctx.arc(wx, wy, minorRadius, 0, Math.PI * 2)
-      }
-    }
-    ctx.fill()
-  }
+    const halfW = maxRadiusScreen / scale
+    const left = Math.max(rect.left, rip.x - halfW)
+    const right = Math.min(rect.right, rip.x + halfW)
+    const top = Math.max(rect.top, rip.y - halfW)
+    const bottom = Math.min(rect.bottom, rip.y + halfW)
 
-  // Draw fully visible minor dots (opacity = 0.04)
-  ctx.beginPath()
-  ctx.fillStyle = `rgba(61, 71, 78, 0.04)`
-  const L_visible = L_start + 2
-  const spacingVis = 20 * Math.pow(2, L_visible)
-  const colMinV = Math.floor(rect.left / spacingVis)
-  const colMaxV = Math.ceil(rect.right / spacingVis)
-  const rowMinV = Math.floor(rect.top / spacingVis)
-  const rowMaxV = Math.ceil(rect.bottom / spacingVis)
+    const colMin = Math.floor(left / 20)
+    const colMax = Math.ceil(right / 20)
+    const rowMin = Math.floor(top / 20)
+    const rowMax = Math.ceil(bottom / 20)
 
-  for (let c = colMinV; c <= colMaxV; c++) {
-    for (let r = rowMinV; r <= rowMaxV; r++) {
-      const wx = c * spacingVis
-      const wy = r * spacingVis
-
-      ctx.moveTo(wx + minorRadius, wy)
-      ctx.arc(wx, wy, minorRadius, 0, Math.PI * 2)
-    }
-  }
-  ctx.fill()
-
-  // 2. Draw lit minor dots overlay on top
-  if (hasRipples) {
-    const spacingFade = 20 * Math.pow(2, L_fade)
-    const colMinF = Math.floor(rect.left / spacingFade)
-    const colMaxF = Math.ceil(rect.right / spacingFade)
-    const rowMinF = Math.floor(rect.top / spacingFade)
-    const rowMaxF = Math.ceil(rect.bottom / spacingFade)
-
-    for (let c = colMinF; c <= colMaxF; c++) {
-      for (let r = rowMinF; r <= rowMaxF; r++) {
-        const wx = c * spacingFade
-        const wy = r * spacingFade
-
-        const isFading = c % 2 !== 0 || r % 2 !== 0
-        const baseOpacity = isFading ? 0.04 * fadeOpacity : 0.04
-        if (baseOpacity < 0.005) continue
-
-        let maxIntensity = 0
-        for (const rip of ripples) {
-          const age = animTime - rip.startTime
-          if (age < 0 || age > rip.duration) continue
-
-          let maxRadiusScreen = 150
-          let crestWidthScreen = 45
-          let peakIntensity = 0.6
-          if (rip.type === 'click') {
-            maxRadiusScreen = 450
-            crestWidthScreen = 90
-            peakIntensity = 0.85
-          } else if (rip.type === 'splash') {
-            maxRadiusScreen = 650
-            crestWidthScreen = 130
-            peakIntensity = 1.0
-          } else if (rip.type === 'drag') {
-            maxRadiusScreen = 180
-            crestWidthScreen = 55
-            peakIntensity = 0.7
-          }
-
-          const R_world = (maxRadiusScreen / scale) * (age / rip.duration)
-          const W_world = crestWidthScreen / scale
-          const distToCenter = Math.hypot(wx - rip.x, wy - rip.y)
-          const d = rip.sourceRadius ? Math.abs(distToCenter - rip.sourceRadius) : distToCenter
-          const intensity = Math.exp(-Math.pow((d - R_world) / W_world, 2)) * (1 - age / rip.duration) * peakIntensity
-          if (intensity > maxIntensity) maxIntensity = intensity
-        }
-
-        if (maxIntensity > 0.01) {
-          const litRadius = (1.0 / scale) * (1.0 + 2.0 * maxIntensity)
-          const litOpacity = baseOpacity + (0.7 - baseOpacity) * maxIntensity
-          ctx.beginPath()
-          ctx.fillStyle = `rgba(0, 98, 157, ${litOpacity})`
-          ctx.arc(wx, wy, litRadius, 0, Math.PI * 2)
-          ctx.fill()
+    for (let c = colMin; c <= colMax; c++) {
+      for (let r = rowMin; r <= rowMax; r++) {
+        const key = `${c},${r}`
+        if (!candidates.has(key)) {
+          candidates.set(key, { c, r })
         }
       }
     }
   }
 
-  // 3. Draw major dots (spacing 160)
-  const fadeMajorOpacity = Math.max(0, Math.min(1, (160 * scale - 12) / 8))
-  if (fadeMajorOpacity > 0.01) {
-    const majorRadius = 1.3 / scale
-    const colMinM = Math.floor(rect.left / 160)
-    const colMaxM = Math.ceil(rect.right / 160)
-    const rowMinM = Math.floor(rect.top / 160)
-    const rowMaxM = Math.ceil(rect.bottom / 160)
+  if (candidates.size === 0) return
 
-    // Base major dots
-    ctx.beginPath()
-    ctx.fillStyle = `rgba(61, 71, 78, ${0.09 * fadeMajorOpacity})`
-    for (let c = colMinM; c <= colMaxM; c++) {
-      for (let r = rowMinM; r <= rowMaxM; r++) {
-        const wx = c * 160
-        const wy = r * 160
-        ctx.moveTo(wx + majorRadius, wy)
-        ctx.arc(wx, wy, majorRadius, 0, Math.PI * 2)
+  for (const { c, r } of candidates.values()) {
+    const wx = c * 20
+    const wy = r * 20
+
+    let maxIntensity = 0
+    for (const rip of ripples) {
+      const age = animTime - rip.startTime
+      if (age < 0 || age > rip.duration) continue
+
+      let maxRadiusScreen = 150
+      let crestWidthScreen = 45
+      let peakIntensity = 0.6
+      if (rip.type === 'click') {
+        maxRadiusScreen = 450
+        crestWidthScreen = 90
+        peakIntensity = 0.85
+      } else if (rip.type === 'splash') {
+        maxRadiusScreen = 650
+        crestWidthScreen = 130
+        peakIntensity = 1.0
+      } else if (rip.type === 'drag') {
+        maxRadiusScreen = 180
+        crestWidthScreen = 55
+        peakIntensity = 0.7
       }
+
+      const R_world = (maxRadiusScreen / scale) * (age / rip.duration)
+      const W_world = crestWidthScreen / scale
+      const distToCenter = Math.hypot(wx - rip.x, wy - rip.y)
+      const d = rip.sourceRadius ? Math.abs(distToCenter - rip.sourceRadius) : distToCenter
+      const intensity = Math.exp(-Math.pow((d - R_world) / W_world, 2)) * (1 - age / rip.duration) * peakIntensity
+      if (intensity > maxIntensity) maxIntensity = intensity
     }
-    ctx.fill()
 
-    // Lit major dots overlay
-    if (hasRipples) {
-      for (let c = colMinM; c <= colMaxM; c++) {
-        for (let r = rowMinM; r <= rowMaxM; r++) {
-          const wx = c * 160
-          const wy = r * 160
+    if (maxIntensity > 0.01) {
+      const isMajor = c % 8 === 0 && r % 8 === 0 // 160 / 20 = 8
+      const baseOpacity = isMajor ? 0.09 : 0.04
+      const baseRadius = isMajor ? 1.3 / scale : 1.0 / scale
+      const litRadius = baseRadius * (isMajor ? (1.0 + 1.8 * maxIntensity) : (1.0 + 2.0 * maxIntensity))
+      const peakOpacity = isMajor ? 0.75 : 0.7
+      const litOpacity = baseOpacity + (peakOpacity - baseOpacity) * maxIntensity
 
-          let maxIntensity = 0
-          for (const rip of ripples) {
-            const age = animTime - rip.startTime
-            if (age < 0 || age > rip.duration) continue
-
-            let maxRadiusScreen = 150
-            let crestWidthScreen = 45
-            let peakIntensity = 0.6
-            if (rip.type === 'click') {
-              maxRadiusScreen = 450
-              crestWidthScreen = 90
-              peakIntensity = 0.85
-            } else if (rip.type === 'splash') {
-              maxRadiusScreen = 650
-              crestWidthScreen = 130
-              peakIntensity = 1.0
-            } else if (rip.type === 'drag') {
-              maxRadiusScreen = 180
-              crestWidthScreen = 55
-              peakIntensity = 0.7
-            }
-
-            const R_world = (maxRadiusScreen / scale) * (age / rip.duration)
-            const W_world = crestWidthScreen / scale
-            const distToCenter = Math.hypot(wx - rip.x, wy - rip.y)
-            const d = rip.sourceRadius ? Math.abs(distToCenter - rip.sourceRadius) : distToCenter
-            const intensity = Math.exp(-Math.pow((d - R_world) / W_world, 2)) * (1 - age / rip.duration) * peakIntensity
-            if (intensity > maxIntensity) maxIntensity = intensity
-          }
-
-          if (maxIntensity > 0.01) {
-            const baseOpacity = 0.09 * fadeMajorOpacity
-            const litRadius = (1.3 / scale) * (1.0 + 1.8 * maxIntensity)
-            const litOpacity = baseOpacity + (0.75 - baseOpacity) * maxIntensity
-            ctx.beginPath()
-            ctx.fillStyle = `rgba(0, 98, 157, ${litOpacity})`
-            ctx.arc(wx, wy, litRadius, 0, Math.PI * 2)
-            ctx.fill()
-          }
-        }
-      }
+      ctx.beginPath()
+      ctx.fillStyle = `rgba(0, 98, 157, ${litOpacity})`
+      ctx.arc(wx, wy, litRadius, 0, Math.PI * 2)
+      ctx.fill()
     }
   }
 }

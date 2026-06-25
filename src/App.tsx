@@ -2099,7 +2099,14 @@ function App() {
 
   // Push the live camera onto the dotted grid without going through React.
   function applyDomCamera() {
-    // No-op: grid is drawn dynamically on the board canvas
+    const surface = surfaceRef.current
+    const cam = cameraRef.current
+    if (surface && cam) {
+      const minor = 20 * cam.scale
+      const major = 160 * cam.scale
+      surface.style.backgroundSize = `${major}px ${major}px, ${minor}px ${minor}px`
+      surface.style.backgroundPosition = `${cam.x}px ${cam.y}px`
+    }
   }
 
   // One imperative frame of a gesture: move the DOM and repaint the (culled)
@@ -2209,7 +2216,7 @@ function App() {
     drawBoardLayer(
       canvas,
       surface,
-      camera,
+      cameraRef.current,
       boardIndex,
       selectedItem,
       hoveredPersonId,
@@ -4172,6 +4179,10 @@ Content-Type: application/json
         ref={surfaceRef}
         className="graph-surface"
         tabIndex={0}
+        style={{
+          backgroundSize: `${160 * camera.scale}px ${160 * camera.scale}px, ${20 * camera.scale}px ${20 * camera.scale}px`,
+          backgroundPosition: `${camera.x}px ${camera.y}px`,
+        }}
         onPointerDown={handleSurfacePointerDown}
         onPointerMove={handleSurfacePointerMove}
         onPointerUp={handleSurfacePointerUp}

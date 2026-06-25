@@ -745,3 +745,17 @@ rediscover, write it here.
 - Decision: Replaced the standard checkbox toggle for ripples in the settings panel with the Material 3 Switch (`.m3-switch` class).
 - Why: The native checkbox looked cheap and cluttered the display panel. The M3 Switch is cleaner, fits the design system tokens, and matches other custom inputs.
 
+### 2026-06-25 — Round Grid Dots, Dense Grid Spacing, Perimeter Waves & Style Change Ripples
+
+- Decision: Changed grid dots rendering shape from squares (`ctx.rect`) to circles (`ctx.arc`). Reduced base minor dot opacity to 0.04 (from 0.09) and major dot opacity to 0.09 (from 0.18), and decreased peak lit dot opacity to 0.7/0.75 and radius growth to 2.0x/1.8x.
+- Why: Circular dots look much softer and blend better with the round aesthetic. Reducing the opacities and growth sizes makes the waves subtle and elegant rather than distracting.
+- Decision: Decreased the default grid spacing from 32 to 20 world units.
+- Why: This creates a denser, more natural-looking backdrop grid. With LOD, screen-space spacing is kept between 10px and 20px.
+- Decision: Removed the `isMajor` skip filter from the minor dots drawing loop. Minor dots are now drawn at every coordinate, and major dots are drawn on top.
+- Why: Previously, when the camera zoomed out, major dots faded out but the corresponding minor dots were skipped, leaving empty "holes" in the grid every 5 dots, which made the grid look crooked (uneven/irregular). Keeping the minor dots grid complete solves the alignment issue.
+- Decision: Extended the grid ripples math to support `sourceRadius`. When a circle is created, dragged, or resized, the ripple wave propagates outward and inward from the circle's actual boundary rather than its center.
+- Why: Visual waves look much more realistic when they emanate directly from the circle's physical perimeter (the hull) rather than its center point.
+- Decision: Integrated throttled (150ms) style-change ripples in `updateCircleStyle` when shape, rounding, sides, opacity, tone, custom color, or image properties are updated.
+- Why: Gives real-time tactile wave feedback to the canvas when modifying any visual settings of a circle.
+
+
