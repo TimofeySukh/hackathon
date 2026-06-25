@@ -1,101 +1,9 @@
-import { useState, useEffect, useRef, type MouseEvent, type CSSProperties } from 'react'
+import { useState, useEffect, useRef, type MouseEvent } from 'react'
 import sdnLogo from './assets/sdn-logo.svg'
-import CanvasGridBackground from './components/CanvasGridBackground'
 import TiltContainer from './components/TiltContainer'
 
-interface GraphNode {
-  id: string
-  name: string
-  x: number
-  y: number
-  r: number
-  fill: string
-  stroke: string
-  glow: string
-  title: string
-  desc: string
-  tags: string[]
-}
-
-const NODES: GraphNode[] = [
-  {
-    id: 'you',
-    name: 'You',
-    x: 240,
-    y: 240,
-    r: 32,
-    fill: 'var(--lp-primary)',
-    stroke: '#10b981',
-    glow: 'rgba(16, 185, 129, 0.3)',
-    title: 'Your Central Node',
-    desc: 'The anchor of your social graph. All your circles branch from here.',
-    tags: ['Owner', 'Workspace'],
-  },
-  {
-    id: 'team',
-    name: 'Team',
-    x: 110,
-    y: 130,
-    r: 25,
-    fill: 'rgba(16, 185, 129, 0.15)',
-    stroke: '#10b981',
-    glow: 'rgba(16, 185, 129, 0.2)',
-    title: 'Engineering Team',
-    desc: 'Developers, designers, and product managers working on the core platform.',
-    tags: ['Colleagues', 'Active'],
-  },
-  {
-    id: 'vcs',
-    name: 'VCs',
-    x: 370,
-    y: 110,
-    r: 25,
-    fill: 'rgba(56, 189, 248, 0.15)',
-    stroke: '#38bdf8',
-    glow: 'rgba(56, 189, 248, 0.2)',
-    title: 'Investors & Advisors',
-    desc: 'Venture partners, angel syndicates, and mentors providing funding and guidance.',
-    tags: ['Advisors', 'High Value'],
-  },
-  {
-    id: 'partners',
-    name: 'Partners',
-    x: 390,
-    y: 350,
-    r: 25,
-    fill: 'rgba(139, 92, 246, 0.15)',
-    stroke: '#8b5cf6',
-    glow: 'rgba(139, 92, 246, 0.2)',
-    title: 'Strategic Partners',
-    desc: 'Integration, marketing, and channel alliance executives driving growth.',
-    tags: ['Contracts', 'External'],
-  },
-  {
-    id: 'leads',
-    name: 'Leads',
-    x: 110,
-    y: 350,
-    r: 25,
-    fill: 'rgba(245, 158, 11, 0.15)',
-    stroke: '#f59e0b',
-    glow: 'rgba(245, 158, 11, 0.2)',
-    title: 'Sales Prospects',
-    desc: 'Enterprise accounts and contacts currently in the sales pipeline.',
-    tags: ['Outreach', 'Enriched'],
-  },
-]
-
-const CONNECTIONS = [
-  { from: 'you', to: 'team', color: '#10b981' },
-  { from: 'you', to: 'vcs', color: '#38bdf8' },
-  { from: 'you', to: 'partners', color: '#8b5cf6' },
-  { from: 'you', to: 'leads', color: '#f59e0b' },
-  { from: 'team', to: 'leads', color: 'rgba(255,255,255,0.03)' },
-  { from: 'partners', to: 'vcs', color: 'rgba(255,255,255,0.03)' },
-]
-
 export default function LandingPage() {
-  const [hoveredNode, setHoveredNode] = useState<string | null>(null)
+  const [activeStep, setActiveStep] = useState(0)
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success'>('idle')
   const [uploadProgress, setUploadProgress] = useState(0)
 
@@ -108,6 +16,33 @@ export default function LandingPage() {
     e.preventDefault()
     window.location.hash = '#docs'
   }
+
+  // Setup scroll observer for scrollytelling steps
+  useEffect(() => {
+    const steps = document.querySelectorAll('.scrolly-step')
+    const observerOptions = {
+      root: null, // viewport
+      rootMargin: '-30% 0px -40% 0px', // center third of viewport
+      threshold: 0.1,
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          const index = Number(entry.target.getAttribute('data-step-idx'))
+          if (!isNaN(index)) {
+            setActiveStep(index)
+          }
+        }
+      })
+    }, observerOptions)
+
+    steps.forEach((step) => observer.observe(step))
+
+    return () => {
+      steps.forEach((step) => observer.unobserve(step))
+    }
+  }, [])
 
   // Simulate file upload progress
   useEffect(() => {
@@ -139,11 +74,6 @@ export default function LandingPage() {
     setUploadProgress(0)
   }
 
-  const isConnectionActive = (fromId: string, toId: string) => {
-    if (!hoveredNode) return false
-    return fromId === hoveredNode || toId === hoveredNode
-  }
-
   // Handle magnetic grid glow on mouse movement for feature cards
   const featureGridRef = useRef<HTMLDivElement | null>(null)
   
@@ -160,13 +90,8 @@ export default function LandingPage() {
     }
   }
 
-  const activeNodeInfo = NODES.find((n) => n.id === hoveredNode) || NODES[0]
-
   return (
     <div className="landing-container">
-      {/* Interactive Dotted Canvas Grid Background */}
-      <CanvasGridBackground />
-
       {/* Background Radial Glow Orbs */}
       <div className="landing-bg-glows" aria-hidden="true">
         <div className="bg-glow-orb orb-top-right" />
@@ -194,6 +119,7 @@ export default function LandingPage() {
 
       {/* Main Content */}
       <main className="landing-main">
+        
         {/* Hero Section */}
         <section className="landing-section hero-section">
           <div className="hero-content">
@@ -216,108 +142,143 @@ export default function LandingPage() {
 
           <div className="hero-visual">
             <TiltContainer>
-              <div className="interactive-graph-container">
-                <svg className="social-graph-svg" viewBox="0 0 480 480">
-                  {/* Connection Lines */}
-                  {CONNECTIONS.map((conn, idx) => {
-                    const fromNode = NODES.find((n) => n.id === conn.from)!
-                    const toNode = NODES.find((n) => n.id === conn.to)!
-                    const isActive = isConnectionActive(conn.from, conn.to)
-                    return (
-                      <line
-                        key={idx}
-                        x1={fromNode.x}
-                        y1={fromNode.y}
-                        x2={toNode.x}
-                        y2={toNode.y}
-                        className={`connection-path ${isActive ? 'active' : ''}`}
-                        style={{
-                          '--active-stroke': hoveredNode
-                            ? NODES.find((n) => n.id === hoveredNode)!.stroke
-                            : '#10b981',
-                        } as CSSProperties}
-                      />
-                    )
-                  })}
+              <div className="stage-wrapper stage-step-2">
+                <svg className="stage-svg" viewBox="0 0 480 480">
+                  {/* Subtle ambient connections */}
+                  <line x1="240" y1="240" x2="160" y2="150" stroke="rgba(255,255,255,0.06)" strokeWidth="1.5" />
+                  <line x1="240" y1="240" x2="340" y2="160" stroke="rgba(255,255,255,0.06)" strokeWidth="1.5" />
+                  <line x1="240" y1="240" x2="360" y2="320" stroke="rgba(255,255,255,0.06)" strokeWidth="1.5" />
+                  <line x1="240" y1="240" x2="140" y2="340" stroke="rgba(255,255,255,0.06)" strokeWidth="1.5" />
 
-                  {/* Nodes */}
-                  {NODES.map((node) => (
-                    <g
-                      key={node.id}
-                      className="node-group"
-                      onMouseEnter={() => setHoveredNode(node.id)}
-                      onMouseLeave={() => setHoveredNode(null)}
-                      style={{
-                        transformOrigin: `${node.x}px ${node.y}px`,
-                      }}
-                    >
-                      <circle
-                        cx={node.x}
-                        cy={node.y}
-                        r={node.r}
-                        className="node-circle"
-                        style={{
-                          '--node-fill': node.fill,
-                          '--node-stroke': node.stroke,
-                          '--node-glow': node.glow,
-                          '--node-glow-strong': node.glow.replace('0.2', '0.5').replace('0.3', '0.6'),
-                        } as CSSProperties}
-                      />
-                      <text x={node.x} y={node.y} className="node-text">
-                        {node.name}
-                      </text>
-                    </g>
-                  ))}
+                  {/* Circle clusters */}
+                  <circle cx="160" cy="150" r="70" fill="rgba(139, 92, 246, 0.04)" stroke="rgba(139, 92, 246, 0.25)" strokeWidth="1.5" />
+                  <circle cx="340" cy="160" r="65" fill="rgba(99, 102, 241, 0.04)" stroke="rgba(99, 102, 241, 0.25)" strokeWidth="1.5" />
+                  <circle cx="360" cy="320" r="60" fill="rgba(0, 242, 254, 0.03)" stroke="rgba(0, 242, 254, 0.2)" strokeWidth="1.5" />
+                  
+                  {/* Outer nodes */}
+                  <circle cx="130" cy="120" r="16" fill="rgba(139, 92, 246, 0.15)" stroke="#8b5cf6" strokeWidth="2" />
+                  <circle cx="190" cy="170" r="16" fill="rgba(139, 92, 246, 0.15)" stroke="#8b5cf6" strokeWidth="2" />
+                  <circle cx="320" cy="130" r="14" fill="rgba(99, 102, 241, 0.15)" stroke="#6366f1" strokeWidth="2" />
+                  <circle cx="370" cy="180" r="14" fill="rgba(99, 102, 241, 0.15)" stroke="#6366f1" strokeWidth="2" />
+                  <circle cx="380" cy="300" r="12" fill="rgba(0, 242, 254, 0.12)" stroke="#00f2fe" strokeWidth="2" />
+                  <circle cx="330" cy="340" r="12" fill="rgba(0, 242, 254, 0.12)" stroke="#00f2fe" strokeWidth="2" />
+
+                  {/* Main Node */}
+                  <circle cx="240" cy="240" r="28" fill="rgba(139, 92, 246, 0.25)" stroke="#8b5cf6" strokeWidth="2" />
+                  <text x="240" y="244" fill="#ffffff" fontSize="10" fontWeight="700" textAnchor="middle">You</text>
                 </svg>
-
-                {/* Hover Metadata Glassmorphic Card */}
-                <div className={`graph-tooltip ${hoveredNode ? 'visible' : ''}`}>
-                  <div className="tooltip-title">{activeNodeInfo.title}</div>
-                  <div className="tooltip-desc">{activeNodeInfo.desc}</div>
-                  <div className="tooltip-tags">
-                    {activeNodeInfo.tags.map((tag, i) => (
-                      <span key={i} className={`tooltip-tag ${i === 0 ? 'tooltip-tag-accent' : ''}`}>
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
               </div>
             </TiltContainer>
           </div>
         </section>
 
-        {/* How It Works Section */}
-        <section className="landing-section workflow-section">
-          <div className="section-header">
-            <h2 className="section-title">How It Works</h2>
-            <p className="section-subtitle">
-              Map and manage your network in three simple, frictionless steps.
-            </p>
-          </div>
+        {/* Split-Screen Scrollytelling Section */}
+        <section className="landing-section scrollytelling-section">
+          <div className="scrollytelling-container">
+            
+            {/* Left side: scrolling info text */}
+            <div className="scrolly-text-col">
+              
+              <div className="scrolly-step" data-step-idx="0">
+                <span className="scrolly-step-number">Phase 01</span>
+                <h2 className="scrolly-step-title">The Central Anchor</h2>
+                <p className="scrolly-step-desc">
+                  Every relationship map begins with you. A clean, central anchor node acts as the origin point of your social universe, ready to expand fluidly in any direction.
+                </p>
+              </div>
 
-          <div className="workflow-steps">
-            <div className="workflow-step">
-              <div className="workflow-num">01</div>
-              <h3 className="workflow-title">Create & Group</h3>
-              <p className="workflow-desc">
-                Start from your own node. Double-tap to create new people, right-click to build visual boundary circles, and drag people into subsets to organize them logically.
-              </p>
+              <div className="scrolly-step" data-step-idx="1">
+                <span className="scrolly-step-number">Phase 02</span>
+                <h2 className="scrolly-step-title">Frictionless Connection</h2>
+                <p className="scrolly-step-desc">
+                  Grow your graph with natural, fluid gestures. Simply drag out a link from any circle and release the cursor to instantly spawn a new connected person, keeping workflow uninterrupted by buttons or menus.
+                </p>
+              </div>
+
+              <div className="scrolly-step" data-step-idx="2">
+                <span className="scrolly-step-number">Phase 03</span>
+                <h2 className="scrolly-step-title">Automatic LinkedIn Sync</h2>
+                <p className="scrolly-step-desc">
+                  Don't map manually. Import your LinkedIn connections ZIP file, and let Datanode automatically analyze, cluster, and pack contacts into elegant sunflower spirals nested inside boundary circles.
+                </p>
+              </div>
+
+              <div className="scrolly-step" data-step-idx="3">
+                <span className="scrolly-step-number">Phase 04</span>
+                <h2 className="scrolly-step-title">AI Enrichment & Insights</h2>
+                <p className="scrolly-step-desc">
+                  Add custom tags and private notes to any contact. Use semantic smart searches to query and filter through your entire board, or let the built-in AI summarize interactions.
+                </p>
+              </div>
+
             </div>
-            <div className="workflow-step">
-              <div className="workflow-num">02</div>
-              <h3 className="workflow-title">Sync LinkedIn</h3>
-              <p className="workflow-desc">
-                Upload your LinkedIn Connections ZIP archive. The system automatically extracts connections, clusters them, and builds company-based groups in seconds.
-              </p>
+
+            {/* Right side: sticky visual stage */}
+            <div className="scrolly-visual-col">
+              <div className={`stage-wrapper stage-step-${activeStep}`}>
+                <svg className="stage-svg" viewBox="0 0 480 480">
+                  
+                  {/* --- Connection Lines --- */}
+                  {/* Center to Top-Left */}
+                  <line x1="240" y1="240" x2="160" y2="150" className="scrolly-link link-branch link-cluster" stroke="rgba(255,255,255,0.06)" strokeWidth="1.5" />
+                  {/* Center to Top-Right */}
+                  <line x1="240" y1="240" x2="340" y2="160" className="scrolly-link link-branch link-cluster" stroke="rgba(255,255,255,0.06)" strokeWidth="1.5" />
+                  {/* Center to Bottom-Right */}
+                  <line x1="240" y1="240" x2="360" y2="320" className="scrolly-link link-branch link-cluster" stroke="rgba(255,255,255,0.06)" strokeWidth="1.5" />
+                  {/* Center to Bottom-Left (Drag simulate line) */}
+                  <line x1="240" y1="240" x2="110" y2="350" className="scrolly-link link-drag-target" stroke="#8b5cf6" strokeWidth="2" />
+                  
+                  {/* --- Clusters Circles (LinkedIn) --- */}
+                  <circle cx="160" cy="150" r="72" className="scrolly-circle circle-violet" fill="rgba(139, 92, 246, 0.04)" stroke="rgba(139, 92, 246, 0.25)" strokeWidth="1.5" />
+                  <circle cx="340" cy="160" r="68" className="scrolly-circle circle-indigo" fill="rgba(99, 102, 241, 0.04)" stroke="rgba(99, 102, 241, 0.25)" strokeWidth="1.5" />
+                  <circle cx="360" cy="320" r="62" className="scrolly-circle circle-cyan" fill="rgba(0, 242, 254, 0.03)" stroke="rgba(0, 242, 254, 0.2)" strokeWidth="1.5" />
+                  
+                  {/* --- Nodes --- */}
+                  {/* Top-Left Cluster Nodes */}
+                  <circle cx="130" cy="120" r="16" className="scrolly-node node-cluster" fill="rgba(139, 92, 246, 0.15)" stroke="#8b5cf6" strokeWidth="2" />
+                  <circle cx="190" cy="170" r="16" className="scrolly-node node-cluster node-ai-highlight" fill="rgba(139, 92, 246, 0.15)" stroke="#8b5cf6" strokeWidth="2" />
+                  
+                  {/* Top-Right Cluster Nodes */}
+                  <circle cx="320" cy="130" r="14" className="scrolly-node node-cluster" fill="rgba(99, 102, 241, 0.15)" stroke="#6366f1" strokeWidth="2" />
+                  <circle cx="370" cy="180" r="14" className="scrolly-node node-cluster" fill="rgba(99, 102, 241, 0.15)" stroke="#6366f1" strokeWidth="2" />
+
+                  {/* Bottom-Right Cluster Nodes */}
+                  <circle cx="380" cy="300" r="12" className="scrolly-node node-cluster" fill="rgba(0, 242, 254, 0.12)" stroke="#00f2fe" strokeWidth="2" />
+                  <circle cx="330" cy="340" r="12" className="scrolly-node node-cluster" fill="rgba(0, 242, 254, 0.12)" stroke="#00f2fe" strokeWidth="2" />
+
+                  {/* Static Branching Nodes (Step 1) */}
+                  <circle cx="160" cy="150" r="18" className="scrolly-node node-branch" fill="rgba(99, 102, 241, 0.18)" stroke="#6366f1" strokeWidth="2" />
+                  <circle cx="340" cy="160" r="18" className="scrolly-node node-branch" fill="rgba(99, 102, 241, 0.18)" stroke="#6366f1" strokeWidth="2" />
+                  <circle cx="360" cy="320" r="18" className="scrolly-node node-branch" fill="rgba(99, 102, 241, 0.18)" stroke="#6366f1" strokeWidth="2" />
+
+                  {/* Drag target Node (Step 1) */}
+                  <circle cx="110" cy="350" r="18" className="scrolly-node node-drag-target" fill="rgba(139, 92, 246, 0.25)" stroke="#8b5cf6" strokeWidth="2" />
+
+                  {/* Central Node (Always Visible) */}
+                  <circle cx="240" cy="240" r="28" className="scrolly-node node-you" fill="rgba(139, 92, 246, 0.25)" stroke="#8b5cf6" strokeWidth="2" />
+                  <text x="240" y="244" className="scrolly-node node-you" fill="#ffffff" fontSize="10" fontWeight="700" textAnchor="middle">You</text>
+
+                  {/* Cursor Indicator (Step 1 connection drag) */}
+                  <g className="scrolly-cursor">
+                    <polygon points="0,0 6,18 10,13 18,17" fill="#ffffff" stroke="#000000" strokeWidth="1.5" />
+                  </g>
+                </svg>
+
+                {/* Floating AI Details Tooltip (Step 3) */}
+                <div className="scrolly-tooltip-ai" style={{ position: 'absolute', top: '240px', left: '20px' }}>
+                  <div className="ai-tooltip-box">
+                    <div className="ai-tooltip-header">Alice Chen</div>
+                    <div className="ai-tooltip-note">"Met at WebConf, discussed Supabase integrations. Follow up next month."</div>
+                    <div className="tooltip-tags" style={{ marginTop: '6px' }}>
+                      <span className="tooltip-tag tooltip-tag-accent" style={{ fontSize: '9px', padding: '1px 5px' }}>Partner</span>
+                      <span className="tooltip-tag" style={{ fontSize: '9px', padding: '1px 5px' }}>FollowUp</span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
             </div>
-            <div className="workflow-step">
-              <div className="workflow-num">03</div>
-              <h3 className="workflow-title">Enrich with AI</h3>
-              <p className="workflow-desc">
-                Add private tags and notes. Let the built-in AI summarize interactions, generate networking insights, and perform semantic searches across your board.
-              </p>
-            </div>
+
           </div>
         </section>
 
@@ -369,7 +330,7 @@ export default function LandingPage() {
 
                 {uploadStatus === 'success' && (
                   <div className="upload-success-card" style={{ textAlign: 'center' }}>
-                    <div className="dropzone-icon" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', margin: '0 auto 16px' }}>
+                    <div className="dropzone-icon" style={{ background: 'rgba(0, 242, 254, 0.12)', color: '#00f2fe', margin: '0 auto 16px' }}>
                       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                         <polyline points="20 6 9 17 4 12" />
                       </svg>
