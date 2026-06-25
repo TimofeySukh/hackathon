@@ -47,6 +47,7 @@ import type {
   HsvColor,
   BoardAnim,
   Connection,
+  GridRipple,
 } from './lib/board/types'
 import {
   MIN_SCALE,
@@ -64,6 +65,7 @@ import {
   MATERIAL_TONES,
   CIRCLE_COLOR_PRESETS,
   LINK_SERVICE_OPTIONS,
+  EMPTY_ANIM_FRAME,
 } from './lib/board/constants'
 import { getCircleColors, hexToHsv, hsvToHex } from './lib/board/colors'
 import { clamp } from './lib/board/geometry'
@@ -469,6 +471,8 @@ function markOnboardingSeen() {
     // ignore
   }
 }
+
+const getPerformanceNow = () => performance.now()
 
 function App() {
   const [viewMode, setViewMode] = useState<'landing' | 'board' | 'docs'>(() => {
@@ -921,6 +925,26 @@ function App() {
   const boardAnimRafRef = useRef<number | null>(null)
   const animNowRef = useRef(0)
   const paintBoardRef = useRef<(now?: number) => void>(() => {})
+
+  const gridRipplesRef = useRef<GridRipple[]>([])
+  const lastMoveRippleRef = useRef<{ x: number; y: number; time: number }>({ x: 0, y: 0, time: 0 })
+
+  function addGridRipple(x: number, y: number, type: 'move' | 'click') {
+    if (prefersReducedMotion()) return
+    const now = getPerformanceNow()
+    const ripple: GridRipple = {
+      x,
+      y,
+      startTime: now,
+      duration: type === 'click' ? 800 : 400,
+      maxRadius: type === 'click' ? 500 : 150,
+      type,
+    }
+    gridRipplesRef.current.push(ripple)
+    if (boardAnimRafRef.current == null) {
+      boardAnimRafRef.current = window.requestAnimationFrame(tickBoardAnims)
+    }
+  }
 
   const [connector, setConnector] = useState<DragConnector | null>(null)
   const [marquee, setMarquee] = useState<MarqueeState | null>(null)
@@ -2042,21 +2066,15 @@ function App() {
 
 
   // Push the live camera onto the dotted grid without going through React.
-  function applyDomCamera(cam: Camera) {
-    const surface = surfaceRef.current
-    if (surface) {
-      const minor = 32 * cam.scale
-      const major = 160 * cam.scale
-      surface.style.backgroundSize = `${major}px ${major}px, ${minor}px ${minor}px`
-      surface.style.backgroundPosition = `${cam.x}px ${cam.y}px`
-    }
+  function applyDomCamera() {
+    // No-op: grid is drawn dynamically on the board canvas
   }
 
   // One imperative frame of a gesture: move the DOM and repaint the (culled)
   // people canvas at the live camera, so newly revealed people fill in mid-pan.
   function applyLiveCamera() {
     const cam = cameraRef.current
-    applyDomCamera(cam)
+    applyDomCamera()
     const canvas = peopleCanvasRef.current
     const surface = surfaceRef.current
     if (canvas && surface) {
@@ -2077,6 +2095,9 @@ function App() {
         marqueeRef.current,
         selectedCircleIds,
         hoveredCircleEdgeId,
+        EMPTY_ANIM_FRAME,
+        gridRipplesRef.current,
+        getPerformanceNow(),
       )
     }
   }
@@ -2171,6 +2192,8 @@ function App() {
       selectedCircleIds,
       hoveredCircleEdgeId,
       frame,
+      gridRipplesRef.current,
+      getPerformanceNow(),
     )
   }
 
@@ -2195,6 +2218,13 @@ function App() {
         active = true
       }
     }
+
+    const perfNow = getPerformanceNow()
+    gridRipplesRef.current = gridRipplesRef.current.filter((r) => perfNow - r.startTime < r.duration)
+    if (gridRipplesRef.current.length > 0) {
+      active = true
+    }
+
     paintBoardRef.current(now)
     if (active) {
       boardAnimRafRef.current = window.requestAnimationFrame(tickBoardAnims)
@@ -2320,6 +2350,11 @@ function App() {
     if (event.pointerType !== 'touch' && event.button !== 0 && event.button !== 2) return
     const isRightClick = event.pointerType !== 'touch' && event.button === 2
     isRightClickDragRef.current = isRightClick
+
+    if (event.button === 0) {
+      const worldPos = screenToWorld({ x: event.clientX, y: event.clientY })
+      addGridRipple(worldPos.x, worldPos.y, 'click')
+    }
 
     event.currentTarget.focus({ preventScroll: true })
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -2545,6 +2580,16 @@ function App() {
     activePointersRef.current = activePointersRef.current.map((p) =>
       p.pointerId === event.pointerId ? event.nativeEvent : p
     )
+
+    // Trigger grid move ripple
+    const worldPos = screenToWorld({ x: event.clientX, y: event.clientY })
+    const now = getPerformanceNow()
+    const dist = Math.hypot(worldPos.x - lastMoveRippleRef.current.x, worldPos.y - lastMoveRippleRef.current.y)
+    const timeDiff = now - lastMoveRippleRef.current.time
+    if (dist > 30 || timeDiff > 100) {
+      addGridRipple(worldPos.x, worldPos.y, 'move')
+      lastMoveRippleRef.current = { x: worldPos.x, y: worldPos.y, time: now }
+    }
 
     if (marqueeRef.current) {
       marqueeRef.current.currentX = event.clientX
@@ -4014,10 +4059,6 @@ Content-Type: application/json
         ref={surfaceRef}
         className="graph-surface"
         tabIndex={0}
-        style={{
-          backgroundSize: `${160 * camera.scale}px ${160 * camera.scale}px, ${32 * camera.scale}px ${32 * camera.scale}px`,
-          backgroundPosition: `${camera.x}px ${camera.y}px`,
-        }}
         onPointerDown={handleSurfacePointerDown}
         onPointerMove={handleSurfacePointerMove}
         onPointerUp={handleSurfacePointerUp}

@@ -20,6 +20,7 @@ import type {
   SelectedItem,
   ShapeType,
   WorldRect,
+  GridRipple,
 } from './types'
 import {
   BOARD_GRID_SIZE,
@@ -337,6 +338,163 @@ export function readAnimFrame(anims: Map<string, BoardAnim>, now: number): AnimF
   return { scales, morphs }
 }
 
+function drawGridDots(
+  ctx: CanvasRenderingContext2D,
+  rect: WorldRect,
+  scale: number,
+  ripples: GridRipple[] | undefined,
+  animTime: number | undefined,
+) {
+  const L_start = Math.max(-4, Math.floor(Math.log2(0.5 / scale)))
+
+  const L_fade = L_start + 1
+  const fadeOpacity = Math.max(0, Math.min(1, 2 * (Math.pow(2, L_fade) * scale) - 1))
+
+  const hasRipples = ripples && ripples.length > 0 && animTime !== undefined
+
+  // 1. Draw minor dots
+  if (!hasRipples) {
+    const minorRadius = 1.0 / scale
+
+    // Draw fading minor dots (opacity = 0.09 * fadeOpacity)
+    if (fadeOpacity > 0.01) {
+      ctx.beginPath()
+      ctx.fillStyle = `rgba(61, 71, 78, ${0.09 * fadeOpacity})`
+      const spacingFade = 32 * Math.pow(2, L_fade)
+      const colMinF = Math.floor(rect.left / spacingFade)
+      const colMaxF = Math.ceil(rect.right / spacingFade)
+      const rowMinF = Math.floor(rect.top / spacingFade)
+      const rowMaxF = Math.ceil(rect.bottom / spacingFade)
+
+      for (let c = colMinF; c <= colMaxF; c++) {
+        for (let r = rowMinF; r <= rowMaxF; r++) {
+          if (c % 2 === 0 && r % 2 === 0) continue
+          const wx = c * spacingFade
+          const wy = r * spacingFade
+          const isMajor = Math.abs(Math.round(wx) % 160) < 0.01 && Math.abs(Math.round(wy) % 160) < 0.01
+          if (isMajor) continue
+
+          ctx.rect(wx - minorRadius, wy - minorRadius, minorRadius * 2, minorRadius * 2)
+        }
+      }
+      ctx.fill()
+    }
+
+    // Draw fully visible minor dots (opacity = 0.09)
+    ctx.beginPath()
+    ctx.fillStyle = `rgba(61, 71, 78, 0.09)`
+    const L_visible = L_start + 2
+    const spacingVis = 32 * Math.pow(2, L_visible)
+    const colMinV = Math.floor(rect.left / spacingVis)
+    const colMaxV = Math.ceil(rect.right / spacingVis)
+    const rowMinV = Math.floor(rect.top / spacingVis)
+    const rowMaxV = Math.ceil(rect.bottom / spacingVis)
+
+    for (let c = colMinV; c <= colMaxV; c++) {
+      for (let r = rowMinV; r <= rowMaxV; r++) {
+        const wx = c * spacingVis
+        const wy = r * spacingVis
+        const isMajor = Math.abs(Math.round(wx) % 160) < 0.01 && Math.abs(Math.round(wy) % 160) < 0.01
+        if (isMajor) continue
+
+        ctx.rect(wx - minorRadius, wy - minorRadius, minorRadius * 2, minorRadius * 2)
+      }
+    }
+    ctx.fill()
+  } else {
+    // Ripples path: calculate per-dot ripple interaction
+    const spacingFade = 32 * Math.pow(2, L_fade)
+    const colMinF = Math.floor(rect.left / spacingFade)
+    const colMaxF = Math.ceil(rect.right / spacingFade)
+    const rowMinF = Math.floor(rect.top / spacingFade)
+    const rowMaxF = Math.ceil(rect.bottom / spacingFade)
+
+    const minorRadius = 1.0 / scale
+
+    for (let c = colMinF; c <= colMaxF; c++) {
+      for (let r = rowMinF; r <= rowMaxF; r++) {
+        const wx = c * spacingFade
+        const wy = r * spacingFade
+        const isMajor = Math.abs(Math.round(wx) % 160) < 0.01 && Math.abs(Math.round(wy) % 160) < 0.01
+        if (isMajor) continue
+
+        const isFading = c % 2 !== 0 || r % 2 !== 0
+        const baseOpacity = isFading ? 0.09 * fadeOpacity : 0.09
+        if (baseOpacity < 0.005) continue
+
+        let maxIntensity = 0
+        for (const rip of ripples) {
+          const age = animTime - rip.startTime
+          if (age < 0 || age > rip.duration) continue
+          const R = rip.maxRadius * (age / rip.duration)
+          const d = Math.hypot(wx - rip.x, wy - rip.y)
+          const W = rip.type === 'click' ? 120 : 60
+          const intensity = Math.exp(-Math.pow((d - R) / W, 2)) * (1 - age / rip.duration)
+          if (intensity > maxIntensity) maxIntensity = intensity
+        }
+
+        if (maxIntensity > 0.01) {
+          const litOpacity = baseOpacity + (0.5 - baseOpacity) * maxIntensity
+          ctx.fillStyle = `rgba(0, 98, 157, ${litOpacity})`
+        } else {
+          ctx.fillStyle = `rgba(61, 71, 78, ${baseOpacity})`
+        }
+        ctx.fillRect(wx - minorRadius, wy - minorRadius, minorRadius * 2, minorRadius * 2)
+      }
+    }
+  }
+
+  // 2. Draw major dots (spacing 160)
+  const fadeMajorOpacity = Math.max(0, Math.min(1, (160 * scale - 12) / 8))
+  if (fadeMajorOpacity > 0.01) {
+    const majorRadius = 1.3 / scale
+    const colMinM = Math.floor(rect.left / 160)
+    const colMaxM = Math.ceil(rect.right / 160)
+    const rowMinM = Math.floor(rect.top / 160)
+    const rowMaxM = Math.ceil(rect.bottom / 160)
+
+    if (!hasRipples) {
+      ctx.beginPath()
+      ctx.fillStyle = `rgba(61, 71, 78, ${0.18 * fadeMajorOpacity})`
+      for (let c = colMinM; c <= colMaxM; c++) {
+        for (let r = rowMinM; r <= rowMaxM; r++) {
+          const wx = c * 160
+          const wy = r * 160
+          ctx.rect(wx - majorRadius, wy - majorRadius, majorRadius * 2, majorRadius * 2)
+        }
+      }
+      ctx.fill()
+    } else {
+      for (let c = colMinM; c <= colMaxM; c++) {
+        for (let r = rowMinM; r <= rowMaxM; r++) {
+          const wx = c * 160
+          const wy = r * 160
+
+          let maxIntensity = 0
+          for (const rip of ripples) {
+            const age = animTime - rip.startTime
+            if (age < 0 || age > rip.duration) continue
+            const R = rip.maxRadius * (age / rip.duration)
+            const d = Math.hypot(wx - rip.x, wy - rip.y)
+            const W = rip.type === 'click' ? 120 : 60
+            const intensity = Math.exp(-Math.pow((d - R) / W, 2)) * (1 - age / rip.duration)
+            if (intensity > maxIntensity) maxIntensity = intensity
+          }
+
+          const baseOpacity = 0.18 * fadeMajorOpacity
+          if (maxIntensity > 0.01) {
+            const litOpacity = baseOpacity + (0.6 - baseOpacity) * maxIntensity
+            ctx.fillStyle = `rgba(0, 98, 157, ${litOpacity})`
+          } else {
+            ctx.fillStyle = `rgba(61, 71, 78, ${baseOpacity})`
+          }
+          ctx.fillRect(wx - majorRadius, wy - majorRadius, majorRadius * 2, majorRadius * 2)
+        }
+      }
+    }
+  }
+}
+
 export function drawBoardLayer(
   canvas: HTMLCanvasElement,
   surface: HTMLElement,
@@ -355,6 +513,8 @@ export function drawBoardLayer(
   selectedCircleIds: string[] = [],
   hoveredCircleEdgeId: string | null = null,
   anim: AnimFrame = EMPTY_ANIM_FRAME,
+  ripples?: GridRipple[],
+  animTime?: number,
 ) {
   const { dpr, width, height } = resizeCanvas(canvas, surface)
   const ctx = canvas.getContext('2d')
@@ -372,6 +532,8 @@ export function drawBoardLayer(
   ctx.save()
   ctx.translate(camera.x, camera.y)
   ctx.scale(camera.scale, camera.scale)
+
+  drawGridDots(ctx, worldRect, camera.scale, ripples, animTime)
 
   drawCircleFills(ctx, visibleCircles, selectedItem, camera.scale, circleShapeMode, circleFillMode, selectedCircleIds, hoveredCircleEdgeId, anim.morphs)
 

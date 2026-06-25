@@ -172,3 +172,12 @@ export type LayoutContext = {
   activeCircleId?: string
   activePersonId?: string
 }
+
+export type GridRipple = {
+  x: number
+  y: number
+  startTime: number
+  duration: number
+  maxRadius: number
+  type: 'move' | 'click'
+}
