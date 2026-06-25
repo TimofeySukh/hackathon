@@ -1,7 +1,7 @@
-import { useState, useEffect, type MouseEvent, type CSSProperties } from 'react'
+import { useState, useEffect, useRef, type MouseEvent, type CSSProperties } from 'react'
 import sdnLogo from './assets/sdn-logo.svg'
-
-
+import CanvasGridBackground from './components/CanvasGridBackground'
+import TiltContainer from './components/TiltContainer'
 
 interface GraphNode {
   id: string
@@ -25,8 +25,8 @@ const NODES: GraphNode[] = [
     y: 240,
     r: 32,
     fill: 'var(--lp-primary)',
-    stroke: '#00629d',
-    glow: 'rgba(0, 98, 157, 0.2)',
+    stroke: '#10b981',
+    glow: 'rgba(16, 185, 129, 0.3)',
     title: 'Your Central Node',
     desc: 'The anchor of your social graph. All your circles branch from here.',
     tags: ['Owner', 'Workspace'],
@@ -37,9 +37,9 @@ const NODES: GraphNode[] = [
     x: 110,
     y: 130,
     r: 25,
-    fill: 'var(--md-tone-green)',
-    stroke: '#1e824a',
-    glow: 'rgba(30, 130, 74, 0.18)',
+    fill: 'rgba(16, 185, 129, 0.15)',
+    stroke: '#10b981',
+    glow: 'rgba(16, 185, 129, 0.2)',
     title: 'Engineering Team',
     desc: 'Developers, designers, and product managers working on the core platform.',
     tags: ['Colleagues', 'Active'],
@@ -50,9 +50,9 @@ const NODES: GraphNode[] = [
     x: 370,
     y: 110,
     r: 25,
-    fill: 'var(--md-tone-blue)',
-    stroke: '#00629d',
-    glow: 'rgba(0, 98, 157, 0.18)',
+    fill: 'rgba(56, 189, 248, 0.15)',
+    stroke: '#38bdf8',
+    glow: 'rgba(56, 189, 248, 0.2)',
     title: 'Investors & Advisors',
     desc: 'Venture partners, angel syndicates, and mentors providing funding and guidance.',
     tags: ['Advisors', 'High Value'],
@@ -63,9 +63,9 @@ const NODES: GraphNode[] = [
     x: 390,
     y: 350,
     r: 25,
-    fill: 'var(--md-tone-violet)',
-    stroke: '#7f67be',
-    glow: 'rgba(127, 103, 190, 0.18)',
+    fill: 'rgba(139, 92, 246, 0.15)',
+    stroke: '#8b5cf6',
+    glow: 'rgba(139, 92, 246, 0.2)',
     title: 'Strategic Partners',
     desc: 'Integration, marketing, and channel alliance executives driving growth.',
     tags: ['Contracts', 'External'],
@@ -76,9 +76,9 @@ const NODES: GraphNode[] = [
     x: 110,
     y: 350,
     r: 25,
-    fill: 'var(--md-tone-amber)',
-    stroke: '#d87a00',
-    glow: 'rgba(216, 122, 0, 0.18)',
+    fill: 'rgba(245, 158, 11, 0.15)',
+    stroke: '#f59e0b',
+    glow: 'rgba(245, 158, 11, 0.2)',
     title: 'Sales Prospects',
     desc: 'Enterprise accounts and contacts currently in the sales pipeline.',
     tags: ['Outreach', 'Enriched'],
@@ -86,12 +86,12 @@ const NODES: GraphNode[] = [
 ]
 
 const CONNECTIONS = [
-  { from: 'you', to: 'team', color: 'var(--md-tone-green)' },
-  { from: 'you', to: 'vcs', color: 'var(--md-tone-blue)' },
-  { from: 'you', to: 'partners', color: 'var(--md-tone-violet)' },
-  { from: 'you', to: 'leads', color: 'var(--md-tone-amber)' },
-  { from: 'team', to: 'leads', color: 'rgba(0,0,0,0.05)' },
-  { from: 'partners', to: 'vcs', color: 'rgba(0,0,0,0.05)' },
+  { from: 'you', to: 'team', color: '#10b981' },
+  { from: 'you', to: 'vcs', color: '#38bdf8' },
+  { from: 'you', to: 'partners', color: '#8b5cf6' },
+  { from: 'you', to: 'leads', color: '#f59e0b' },
+  { from: 'team', to: 'leads', color: 'rgba(255,255,255,0.03)' },
+  { from: 'partners', to: 'vcs', color: 'rgba(255,255,255,0.03)' },
 ]
 
 export default function LandingPage() {
@@ -99,9 +99,14 @@ export default function LandingPage() {
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success'>('idle')
   const [uploadProgress, setUploadProgress] = useState(0)
 
-  const handleLiveDemo = (e: MouseEvent) => {
+  const handleLaunchApp = (e: MouseEvent) => {
     e.preventDefault()
-    window.open('https://social.datanode.live/', '_blank', 'noopener,noreferrer')
+    window.location.hash = '#board'
+  }
+
+  const handleDocs = (e: MouseEvent) => {
+    e.preventDefault()
+    window.location.hash = '#docs'
   }
 
   // Simulate file upload progress
@@ -139,10 +144,29 @@ export default function LandingPage() {
     return fromId === hoveredNode || toId === hoveredNode
   }
 
+  // Handle magnetic grid glow on mouse movement for feature cards
+  const featureGridRef = useRef<HTMLDivElement | null>(null)
+  
+  const handleFeatureMouseMove = (e: React.MouseEvent) => {
+    if (!featureGridRef.current) return
+    const cards = featureGridRef.current.getElementsByClassName('feature-card')
+    for (let i = 0; i < cards.length; i++) {
+      const card = cards[i] as HTMLDivElement
+      const rect = card.getBoundingClientRect()
+      const x = e.clientX - rect.left
+      const y = e.clientY - rect.top
+      card.style.setProperty('--mouse-x', `${x}px`)
+      card.style.setProperty('--mouse-y', `${y}px`)
+    }
+  }
+
   const activeNodeInfo = NODES.find((n) => n.id === hoveredNode) || NODES[0]
 
   return (
     <div className="landing-container">
+      {/* Interactive Dotted Canvas Grid Background */}
+      <CanvasGridBackground />
+
       {/* Background Radial Glow Orbs */}
       <div className="landing-bg-glows" aria-hidden="true">
         <div className="bg-glow-orb orb-top-right" />
@@ -158,8 +182,11 @@ export default function LandingPage() {
             <span className="landing-logo-text">Social Datanode</span>
           </a>
           <div className="landing-nav-actions">
-            <button className="lp-btn lp-btn-filled" onClick={handleLiveDemo}>
-              View Demo
+            <button className="lp-btn lp-btn-outlined" onClick={handleDocs}>
+              Docs
+            </button>
+            <button className="lp-btn lp-btn-filled" onClick={handleLaunchApp}>
+              Launch App
             </button>
           </div>
         </nav>
@@ -175,83 +202,88 @@ export default function LandingPage() {
               Map your social universe.
             </h1>
             <p className="hero-description">
-              Visualize, cluster, and explore your personal and professional networks on an interactive, infinite canvas. Build your private social graph.
+              Visualize, cluster, and explore your personal and professional networks on an interactive, infinite canvas. Build your private, AI-enriched social graph.
             </p>
             <div className="hero-ctas">
-              <button className="lp-btn lp-btn-filled" style={{ height: '48px', padding: '0 32px', fontSize: '15px' }} onClick={handleLiveDemo}>
-                View Demo
+              <button className="lp-btn lp-btn-filled" style={{ height: '48px', padding: '0 32px', fontSize: '15px' }} onClick={handleLaunchApp}>
+                Launch App
+              </button>
+              <button className="lp-btn lp-btn-outlined" style={{ height: '48px', padding: '0 32px', fontSize: '15px' }} onClick={handleDocs}>
+                Read Docs
               </button>
             </div>
           </div>
 
           <div className="hero-visual">
-            <div className="interactive-graph-container">
-              <svg className="social-graph-svg" viewBox="0 0 480 480">
-                {/* Connection Lines */}
-                {CONNECTIONS.map((conn, idx) => {
-                  const fromNode = NODES.find((n) => n.id === conn.from)!
-                  const toNode = NODES.find((n) => n.id === conn.to)!
-                  const isActive = isConnectionActive(conn.from, conn.to)
-                  return (
-                    <line
-                      key={idx}
-                      x1={fromNode.x}
-                      y1={fromNode.y}
-                      x2={toNode.x}
-                      y2={toNode.y}
-                      className={`connection-path ${isActive ? 'active' : ''}`}
-                      style={{
-                        '--active-stroke': hoveredNode
-                          ? NODES.find((n) => n.id === hoveredNode)!.stroke
-                          : '#a78bfa',
-                      } as CSSProperties}
-                    />
-                  )
-                })}
+            <TiltContainer>
+              <div className="interactive-graph-container">
+                <svg className="social-graph-svg" viewBox="0 0 480 480">
+                  {/* Connection Lines */}
+                  {CONNECTIONS.map((conn, idx) => {
+                    const fromNode = NODES.find((n) => n.id === conn.from)!
+                    const toNode = NODES.find((n) => n.id === conn.to)!
+                    const isActive = isConnectionActive(conn.from, conn.to)
+                    return (
+                      <line
+                        key={idx}
+                        x1={fromNode.x}
+                        y1={fromNode.y}
+                        x2={toNode.x}
+                        y2={toNode.y}
+                        className={`connection-path ${isActive ? 'active' : ''}`}
+                        style={{
+                          '--active-stroke': hoveredNode
+                            ? NODES.find((n) => n.id === hoveredNode)!.stroke
+                            : '#10b981',
+                        } as CSSProperties}
+                      />
+                    )
+                  })}
 
-                {/* Nodes */}
-                {NODES.map((node) => (
-                  <g
-                    key={node.id}
-                    className="node-group"
-                    onMouseEnter={() => setHoveredNode(node.id)}
-                    onMouseLeave={() => setHoveredNode(null)}
-                    style={{
-                      transformOrigin: `${node.x}px ${node.y}px`,
-                    }}
-                  >
-                    <circle
-                      cx={node.x}
-                      cy={node.y}
-                      r={node.r}
-                      className="node-circle"
+                  {/* Nodes */}
+                  {NODES.map((node) => (
+                    <g
+                      key={node.id}
+                      className="node-group"
+                      onMouseEnter={() => setHoveredNode(node.id)}
+                      onMouseLeave={() => setHoveredNode(null)}
                       style={{
-                        '--node-fill': node.fill,
-                        '--node-stroke': node.stroke,
-                        '--node-glow': node.glow,
-                        '--node-glow-strong': node.glow.replace('0.4', '0.7').replace('0.35', '0.65'),
-                      } as CSSProperties}
-                    />
-                    <text x={node.x} y={node.y} className="node-text">
-                      {node.name}
-                    </text>
-                  </g>
-                ))}
-              </svg>
-
-              {/* Hover Metadata Glassmorphic Card */}
-              <div className={`graph-tooltip ${hoveredNode ? 'visible' : ''}`}>
-                <div className="tooltip-title">{activeNodeInfo.title}</div>
-                <div className="tooltip-desc">{activeNodeInfo.desc}</div>
-                <div className="tooltip-tags">
-                  {activeNodeInfo.tags.map((tag, i) => (
-                    <span key={i} className={`tooltip-tag ${i === 0 ? 'tooltip-tag-accent' : ''}`}>
-                      {tag}
-                    </span>
+                        transformOrigin: `${node.x}px ${node.y}px`,
+                      }}
+                    >
+                      <circle
+                        cx={node.x}
+                        cy={node.y}
+                        r={node.r}
+                        className="node-circle"
+                        style={{
+                          '--node-fill': node.fill,
+                          '--node-stroke': node.stroke,
+                          '--node-glow': node.glow,
+                          '--node-glow-strong': node.glow.replace('0.2', '0.5').replace('0.3', '0.6'),
+                        } as CSSProperties}
+                      />
+                      <text x={node.x} y={node.y} className="node-text">
+                        {node.name}
+                      </text>
+                    </g>
                   ))}
+                </svg>
+
+                {/* Hover Metadata Glassmorphic Card */}
+                <div className={`graph-tooltip ${hoveredNode ? 'visible' : ''}`}>
+                  <div className="tooltip-title">{activeNodeInfo.title}</div>
+                  <div className="tooltip-desc">{activeNodeInfo.desc}</div>
+                  <div className="tooltip-tags">
+                    {activeNodeInfo.tags.map((tag, i) => (
+                      <span key={i} className={`tooltip-tag ${i === 0 ? 'tooltip-tag-accent' : ''}`}>
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
+            </TiltContainer>
           </div>
         </section>
 
@@ -274,7 +306,7 @@ export default function LandingPage() {
             </div>
             <div className="workflow-step">
               <div className="workflow-num">02</div>
-              <h3 className="workflow-title">Import LinkedIn</h3>
+              <h3 className="workflow-title">Sync LinkedIn</h3>
               <p className="workflow-desc">
                 Upload your LinkedIn Connections ZIP archive. The system automatically extracts connections, clusters them, and builds company-based groups in seconds.
               </p>
@@ -299,8 +331,8 @@ export default function LandingPage() {
               <p className="hero-description">
                 Don't start from scratch. Export your network details from LinkedIn, drop them in, and see your entire flat contact history convert into a gorgeous visual dashboard instantly.
               </p>
-              <button className="lp-btn lp-btn-outlined" onClick={handleLiveDemo}>
-                View Demo
+              <button className="lp-btn lp-btn-outlined" onClick={handleLaunchApp}>
+                Try Live Sync
               </button>
             </div>
 
@@ -365,7 +397,7 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="features-grid">
+          <div className="features-grid" ref={featureGridRef} onMouseMove={handleFeatureMouseMove}>
             {/* Feature 1 */}
             <div className="feature-card">
               <div className="feature-icon-wrapper">
@@ -431,8 +463,8 @@ export default function LandingPage() {
             <p className="banner-desc">
               Organize your workspace, visualize connections, and gain insights with Social Datanode today. Free, open, and secure.
             </p>
-            <button className="lp-btn lp-btn-filled" style={{ height: '52px', padding: '0 36px', fontSize: '15px' }} onClick={handleLiveDemo}>
-              View Demo
+            <button className="lp-btn lp-btn-filled" style={{ height: '52px', padding: '0 36px', fontSize: '15px' }} onClick={handleLaunchApp}>
+              Launch Board
             </button>
           </div>
         </section>
@@ -443,7 +475,7 @@ export default function LandingPage() {
         <div className="footer-content">
           <a href="#" className="footer-logo" onClick={(e) => e.preventDefault()}>
             <img className="footer-logo-mark" src={sdnLogo} alt="" aria-hidden="true" />
-            <span>Social Datanode</span>
+            <span className="footer-logo-text">Social Datanode</span>
           </a>
           <span className="footer-copyright">
             &copy; {new Date().getFullYear()} Social Datanode. All rights reserved.
