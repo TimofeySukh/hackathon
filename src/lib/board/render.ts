@@ -20,7 +20,6 @@ import type {
   SelectedItem,
   ShapeType,
   WorldRect,
-  GridRipple,
 } from './types'
 import {
   BOARD_GRID_SIZE,
@@ -338,101 +337,6 @@ export function readAnimFrame(anims: Map<string, BoardAnim>, now: number): AnimF
   return { scales, morphs }
 }
 
-function drawGridDots(
-  ctx: CanvasRenderingContext2D,
-  rect: WorldRect,
-  scale: number,
-  ripples: GridRipple[] | undefined,
-  animTime: number | undefined,
-) {
-  const hasRipples = ripples && ripples.length > 0 && animTime !== undefined
-  if (!hasRipples) return
-
-  // Collect candidate dots from the bounding boxes of all active ripples
-  const candidates = new Map<string, { c: number; r: number }>()
-
-  for (const rip of ripples) {
-    const age = animTime - rip.startTime
-    if (age < 0 || age > rip.duration) continue
-
-    let maxRadiusScreen = 150
-    if (rip.type === 'click') maxRadiusScreen = 450
-    else if (rip.type === 'splash') maxRadiusScreen = 650
-    else if (rip.type === 'drag') maxRadiusScreen = 180
-
-    const halfW = maxRadiusScreen / scale
-    const left = Math.max(rect.left, rip.x - halfW)
-    const right = Math.min(rect.right, rip.x + halfW)
-    const top = Math.max(rect.top, rip.y - halfW)
-    const bottom = Math.min(rect.bottom, rip.y + halfW)
-
-    const colMin = Math.floor(left / 20)
-    const colMax = Math.ceil(right / 20)
-    const rowMin = Math.floor(top / 20)
-    const rowMax = Math.ceil(bottom / 20)
-
-    for (let c = colMin; c <= colMax; c++) {
-      for (let r = rowMin; r <= rowMax; r++) {
-        const key = `${c},${r}`
-        if (!candidates.has(key)) {
-          candidates.set(key, { c, r })
-        }
-      }
-    }
-  }
-
-  if (candidates.size === 0) return
-
-  for (const { c, r } of candidates.values()) {
-    const wx = c * 20
-    const wy = r * 20
-
-    let maxIntensity = 0
-    for (const rip of ripples) {
-      const age = animTime - rip.startTime
-      if (age < 0 || age > rip.duration) continue
-
-      let maxRadiusScreen = 150
-      let crestWidthScreen = 45
-      let peakIntensity = 0.6
-      if (rip.type === 'click') {
-        maxRadiusScreen = 450
-        crestWidthScreen = 90
-        peakIntensity = 0.85
-      } else if (rip.type === 'splash') {
-        maxRadiusScreen = 650
-        crestWidthScreen = 130
-        peakIntensity = 1.0
-      } else if (rip.type === 'drag') {
-        maxRadiusScreen = 180
-        crestWidthScreen = 55
-        peakIntensity = 0.7
-      }
-
-      const R_world = (maxRadiusScreen / scale) * (age / rip.duration)
-      const W_world = crestWidthScreen / scale
-      const distToCenter = Math.hypot(wx - rip.x, wy - rip.y)
-      const d = rip.sourceRadius ? Math.abs(distToCenter - rip.sourceRadius) : distToCenter
-      const intensity = Math.exp(-Math.pow((d - R_world) / W_world, 2)) * (1 - age / rip.duration) * peakIntensity
-      if (intensity > maxIntensity) maxIntensity = intensity
-    }
-
-    if (maxIntensity > 0.01) {
-      const isMajor = c % 8 === 0 && r % 8 === 0 // 160 / 20 = 8
-      const baseOpacity = isMajor ? 0.09 : 0.04
-      const baseRadius = isMajor ? 1.3 / scale : 1.0 / scale
-      const litRadius = baseRadius * (isMajor ? (1.0 + 1.8 * maxIntensity) : (1.0 + 2.0 * maxIntensity))
-      const peakOpacity = isMajor ? 0.75 : 0.7
-      const litOpacity = baseOpacity + (peakOpacity - baseOpacity) * maxIntensity
-
-      ctx.beginPath()
-      ctx.fillStyle = `rgba(0, 98, 157, ${litOpacity})`
-      ctx.arc(wx, wy, litRadius, 0, Math.PI * 2)
-      ctx.fill()
-    }
-  }
-}
-
 export function drawBoardLayer(
   canvas: HTMLCanvasElement,
   surface: HTMLElement,
@@ -451,8 +355,6 @@ export function drawBoardLayer(
   selectedCircleIds: string[] = [],
   hoveredCircleEdgeId: string | null = null,
   anim: AnimFrame = EMPTY_ANIM_FRAME,
-  ripples?: GridRipple[],
-  animTime?: number,
 ) {
   const { dpr, width, height } = resizeCanvas(canvas, surface)
   const ctx = canvas.getContext('2d')
@@ -470,8 +372,6 @@ export function drawBoardLayer(
   ctx.save()
   ctx.translate(camera.x, camera.y)
   ctx.scale(camera.scale, camera.scale)
-
-  drawGridDots(ctx, worldRect, camera.scale, ripples, animTime)
 
   drawCircleFills(ctx, visibleCircles, selectedItem, camera.scale, circleShapeMode, circleFillMode, selectedCircleIds, hoveredCircleEdgeId, anim.morphs)
 

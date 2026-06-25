@@ -47,7 +47,6 @@ import type {
   HsvColor,
   BoardAnim,
   Connection,
-  GridRipple,
 } from './lib/board/types'
 import {
   MIN_SCALE,
@@ -472,7 +471,6 @@ function markOnboardingSeen() {
   }
 }
 
-const getPerformanceNow = () => performance.now()
 
 function App() {
   const [viewMode, setViewMode] = useState<'landing' | 'board' | 'docs'>(() => {
@@ -926,39 +924,7 @@ function App() {
   const animNowRef = useRef(0)
   const paintBoardRef = useRef<(now?: number) => void>(() => {})
 
-  const gridRipplesRef = useRef<GridRipple[]>([])
-  const lastMoveRippleRef = useRef<{ x: number; y: number; time: number }>({ x: 0, y: 0, time: 0 })
-  const lastStyleRippleRef = useRef<Record<string, number>>({})
 
-  function addGridRipple(x: number, y: number, type: 'move' | 'click' | 'splash' | 'drag', sourceRadius?: number) {
-    if (!enableRipples || prefersReducedMotion()) return
-    const now = getPerformanceNow()
-    let duration = 400
-    let maxRadius = 150
-    if (type === 'click') {
-      duration = 800
-      maxRadius = 450
-    } else if (type === 'splash') {
-      duration = 1200
-      maxRadius = 650
-    } else if (type === 'drag') {
-      duration = 500
-      maxRadius = 180
-    }
-    const ripple: GridRipple = {
-      x,
-      y,
-      startTime: now,
-      duration,
-      maxRadius,
-      type,
-      sourceRadius,
-    }
-    gridRipplesRef.current.push(ripple)
-    if (boardAnimRafRef.current == null) {
-      boardAnimRafRef.current = window.requestAnimationFrame(tickBoardAnims)
-    }
-  }
 
   const [connector, setConnector] = useState<DragConnector | null>(null)
   const [marquee, setMarquee] = useState<MarqueeState | null>(null)
@@ -1125,23 +1091,7 @@ function App() {
 
   const [showSettings, setShowSettings] = useState(false)
 
-  const [enableRipples, setEnableRipples] = useState(() => {
-    try {
-      const val = window.localStorage.getItem('datanode_grid_ripples')
-      return val !== '0'
-    } catch {
-      return true
-    }
-  })
 
-  const handleToggleRipples = (val: boolean) => {
-    setEnableRipples(val)
-    try {
-      window.localStorage.setItem('datanode_grid_ripples', val ? '1' : '0')
-    } catch {
-      // ignore
-    }
-  }
   const [showAgentSettings, setShowAgentSettings] = useState(false)
   const [showLinkedInGuide, setShowLinkedInGuide] = useState(false)
   const showCircleLabels = true
@@ -2135,8 +2085,6 @@ function App() {
         selectedCircleIds,
         hoveredCircleEdgeId,
         EMPTY_ANIM_FRAME,
-        enableRipples ? gridRipplesRef.current : undefined,
-        getPerformanceNow(),
       )
     }
   }
@@ -2231,8 +2179,6 @@ function App() {
       selectedCircleIds,
       hoveredCircleEdgeId,
       frame,
-      enableRipples ? gridRipplesRef.current : undefined,
-      getPerformanceNow(),
     )
   }
 
@@ -2258,11 +2204,7 @@ function App() {
       }
     }
 
-    const perfNow = getPerformanceNow()
-    gridRipplesRef.current = gridRipplesRef.current.filter((r) => perfNow - r.startTime < r.duration)
-    if (gridRipplesRef.current.length > 0) {
-      active = true
-    }
+
 
     paintBoardRef.current(now)
     if (active) {
@@ -2390,10 +2332,7 @@ function App() {
     const isRightClick = event.pointerType !== 'touch' && event.button === 2
     isRightClickDragRef.current = isRightClick
 
-    if (event.button === 0) {
-      const worldPos = screenToWorld({ x: event.clientX, y: event.clientY })
-      addGridRipple(worldPos.x, worldPos.y, 'click')
-    }
+
 
     event.currentTarget.focus({ preventScroll: true })
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -2620,23 +2559,8 @@ function App() {
       p.pointerId === event.pointerId ? event.nativeEvent : p
     )
 
-    const isDragging = !!(
-      (moveCircleRef.current && moveCircleRef.current.pointerId === event.pointerId) ||
-      (movePersonRef.current && movePersonRef.current.pointerId === event.pointerId) ||
-      (resizeCircleRef.current && resizeCircleRef.current.pointerId === event.pointerId)
-    )
 
-    // Trigger grid move ripple using screen-space distance to keep interaction size-invariant
-    if (!isDragging) {
-      const worldPos = screenToWorld({ x: event.clientX, y: event.clientY })
-      const now = getPerformanceNow()
-      const distScreen = Math.hypot(worldPos.x - lastMoveRippleRef.current.x, worldPos.y - lastMoveRippleRef.current.y) * camera.scale
-      const timeDiff = now - lastMoveRippleRef.current.time
-      if (distScreen > 20 || (distScreen > 2 && timeDiff > 80)) {
-        addGridRipple(worldPos.x, worldPos.y, 'move')
-        lastMoveRippleRef.current = { x: worldPos.x, y: worldPos.y, time: now }
-      }
-    }
+
 
     if (marqueeRef.current) {
       marqueeRef.current.currentX = event.clientX
@@ -2742,16 +2666,7 @@ function App() {
       )
       paintBoard()
 
-      const updated = boardIndexRef.current.circlesById.get(moving.circleId)
-      if (updated) {
-        const dragNow = getPerformanceNow()
-        const dragDistScreen = Math.hypot(updated.x - lastMoveRippleRef.current.x, updated.y - lastMoveRippleRef.current.y) * camera.scale
-        const dragTimeDiff = dragNow - lastMoveRippleRef.current.time
-        if (dragDistScreen > 15 || (dragDistScreen > 2 && dragTimeDiff > 50)) {
-          addGridRipple(updated.x, updated.y, 'drag', updated.radius)
-          lastMoveRippleRef.current = { x: updated.x, y: updated.y, time: dragNow }
-        }
-      }
+
     }
 
     const movingPerson = movePersonRef.current
@@ -2773,16 +2688,7 @@ function App() {
       )
       paintBoard()
 
-      const updated = boardIndexRef.current.peopleById.get(movingPerson.personId)
-      if (updated) {
-        const dragNow = getPerformanceNow()
-        const dragDistScreen = Math.hypot(updated.x - lastMoveRippleRef.current.x, updated.y - lastMoveRippleRef.current.y) * camera.scale
-        const dragTimeDiff = dragNow - lastMoveRippleRef.current.time
-        if (dragDistScreen > 15 || (dragDistScreen > 2 && dragTimeDiff > 50)) {
-          addGridRipple(updated.x, updated.y, 'drag', 20)
-          lastMoveRippleRef.current = { x: updated.x, y: updated.y, time: dragNow }
-        }
-      }
+
     }
 
     const resizing = resizeCircleRef.current
@@ -2797,16 +2703,7 @@ function App() {
       )
       paintBoard()
 
-      const updated = boardIndexRef.current.circlesById.get(resizing.circleId)
-      if (updated) {
-        const dragNow = getPerformanceNow()
-        const dragDistScreen = Math.hypot(updated.x - lastMoveRippleRef.current.x, updated.y - lastMoveRippleRef.current.y) * camera.scale
-        const dragTimeDiff = dragNow - lastMoveRippleRef.current.time
-        if (dragDistScreen > 15 || (dragDistScreen > 2 && dragTimeDiff > 50)) {
-          addGridRipple(updated.x, updated.y, 'drag', updated.radius)
-          lastMoveRippleRef.current = { x: updated.x, y: updated.y, time: dragNow }
-        }
-      }
+
     }
 
     if (connector) {
@@ -3297,7 +3194,7 @@ function App() {
       ],
     }))
     setSelectedPeopleIds([])
-    addGridRipple(world.x, world.y, 'splash')
+
     selectItem({ type: 'person', id })
     // Grow the new person in so it feels placed, not blinked into existence.
     startBoardAnim('pop:' + id, 360)
@@ -3443,7 +3340,7 @@ function App() {
       }
       return nextGraph
     })
-    addGridRipple(createMenu.x, createMenu.y, 'splash')
+
     selectItem({ type: 'person', id })
     // Grow the new person in so it feels placed, not blinked into existence.
     startBoardAnim('pop:' + id, 360)
@@ -3468,7 +3365,6 @@ function App() {
     const source = circlesById.get(createMenu.sourceCircleId)
     if (!source) return
 
-    // eslint-disable-next-line react-hooks/purity -- created from a pointer event, not during render.
     const id = `circle-${Date.now()}`
     const isNested = mode === 'nested'
     pushHistory()
@@ -3501,7 +3397,7 @@ function App() {
       }
       return nextGraph
     })
-    addGridRipple(createMenu.x, createMenu.y, 'splash', isNested ? 82 : 190)
+
     selectItem({ type: 'circle', id })
     setCreateMenu(null)
     notifyOnboarding('create')
@@ -3528,27 +3424,6 @@ function App() {
   }
 
   function updateCircleStyle(id: string, updates: Partial<CircleNode>) {
-    const circle = boardIndexRef.current.circlesById.get(id)
-    if (circle) {
-      const hasVisualChange = (
-        'shapeType' in updates ||
-        'sides' in updates ||
-        'amplitude' in updates ||
-        'fillMode' in updates ||
-        'tone' in updates ||
-        'customColor' in updates ||
-        'imageUrl' in updates
-      )
-      if (hasVisualChange) {
-        const now = getPerformanceNow()
-        const lastTime = lastStyleRippleRef.current[id] || 0
-        if (now - lastTime > 150) {
-          addGridRipple(circle.x, circle.y, 'click', circle.radius)
-          lastStyleRippleRef.current[id] = now
-        }
-      }
-    }
-
     setGraph((current) => ({
       ...current,
       circles: current.circles.map((circle) =>
@@ -4094,20 +3969,7 @@ Content-Type: application/json
               />
             </div>
 
-            <div style={{ borderTop: '1px solid var(--md-outline-variant)', paddingTop: '16px' }}>
-              <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--md-on-surface-variant)', display: 'block', marginBottom: '8px' }}>
-                Display Options
-              </label>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px', color: 'var(--md-on-surface)' }}>
-                <span>Grid Ripple Effects</span>
-                <input
-                  type="checkbox"
-                  className="m3-switch"
-                  checked={enableRipples}
-                  onChange={(e) => handleToggleRipples(e.target.checked)}
-                />
-              </div>
-            </div>
+
 
           </div>
         </div>
