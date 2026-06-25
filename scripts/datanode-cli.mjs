@@ -1,6 +1,26 @@
 #!/usr/bin/env node
 
-import { addLink, addNote, createConnection, createPerson, getMeta, listCircles, search, importLinkedInPerson, deletePerson, deleteNote, deleteLink, deleteConnection } from './datanode-api-client.mjs'
+import {
+  addLink,
+  addNote,
+  createConnection,
+  createPerson,
+  getMeta,
+  listCircles,
+  search,
+  importLinkedInPerson,
+  deletePerson,
+  deleteNote,
+  deleteLink,
+  deleteConnection,
+  exportGraph,
+  importGraph,
+  clearGraph,
+  createCircle,
+  updateCircle,
+  deleteCircle,
+  uploadAvatar
+} from './datanode-api-client.mjs'
 
 function usage() {
   console.log(`Usage:
@@ -16,6 +36,13 @@ function usage() {
   datanode notes:delete <personId> <noteId>
   datanode links:delete <personId> <linkId>
   datanode connections:delete <connectionId>
+  datanode graph:export
+  datanode graph:import <filePath>
+  datanode graph:clear
+  datanode circles:add <name> [parentId] [connectedTo]
+  datanode circles:update <circleId> <field> <value>
+  datanode circles:delete <circleId>
+  datanode avatars:upload <type> <id> <base64OrUrlOrFilePath>
 
 Environment:
   DATANODE_API_URL=https://.../functions/v1/graph-api/v1
@@ -135,6 +162,96 @@ async function main() {
     console.log(JSON.stringify(await deleteConnection(getArg(3, 'connectionId'), {
       expectedRevision: meta.revision,
     }), null, 2))
+    return
+  }
+
+  if (command === 'graph:export') {
+    console.log(JSON.stringify(await exportGraph(), null, 2))
+    return
+  }
+
+  if (command === 'graph:import') {
+    const filePath = getArg(3, 'filePath')
+    const fs = await import('node:fs/promises')
+    const path = await import('node:path')
+    const content = await fs.readFile(path.resolve(filePath), 'utf8')
+    const graphData = JSON.parse(content)
+    const graph = graphData.graph ? graphData.graph : graphData
+    const meta = await getMeta()
+    console.log(JSON.stringify(await importGraph({
+      graph,
+      expectedRevision: meta.revision,
+    }), null, 2))
+    return
+  }
+
+  if (command === 'graph:clear') {
+    const meta = await getMeta()
+    console.log(JSON.stringify(await clearGraph({
+      expectedRevision: meta.revision,
+    }), null, 2))
+    return
+  }
+
+  if (command === 'circles:add') {
+    const meta = await getMeta()
+    const name = getArg(3, 'name')
+    const parentId = process.argv[4] || null
+    const connectedTo = process.argv[5] || null
+    console.log(JSON.stringify(await createCircle({
+      expectedRevision: meta.revision,
+      name,
+      parentId,
+      connectedTo,
+    }), null, 2))
+    return
+  }
+
+  if (command === 'circles:update') {
+    const meta = await getMeta()
+    const circleId = getArg(3, 'circleId')
+    const field = getArg(4, 'field')
+    const value = getArg(5, 'value')
+    let parsedValue = value
+    if (value === 'true') parsedValue = true
+    else if (value === 'false') parsedValue = false
+    else if (!isNaN(Number(value))) parsedValue = Number(value)
+    
+    console.log(JSON.stringify(await updateCircle(circleId, {
+      expectedRevision: meta.revision,
+      [field]: parsedValue,
+    }), null, 2))
+    return
+  }
+
+  if (command === 'circles:delete') {
+    const meta = await getMeta()
+    console.log(JSON.stringify(await deleteCircle(getArg(3, 'circleId'), {
+      expectedRevision: meta.revision,
+    }), null, 2))
+    return
+  }
+
+  if (command === 'avatars:upload') {
+    const meta = await getMeta()
+    const type = getArg(3, 'type')
+    if (type !== 'person' && type !== 'circle') throw new Error('type must be person or circle')
+    const id = getArg(4, 'id')
+    const source = getArg(5, 'source')
+    let base64OrUrl = source
+    if (!source.startsWith('http://') && !source.startsWith('https://') && !source.startsWith('data:')) {
+      const fs = await import('node:fs/promises')
+      const path = await import('node:path')
+      try {
+        const fileBuffer = await fs.readFile(path.resolve(source))
+        const ext = path.extname(source).toLowerCase().replace(/^\./, '') || 'png'
+        const mime = ext === 'jpg' ? 'image/jpeg' : ext === 'jpeg' ? 'image/jpeg' : `image/${ext}`
+        base64OrUrl = `data:${mime};base64,${fileBuffer.toString('base64')}`
+      } catch (err) {
+        throw new Error(`Failed to read file ${source}: ${err.message}`)
+      }
+    }
+    console.log(JSON.stringify(await uploadAvatar(type, id, base64OrUrl, meta.revision), null, 2))
     return
   }
 

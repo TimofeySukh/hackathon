@@ -164,9 +164,37 @@ export default function DocsPage() {
                   <td className="docs-param-name">delete_link</td>
                   <td>Delete a specific link/social connection from a person.</td>
                 </tr>
-                <tr>
+                 <tr>
                   <td className="docs-param-name">delete_connection</td>
                   <td>Delete a relationship connection between two nodes.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">export_graph</td>
+                  <td>Retrieve the entire social graph JSON. Recommended for backup before changes.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">import_graph</td>
+                  <td>Replace the entire graph with a new graph JSON.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">clear_graph</td>
+                  <td>Clear the graph, resetting it.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">create_circle</td>
+                  <td>Create a circle (standalone or nested).</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">update_circle</td>
+                  <td>Update properties of a circle.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">delete_circle</td>
+                  <td>Delete a circle (promotes child elements).</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">upload_avatar</td>
+                  <td>Upload/set a photo or avatar for a person or circle (Base64 or URL).</td>
                 </tr>
               </tbody>
             </table>
@@ -290,6 +318,41 @@ ${npxCmd}`}</code>
                   <td className="docs-param-name">connections:delete</td>
                   <td><code>&lt;connectionId&gt;</code></td>
                   <td>Delete a connector link.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">graph:export</td>
+                  <td>None</td>
+                  <td>Retrieve the entire social graph JSON. Recommended for backups.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">graph:import</td>
+                  <td><code>&lt;filePath&gt;</code></td>
+                  <td>Replace the entire graph with a local JSON file.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">graph:clear</td>
+                  <td>None</td>
+                  <td>Reset the graph, deleting all circles/people.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">circles:add</td>
+                  <td><code>&lt;name&gt; [parentId] [connectedTo]</code></td>
+                  <td>Create a new circle.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">circles:update</td>
+                  <td><code>&lt;circleId&gt; &lt;field&gt; &lt;value&gt;</code></td>
+                  <td>Update properties of a circle.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">circles:delete</td>
+                  <td><code>&lt;circleId&gt;</code></td>
+                  <td>Delete a circle (promotes child elements).</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">avatars:upload</td>
+                  <td><code>&lt;type&gt; &lt;id&gt; &lt;base64OrUrlOrFilePath&gt;</code></td>
+                  <td>Upload/set avatar or photo for a person or circle.</td>
                 </tr>
               </tbody>
             </table>
@@ -1071,6 +1134,264 @@ ${npxCmd}`}</code>
               <pre className="docs-code-pre">
                 <code className="docs-code">{curl}</code>
               </pre>
+            </div>
+          </div>
+        )
+      }
+    },
+    {
+      id: 'get-graph',
+      category: 'api',
+      title: 'GET /graph',
+      badge: 'get',
+      keywords: ['get', '/graph', 'export graph', 'backup'],
+      render: (copy) => {
+        const curl = `curl -X GET "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/graph" \\
+  -H "Authorization: Bearer dn_live_your_token"`
+        return (
+          <div>
+            <div className="docs-endpoint-title">
+              <span className="docs-method-badge get">GET</span>
+              <span className="docs-endpoint-path">/graph</span>
+            </div>
+            <p>Retrieves the entire graph state (circles, people, connections) and the current revision. This is useful for making backups.</p>
+            <h3>Request Example</h3>
+            <div className="docs-code-container">
+              <div className="docs-code-header">
+                <span>cURL</span>
+                <button className="docs-code-copy-btn" onClick={() => copy(curl, 'cURL copied!')}>Copy</button>
+              </div>
+              <pre className="docs-code-pre"><code className="docs-code">{curl}</code></pre>
+            </div>
+          </div>
+        )
+      }
+    },
+    {
+      id: 'put-graph',
+      category: 'api',
+      title: 'PUT /graph',
+      badge: 'post',
+      keywords: ['put', '/graph', 'import graph', 'replace'],
+      render: (copy) => {
+        const curl = `curl -X PUT "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/graph" \\
+  -H "Authorization: Bearer dn_live_your_token" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "expectedRevision": 10,
+    "graph": {
+      "circles": [...],
+      "people": [...],
+      "connections": [...]
+    }
+  }'`
+        return (
+          <div>
+            <div className="docs-endpoint-title">
+              <span className="docs-method-badge post">PUT</span>
+              <span className="docs-endpoint-path">/graph</span>
+            </div>
+            <p>Replaces the entire graph state with a new graph payload. Requires <code>graph:replace</code> scope.</p>
+            <h3>Request Example</h3>
+            <div className="docs-code-container">
+              <div className="docs-code-header">
+                <span>cURL</span>
+                <button className="docs-code-copy-btn" onClick={() => copy(curl, 'cURL copied!')}>Copy</button>
+              </div>
+              <pre className="docs-code-pre"><code className="docs-code">{curl}</code></pre>
+            </div>
+          </div>
+        )
+      }
+    },
+    {
+      id: 'clear-graph',
+      category: 'api',
+      title: 'POST /graph/clear',
+      badge: 'post',
+      keywords: ['post', '/graph/clear', 'reset graph', 'clear'],
+      render: (copy) => {
+        const curl = `curl -X POST "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/graph/clear" \\
+  -H "Authorization: Bearer dn_live_your_token" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "expectedRevision": 10
+  }'`
+        return (
+          <div>
+            <div className="docs-endpoint-title">
+              <span className="docs-method-badge post">POST</span>
+              <span className="docs-endpoint-path">/graph/clear</span>
+            </div>
+            <p>Clears all circles, people, and connections, resetting the graph to a single "You" circle. Requires <code>graph:replace</code> scope.</p>
+            <h3>Request Example</h3>
+            <div className="docs-code-container">
+              <div className="docs-code-header">
+                <span>cURL</span>
+                <button className="docs-code-copy-btn" onClick={() => copy(curl, 'cURL copied!')}>Copy</button>
+              </div>
+              <pre className="docs-code-pre"><code className="docs-code">{curl}</code></pre>
+            </div>
+          </div>
+        )
+      }
+    },
+    {
+      id: 'post-circles',
+      category: 'api',
+      title: 'POST /circles',
+      badge: 'post',
+      keywords: ['post', '/circles', 'create circle'],
+      render: (copy) => {
+        const curl = `curl -X POST "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/circles" \\
+  -H "Authorization: Bearer dn_live_your_token" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "expectedRevision": 10,
+    "name": "Design Team",
+    "parentId": "you",
+    "tone": "violet"
+  }'`
+        return (
+          <div>
+            <div className="docs-endpoint-title">
+              <span className="docs-method-badge post">POST</span>
+              <span className="docs-endpoint-path">/circles</span>
+            </div>
+            <p>Creates a new circle (either standalone or nested inside a parent circle). Requires <code>circles:write</code> scope.</p>
+            <h3>Request Example</h3>
+            <div className="docs-code-container">
+              <div className="docs-code-header">
+                <span>cURL</span>
+                <button className="docs-code-copy-btn" onClick={() => copy(curl, 'cURL copied!')}>Copy</button>
+              </div>
+              <pre className="docs-code-pre"><code className="docs-code">{curl}</code></pre>
+            </div>
+          </div>
+        )
+      }
+    },
+    {
+      id: 'patch-circles',
+      category: 'api',
+      title: 'PATCH /circles/:id',
+      badge: 'post',
+      keywords: ['patch', '/circles', 'update circle', 'edit circle'],
+      render: (copy) => {
+        const curl = `curl -X PATCH "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/circles/circle-123" \\
+  -H "Authorization: Bearer dn_live_your_token" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "expectedRevision": 11,
+    "name": "Product Design",
+    "tone": "blue"
+  }'`
+        return (
+          <div>
+            <div className="docs-endpoint-title">
+              <span className="docs-method-badge post">PATCH</span>
+              <span className="docs-endpoint-path">/circles/:circleId</span>
+            </div>
+            <p>Updates properties of a circle (name, coordinates, parentId, connectedTo, color tone, shape style, etc.). Requires <code>circles:write</code> scope.</p>
+            <h3>Request Example</h3>
+            <div className="docs-code-container">
+              <div className="docs-code-header">
+                <span>cURL</span>
+                <button className="docs-code-copy-btn" onClick={() => copy(curl, 'cURL copied!')}>Copy</button>
+              </div>
+              <pre className="docs-code-pre"><code className="docs-code">{curl}</code></pre>
+            </div>
+          </div>
+        )
+      }
+    },
+    {
+      id: 'delete-circles',
+      category: 'api',
+      title: 'DELETE /circles/:id',
+      badge: 'delete',
+      keywords: ['delete', '/circles', 'remove circle'],
+      render: (copy) => {
+        const curl = `curl -X DELETE "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/circles/circle-123" \\
+  -H "Authorization: Bearer dn_live_your_token" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "expectedRevision": 12
+  }'`
+        return (
+          <div>
+            <div className="docs-endpoint-title">
+              <span className="docs-method-badge delete">DELETE</span>
+              <span className="docs-endpoint-path">/circles/:circleId</span>
+            </div>
+            <p>Deletes a circle. Its child circles/people are promoted to its parent circle. Requires <code>circles:write</code> scope.</p>
+            <h3>Request Example</h3>
+            <div className="docs-code-container">
+              <div className="docs-code-header">
+                <span>cURL</span>
+                <button className="docs-code-copy-btn" onClick={() => copy(curl, 'cURL copied!')}>Copy</button>
+              </div>
+              <pre className="docs-code-pre"><code className="docs-code">{curl}</code></pre>
+            </div>
+          </div>
+        )
+      }
+    },
+    {
+      id: 'post-people-avatar',
+      category: 'api',
+      title: 'POST /people/:id/avatar',
+      badge: 'post',
+      keywords: ['post', '/people/avatar', 'upload photo', 'avatar'],
+      render: (copy) => {
+        const curl = `curl -X POST "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/people/person-123/avatar" \\
+  -H "Authorization: Bearer dn_live_your_token" \\
+  -H "Content-Type: image/png" \\
+  --data-binary "@avatar.png"`
+        return (
+          <div>
+            <div className="docs-endpoint-title">
+              <span className="docs-method-badge post">POST</span>
+              <span className="docs-endpoint-path">/people/:personId/avatar</span>
+            </div>
+            <p>Uploads and updates a person's avatar photo. Accepts a raw binary payload (with image Content-Type) or a JSON body with <code>imageUrl</code> or <code>base64</code>. Requires <code>people:write</code> scope.</p>
+            <h3>Request Example (Raw Binary)</h3>
+            <div className="docs-code-container">
+              <div className="docs-code-header">
+                <span>cURL</span>
+                <button className="docs-code-copy-btn" onClick={() => copy(curl, 'cURL copied!')}>Copy</button>
+              </div>
+              <pre className="docs-code-pre"><code className="docs-code">{curl}</code></pre>
+            </div>
+          </div>
+        )
+      }
+    },
+    {
+      id: 'post-circles-avatar',
+      category: 'api',
+      title: 'POST /circles/:id/avatar',
+      badge: 'post',
+      keywords: ['post', '/circles/avatar', 'upload photo', 'avatar'],
+      render: (copy) => {
+        const curl = `curl -X POST "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/circles/circle-123/avatar" \\
+  -H "Authorization: Bearer dn_live_your_token" \\
+  -H "Content-Type: image/png" \\
+  --data-binary "@circle.png"`
+        return (
+          <div>
+            <div className="docs-endpoint-title">
+              <span className="docs-method-badge post">POST</span>
+              <span className="docs-endpoint-path">/circles/:circleId/avatar</span>
+            </div>
+            <p>Uploads and updates a circle's photo. Accepts a raw binary payload (with image Content-Type) or a JSON body with <code>imageUrl</code> or <code>base64</code>. Requires <code>circles:write</code> scope.</p>
+            <h3>Request Example (Raw Binary)</h3>
+            <div className="docs-code-container">
+              <div className="docs-code-header">
+                <span>cURL</span>
+                <button className="docs-code-copy-btn" onClick={() => copy(curl, 'cURL copied!')}>Copy</button>
+              </div>
+              <pre className="docs-code-pre"><code className="docs-code">{curl}</code></pre>
             </div>
           </div>
         )

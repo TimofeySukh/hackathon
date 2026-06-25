@@ -68,7 +68,7 @@ type GraphState = { circles: CircleNode[]; people: PersonNode[]; connections: Co
 type GraphRecord = { graph: GraphState | null; revision: number | null }
 type AuthContext = { userId: string; scopes: Set<string>; authType: 'session' | 'agent'; tokenId?: string }
 
-const DEFAULT_AGENT_SCOPES: Scope[] = ['graph:read', 'search:read', 'people:write', 'notes:write', 'links:write', 'connections:write']
+const DEFAULT_AGENT_SCOPES: Scope[] = ['graph:read', 'search:read', 'people:write', 'notes:write', 'links:write', 'connections:write', 'circles:write']
 const PERSON_RADIUS = 30
 
 function jsonResponse(body: unknown, status = 200) {
@@ -400,6 +400,125 @@ function refitParents(graph: GraphState, startingCircleId: string) {
   graph.circles = graph.circles.map((circle) => circlesById.get(circle.id) ?? circle)
 }
 
+function createCircle(graph: GraphState, data: Record<string, unknown>) {
+  const name = assertString(data.name, 'name')
+  const id = typeof data.id === 'string' && data.id.trim() ? data.id.trim() : makeId('circle')
+  if (graph.circles.some((circle) => circle.id === id)) {
+    throw new Response('Circle ID already exists.', { status: 400 })
+  }
+  const parentId = typeof data.parentId === 'string' && data.parentId.trim() ? data.parentId.trim() : null
+  if (parentId && !graph.circles.some((circle) => circle.id === parentId)) {
+    throw new Response('Unknown parentId.', { status: 400 })
+  }
+  const connectedTo = typeof data.connectedTo === 'string' && data.connectedTo.trim() ? data.connectedTo.trim() : null
+  if (connectedTo && !graph.circles.some((circle) => circle.id === connectedTo)) {
+    throw new Response('Unknown connectedTo.', { status: 400 })
+  }
+  const tone = typeof data.tone === 'string' && ['blue', 'red', 'green', 'amber', 'violet'].includes(data.tone) ? data.tone : 'blue'
+  const fillMode = typeof data.fillMode === 'string' && ['transparent', 'solid'].includes(data.fillMode) ? data.fillMode : 'transparent'
+  const shapeType = typeof data.shapeType === 'string' && ['circle', 'wavy', 'polygon'].includes(data.shapeType) ? data.shapeType : 'circle'
+
+  let x = typeof data.x === 'number' ? data.x : 0
+  let y = typeof data.y === 'number' ? data.y : 0
+  if (typeof data.x !== 'number' || typeof data.y !== 'number') {
+    const relativeCircle = parentId ? graph.circles.find(c => c.id === parentId) : graph.circles.find(c => c.id === 'you')
+    if (relativeCircle) {
+      const angle = Math.random() * 2 * Math.PI
+      const dist = parentId ? 150 : 400
+      x = Math.round(relativeCircle.x + Math.cos(angle) * dist)
+      y = Math.round(relativeCircle.y + Math.sin(angle) * dist)
+    }
+  }
+
+  const circle: CircleNode = {
+    id,
+    name,
+    icon: typeof data.icon === 'string' && data.icon.trim() ? data.icon.trim() : makeInitials(name),
+    x,
+    y,
+    radius: typeof data.radius === 'number' ? data.radius : 90,
+    minRadius: typeof data.minRadius === 'number' ? data.minRadius : 90,
+    parentId,
+    connectedTo,
+    tone: tone as CircleNode['tone'],
+    fillMode: fillMode as CircleNode['fillMode'],
+    shapeType: shapeType as CircleNode['shapeType'],
+    shapeCustom: typeof data.shapeCustom === 'boolean' ? data.shapeCustom : false,
+    sides: typeof data.sides === 'number' ? data.sides : 25,
+    amplitude: typeof data.amplitude === 'number' ? data.amplitude : 0,
+    imageUrl: typeof data.imageUrl === 'string' ? data.imageUrl : undefined,
+    customColor: typeof data.customColor === 'string' ? data.customColor : undefined,
+  }
+  graph.circles.push(circle)
+  if (parentId) {
+    refitParents(graph, parentId)
+  }
+  return circle
+}
+
+function deleteCircle(graph: GraphState, circleId: string) {
+  if (circleId === 'you') throw new Response('Cannot delete the "you" circle.', { status: 400 })
+  const deletedCircle = graph.circles.find((c) => c.id === circleId)
+  if (!deletedCircle) throw new Response('Circle not found.', { status: 404 })
+
+  const newParentId = deletedCircle.parentId ?? 'you'
+
+  graph.circles = graph.circles
+    .filter((c) => c.id !== circleId)
+    .map((c) => {
+      const updated = { ...c }
+      if (c.parentId === circleId) {
+        updated.parentId = newParentId
+      }
+      if (c.connectedTo === circleId) {
+        updated.connectedTo = null
+      }
+      return updated
+    })
+
+  graph.people = graph.people.map((p) => {
+    if (p.circleId === circleId) {
+      return { ...p, circleId: newParentId }
+    }
+    return p
+  })
+
+  graph.connections = graph.connections.filter(
+    (conn) => conn.fromId !== circleId && conn.toId !== circleId
+  )
+
+  refitParents(graph, newParentId)
+  return { deleted: circleId }
+}
+
+async function getUploadedImageUrl(req: Request, body: Record<string, unknown>): Promise<string> {
+  const contentType = req.headers.get('content-type') || ''
+  if (contentType.startsWith('image/') || contentType === 'application/octet-stream') {
+    const buffer = await req.arrayBuffer()
+    const bytes = new Uint8Array(buffer)
+    let binary = ''
+    const len = bytes.byteLength
+    for (let i = 0; i < len; i++) {
+      binary += String.fromCharCode(bytes[i])
+    }
+    const base64 = btoa(binary)
+    const mime = contentType === 'application/octet-stream' ? 'image/png' : contentType
+    return `data:${mime};base64,${base64}`
+  }
+
+  const urlVal = typeof body.imageUrl === 'string' ? body.imageUrl : typeof body.base64 === 'string' ? body.base64 : ''
+  if (!urlVal) {
+    throw new Response('Request body must contain imageUrl/base64, or be a raw image payload.', { status: 400 })
+  }
+  if (urlVal.startsWith('data:')) {
+    return urlVal
+  }
+  if (/^[a-zA-Z0-9+/=]+$/.test(urlVal)) {
+    return `data:image/png;base64,${urlVal}`
+  }
+  return urlVal
+}
+
 function createPerson(graph: GraphState, data: Record<string, unknown>) {
   const name = assertString(data.name, 'name')
   const circleId = assertString(data.circleId, 'circleId')
@@ -494,6 +613,10 @@ function parseBody(body: unknown): Record<string, unknown> {
 
 async function readJson(req: Request) {
   if (req.method === 'GET') return {}
+  const contentType = req.headers.get('content-type') || ''
+  if (contentType.startsWith('image/') || contentType === 'application/octet-stream') {
+    return {}
+  }
   return parseBody(await req.json().catch(() => ({})))
 }
 
@@ -599,7 +722,7 @@ async function handleGraphRoutes(req: Request, path: string, auth: AuthContext, 
     if (!auth.scopes.has('graph:replace')) return jsonResponse({ error: 'Missing scope: graph:replace' }, 403)
     const graph = body.graph
     if (!isGraphState(graph)) return jsonResponse({ error: 'Invalid graph.' }, 400)
-    return await writeGraph(auth.userId, graph, getExpectedRevision(body))
+    return await writeGraph(auth.userId, graph, getExpectedRevision(req, body))
   }
 
   if (req.method === 'GET' && path === '/v1/search') {
@@ -922,6 +1045,131 @@ async function handleGraphRoutes(req: Request, path: string, auth: AuthContext, 
         }
       }
       return results
+    })
+  }
+
+  if (req.method === 'POST' && path === '/v1/graph/clear') {
+    if (!auth.scopes.has('graph:replace')) return jsonResponse({ error: 'Missing scope: graph:replace' }, 403)
+    return await mutateGraph(req, auth, body, (graph) => {
+      graph.circles = [
+        {
+          id: 'you',
+          name: 'You',
+          icon: 'YOU',
+          x: 0,
+          y: 0,
+          radius: 104,
+          minRadius: 104,
+          parentId: null,
+          connectedTo: null,
+          tone: 'blue',
+          fillMode: 'transparent',
+          shapeType: 'circle',
+          shapeCustom: false,
+          sides: 25,
+          amplitude: 0,
+        }
+      ]
+      graph.people = []
+      graph.connections = []
+      return { cleared: true }
+    })
+  }
+
+  if (req.method === 'POST' && path === '/v1/circles') {
+    if (!auth.scopes.has('circles:write')) return jsonResponse({ error: 'Missing scope: circles:write' }, 403)
+    return await mutateGraph(req, auth, body, (graph) => createCircle(graph, body))
+  }
+
+  const circleMatch = path.match(/^\/v1\/circles\/([^/]+)$/)
+  if (circleMatch) {
+    if (req.method === 'PATCH') {
+      if (!auth.scopes.has('circles:write')) return jsonResponse({ error: 'Missing scope: circles:write' }, 403)
+      return await mutateGraph(req, auth, body, (graph) => {
+        const circle = graph.circles.find((candidate) => candidate.id === circleMatch[1])
+        if (!circle) throw new Response('Circle not found.', { status: 404 })
+
+        if (typeof body.name === 'string' && body.name.trim()) {
+          circle.name = body.name.trim()
+          if (!body.icon) circle.icon = makeInitials(circle.name)
+        }
+        if (typeof body.icon === 'string') circle.icon = body.icon.trim()
+        if (typeof body.x === 'number') circle.x = body.x
+        if (typeof body.y === 'number') circle.y = body.y
+        if (typeof body.radius === 'number') circle.radius = body.radius
+        if (typeof body.minRadius === 'number') circle.minRadius = body.minRadius
+
+        if ('parentId' in body) {
+          const pId = typeof body.parentId === 'string' && body.parentId.trim() ? body.parentId.trim() : null
+          if (pId && !graph.circles.some((c) => c.id === pId)) throw new Response('Unknown parentId.', { status: 400 })
+          circle.parentId = pId
+        }
+
+        if ('connectedTo' in body) {
+          const cTo = typeof body.connectedTo === 'string' && body.connectedTo.trim() ? body.connectedTo.trim() : null
+          if (cTo && !graph.circles.some((c) => c.id === cTo)) throw new Response('Unknown connectedTo.', { status: 400 })
+          circle.connectedTo = cTo
+        }
+
+        if (typeof body.tone === 'string' && ['blue', 'red', 'green', 'amber', 'violet'].includes(body.tone)) {
+          circle.tone = body.tone as CircleNode['tone']
+        }
+        if (typeof body.fillMode === 'string' && ['transparent', 'solid'].includes(body.fillMode)) {
+          circle.fillMode = body.fillMode as CircleNode['fillMode']
+        }
+        if (typeof body.shapeType === 'string' && ['circle', 'wavy', 'polygon'].includes(body.shapeType)) {
+          circle.shapeType = body.shapeType as CircleNode['shapeType']
+        }
+        if (typeof body.shapeCustom === 'boolean') {
+          circle.shapeCustom = body.shapeCustom
+        }
+        if (typeof body.sides === 'number') {
+          circle.sides = body.sides
+        }
+        if (typeof body.amplitude === 'number') {
+          circle.amplitude = body.amplitude
+        }
+        if ('imageUrl' in body) {
+          circle.imageUrl = typeof body.imageUrl === 'string' ? body.imageUrl : undefined
+        }
+        if ('customColor' in body) {
+          circle.customColor = typeof body.customColor === 'string' ? body.customColor : undefined
+        }
+
+        if (circle.parentId) {
+          refitParents(graph, circle.parentId)
+        }
+        return circle
+      })
+    }
+
+    if (req.method === 'DELETE') {
+      if (!auth.scopes.has('circles:write')) return jsonResponse({ error: 'Missing scope: circles:write' }, 403)
+      return await mutateGraph(req, auth, body, (graph) => deleteCircle(graph, circleMatch[1]))
+    }
+  }
+
+  const personAvatarMatch = path.match(/^\/v1\/people\/([^/]+)\/avatar$/)
+  if (personAvatarMatch && req.method === 'POST') {
+    if (!auth.scopes.has('people:write')) return jsonResponse({ error: 'Missing scope: people:write' }, 403)
+    const imageUrl = await getUploadedImageUrl(req, body)
+    return await mutateGraph(req, auth, body, (graph) => {
+      const person = graph.people.find((candidate) => candidate.id === personAvatarMatch[1])
+      if (!person) throw new Response('Person not found.', { status: 404 })
+      person.imageUrl = imageUrl
+      return person
+    })
+  }
+
+  const circleAvatarMatch = path.match(/^\/v1\/circles\/([^/]+)\/avatar$/)
+  if (circleAvatarMatch && req.method === 'POST') {
+    if (!auth.scopes.has('circles:write')) return jsonResponse({ error: 'Missing scope: circles:write' }, 403)
+    const imageUrl = await getUploadedImageUrl(req, body)
+    return await mutateGraph(req, auth, body, (graph) => {
+      const circle = graph.circles.find((candidate) => candidate.id === circleAvatarMatch[1])
+      if (!circle) throw new Response('Circle not found.', { status: 404 })
+      circle.imageUrl = imageUrl
+      return circle
     })
   }
 

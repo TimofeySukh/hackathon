@@ -102,3 +102,53 @@ export async function deleteConnection(connectionId, input) {
     body: JSON.stringify(input),
   })
 }
+
+export async function exportGraph() {
+  return await datanodeFetch('/graph')
+}
+
+export async function importGraph(input) {
+  return await datanodeFetch('/graph', {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  })
+}
+
+export async function clearGraph(input) {
+  return await datanodeFetch('/graph/clear', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+export async function createCircle(input) {
+  return await datanodeFetch('/circles', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+export async function updateCircle(circleId, input) {
+  return await datanodeFetch(`/circles/${encodeURIComponent(circleId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  })
+}
+
+export async function deleteCircle(circleId, input) {
+  return await datanodeFetch(`/circles/${encodeURIComponent(circleId)}`, {
+    method: 'DELETE',
+    body: JSON.stringify(input),
+  })
+}
+
+export async function uploadAvatar(type, id, base64OrUrl, expectedRevision) {
+  const path = type === 'circle' ? `/circles/${encodeURIComponent(id)}/avatar` : `/people/${encodeURIComponent(id)}/avatar`
+  return await datanodeFetch(path, {
+    method: 'POST',
+    body: JSON.stringify({
+      imageUrl: base64OrUrl,
+      expectedRevision,
+    }),
+  })
+}

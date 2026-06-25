@@ -80,15 +80,6 @@
   transform: scale(0.9);
 }
 
-.app-shell.is-demo-mode .toolbar {
-  left: auto;
-  right: 16px;
-  width: auto;
-}
-
-.toolbar__group--demo {
-  border-radius: var(--md-r-full);
-}
 
 .m3-switch-row {
   display: flex;

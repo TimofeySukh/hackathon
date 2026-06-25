@@ -1,6 +1,26 @@
 #!/usr/bin/env node
 
-import { addLink, addNote, createConnection, createPerson, getMeta, listCircles, search, importLinkedInPerson, deletePerson, deleteNote, deleteLink, deleteConnection } from './datanode-api-client.mjs'
+import {
+  addLink,
+  addNote,
+  createConnection,
+  createPerson,
+  getMeta,
+  listCircles,
+  search,
+  importLinkedInPerson,
+  deletePerson,
+  deleteNote,
+  deleteLink,
+  deleteConnection,
+  exportGraph,
+  importGraph,
+  clearGraph,
+  createCircle,
+  updateCircle,
+  deleteCircle,
+  uploadAvatar
+} from './datanode-api-client.mjs'
 
 const tools = [
   {
@@ -130,6 +150,90 @@ const tools = [
       required: ['connectionId'],
     },
   },
+  {
+    name: 'export_graph',
+    description: 'Retrieve the entire social graph (circles, people, connections) and its revision. RECOMMENDED: Run this tool to create a backup file locally before making any large or experimental changes to the graph.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'import_graph',
+    description: 'Replace the entire graph with a new graph JSON.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        graph: {
+          type: 'object',
+          description: 'The complete graph state containing circles, people, and connections arrays.'
+        },
+      },
+      required: ['graph'],
+    },
+  },
+  {
+    name: 'clear_graph',
+    description: 'Reset the graph, deleting all circles, people, and connections, leaving only the central "You" circle.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'create_circle',
+    description: 'Create a circle (standalone or nested).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'The name of the circle.' },
+        parentId: { type: 'string', description: 'Optional. Parent circle ID to nest this circle.' },
+        connectedTo: { type: 'string', description: 'Optional. ID of another circle to connect this one to.' },
+        tone: { type: 'string', enum: ['blue', 'red', 'green', 'amber', 'violet'], description: 'Optional color tone.' },
+      },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'update_circle',
+    description: 'Update circle properties (name, parent, connections, position, color/shape style).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        circleId: { type: 'string' },
+        name: { type: 'string' },
+        parentId: { type: 'string' },
+        connectedTo: { type: 'string' },
+        tone: { type: 'string', enum: ['blue', 'red', 'green', 'amber', 'violet'] },
+        x: { type: 'number' },
+        y: { type: 'number' },
+        radius: { type: 'number' },
+        minRadius: { type: 'number' },
+        shapeType: { type: 'string', enum: ['circle', 'wavy', 'polygon'] },
+        sides: { type: 'number' },
+        amplitude: { type: 'number' },
+      },
+      required: ['circleId'],
+    },
+  },
+  {
+    name: 'delete_circle',
+    description: 'Delete a circle. Its child circles/people are promoted to its parent circle.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        circleId: { type: 'string' },
+      },
+      required: ['circleId'],
+    },
+  },
+  {
+    name: 'upload_avatar',
+    description: 'Upload/set a photo or avatar for a person or circle (accepts Base64 image data or URL).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        type: { type: 'string', enum: ['person', 'circle'], description: 'Whether it is a person or a circle.' },
+        id: { type: 'string', description: 'The ID of the person or circle.' },
+        imageUrl: { type: 'string', description: 'Base64 image string (with or without MIME prefix) or a URL.' },
+      },
+      required: ['type', 'id', 'imageUrl'],
+    },
+  },
 ]
 
 function send(message) {
@@ -183,6 +287,33 @@ async function callTool(name, args = {}) {
     case 'delete_connection': {
       const meta = await getMeta()
       return textResult(await deleteConnection(args.connectionId, { expectedRevision: meta.revision }))
+    }
+    case 'export_graph':
+      return textResult(await exportGraph())
+    case 'import_graph': {
+      const meta = await getMeta()
+      return textResult(await importGraph({ graph: args.graph, expectedRevision: meta.revision }))
+    }
+    case 'clear_graph': {
+      const meta = await getMeta()
+      return textResult(await clearGraph({ expectedRevision: meta.revision }))
+    }
+    case 'create_circle': {
+      const meta = await getMeta()
+      return textResult(await createCircle({ expectedRevision: meta.revision, ...args }))
+    }
+    case 'update_circle': {
+      const meta = await getMeta()
+      const { circleId, ...rest } = args
+      return textResult(await updateCircle(circleId, { expectedRevision: meta.revision, ...rest }))
+    }
+    case 'delete_circle': {
+      const meta = await getMeta()
+      return textResult(await deleteCircle(args.circleId, { expectedRevision: meta.revision }))
+    }
+    case 'upload_avatar': {
+      const meta = await getMeta()
+      return textResult(await uploadAvatar(args.type, args.id, args.imageUrl, meta.revision))
     }
     default:
       throw new Error(`Unknown tool: ${name}`)

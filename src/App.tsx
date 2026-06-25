@@ -1088,13 +1088,12 @@ function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [showAgentSettings, setShowAgentSettings] = useState(false)
   const [showLinkedInGuide, setShowLinkedInGuide] = useState(false)
-  const [demoMode, setDemoMode] = useState(false)
-  const [showCircleLabels, setShowCircleLabels] = useState(true)
-  const [showPersonLabels, setShowPersonLabels] = useState(true)
-  const [circleShapeMode, setCircleShapeMode] = useState<CircleShapeMode>('circles')
-  const [circleFillMode, setCircleFillMode] = useState<CircleFillMode>('transparent')
+  const showCircleLabels = true
+  const showPersonLabels = true
+  const circleShapeMode: CircleShapeMode = 'circles'
+  const circleFillMode: CircleFillMode = 'transparent'
   const [circleCreationDefaults] = useState(loadCircleCreationDefaults)
-  const [centerBehavior, setCenterBehavior] = useState<'connect' | 'move'>('connect')
+  const centerBehavior = 'connect'
   const [hoveredConnId, setHoveredConnId] = useState<string | null>(null)
   const [openNotesPersonId, setOpenNotesPersonId] = useState<string | null>(null)
   const [newNoteBody, setNewNoteBody] = useState('')
@@ -2366,7 +2365,7 @@ function App() {
       return
     }
 
-    if (!demoMode) setCreateMenu(null)
+    setCreateMenu(null)
     setOpenNotesPersonId(null)
     // A fresh gesture hasn't recorded its undo snapshot yet.
     gestureSnapshotTakenRef.current = false
@@ -2967,7 +2966,7 @@ function App() {
 
   function handleSurfaceContextMenu(event: ReactMouseEvent<HTMLDivElement>) {
     event.preventDefault()
-    if (demoMode) return
+
     const hit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
       x: event.clientX,
       y: event.clientY,
@@ -3134,7 +3133,7 @@ function App() {
   // the board never reflows or visibly jumps around the new person.
   function handleSurfaceDoubleClick(event: React.MouseEvent<HTMLDivElement>) {
     if (event.button !== 0) return
-    if (demoMode) return
+
     if (cameraRef.current.scale < ZONE_ONLY_SCALE) return
     const hit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
       x: event.clientX,
@@ -3379,29 +3378,7 @@ function App() {
     notifyOnboarding('create')
   }
 
-  /* Commented out to hide from menu, keeping in code for future use
-  function addDemoCluster() {
-    const source = selectedCircle ?? circlesById.get('you')
-    if (!source) return
 
-    const nextIndex = graph.people.length + 1
-    const points = [-58, 0, 58].map((offset, index) => {
-      const sides = Math.floor(Math.random() * 5) + 8
-      return {
-        id: `person-${Date.now()}-${index}`,
-        name: ['Alex', 'Daria', 'Sam'][index],
-        x: source.x + offset,
-        y: source.y + source.radius * 0.42 + index * 18,
-        circleId: source.id,
-        avatar: makeAvatar(nextIndex + index),
-        shapeType: 'wavy' as ShapeType,
-        sides,
-        amplitude: 1,
-      }
-    })
-    setGraph((current) => ensureContainment({ ...current, people: [...current.people, ...points] }))
-  }
-  */
 
 
 
@@ -3439,20 +3416,7 @@ function App() {
     }))
   }
 
-  function applyCircleShapeMode(nextMode: CircleShapeMode) {
-    setCircleShapeMode(nextMode)
-    if (nextMode !== 'figures') return
 
-    setGraph((current) => ({
-      ...current,
-      circles: current.circles.map((circle) => ({
-        ...circle,
-        shapeType: 'wavy',
-        sides: circle.sides ?? Math.max(8, Math.round(circle.radius / 10)),
-        amplitude: Math.max(4, circle.amplitude && circle.amplitude > 0 ? circle.amplitude : Math.round(circle.radius * 0.055)),
-      })),
-    }))
-  }
 
   function handleImageUpload(event: React.ChangeEvent<HTMLInputElement>, onComplete: (base64: string) => void) {
     const file = event.target.files?.[0]
@@ -3610,10 +3574,7 @@ Content-Type: application/json
   "notes": [{ "body": "Met at conference" }]
 }`
 
-  // Keep references to unused features so they remain in codebase for future use and satisfy TS/ESLint checks
-  if (false as boolean) {
-    console.log(setDemoMode, setShowCircleLabels, setShowPersonLabels, setCircleFillMode, setCenterBehavior, applyCircleShapeMode, CheckIcon, SubsetIcon)
-  }
+
 
   if (viewMode === 'landing') {
     return (
@@ -3628,7 +3589,7 @@ Content-Type: application/json
   }
 
   return (
-    <main className={`app-shell ${demoMode ? 'is-demo-mode' : ''} ${searchOpen ? 'is-search-open' : ''} ${showSettings ? 'is-settings-open' : ''} ${selectedItem ? 'is-inspector-open' : ''}`}>
+    <main className={`app-shell ${searchOpen ? 'is-search-open' : ''} ${showSettings ? 'is-settings-open' : ''} ${selectedItem ? 'is-inspector-open' : ''}`}>
       {graphLoadError && (
         <div style={{
           position: 'absolute',
@@ -3771,7 +3732,7 @@ Content-Type: application/json
             </div>
           )}
         </div>
-        <div className={`toolbar__group ${demoMode ? 'toolbar__group--demo' : ''}`}>
+        <div className="toolbar__group">
           <button
             ref={settingsButtonRef}
             type="button"
@@ -4123,7 +4084,7 @@ Content-Type: application/json
         </div>
       )}
 
-      {!demoMode && selectedItem && (
+      {selectedItem && (
       <aside key={`${selectedItem.type}:${selectedItem.id}`} className="inspector" aria-label="Selection details" style={{ overflow: 'visible', maxHeight: 'calc(100vh - 120px)' }}>
 
             {selectedItem.type !== 'connection' ? (
@@ -4409,11 +4370,7 @@ Content-Type: application/json
 
                 {/* Sticky Actions at Bottom */}
                 <div className="inspector-actions-section" style={{ borderTop: 'none', paddingTop: 0 }}>
-                  {/* Commented out Add 3 demo people to hide from menu, keeping in code for future use
-                  <button type="button" className="primary-action" onClick={addDemoCluster}>
-                    Add 3 demo people
-                  </button>
-                  */}
+
 
                   {selectedCircle.id !== 'you' && (
                     <button
@@ -5332,7 +5289,7 @@ Content-Type: application/json
         </div>
       )}
 
-      {graphLoaded && !demoMode && onboardingStep >= 0 && (
+      {graphLoaded && onboardingStep >= 0 && (
         <OnboardingCoach
           step={onboardingStep}
           celebrating={onboardingCelebrating}
@@ -6022,14 +5979,7 @@ function PersonIcon() {
   )
 }
 
-function SubsetIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="8" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  )
-}
+
 
 function CircleIcon() {
   return (
@@ -6062,26 +6012,7 @@ function SettingsIcon() {
   )
 }
 
-function CheckIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      style={{
-        width: '14px',
-        height: '14px',
-        fill: 'none',
-        stroke: 'currentColor',
-        strokeWidth: 3,
-        strokeLinecap: 'round',
-        strokeLinejoin: 'round',
-        marginRight: '6px',
-      }}
-    >
-      <path d="M20 6L9 17l-5-5" />
-    </svg>
-  )
-}
+
 
 function UploadIcon() {
   return (
