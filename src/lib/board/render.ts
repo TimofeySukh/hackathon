@@ -352,48 +352,24 @@ function drawGridDots(
 
   const hasRipples = ripples && ripples.length > 0 && animTime !== undefined
 
-  // 1. Draw minor dots
-  if (!hasRipples) {
-    const minorRadius = 1.0 / scale
+  // 1. Draw base minor dots (fast batched path)
+  const minorRadius = 1.0 / scale
 
-    // Draw fading minor dots (opacity = 0.09 * fadeOpacity)
-    if (fadeOpacity > 0.01) {
-      ctx.beginPath()
-      ctx.fillStyle = `rgba(61, 71, 78, ${0.09 * fadeOpacity})`
-      const spacingFade = 32 * Math.pow(2, L_fade)
-      const colMinF = Math.floor(rect.left / spacingFade)
-      const colMaxF = Math.ceil(rect.right / spacingFade)
-      const rowMinF = Math.floor(rect.top / spacingFade)
-      const rowMaxF = Math.ceil(rect.bottom / spacingFade)
-
-      for (let c = colMinF; c <= colMaxF; c++) {
-        for (let r = rowMinF; r <= rowMaxF; r++) {
-          if (c % 2 === 0 && r % 2 === 0) continue
-          const wx = c * spacingFade
-          const wy = r * spacingFade
-          const isMajor = Math.abs(Math.round(wx) % 160) < 0.01 && Math.abs(Math.round(wy) % 160) < 0.01
-          if (isMajor) continue
-
-          ctx.rect(wx - minorRadius, wy - minorRadius, minorRadius * 2, minorRadius * 2)
-        }
-      }
-      ctx.fill()
-    }
-
-    // Draw fully visible minor dots (opacity = 0.09)
+  // Draw fading minor dots (opacity = 0.09 * fadeOpacity)
+  if (fadeOpacity > 0.01) {
     ctx.beginPath()
-    ctx.fillStyle = `rgba(61, 71, 78, 0.09)`
-    const L_visible = L_start + 2
-    const spacingVis = 32 * Math.pow(2, L_visible)
-    const colMinV = Math.floor(rect.left / spacingVis)
-    const colMaxV = Math.ceil(rect.right / spacingVis)
-    const rowMinV = Math.floor(rect.top / spacingVis)
-    const rowMaxV = Math.ceil(rect.bottom / spacingVis)
+    ctx.fillStyle = `rgba(61, 71, 78, ${0.09 * fadeOpacity})`
+    const spacingFade = 32 * Math.pow(2, L_fade)
+    const colMinF = Math.floor(rect.left / spacingFade)
+    const colMaxF = Math.ceil(rect.right / spacingFade)
+    const rowMinF = Math.floor(rect.top / spacingFade)
+    const rowMaxF = Math.ceil(rect.bottom / spacingFade)
 
-    for (let c = colMinV; c <= colMaxV; c++) {
-      for (let r = rowMinV; r <= rowMaxV; r++) {
-        const wx = c * spacingVis
-        const wy = r * spacingVis
+    for (let c = colMinF; c <= colMaxF; c++) {
+      for (let r = rowMinF; r <= rowMaxF; r++) {
+        if (c % 2 === 0 && r % 2 === 0) continue
+        const wx = c * spacingFade
+        const wy = r * spacingFade
         const isMajor = Math.abs(Math.round(wx) % 160) < 0.01 && Math.abs(Math.round(wy) % 160) < 0.01
         if (isMajor) continue
 
@@ -401,15 +377,37 @@ function drawGridDots(
       }
     }
     ctx.fill()
-  } else {
-    // Ripples path: calculate per-dot ripple interaction
+  }
+
+  // Draw fully visible minor dots (opacity = 0.09)
+  ctx.beginPath()
+  ctx.fillStyle = `rgba(61, 71, 78, 0.09)`
+  const L_visible = L_start + 2
+  const spacingVis = 32 * Math.pow(2, L_visible)
+  const colMinV = Math.floor(rect.left / spacingVis)
+  const colMaxV = Math.ceil(rect.right / spacingVis)
+  const rowMinV = Math.floor(rect.top / spacingVis)
+  const rowMaxV = Math.ceil(rect.bottom / spacingVis)
+
+  for (let c = colMinV; c <= colMaxV; c++) {
+    for (let r = rowMinV; r <= rowMaxV; r++) {
+      const wx = c * spacingVis
+      const wy = r * spacingVis
+      const isMajor = Math.abs(Math.round(wx) % 160) < 0.01 && Math.abs(Math.round(wy) % 160) < 0.01
+      if (isMajor) continue
+
+      ctx.rect(wx - minorRadius, wy - minorRadius, minorRadius * 2, minorRadius * 2)
+    }
+  }
+  ctx.fill()
+
+  // 2. Draw lit minor dots overlay on top
+  if (hasRipples) {
     const spacingFade = 32 * Math.pow(2, L_fade)
     const colMinF = Math.floor(rect.left / spacingFade)
     const colMaxF = Math.ceil(rect.right / spacingFade)
     const rowMinF = Math.floor(rect.top / spacingFade)
     const rowMaxF = Math.ceil(rect.bottom / spacingFade)
-
-    const minorRadius = 1.0 / scale
 
     for (let c = colMinF; c <= colMaxF; c++) {
       for (let r = rowMinF; r <= rowMaxF; r++) {
@@ -427,21 +425,21 @@ function drawGridDots(
           const age = animTime - rip.startTime
           if (age < 0 || age > rip.duration) continue
 
-          let maxRadiusScreen = 120
-          let crestWidthScreen = 40
-          let peakIntensity = 0.3
+          let maxRadiusScreen = 150
+          let crestWidthScreen = 45
+          let peakIntensity = 0.6
           if (rip.type === 'click') {
-            maxRadiusScreen = 400
-            crestWidthScreen = 80
-            peakIntensity = 0.6
+            maxRadiusScreen = 450
+            crestWidthScreen = 90
+            peakIntensity = 0.85
           } else if (rip.type === 'splash') {
-            maxRadiusScreen = 600
-            crestWidthScreen = 120
-            peakIntensity = 0.8
+            maxRadiusScreen = 650
+            crestWidthScreen = 130
+            peakIntensity = 1.0
           } else if (rip.type === 'drag') {
-            maxRadiusScreen = 150
-            crestWidthScreen = 50
-            peakIntensity = 0.4
+            maxRadiusScreen = 180
+            crestWidthScreen = 55
+            peakIntensity = 0.7
           }
 
           const R_world = (maxRadiusScreen / scale) * (age / rip.duration)
@@ -452,17 +450,16 @@ function drawGridDots(
         }
 
         if (maxIntensity > 0.01) {
-          const litOpacity = baseOpacity + (0.5 - baseOpacity) * maxIntensity
+          const litRadius = (1.0 / scale) * (1.0 + 3.0 * maxIntensity)
+          const litOpacity = baseOpacity + (0.9 - baseOpacity) * maxIntensity
           ctx.fillStyle = `rgba(0, 98, 157, ${litOpacity})`
-        } else {
-          ctx.fillStyle = `rgba(61, 71, 78, ${baseOpacity})`
+          ctx.fillRect(wx - litRadius, wy - litRadius, litRadius * 2, litRadius * 2)
         }
-        ctx.fillRect(wx - minorRadius, wy - minorRadius, minorRadius * 2, minorRadius * 2)
       }
     }
   }
 
-  // 2. Draw major dots (spacing 160)
+  // 3. Draw major dots (spacing 160)
   const fadeMajorOpacity = Math.max(0, Math.min(1, (160 * scale - 12) / 8))
   if (fadeMajorOpacity > 0.01) {
     const majorRadius = 1.3 / scale
@@ -471,18 +468,20 @@ function drawGridDots(
     const rowMinM = Math.floor(rect.top / 160)
     const rowMaxM = Math.ceil(rect.bottom / 160)
 
-    if (!hasRipples) {
-      ctx.beginPath()
-      ctx.fillStyle = `rgba(61, 71, 78, ${0.18 * fadeMajorOpacity})`
-      for (let c = colMinM; c <= colMaxM; c++) {
-        for (let r = rowMinM; r <= rowMaxM; r++) {
-          const wx = c * 160
-          const wy = r * 160
-          ctx.rect(wx - majorRadius, wy - majorRadius, majorRadius * 2, majorRadius * 2)
-        }
+    // Base major dots
+    ctx.beginPath()
+    ctx.fillStyle = `rgba(61, 71, 78, ${0.18 * fadeMajorOpacity})`
+    for (let c = colMinM; c <= colMaxM; c++) {
+      for (let r = rowMinM; r <= rowMaxM; r++) {
+        const wx = c * 160
+        const wy = r * 160
+        ctx.rect(wx - majorRadius, wy - majorRadius, majorRadius * 2, majorRadius * 2)
       }
-      ctx.fill()
-    } else {
+    }
+    ctx.fill()
+
+    // Lit major dots overlay
+    if (hasRipples) {
       for (let c = colMinM; c <= colMaxM; c++) {
         for (let r = rowMinM; r <= rowMaxM; r++) {
           const wx = c * 160
@@ -493,21 +492,21 @@ function drawGridDots(
             const age = animTime - rip.startTime
             if (age < 0 || age > rip.duration) continue
 
-            let maxRadiusScreen = 120
-            let crestWidthScreen = 40
-            let peakIntensity = 0.3
+            let maxRadiusScreen = 150
+            let crestWidthScreen = 45
+            let peakIntensity = 0.6
             if (rip.type === 'click') {
-              maxRadiusScreen = 400
-              crestWidthScreen = 80
-              peakIntensity = 0.6
+              maxRadiusScreen = 450
+              crestWidthScreen = 90
+              peakIntensity = 0.85
             } else if (rip.type === 'splash') {
-              maxRadiusScreen = 600
-              crestWidthScreen = 120
-              peakIntensity = 0.8
+              maxRadiusScreen = 650
+              crestWidthScreen = 130
+              peakIntensity = 1.0
             } else if (rip.type === 'drag') {
-              maxRadiusScreen = 150
-              crestWidthScreen = 50
-              peakIntensity = 0.4
+              maxRadiusScreen = 180
+              crestWidthScreen = 55
+              peakIntensity = 0.7
             }
 
             const R_world = (maxRadiusScreen / scale) * (age / rip.duration)
@@ -517,14 +516,13 @@ function drawGridDots(
             if (intensity > maxIntensity) maxIntensity = intensity
           }
 
-          const baseOpacity = 0.18 * fadeMajorOpacity
           if (maxIntensity > 0.01) {
-            const litOpacity = baseOpacity + (0.6 - baseOpacity) * maxIntensity
+            const baseOpacity = 0.18 * fadeMajorOpacity
+            const litRadius = (1.3 / scale) * (1.0 + 2.5 * maxIntensity)
+            const litOpacity = baseOpacity + (0.95 - baseOpacity) * maxIntensity
             ctx.fillStyle = `rgba(0, 98, 157, ${litOpacity})`
-          } else {
-            ctx.fillStyle = `rgba(61, 71, 78, ${baseOpacity})`
+            ctx.fillRect(wx - litRadius, wy - litRadius, litRadius * 2, litRadius * 2)
           }
-          ctx.fillRect(wx - majorRadius, wy - majorRadius, majorRadius * 2, majorRadius * 2)
         }
       }
     }

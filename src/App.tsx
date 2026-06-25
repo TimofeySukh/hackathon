@@ -2617,13 +2617,13 @@ function App() {
       (resizeCircleRef.current && resizeCircleRef.current.pointerId === event.pointerId)
     )
 
-    // Trigger grid move ripple
+    // Trigger grid move ripple using screen-space distance to keep interaction size-invariant
     if (!isDragging) {
       const worldPos = screenToWorld({ x: event.clientX, y: event.clientY })
       const now = getPerformanceNow()
-      const dist = Math.hypot(worldPos.x - lastMoveRippleRef.current.x, worldPos.y - lastMoveRippleRef.current.y)
+      const distScreen = Math.hypot(worldPos.x - lastMoveRippleRef.current.x, worldPos.y - lastMoveRippleRef.current.y) * camera.scale
       const timeDiff = now - lastMoveRippleRef.current.time
-      if (dist > 30 || timeDiff > 100) {
+      if (distScreen > 20 || (distScreen > 2 && timeDiff > 80)) {
         addGridRipple(worldPos.x, worldPos.y, 'move')
         lastMoveRippleRef.current = { x: worldPos.x, y: worldPos.y, time: now }
       }
@@ -2736,9 +2736,9 @@ function App() {
       const updated = boardIndexRef.current.circlesById.get(moving.circleId)
       if (updated) {
         const dragNow = getPerformanceNow()
-        const dragDist = Math.hypot(updated.x - lastMoveRippleRef.current.x, updated.y - lastMoveRippleRef.current.y)
+        const dragDistScreen = Math.hypot(updated.x - lastMoveRippleRef.current.x, updated.y - lastMoveRippleRef.current.y) * camera.scale
         const dragTimeDiff = dragNow - lastMoveRippleRef.current.time
-        if (dragDist > 15 || dragTimeDiff > 50) {
+        if (dragDistScreen > 15 || (dragDistScreen > 2 && dragTimeDiff > 50)) {
           addGridRipple(updated.x, updated.y, 'drag')
           lastMoveRippleRef.current = { x: updated.x, y: updated.y, time: dragNow }
         }
@@ -2767,9 +2767,9 @@ function App() {
       const updated = boardIndexRef.current.peopleById.get(movingPerson.personId)
       if (updated) {
         const dragNow = getPerformanceNow()
-        const dragDist = Math.hypot(updated.x - lastMoveRippleRef.current.x, updated.y - lastMoveRippleRef.current.y)
+        const dragDistScreen = Math.hypot(updated.x - lastMoveRippleRef.current.x, updated.y - lastMoveRippleRef.current.y) * camera.scale
         const dragTimeDiff = dragNow - lastMoveRippleRef.current.time
-        if (dragDist > 15 || dragTimeDiff > 50) {
+        if (dragDistScreen > 15 || (dragDistScreen > 2 && dragTimeDiff > 50)) {
           addGridRipple(updated.x, updated.y, 'drag')
           lastMoveRippleRef.current = { x: updated.x, y: updated.y, time: dragNow }
         }
@@ -2791,9 +2791,9 @@ function App() {
       const updated = boardIndexRef.current.circlesById.get(resizing.circleId)
       if (updated) {
         const dragNow = getPerformanceNow()
-        const dragDist = Math.hypot(updated.x - lastMoveRippleRef.current.x, updated.y - lastMoveRippleRef.current.y)
+        const dragDistScreen = Math.hypot(updated.x - lastMoveRippleRef.current.x, updated.y - lastMoveRippleRef.current.y) * camera.scale
         const dragTimeDiff = dragNow - lastMoveRippleRef.current.time
-        if (dragDist > 15 || dragTimeDiff > 50) {
+        if (dragDistScreen > 15 || (dragDistScreen > 2 && dragTimeDiff > 50)) {
           addGridRipple(updated.x, updated.y, 'drag')
           lastMoveRippleRef.current = { x: updated.x, y: updated.y, time: dragNow }
         }
@@ -4072,9 +4072,9 @@ Content-Type: application/json
                 <span>Grid Ripple Effects</span>
                 <input
                   type="checkbox"
+                  className="m3-switch"
                   checked={enableRipples}
                   onChange={(e) => handleToggleRipples(e.target.checked)}
-                  style={{ width: '16px', height: '16px', cursor: 'pointer' }}
                 />
               </div>
             </div>
