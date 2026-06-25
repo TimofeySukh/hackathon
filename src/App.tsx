@@ -928,21 +928,22 @@ function App() {
 
   const gridRipplesRef = useRef<GridRipple[]>([])
   const lastMoveRippleRef = useRef<{ x: number; y: number; time: number }>({ x: 0, y: 0, time: 0 })
+  const lastStyleRippleRef = useRef<Record<string, number>>({})
 
-  function addGridRipple(x: number, y: number, type: 'move' | 'click' | 'splash' | 'drag') {
+  function addGridRipple(x: number, y: number, type: 'move' | 'click' | 'splash' | 'drag', sourceRadius?: number) {
     if (!enableRipples || prefersReducedMotion()) return
     const now = getPerformanceNow()
     let duration = 400
-    let maxRadius = 120
+    let maxRadius = 150
     if (type === 'click') {
       duration = 800
-      maxRadius = 400
+      maxRadius = 450
     } else if (type === 'splash') {
       duration = 1200
-      maxRadius = 600
+      maxRadius = 650
     } else if (type === 'drag') {
       duration = 500
-      maxRadius = 150
+      maxRadius = 180
     }
     const ripple: GridRipple = {
       x,
@@ -951,6 +952,7 @@ function App() {
       duration,
       maxRadius,
       type,
+      sourceRadius,
     }
     gridRipplesRef.current.push(ripple)
     if (boardAnimRafRef.current == null) {
@@ -2739,7 +2741,7 @@ function App() {
         const dragDistScreen = Math.hypot(updated.x - lastMoveRippleRef.current.x, updated.y - lastMoveRippleRef.current.y) * camera.scale
         const dragTimeDiff = dragNow - lastMoveRippleRef.current.time
         if (dragDistScreen > 15 || (dragDistScreen > 2 && dragTimeDiff > 50)) {
-          addGridRipple(updated.x, updated.y, 'drag')
+          addGridRipple(updated.x, updated.y, 'drag', updated.radius)
           lastMoveRippleRef.current = { x: updated.x, y: updated.y, time: dragNow }
         }
       }
@@ -2770,7 +2772,7 @@ function App() {
         const dragDistScreen = Math.hypot(updated.x - lastMoveRippleRef.current.x, updated.y - lastMoveRippleRef.current.y) * camera.scale
         const dragTimeDiff = dragNow - lastMoveRippleRef.current.time
         if (dragDistScreen > 15 || (dragDistScreen > 2 && dragTimeDiff > 50)) {
-          addGridRipple(updated.x, updated.y, 'drag')
+          addGridRipple(updated.x, updated.y, 'drag', 20)
           lastMoveRippleRef.current = { x: updated.x, y: updated.y, time: dragNow }
         }
       }
@@ -2794,7 +2796,7 @@ function App() {
         const dragDistScreen = Math.hypot(updated.x - lastMoveRippleRef.current.x, updated.y - lastMoveRippleRef.current.y) * camera.scale
         const dragTimeDiff = dragNow - lastMoveRippleRef.current.time
         if (dragDistScreen > 15 || (dragDistScreen > 2 && dragTimeDiff > 50)) {
-          addGridRipple(updated.x, updated.y, 'drag')
+          addGridRipple(updated.x, updated.y, 'drag', updated.radius)
           lastMoveRippleRef.current = { x: updated.x, y: updated.y, time: dragNow }
         }
       }
@@ -3492,7 +3494,7 @@ function App() {
       }
       return nextGraph
     })
-    addGridRipple(createMenu.x, createMenu.y, 'splash')
+    addGridRipple(createMenu.x, createMenu.y, 'splash', isNested ? 82 : 190)
     selectItem({ type: 'circle', id })
     setCreateMenu(null)
     notifyOnboarding('create')
@@ -3519,6 +3521,27 @@ function App() {
   }
 
   function updateCircleStyle(id: string, updates: Partial<CircleNode>) {
+    const circle = boardIndexRef.current.circlesById.get(id)
+    if (circle) {
+      const hasVisualChange = (
+        'shapeType' in updates ||
+        'sides' in updates ||
+        'amplitude' in updates ||
+        'fillMode' in updates ||
+        'tone' in updates ||
+        'customColor' in updates ||
+        'imageUrl' in updates
+      )
+      if (hasVisualChange) {
+        const now = getPerformanceNow()
+        const lastTime = lastStyleRippleRef.current[id] || 0
+        if (now - lastTime > 150) {
+          addGridRipple(circle.x, circle.y, 'click', circle.radius)
+          lastStyleRippleRef.current[id] = now
+        }
+      }
+    }
+
     setGraph((current) => ({
       ...current,
       circles: current.circles.map((circle) =>

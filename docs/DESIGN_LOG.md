@@ -735,3 +735,13 @@ rediscover, write it here.
 - Why: The popup banner was intrusive, cluttered mobile viewports, and clashed/overlapped with logo and onboarding controls. The badge is much quieter, spec-compliant, and cleanly guides users to their settings.
 - Decision: Replaced fixed top/bottom classes for the mobile onboarding coach with a dynamic JS offset measurement. A MutationObserver and window listeners monitor the height of the bottom inspector and the circle style popover, setting an inline `bottom` offset so the coach card dynamically glides up and down, floating exactly 12px above whichever bottom sheet is active.
 - Why: Pushing the onboarding coach to the top of the screen on mobile avoided the bottom notes but ended up covering the search dropdown and other top-level elements. Pushing it up just enough to float above bottom sheets keeps the top area completely clear.
+
+### 2026-06-25 — Enhanced Grid Ripple Visibility & Settings Toggle Switch
+
+- Decision: Optimised background grid dot ripple rendering by separating the base grid drawing path (fast batched path) from the interactive overlay pass. Lit dots now grow dynamically in radius (up to 4x their base size) and increase their opacity (up to 0.9/0.95 of a vibrant primary blue tone) as a wave crest passes.
+- Why: Faint ripples were previously invisible to the human eye due to low opacities and lack of size scaling, especially at different zoom levels. Dynamic sizing and higher opacity make ripples look like clear, fluid water droplets/pulses.
+- Decision: Converted pointer-move and drag distance calculations to screen-space coordinates by multiplying world-space distances by the camera scale. Added a sub-pixel jitter filter (`distScreen > 2` pixels) to only spawn ripples on actual pointer move.
+- Why: Using raw world distance meant that ripple trails were dense at far zoom-out levels but extremely sparse/hard to trigger at close zoom-in levels. Screen-space distance keeps gesture ripple trails size-invariant across all camera scale factors.
+- Decision: Replaced the standard checkbox toggle for ripples in the settings panel with the Material 3 Switch (`.m3-switch` class).
+- Why: The native checkbox looked cheap and cluttered the display panel. The M3 Switch is cleaner, fits the design system tokens, and matches other custom inputs.
+

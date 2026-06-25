@@ -180,4 +180,5 @@ export type GridRipple = {
   duration: number
   maxRadius: number
   type: 'move' | 'click' | 'splash' | 'drag'
+  sourceRadius?: number
 }

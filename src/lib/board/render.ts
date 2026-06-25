@@ -355,11 +355,11 @@ function drawGridDots(
   // 1. Draw base minor dots (fast batched path)
   const minorRadius = 1.0 / scale
 
-  // Draw fading minor dots (opacity = 0.09 * fadeOpacity)
+  // Draw fading minor dots (opacity = 0.04 * fadeOpacity)
   if (fadeOpacity > 0.01) {
     ctx.beginPath()
-    ctx.fillStyle = `rgba(61, 71, 78, ${0.09 * fadeOpacity})`
-    const spacingFade = 32 * Math.pow(2, L_fade)
+    ctx.fillStyle = `rgba(61, 71, 78, ${0.04 * fadeOpacity})`
+    const spacingFade = 20 * Math.pow(2, L_fade)
     const colMinF = Math.floor(rect.left / spacingFade)
     const colMaxF = Math.ceil(rect.right / spacingFade)
     const rowMinF = Math.floor(rect.top / spacingFade)
@@ -370,20 +370,19 @@ function drawGridDots(
         if (c % 2 === 0 && r % 2 === 0) continue
         const wx = c * spacingFade
         const wy = r * spacingFade
-        const isMajor = Math.abs(Math.round(wx) % 160) < 0.01 && Math.abs(Math.round(wy) % 160) < 0.01
-        if (isMajor) continue
 
-        ctx.rect(wx - minorRadius, wy - minorRadius, minorRadius * 2, minorRadius * 2)
+        ctx.moveTo(wx + minorRadius, wy)
+        ctx.arc(wx, wy, minorRadius, 0, Math.PI * 2)
       }
     }
     ctx.fill()
   }
 
-  // Draw fully visible minor dots (opacity = 0.09)
+  // Draw fully visible minor dots (opacity = 0.04)
   ctx.beginPath()
-  ctx.fillStyle = `rgba(61, 71, 78, 0.09)`
+  ctx.fillStyle = `rgba(61, 71, 78, 0.04)`
   const L_visible = L_start + 2
-  const spacingVis = 32 * Math.pow(2, L_visible)
+  const spacingVis = 20 * Math.pow(2, L_visible)
   const colMinV = Math.floor(rect.left / spacingVis)
   const colMaxV = Math.ceil(rect.right / spacingVis)
   const rowMinV = Math.floor(rect.top / spacingVis)
@@ -393,17 +392,16 @@ function drawGridDots(
     for (let r = rowMinV; r <= rowMaxV; r++) {
       const wx = c * spacingVis
       const wy = r * spacingVis
-      const isMajor = Math.abs(Math.round(wx) % 160) < 0.01 && Math.abs(Math.round(wy) % 160) < 0.01
-      if (isMajor) continue
 
-      ctx.rect(wx - minorRadius, wy - minorRadius, minorRadius * 2, minorRadius * 2)
+      ctx.moveTo(wx + minorRadius, wy)
+      ctx.arc(wx, wy, minorRadius, 0, Math.PI * 2)
     }
   }
   ctx.fill()
 
   // 2. Draw lit minor dots overlay on top
   if (hasRipples) {
-    const spacingFade = 32 * Math.pow(2, L_fade)
+    const spacingFade = 20 * Math.pow(2, L_fade)
     const colMinF = Math.floor(rect.left / spacingFade)
     const colMaxF = Math.ceil(rect.right / spacingFade)
     const rowMinF = Math.floor(rect.top / spacingFade)
@@ -413,11 +411,9 @@ function drawGridDots(
       for (let r = rowMinF; r <= rowMaxF; r++) {
         const wx = c * spacingFade
         const wy = r * spacingFade
-        const isMajor = Math.abs(Math.round(wx) % 160) < 0.01 && Math.abs(Math.round(wy) % 160) < 0.01
-        if (isMajor) continue
 
         const isFading = c % 2 !== 0 || r % 2 !== 0
-        const baseOpacity = isFading ? 0.09 * fadeOpacity : 0.09
+        const baseOpacity = isFading ? 0.04 * fadeOpacity : 0.04
         if (baseOpacity < 0.005) continue
 
         let maxIntensity = 0
@@ -444,16 +440,19 @@ function drawGridDots(
 
           const R_world = (maxRadiusScreen / scale) * (age / rip.duration)
           const W_world = crestWidthScreen / scale
-          const d = Math.hypot(wx - rip.x, wy - rip.y)
+          const distToCenter = Math.hypot(wx - rip.x, wy - rip.y)
+          const d = rip.sourceRadius ? Math.abs(distToCenter - rip.sourceRadius) : distToCenter
           const intensity = Math.exp(-Math.pow((d - R_world) / W_world, 2)) * (1 - age / rip.duration) * peakIntensity
           if (intensity > maxIntensity) maxIntensity = intensity
         }
 
         if (maxIntensity > 0.01) {
-          const litRadius = (1.0 / scale) * (1.0 + 3.0 * maxIntensity)
-          const litOpacity = baseOpacity + (0.9 - baseOpacity) * maxIntensity
+          const litRadius = (1.0 / scale) * (1.0 + 2.0 * maxIntensity)
+          const litOpacity = baseOpacity + (0.7 - baseOpacity) * maxIntensity
+          ctx.beginPath()
           ctx.fillStyle = `rgba(0, 98, 157, ${litOpacity})`
-          ctx.fillRect(wx - litRadius, wy - litRadius, litRadius * 2, litRadius * 2)
+          ctx.arc(wx, wy, litRadius, 0, Math.PI * 2)
+          ctx.fill()
         }
       }
     }
@@ -470,12 +469,13 @@ function drawGridDots(
 
     // Base major dots
     ctx.beginPath()
-    ctx.fillStyle = `rgba(61, 71, 78, ${0.18 * fadeMajorOpacity})`
+    ctx.fillStyle = `rgba(61, 71, 78, ${0.09 * fadeMajorOpacity})`
     for (let c = colMinM; c <= colMaxM; c++) {
       for (let r = rowMinM; r <= rowMaxM; r++) {
         const wx = c * 160
         const wy = r * 160
-        ctx.rect(wx - majorRadius, wy - majorRadius, majorRadius * 2, majorRadius * 2)
+        ctx.moveTo(wx + majorRadius, wy)
+        ctx.arc(wx, wy, majorRadius, 0, Math.PI * 2)
       }
     }
     ctx.fill()
@@ -511,17 +511,20 @@ function drawGridDots(
 
             const R_world = (maxRadiusScreen / scale) * (age / rip.duration)
             const W_world = crestWidthScreen / scale
-            const d = Math.hypot(wx - rip.x, wy - rip.y)
+            const distToCenter = Math.hypot(wx - rip.x, wy - rip.y)
+            const d = rip.sourceRadius ? Math.abs(distToCenter - rip.sourceRadius) : distToCenter
             const intensity = Math.exp(-Math.pow((d - R_world) / W_world, 2)) * (1 - age / rip.duration) * peakIntensity
             if (intensity > maxIntensity) maxIntensity = intensity
           }
 
           if (maxIntensity > 0.01) {
-            const baseOpacity = 0.18 * fadeMajorOpacity
-            const litRadius = (1.3 / scale) * (1.0 + 2.5 * maxIntensity)
-            const litOpacity = baseOpacity + (0.95 - baseOpacity) * maxIntensity
+            const baseOpacity = 0.09 * fadeMajorOpacity
+            const litRadius = (1.3 / scale) * (1.0 + 1.8 * maxIntensity)
+            const litOpacity = baseOpacity + (0.75 - baseOpacity) * maxIntensity
+            ctx.beginPath()
             ctx.fillStyle = `rgba(0, 98, 157, ${litOpacity})`
-            ctx.fillRect(wx - litRadius, wy - litRadius, litRadius * 2, litRadius * 2)
+            ctx.arc(wx, wy, litRadius, 0, Math.PI * 2)
+            ctx.fill()
           }
         }
       }
