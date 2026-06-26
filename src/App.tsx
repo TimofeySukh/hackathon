@@ -474,22 +474,20 @@ function markOnboardingSeen() {
 
 function App() {
   const [viewMode, setViewMode] = useState<'landing' | 'board' | 'docs'>(() => {
-    // Show landing/docs page if explicitly requested in the URL hash
-    if (window.location.hash === '#landing') return 'landing';
+    if (window.location.hash === '#board') return 'board';
     if (window.location.hash === '#docs') return 'docs';
-    return 'board';
+    return 'landing';
   });
-
 
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash;
-      if (hash === '#landing') {
-        setViewMode('landing');
+      if (hash === '#board') {
+        setViewMode('board');
       } else if (hash === '#docs') {
         setViewMode('docs');
       } else {
-        setViewMode('board');
+        setViewMode('landing');
       }
     };
     window.addEventListener('hashchange', handleHashChange);
