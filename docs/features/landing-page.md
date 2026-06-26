@@ -2,39 +2,31 @@
 
 ## Purpose
 
-The landing page must communicate one product idea: Social Datanode turns messy
-relationship information into an organized visual board.
+The landing page should be a polished product landing page for Social Datanode.
+It should use the user's sketch as the source of truth for the main layout and
+turn that sketch into a clean, finished screen.
 
-It is not a generic startup marketing page. It should not lead with API, CLI, or
-MCP material. It should show that contacts, companies, notes, follow-ups, and
-connections can be sorted into a readable board.
+Do not invent a different concept. Do not replace the sketch with a generic SaaS
+layout. Do not add unrelated API, CLI, or MCP marketing sections to the main
+landing page.
 
-## Core Message
+## Reference Direction
 
-The first screen should make this clear:
+Use Linear's landing/header as a reference for obvious product-page structure:
 
-- relationship data starts as chaos
-- people can be sorted into zones
-- each person keeps their context: zone, photo, notes, and connections
-- opening the board starts from a clean workspace
+- a clean top navigation
+- logo and product name
+- central navigation links
+- auth/actions on the right
+- balanced spacing and careful proportions
+- polished product-page typography
 
-Keep the copy short. Avoid long explanatory paragraphs in the hero.
+This does not mean making a dark page or copying colors blindly. The structure
+and proportions matter more than decorative styling.
 
 ## Header
 
-The header should copy the structure of Linear's header instead of loosely
-imitating it.
-
-Required structure:
-
-- light page background
-- narrow navigation bar near the top
-- logo and product name on the left
-- navigation links in the center
-- authentication/actions on the right
-- visually compact proportions
-
-Required links/actions:
+Required header items:
 
 - `Product`
 - `Docs`
@@ -42,115 +34,123 @@ Required links/actions:
 - `Log in`
 - `Sign up`
 
-`Log in` and `Sign up` must open the same authentication dialogs used by the
-main board. After the auth flow, the user should be in the main product.
+Header requirements:
 
-`Contact` can be inert for now.
+- It should feel like a normal polished landing-page header.
+- It should follow the clear structure of the Linear reference.
+- It should not become a huge black banner.
+- It should not dominate the first screen.
+- `Contact` can be inert for now.
 
-Do not make the whole landing visually black. If the Linear reference uses a
-dark header, only copy the compact header structure and proportions, not a large
-black banner.
+Auth behavior:
+
+- `Log in` and `Sign up` should use the same auth menu/dialog system as the
+  board.
+- The landing page should not simply dump the user onto the board with an auth
+  modal as a visual surprise.
+- The auth flow should feel intentional from the landing header and then move
+  the user into the main product when appropriate.
 
 ## First Viewport
 
-The first viewport should follow the provided sketch closely.
+The first viewport should repeat the sketch, but polished.
 
-Required composition:
+Required elements:
 
 1. Header at the top.
-2. Three primary slogans above the separator.
-3. A stepped separator as the central visual motif.
-4. One blue-ish note below the separator.
-5. The blue note acts as the main CTA and opens the board.
+2. Three main slogans near the top of the hero.
+3. A stepped divider/shape under the slogans.
+4. A single blue-ish note/CTA under the stepped divider.
+5. The note opens the board.
 
-The three slogans are not three large SaaS cards. They should read as part of
-the hero composition around the stepped separator.
+The three slogans should not become three oversized generic feature cards. They
+are part of the hero composition from the sketch.
 
-The blue CTA note should look clickable. It should not be buried among many
-other cards.
+The stepped divider should be a central design element. It should look clean and
+intentional, but it should still clearly come from the sketch.
 
-## Hero Copy Direction
+The blue note should feel clickable. It is the first-screen CTA.
 
-The exact text can change, but it should stay close to these meanings:
+## Copy
 
-- sort the chaos of contacts and relationships
-- put people into clear zones
-- open the board and act on the context
+Do not invent extra product claims beyond the user's provided direction.
 
-Avoid API language, tool jargon, and long product explanations in the hero.
+The copy should stay short and should support the visual idea in the sketch.
+Avoid long paragraphs in the hero.
 
-## Stepped Separator
+The landing can communicate that Social Datanode helps organize relationship
+information on a visual board, but it should not over-explain the product or add
+new promises that were not requested.
 
-The stepped separator is a required visual element.
+## Interactive Section
 
-It should:
+The interactive section should transfer the concrete inspector-style UI shown in
+the reference, not a loose approximation.
 
-- divide the upper slogans from the lower CTA note
-- feel connected to the board/relationship-map visual language
-- preserve the stepped shape from the sketch
-- stay visually central on the first screen
-
-Do not turn it into unrelated decorative stairs with random marketing cards
-placed on top.
-
-## Interactive Product Demo
-
-The interactive section should be a concrete person inspector demo, not an
-abstract marketing preview.
-
-Required fields and actions:
+Required content:
 
 - editable person name
 - zone selector
 - three zones: `Anthropic`, `Google`, `OpenAI`
-- photo upload/preview
+- photo/avatar control
 - notes
 - connections
 
-The demo must be local-only. It should not save to Supabase, localStorage, or
+The interaction is a demo only. It must not save to Supabase, localStorage, or
 the real board graph.
 
-The demo should visually match the real board inspector enough that users
-understand this is the product interaction model.
+The UI should resemble the real board inspector/menu style closely enough that
+it feels like the product, not a separate marketing illustration.
 
 ## Docs
 
-The main landing page should not contain the large technical documentation.
+`Docs` should lead to existing documentation, not invented content.
 
-The header should include a `Docs` button. That destination is where existing
-technical docs belong, including API, CLI, MCP, setup, and operational material.
+The docs destination should expose the documentation/access material that
+already exists in the product/project. The provided reference shows a docs/access
+layout with:
 
-Do not invent new API/CLI/MCP marketing cards for the landing page. Move or
-surface the real documentation there instead.
+- sidebar navigation
+- `Agent access`
+- `Quick setup`
+- `MCP`
+- `CLI`
+- `API`
+- `Keys`
+- a `Full Wiki & Docs` link
+- setup panels and copyable instructions
+
+Do not create fake docs cards such as made-up API/CLI/MCP marketing summaries.
+Use the real existing documentation/content and organize it in a polished docs
+view.
 
 ## Contact
 
-`Contact` does not need a finished page yet. It can be a placeholder or inert
-button until the contact flow is defined.
+`Contact` does not need a finished flow yet. It may be inert or a placeholder
+until the contact experience is defined.
 
-## CTA Buttons
+## CTA Style
 
-Primary CTA buttons should use the same general structure:
+Primary CTAs should share one clear button structure:
 
-- blue filled button
-- pill shape where appropriate
+- blue filled button or blue clickable note when used in the hero
 - simple label
+- polished spacing
 - no extra decorative wrapper
 
-The blue hero note is the main first-screen CTA. Other CTA buttons should feel
-related to it, not like unrelated components.
+Buttons should feel consistent across the landing page.
 
 ## What Not To Do
 
-- Do not make a dark landing page.
-- Do not create a large black header/banner.
-- Do not replace the sketch with a generic SaaS card layout.
-- Do not put API, CLI, or MCP content on the main hero.
-- Do not invent placeholder technical documentation.
-- Do not make the first three slogans into oversized independent cards.
-- Do not make a similar-looking block when the instruction is to transfer a
-  specific element.
-- Do not save interactive demo edits to real product data.
+- Do not make the page dark.
+- Do not create a large black header.
+- Do not replace the sketch with a generic SaaS feature-card layout.
+- Do not invent docs content.
+- Do not put fake API/CLI/MCP summaries on the main landing page.
+- Do not turn the three hero slogans into unrelated oversized cards.
+- Do not make a similar-looking element when the instruction is to copy or
+  transfer a specific element.
+- Do not save demo inspector edits to real product data.
 
 ## Code
 
