@@ -12,7 +12,7 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
   // Interactive Inspector Simulator local state
   const [demoName, setDemoName] = useState('New person 1')
   const [demoZone, setDemoZone] = useState<'Anthropic' | 'Google' | 'OpenAI' | null>(null)
-  const [demoAvatar, setDemoAvatar] = useState<'initials' | 'timofey' | 'velizar'>('initials')
+  const [demoAvatar, setDemoAvatar] = useState<string | null>(null)
   const [demoNotes, setDemoNotes] = useState<string[]>([])
   const [newNoteText, setNewNoteText] = useState('')
   const [demoConnections, setDemoConnections] = useState<Array<{ id: string; label: string; url: string; service: 'linkedin' | 'telegram' | 'website' }>>([])
@@ -47,14 +47,14 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
     setIsAddingDemoNote(false)
   }
 
-  const handleCycleDemoAvatar = () => {
-    if (demoAvatar === 'initials') {
-      setDemoAvatar('timofey')
-    } else if (demoAvatar === 'timofey') {
-      setDemoAvatar('velizar')
-    } else {
-      setDemoAvatar('initials')
+  const handleDemoAvatarUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setDemoAvatar(reader.result as string)
     }
+    reader.readAsDataURL(file)
   }
 
   const handleAddDemoConnection = (e: FormEvent) => {
@@ -331,24 +331,26 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
                   )}
                 </div>
 
-                {/* Avatar Picker / Cycle */}
-                <button
-                  type="button"
+                {/* Avatar Picker */}
+                <label
                   className="demo-avatar-btn"
-                  onClick={handleCycleDemoAvatar}
-                  title="Click to cycle avatar image"
+                  title="Upload avatar image from computer"
                 >
-                  {demoAvatar === 'timofey' ? (
-                    <img src="/timofey_avatar.jpeg" alt="Avatar" />
-                  ) : demoAvatar === 'velizar' ? (
-                    <img src="/velizar_avatar.jpeg" alt="Avatar" />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={handleDemoAvatarUpload}
+                  />
+                  {demoAvatar ? (
+                    <img src={demoAvatar} alt="Avatar" />
                   ) : (
                     <svg viewBox="0 0 24 24" className="demo-avatar-icon">
                       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                       <circle cx="12" cy="7" r="4" />
                     </svg>
                   )}
-                </button>
+                </label>
               </div>
 
               {/* Notes Box */}
