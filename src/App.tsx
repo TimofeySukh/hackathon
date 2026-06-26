@@ -14,6 +14,7 @@ import sdnLogo from './assets/sdn-logo.svg'
 
 zip.configure({ useWebWorkers: false })
 import { useAuth } from './lib/useAuth'
+import LandingPage from './LandingPage'
 import { loadGraphRecord, saveGraph, loadLocalGraph, saveLocalGraph } from './lib/graphPersistence'
 import { enrichLinkedInProfile } from './lib/linkedinEnrichment'
 import { OnboardingCoach } from './Onboarding'
@@ -466,6 +467,7 @@ function markOnboardingSeen() {
 }
 
 function App() {
+  const [showLanding, setShowLanding] = useState(() => window.location.hash !== '#board')
   const surfaceRef = useRef<HTMLDivElement | null>(null)
   // Canvas 2D board renderer: circles, edges, people, labels, and interaction chrome.
   const peopleCanvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -488,6 +490,15 @@ function App() {
   // The real graph replaces this once loaded; keeping demo data here caused it to
   // flash for a few frames on some reloads before the loaded graph took over.
   const [graph, setGraph] = useState(createFreshGraph)
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      setShowLanding(window.location.hash !== '#board')
+    }
+
+    window.addEventListener('hashchange', handleHashChange)
+    return () => window.removeEventListener('hashchange', handleHashChange)
+  }, [])
   // True once the current drag/resize gesture has recorded its undo snapshot.
   // Only touched from pointer event handlers, never during render.
   const gestureSnapshotTakenRef = useRef(false)
@@ -3273,6 +3284,14 @@ function App() {
   // Keep references to unused features so they remain in codebase for future use and satisfy TS/ESLint checks
   if (false as boolean) {
     console.log(setDemoMode, setShowCircleLabels, setShowPersonLabels, setCircleFillMode, setCenterBehavior, applyCircleShapeMode, CheckIcon, SubsetIcon)
+  }
+
+  if (showLanding) {
+    return (
+      <div className="app-shell">
+        <LandingPage />
+      </div>
+    )
   }
 
   return (

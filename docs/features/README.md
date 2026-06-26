@@ -24,3 +24,4 @@ design without reverse-engineering `src/App.tsx`.
 - [Board search](board-search.md) — find a person (name/role) or circle (tag) from the toolbar and fly the camera to it.
 - [Authentication](auth.md) — local editing, Google sign-in, email/password registration, confirmation resend, and password reset.
 - [Import load testing](import-load-testing.md) — isolated database load checks and browser responsiveness verification for large LinkedIn imports.
+- [Landing page](landing-page.md) — first viewport with a diagonal staircase layout and Trello-style notes.
