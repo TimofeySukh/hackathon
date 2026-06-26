@@ -106,16 +106,16 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
         <section className="landing-section hero-section">
           {/* Stepped background ribbon using double stroke technique for perfect border & thickness */}
           <div className="hero-stepped-path-container" aria-hidden="true">
-            <svg width="100%" height="100%" viewBox="0 0 1100 650" fill="none" preserveAspectRatio="none">
+            <svg width="100%" height="100%" viewBox="0 0 1100 650" fill="none" preserveAspectRatio="none" style={{ overflow: 'visible' }}>
               <path
-                d="M -50,140 L 180,140 C 250,140 250,260 320,260 L 380,260 C 450,260 430,420 500,420 L 580,420 C 660,420 660,540 740,540 L 1150,540"
+                d="M 80,-10 L 80,60 C 80,140 130,140 180,140 C 250,140 250,260 320,260 L 380,260 C 450,260 430,420 500,420 L 580,420 C 660,420 660,540 740,540 C 780,540 820,580 820,620 L 820,660"
                 stroke="#00629d"
                 strokeWidth="60"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
               <path
-                d="M -50,140 L 180,140 C 250,140 250,260 320,260 L 380,260 C 450,260 430,420 500,420 L 580,420 C 660,420 660,540 740,540 L 1150,540"
+                d="M 80,-10 L 80,60 C 80,140 130,140 180,140 C 250,140 250,260 320,260 L 380,260 C 450,260 430,420 500,420 L 580,420 C 660,420 660,540 740,540 C 780,540 820,580 820,620 L 820,660"
                 stroke="#d2e4ff"
                 strokeWidth="48"
                 strokeLinecap="round"
@@ -131,16 +131,13 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
             <div className="hero-slogan-card">Keep people, notes, and context in one visual workspace</div>
           </div>
 
-          {/* "Try our product" CTA card (bottom-left) */}
-          <div className="hero-cta-card">
-            <h3 className="hero-cta-card-title">Try our product</h3>
-            <p className="hero-cta-card-desc">
+          {/* "Try our product" CTA clickable note (bottom-left) */}
+          <a href="#board" className="hero-cta-note" onClick={handleLaunchApp}>
+            <span className="hero-cta-note-title">Try our product</span>
+            <span className="hero-cta-note-desc">
               Open the workspace and start mapping your own relationship graph.
-            </p>
-            <a href="#board" className="hero-cta-card-btn" onClick={handleLaunchApp}>
-              Open product
-            </a>
-          </div>
+            </span>
+          </a>
         </section>
 
         {/* Interactive Demo Section */}
