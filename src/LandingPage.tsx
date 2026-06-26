@@ -135,16 +135,18 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
               <path
                 d="M 80,-100 L 80,60 C 80,140 130,140 180,140 C 250,140 250,260 320,260 L 380,260 C 450,260 430,420 500,420 L 580,420 C 660,420 660,540 740,540 C 780,540 820,580 820,600 L 820,800"
                 stroke="#00629d"
-                strokeWidth="60"
+                strokeWidth="84"
                 strokeLinecap="round"
                 strokeLinejoin="round"
+                style={{ vectorEffect: 'non-scaling-stroke' }}
               />
               <path
                 d="M 80,-100 L 80,60 C 80,140 130,140 180,140 C 250,140 250,260 320,260 L 380,260 C 450,260 430,420 500,420 L 580,420 C 660,420 660,540 740,540 C 780,540 820,580 820,600 L 820,800"
                 stroke="#d2e4ff"
-                strokeWidth="48"
+                strokeWidth="72"
                 strokeLinecap="round"
                 strokeLinejoin="round"
+                style={{ vectorEffect: 'non-scaling-stroke' }}
               />
             </svg>
           </div>
