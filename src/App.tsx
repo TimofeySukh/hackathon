@@ -467,7 +467,8 @@ function markOnboardingSeen() {
 }
 
 function App() {
-  const [showLanding, setShowLanding] = useState(() => window.location.hash !== '#board')
+  const [appHash, setAppHash] = useState(() => window.location.hash || '#top')
+  const showLanding = appHash !== '#board'
   const surfaceRef = useRef<HTMLDivElement | null>(null)
   // Canvas 2D board renderer: circles, edges, people, labels, and interaction chrome.
   const peopleCanvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -493,7 +494,7 @@ function App() {
 
   useEffect(() => {
     const handleHashChange = () => {
-      setShowLanding(window.location.hash !== '#board')
+      setAppHash(window.location.hash || '#top')
     }
 
     window.addEventListener('hashchange', handleHashChange)
@@ -528,6 +529,19 @@ function App() {
     setEmailAuthError(null)
     auth.clearError()
     setShowSignInModal(true)
+  }
+
+  const openProductFromLanding = () => {
+    window.location.hash = '#board'
+  }
+
+  const openAuthFromLanding = (intent: 'signin' | 'signup') => {
+    setEmailAuthMode(intent)
+    setEmailAuthNotice(null)
+    setEmailAuthError(null)
+    auth.clearError()
+    setShowSignInModal(true)
+    window.location.hash = '#board'
   }
 
   const handleEmailAuthSubmit = async () => {
@@ -3287,9 +3301,15 @@ function App() {
   }
 
   if (showLanding) {
+    const landingRoute = appHash === '#docs' ? 'docs' : appHash === '#contact' ? 'contact' : 'home'
+
     return (
       <div className="app-shell">
-        <LandingPage />
+        <LandingPage
+          route={landingRoute}
+          onOpenProduct={openProductFromLanding}
+          onAuthIntent={openAuthFromLanding}
+        />
       </div>
     )
   }

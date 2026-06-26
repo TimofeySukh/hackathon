@@ -17,6 +17,18 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-26 — Reframe landing around sorting relationship chaos
+
+- Decision: replaced the generic startup landing composition with a focused
+  "sort the chaos" entry screen: Linear-like black header, three hero slogans,
+  stepped divider, blue board CTA note, and a concrete local-only person
+  inspector demo.
+- Decision: header Log in and Sign up now enter the real board auth dialog, and
+  Docs moved to its own landing route for API, CLI, and MCP material.
+- Why: the landing should communicate the product's core job — turning loose
+  relationship data into an organized board — instead of presenting an abstract
+  marketing preview.
+
 ### 2026-06-23 — Protect Graph Persistence During Backend Migrations
 
 - Decision: signed-in graph loading now records whether data came from the current

@@ -1,255 +1,268 @@
 import { useMemo, useState } from 'react'
+import type { ChangeEvent } from 'react'
+import sdnLogo from './assets/sdn-logo.svg'
 
-type LandingMode = 'fundraise' | 'hire' | 'reconnect'
+type LandingRoute = 'home' | 'docs' | 'contact'
+type AuthIntent = 'signin' | 'signup'
 
-const modes: Record<
-  LandingMode,
-  {
-    label: string
-    eyebrow: string
-    headline: string
-    note: string
-    insight: string
-    nodes: string[]
-  }
-> = {
-  fundraise: {
-    label: 'Fundraise',
-    eyebrow: 'Warm paths',
-    headline: 'Find the people who can move the round.',
-    note: 'Cluster angels, operators, founders, and intros before you start sending cold asks.',
-    insight: '12 warm intro paths',
-    nodes: ['You', 'Ex-founder', 'Angel', 'Partner', 'Operator'],
-  },
-  hire: {
-    label: 'Hire',
-    eyebrow: 'Talent map',
-    headline: 'Turn loose referrals into a hiring graph.',
-    note: 'See who knows candidates, who worked together, and which communities are underused.',
-    insight: '8 high-trust candidates',
-    nodes: ['You', 'Design', 'Backend', 'Growth', 'Referral'],
-  },
-  reconnect: {
-    label: 'Reconnect',
-    eyebrow: 'AI memory',
-    headline: 'Remember why every relationship matters.',
-    note: 'Keep notes, follow-ups, and context attached to people instead of buried in chat history.',
-    insight: '24 follow-ups found',
-    nodes: ['You', 'Mentor', 'Customer', 'Alumni', 'Friend'],
-  },
+type LandingPageProps = {
+  route: LandingRoute
+  onOpenProduct: () => void
+  onAuthIntent: (intent: AuthIntent) => void
 }
 
-const workflow = [
+const docGroups = [
   {
-    title: 'Import the mess',
-    body: 'Drop in LinkedIn connections, add people manually, or start with one important relationship.',
+    title: 'API surface',
+    body: 'Browser app, Supabase Edge Functions, AI note sync, LinkedIn enrichment, and graph persistence entry points.',
+    items: ['sync-person-ai-note', 'search-people-ai', 'enrich-linkedin-profile', 'user_graphs graph blob'],
   },
   {
-    title: 'Shape the board',
-    body: 'Drag circles, make clusters, and arrange people the same way you actually think about them.',
+    title: 'CLI',
+    body: 'Local commands for development, builds, seeding, load checks, and production validation.',
+    items: ['npm run dev', 'npm run build', 'npm run seed:board', 'npm run test:load'],
   },
   {
-    title: 'Ask the graph',
-    body: 'Use notes and AI search to find intros, follow-ups, collaborators, and forgotten context.',
+    title: 'MCP',
+    body: 'Agent-facing project resources and service-role scoped board graph tools live behind the local MCP server.',
+    items: ['npm run mcp:start', '.env.mcp.local', 'docs resources', 'board graph tools'],
   },
 ]
 
-const featureCards = [
-  ['Visual CRM', 'A relationship graph instead of another table of names.'],
-  ['Private by default', 'Your board starts as your own workspace, not a public network.'],
-  ['AI notes', 'Summaries and search help you recover context when it matters.'],
-  ['Live board canvas', 'Move fast with direct manipulation, zoom, selection, and nested circles.'],
-]
+const zones = ['Anthropic', 'Google', 'OpenAI']
 
-const useCases = [
-  ['Founders', 'Map investors, operators, customers, and warm paths before outreach.'],
-  ['Communities', 'Understand who belongs where and which bridges are missing.'],
-  ['Operators', 'Keep people, projects, and follow-ups in one repeatable workspace.'],
-]
+export default function LandingPage({ route, onOpenProduct, onAuthIntent }: LandingPageProps) {
+  const [personName, setPersonName] = useState('New person 2')
+  const [selectedZone, setSelectedZone] = useState(zones[2])
+  const [noteDraft, setNoteDraft] = useState('')
+  const [notes, setNotes] = useState(['Met at AI infra dinner', 'Can intro to platform teams'])
+  const [connectionDraft, setConnectionDraft] = useState('@sam-network')
+  const [connections, setConnections] = useState(['linkedin.com/in/sam'])
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
 
-export default function LandingPage() {
-  const [mode, setMode] = useState<LandingMode>('fundraise')
-  const [activeStep, setActiveStep] = useState(1)
-  const activeMode = modes[mode]
-  const activeWorkflow = workflow[activeStep]
+  const selectedZoneText = useMemo(() => `${selectedZone} zone`, [selectedZone])
 
-  const previewNodes = useMemo(
-    () =>
-      activeMode.nodes.map((name, index) => ({
-        name,
-        className: `landing-node landing-node-${index + 1}`,
-      })),
-    [activeMode],
-  )
+  const handleAvatar = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    setAvatarUrl(URL.createObjectURL(file))
+  }
 
-  const openProduct = () => {
-    window.location.hash = '#board'
+  const addNote = () => {
+    const nextNote = noteDraft.trim()
+    if (!nextNote) return
+    setNotes((current) => [...current, nextNote])
+    setNoteDraft('')
+  }
+
+  const addConnection = () => {
+    const nextConnection = connectionDraft.trim()
+    if (!nextConnection) return
+    setConnections((current) => [...current, nextConnection])
+    setConnectionDraft('')
   }
 
   return (
-    <main className="landing-page" aria-label="Social Datanode landing">
-      <nav className="landing-nav" aria-label="Landing navigation">
-        <a className="landing-brand" href="#top" aria-label="Social Datanode home">
-          <span aria-hidden="true">SD</span>
-          <strong>Social Datanode</strong>
-        </a>
-        <div className="landing-nav-links">
-          <a href="#workflow">Workflow</a>
-          <a href="#use-cases">Use cases</a>
-          <a href="#features">Features</a>
-        </div>
-        <button className="landing-nav-cta" type="button" onClick={openProduct}>
-          Open app
-        </button>
-      </nav>
+    <main className="landing-page" aria-label="Social Datanode">
+      <Header route={route} onAuthIntent={onAuthIntent} onOpenProduct={onOpenProduct} />
+      {route === 'docs' ? (
+        <DocsPage />
+      ) : route === 'contact' ? (
+        <ContactPage />
+      ) : (
+        <>
+          <section className="landing-hero" id="top">
+            <div className="landing-hero-slogans" aria-label="Product focus">
+              <article>
+                <span>01</span>
+                <strong>Sort the chaos</strong>
+                <p>Contacts, notes, companies, follow-ups, and half-remembered intros stop living in separate piles.</p>
+              </article>
+              <article>
+                <span>02</span>
+                <strong>Make the map visible</strong>
+                <p>Drop people into zones, keep context attached, and see where the relationship actually belongs.</p>
+              </article>
+              <article>
+                <span>03</span>
+                <strong>Act from the board</strong>
+                <p>Open the workspace when the next person, intro, or note is clear enough to move.</p>
+              </article>
+            </div>
 
-      <section className="landing-hero" id="top">
-        <svg className="landing-stairs" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
-          <path
-            className="landing-stairs-outline"
-            d="M-46 150 H296 C333 150 352 169 352 206 V226 C352 263 371 282 408 282 H474 C511 282 530 301 530 338 V360 C530 397 549 416 586 416 H682 C719 416 738 435 738 472 V484 C738 521 757 540 794 540 H902 C939 540 958 559 958 596 V618 C958 655 977 674 1014 674 H1098 C1135 674 1154 693 1154 730 V738 C1154 775 1173 794 1210 794 H1486"
-          />
-          <path
-            className="landing-stairs-fill"
-            d="M-46 150 H296 C333 150 352 169 352 206 V226 C352 263 371 282 408 282 H474 C511 282 530 301 530 338 V360 C530 397 549 416 586 416 H682 C719 416 738 435 738 472 V484 C738 521 757 540 794 540 H902 C939 540 958 559 958 596 V618 C958 655 977 674 1014 674 H1098 C1135 674 1154 693 1154 730 V738 C1154 775 1173 794 1210 794 H1486"
-          />
-        </svg>
-
-        <div className="landing-hero-copy">
-          <span className="landing-kicker">Social Datanode</span>
-          <h1>Your network, laid out like a startup command board</h1>
-          <p>
-            Import contacts, cluster people visually, attach notes, and use AI search to find the next
-            person you should talk to.
-          </p>
-          <div className="landing-mode-switch" aria-label="Choose a startup workflow">
-            {(Object.keys(modes) as LandingMode[]).map((key) => (
-              <button
-                className={key === mode ? 'is-active' : ''}
-                key={key}
-                type="button"
-                onClick={() => setMode(key)}
-              >
-                {modes[key].label}
+            <div className="landing-chaos-stage">
+              <svg className="landing-stairs" viewBox="0 0 1200 440" preserveAspectRatio="none" aria-hidden="true">
+                <path
+                  className="landing-stairs-outline"
+                  d="M18 82 H264 V126 H330 V172 H454 V214 H560 V252 H716 V302 H842 V344 H1048 V386 H1182"
+                />
+                <path
+                  className="landing-stairs-fill"
+                  d="M18 82 H264 V126 H330 V172 H454 V214 H560 V252 H716 V302 H842 V344 H1048 V386 H1182"
+                />
+              </svg>
+              <div className="chaos-card chaos-card-a">Investor list.pdf</div>
+              <div className="chaos-card chaos-card-b">OpenAI lead</div>
+              <div className="chaos-card chaos-card-c">Google alumni</div>
+              <div className="chaos-card chaos-card-d">Need warm intro</div>
+              <button type="button" className="landing-board-note" onClick={onOpenProduct}>
+                <span>Open the blank board</span>
+                <strong>Start turning loose relationship data into a working map.</strong>
               </button>
-            ))}
-          </div>
-          <div className="landing-action-row">
-            <button className="landing-product-button" type="button" aria-label="Open workspace" onClick={openProduct}>
-              <span>Open workspace</span>
-              <span aria-hidden="true">-&gt;</span>
-            </button>
-            <small>Starts with a blank board. No demo data forced.</small>
-          </div>
-          <div className="landing-hero-notes" aria-label="Product notes">
-            <div className="landing-card landing-note landing-note-a">
-              <span>{activeMode.eyebrow}</span>
-              <strong>{activeMode.headline}</strong>
             </div>
-            <div className="landing-card landing-note landing-note-b">
-              <span>Board first</span>
-              <strong>Not another spreadsheet pretending to understand relationships.</strong>
-            </div>
-          </div>
-        </div>
+          </section>
 
-        <aside className="landing-product-demo" aria-label="Interactive product preview">
-          <div className="landing-demo-toolbar">
-            <span>Live board preview</span>
-            <strong>{activeMode.insight}</strong>
-          </div>
-          <div className="landing-demo-canvas">
-            <div className="landing-orbit landing-orbit-one" />
-            <div className="landing-orbit landing-orbit-two" />
-            {previewNodes.map((node) => (
-              <div className={node.className} key={node.name}>
-                {node.name}
+          <section className="landing-interactive" id="product">
+            <div className="landing-interactive-copy">
+              <span className="landing-section-kicker">Interactive inspector</span>
+              <h1>One person, three zones, all the context attached.</h1>
+              <p>
+                This mock panel behaves like the board inspector. Try changing the zone, adding a photo,
+                writing notes, and collecting connections. Nothing here is saved.
+              </p>
+            </div>
+
+            <div className="landing-inspector-demo" aria-label="Person inspector demo">
+              <div className="landing-demo-board">
+                {zones.map((zone, index) => (
+                  <button
+                    type="button"
+                    key={zone}
+                    className={`landing-zone landing-zone-${index + 1} ${zone === selectedZone ? 'is-active' : ''}`}
+                    onClick={() => setSelectedZone(zone)}
+                  >
+                    {zone}
+                  </button>
+                ))}
+                <div className="landing-person-chip">
+                  {avatarUrl ? <img src={avatarUrl} alt="" /> : <span>{personName.slice(0, 1) || 'N'}</span>}
+                  <strong>{personName || 'Unnamed person'}</strong>
+                  <small>{selectedZoneText}</small>
+                </div>
               </div>
-            ))}
-            <div className="landing-demo-note">
-              <span>{activeMode.label}</span>
-              <strong>{activeMode.note}</strong>
+
+              <aside className="landing-person-panel">
+                <div className="landing-panel-title">
+                  <input
+                    aria-label="Person name"
+                    value={personName}
+                    onChange={(event) => setPersonName(event.target.value)}
+                  />
+                  <span aria-hidden="true">☆</span>
+                </div>
+                <div className="landing-person-row">
+                  <label className="landing-zone-select">
+                    <span aria-hidden="true" />
+                    <select value={selectedZone} onChange={(event) => setSelectedZone(event.target.value)}>
+                      {zones.map((zone) => (
+                        <option key={zone} value={zone}>{zone}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="landing-avatar-picker">
+                    {avatarUrl ? <img src={avatarUrl} alt="" /> : <span aria-hidden="true">⌁</span>}
+                    <input type="file" accept="image/*" onChange={handleAvatar} aria-label="Add photo" />
+                  </label>
+                </div>
+                <section className="landing-panel-block">
+                  <h2>Notes</h2>
+                  <div className="landing-note-list">
+                    {notes.map((note) => <p key={note}>{note}</p>)}
+                  </div>
+                  <div className="landing-inline-compose">
+                    <input
+                      value={noteDraft}
+                      onChange={(event) => setNoteDraft(event.target.value)}
+                      placeholder="Add note"
+                    />
+                    <button type="button" onClick={addNote}>Add</button>
+                  </div>
+                </section>
+                <section className="landing-panel-block">
+                  <h2>Connections</h2>
+                  <div className="landing-connection-list">
+                    {connections.map((connection) => <span key={connection}>{connection}</span>)}
+                  </div>
+                  <div className="landing-inline-compose">
+                    <input
+                      value={connectionDraft}
+                      onChange={(event) => setConnectionDraft(event.target.value)}
+                      placeholder="Add link, @handle, or phone"
+                    />
+                    <button type="button" onClick={addConnection}>Save</button>
+                  </div>
+                </section>
+                <button type="button" className="landing-delete-person">Delete person</button>
+              </aside>
             </div>
-          </div>
-        </aside>
-      </section>
+          </section>
 
-      <section className="landing-section landing-workflow" id="workflow">
-        <div className="landing-section-copy">
-          <span className="landing-section-kicker">How it works</span>
-          <h2>Three moves from contact soup to useful graph.</h2>
-        </div>
-        <div className="landing-workflow-grid">
-          <div className="landing-workflow-tabs" role="tablist" aria-label="Workflow steps">
-            {workflow.map((step, index) => (
-              <button
-                className={index === activeStep ? 'is-active' : ''}
-                key={step.title}
-                type="button"
-                role="tab"
-                aria-selected={index === activeStep}
-                onClick={() => setActiveStep(index)}
-              >
-                <span>{String(index + 1).padStart(2, '0')}</span>
-                {step.title}
-              </button>
-            ))}
-          </div>
-          <article className="landing-card landing-workflow-card">
-            <span>{activeWorkflow.title}</span>
-            <h3>{activeWorkflow.body}</h3>
-            <div className="landing-mini-board" aria-hidden="true">
-              <i />
-              <i />
-              <i />
-              <i />
-              <i />
+          <section className="landing-final">
+            <div>
+              <span className="landing-section-kicker">Blank by default</span>
+              <h1>Open the board when you are ready to organize the real mess.</h1>
             </div>
-          </article>
-        </div>
-      </section>
-
-      <section className="landing-section landing-use-cases" id="use-cases">
-        <div className="landing-section-copy">
-          <span className="landing-section-kicker">Built for messy networks</span>
-          <h2>Useful before you have a perfect CRM process.</h2>
-        </div>
-        <div className="landing-use-case-grid">
-          {useCases.map(([title, body]) => (
-            <article className="landing-card landing-use-case" key={title}>
-              <span>{title}</span>
-              <p>{body}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="landing-section landing-features" id="features">
-        <div className="landing-section-copy">
-          <span className="landing-section-kicker">What ships today</span>
-          <h2>A real canvas app behind the landing page.</h2>
-        </div>
-        <div className="landing-feature-grid">
-          {featureCards.map(([title, body]) => (
-            <article className="landing-card landing-feature" key={title}>
-              <span aria-hidden="true" />
-              <h3>{title}</h3>
-              <p>{body}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="landing-final">
-        <div className="landing-final-copy">
-          <span className="landing-section-kicker">Try it now</span>
-          <h2>Open the board and start arranging the people that matter.</h2>
-        </div>
-        <button className="landing-product-button" type="button" aria-label="Launch Social Datanode" onClick={openProduct}>
-          <span>Launch Social Datanode</span>
-          <span aria-hidden="true">-&gt;</span>
-        </button>
-      </section>
+            <button type="button" className="landing-product-button" onClick={onOpenProduct}>
+              Open workspace
+            </button>
+          </section>
+        </>
+      )}
     </main>
+  )
+}
+
+function Header({ route, onAuthIntent, onOpenProduct }: LandingPageProps) {
+  return (
+    <nav className="landing-nav" aria-label="Landing navigation">
+      <a className="landing-brand" href="#top" aria-label="Social Datanode home">
+        <img src={sdnLogo} alt="" aria-hidden="true" />
+        <strong>Social Datanode</strong>
+      </a>
+      <div className="landing-nav-links">
+        <a className={route === 'home' ? 'is-active' : ''} href="#top">Product</a>
+        <a className={route === 'docs' ? 'is-active' : ''} href="#docs">Docs</a>
+        <a className={route === 'contact' ? 'is-active' : ''} href="#contact">Contact</a>
+      </div>
+      <div className="landing-nav-actions">
+        <button type="button" onClick={() => onAuthIntent('signin')}>Log in</button>
+        <button type="button" className="landing-nav-cta" onClick={() => onAuthIntent('signup')}>Sign up</button>
+        <button type="button" className="landing-nav-open" onClick={onOpenProduct}>Open app</button>
+      </div>
+    </nav>
+  )
+}
+
+function DocsPage() {
+  return (
+    <section className="landing-docs" aria-label="Developer documentation">
+      <div className="landing-docs-hero">
+        <span className="landing-section-kicker">Docs</span>
+        <h1>API, CLI, and MCP notes belong here, not on the board.</h1>
+        <p>
+          This page collects the operational docs that were crowding the product story:
+          app commands, server-side functions, graph persistence, and agent tooling.
+        </p>
+      </div>
+      <div className="landing-doc-grid">
+        {docGroups.map((group) => (
+          <article className="landing-doc-card" key={group.title}>
+            <h2>{group.title}</h2>
+            <p>{group.body}</p>
+            <ul>
+              {group.items.map((item) => <li key={item}>{item}</li>)}
+            </ul>
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function ContactPage() {
+  return (
+    <section className="landing-contact" aria-label="Contact">
+      <h1>Contact</h1>
+    </section>
   )
 }

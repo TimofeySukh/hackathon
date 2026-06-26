@@ -2,29 +2,35 @@
 
 ## Purpose
 
-The landing page is the startup-style product entry screen. It explains Social Datanode
-as a visual relationship workspace and drives users into the board app.
+The landing page is the product entry screen for Social Datanode. Its focus is
+sorting relationship chaos: loose contacts, notes, company zones, docs, and
+connections become a visual board.
 
 ## Behavior
 
 - Root visits show the landing page.
-- The "Open product" button switches to the board by setting `#board`.
-- The top navigation links scroll within the landing page.
-- The hero has an interactive workflow switcher for fundraise, hiring, and reconnecting.
-- The workflow section has interactive step tabs that update the explanatory card.
+- Product CTAs switch to the board by setting `#board`.
+- Header Log in and Sign up switch to `#board` and open the existing board auth dialog
+  in the matching email auth mode.
+- Header Product points back to the landing home.
+- Header Docs opens `#docs`, a documentation page for API, CLI, and MCP notes.
+- Header Contact opens `#contact`, currently a placeholder page.
+- The interactive inspector demo lets visitors change a local-only person name,
+  zone, photo preview, notes, and connections. The demo does not save data.
 
 ## Design
 
-- The background uses a soft blue-white Material 3-tonal gradient with a subtle dotted board
-  texture.
-- The hero keeps the diagonal uneven staircase motif from the prototype. The separator uses
-  the board bubble language: wide pale blue body, dark blue outline, and soft rounded bends.
-- Product claims are written as separate overlapping Trello-style note cards, not as a
-  conventional marketing card stack.
-- The first viewport pairs a large startup-style headline with an interactive product preview
-  that looks like the relationship board.
-- Lower sections cover workflow, use cases, current product capabilities, and a final CTA.
-- Narrow screens stack the story vertically while preserving the staircase and note-card motif.
+- The header is a compact black Linear-like pill, adapted to the Social Datanode
+  theme and auth flow.
+- The first viewport has three primary slogans above a stepped divider. A blue
+  note below the divider acts as the board CTA.
+- The page keeps the dotted board texture and Material 3 tokens, but removes the
+  generic startup card stack.
+- The main product demo is a concrete inspector panel, matching the board's
+  person-editing workflow instead of an abstract marketing preview.
+- Docs are moved to a separate landing route so API/CLI/MCP material does not
+  crowd the product story.
+- Narrow screens stack the slogans, board mock, inspector, and docs cards.
 
 ## Code
 
