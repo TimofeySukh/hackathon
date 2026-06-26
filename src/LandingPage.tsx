@@ -116,16 +116,6 @@ export default function LandingPage() {
         </svg>
 
         <div className="landing-hero-copy">
-          <div className="landing-hero-notes" aria-label="Product notes">
-            <div className="landing-card landing-note landing-note-a">
-              <span>{activeMode.eyebrow}</span>
-              <strong>{activeMode.headline}</strong>
-            </div>
-            <div className="landing-card landing-note landing-note-b">
-              <span>Board first</span>
-              <strong>Not another spreadsheet pretending to understand relationships.</strong>
-            </div>
-          </div>
           <span className="landing-kicker">Social Datanode</span>
           <h1>Your network, laid out like a startup command board</h1>
           <p>
@@ -150,6 +140,16 @@ export default function LandingPage() {
               <span aria-hidden="true">-&gt;</span>
             </button>
             <small>Starts with a blank board. No demo data forced.</small>
+          </div>
+          <div className="landing-hero-notes" aria-label="Product notes">
+            <div className="landing-card landing-note landing-note-a">
+              <span>{activeMode.eyebrow}</span>
+              <strong>{activeMode.headline}</strong>
+            </div>
+            <div className="landing-card landing-note landing-note-b">
+              <span>Board first</span>
+              <strong>Not another spreadsheet pretending to understand relationships.</strong>
+            </div>
           </div>
         </div>
 
