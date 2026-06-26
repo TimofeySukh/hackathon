@@ -104,25 +104,43 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
         
         {/* First Viewport: Hero Section */}
         <section className="landing-section hero-section">
-          {/* Three slogans near the top of the hero */}
-          <div className="hero-slogans-container">
-            <span className="hero-slogan-item">Map your social universe</span>
-            <div className="hero-slogan-dot" aria-hidden="true" />
-            <span className="hero-slogan-item">Organize connections visually</span>
-            <div className="hero-slogan-dot" aria-hidden="true" />
-            <span className="hero-slogan-item">Private. Local. AI-enriched</span>
+          {/* Stepped background ribbon using double stroke technique for perfect border & thickness */}
+          <div className="hero-stepped-path-container" aria-hidden="true">
+            <svg width="100%" height="100%" viewBox="0 0 1100 650" fill="none" preserveAspectRatio="none">
+              <path
+                d="M -50,170 L 260,170 A 40,40 0 0,1 300,210 L 300,270 A 40,40 0 0,0 340,310 L 480,310 A 40,40 0 0,1 520,350 L 520,410 A 40,40 0 0,0 560,450 L 700,450 A 40,40 0 0,1 740,490 L 740,550 A 40,40 0 0,0 780,590 L 1150,590"
+                stroke="#00629d"
+                strokeWidth="116"
+                strokeLinecap="square"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M -50,170 L 260,170 A 40,40 0 0,1 300,210 L 300,270 A 40,40 0 0,0 340,310 L 480,310 A 40,40 0 0,1 520,350 L 520,410 A 40,40 0 0,0 560,450 L 700,450 A 40,40 0 0,1 740,490 L 740,550 A 40,40 0 0,0 780,590 L 1150,590"
+                stroke="#d2e4ff"
+                strokeWidth="100"
+                strokeLinecap="square"
+                strokeLinejoin="round"
+              />
+            </svg>
           </div>
 
-          {/* Stepped divider shape */}
-          <svg className="hero-stepped-divider" viewBox="0 0 120 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M10 20 h30 v-10 h40 v-10 h30" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          {/* Slogans stacked deck (top-right) */}
+          <div className="hero-slogans-deck">
+            <div className="hero-slogan-card">Structurise your network</div>
+            <div className="hero-slogan-card">Brainstorm while looking at the graph</div>
+            <div className="hero-slogan-card">Keep people, notes, and context in one visual workspace</div>
+          </div>
 
-          {/* Single blue-ish note/CTA card */}
-          <a href="#board" className="hero-note-cta" onClick={handleLaunchApp}>
-            <span className="hero-note-title">Open relationship board graph</span>
-            <span className="hero-note-subtitle">Launch workspace &rarr;</span>
-          </a>
+          {/* "Try our product" CTA card (bottom-left) */}
+          <div className="hero-cta-card">
+            <h3 className="hero-cta-card-title">Try our product</h3>
+            <p className="hero-cta-card-desc">
+              Open the workspace and start mapping your own relationship graph.
+            </p>
+            <a href="#board" className="hero-cta-card-btn" onClick={handleLaunchApp}>
+              Open product
+            </a>
+          </div>
         </section>
 
         {/* Interactive Demo Section */}
