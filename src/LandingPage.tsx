@@ -6,7 +6,14 @@ export default function LandingPage() {
   return (
     <main className="landing-page" aria-label="Social Datanode landing">
       <svg className="landing-stairs" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
-        <path d="M0 150 H338 V268 H526 V402 H735 V526 H946 V660 H1144 V780 H1440" />
+        <path
+          className="landing-stairs-outline"
+          d="M-46 150 H296 C333 150 352 169 352 206 V226 C352 263 371 282 408 282 H474 C511 282 530 301 530 338 V360 C530 397 549 416 586 416 H682 C719 416 738 435 738 472 V484 C738 521 757 540 794 540 H902 C939 540 958 559 958 596 V618 C958 655 977 674 1014 674 H1098 C1135 674 1154 693 1154 730 V738 C1154 775 1173 794 1210 794 H1486"
+        />
+        <path
+          className="landing-stairs-fill"
+          d="M-46 150 H296 C333 150 352 169 352 206 V226 C352 263 371 282 408 282 H474 C511 282 530 301 530 338 V360 C530 397 549 416 586 416 H682 C719 416 738 435 738 472 V484 C738 521 757 540 794 540 H902 C939 540 958 559 958 596 V618 C958 655 977 674 1014 674 H1098 C1135 674 1154 693 1154 730 V738 C1154 775 1173 794 1210 794 H1486"
+        />
       </svg>
 
       <section className="landing-idea" aria-label="Project idea">
