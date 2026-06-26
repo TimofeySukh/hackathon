@@ -1,9 +1,6 @@
 import { useState, type MouseEvent, type ChangeEvent, type FormEvent } from 'react'
 import sdnLogo from './assets/sdn-logo.svg'
-import linkedinIcon from './assets/brands/linkedin.svg'
-import telegramIcon from './assets/brands/telegram.svg'
-import websiteIcon from './assets/brands/website.svg'
-import { SelectionIndicator } from './components/SelectionIndicator'
+
 
 interface LandingPageProps {
   onLogin: () => void
@@ -13,14 +10,16 @@ interface LandingPageProps {
 
 export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: LandingPageProps) {
   // Interactive Inspector Simulator local state
-  const [demoName, setDemoName] = useState('Alice Chen')
-  const [demoZone, setDemoZone] = useState<'Anthropic' | 'Google' | 'OpenAI'>('Anthropic')
+  const [demoName, setDemoName] = useState('New person 1')
+  const [demoZone, setDemoZone] = useState<'Anthropic' | 'Google' | 'OpenAI' | null>(null)
   const [demoAvatar, setDemoAvatar] = useState<'initials' | 'timofey' | 'velizar'>('initials')
-  const [demoNotes, setDemoNotes] = useState<string[]>([
-    'Met at WebConf, discussed Supabase integrations.',
-    'Follow up next month to sync on APIs.'
-  ])
+  const [demoNotes, setDemoNotes] = useState<string[]>([])
   const [newNoteText, setNewNoteText] = useState('')
+  const [demoConnections, setDemoConnections] = useState<Array<{ id: string; label: string; url: string; service: 'linkedin' | 'telegram' | 'website' }>>([])
+  const [demoConnectionInput, setDemoConnectionInput] = useState('')
+  const [isFavorite, setIsFavorite] = useState(false)
+  const [showDemoDropdown, setShowDemoDropdown] = useState(false)
+  const [isAddingDemoNote, setIsAddingDemoNote] = useState(false)
 
   const handleLaunchApp = (e: MouseEvent) => {
     e.preventDefault()
@@ -45,6 +44,7 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
     if (!newNoteText.trim()) return
     setDemoNotes([...demoNotes, newNoteText.trim()])
     setNewNoteText('')
+    setIsAddingDemoNote(false)
   }
 
   const handleCycleDemoAvatar = () => {
@@ -55,6 +55,44 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
     } else {
       setDemoAvatar('initials')
     }
+  }
+
+  const handleAddDemoConnection = (e: FormEvent) => {
+    e.preventDefault()
+    if (!demoConnectionInput.trim()) return
+    const input = demoConnectionInput.trim()
+    let service: 'linkedin' | 'telegram' | 'website' = 'website'
+    let label = input
+    if (input.includes('linkedin.com') || input.includes('in/')) {
+      service = 'linkedin'
+      label = 'LinkedIn Profile'
+    } else if (input.includes('t.me') || input.startsWith('@')) {
+      service = 'telegram'
+      label = 'Telegram Chat'
+    } else {
+      label = 'Personal Link'
+    }
+    setDemoConnections([
+      ...demoConnections,
+      { id: Date.now().toString(), label, url: input, service }
+    ])
+    setDemoConnectionInput('')
+  }
+
+  const handleDeleteDemoConnection = (id: string) => {
+    setDemoConnections(demoConnections.filter((c) => c.id !== id))
+  }
+
+  const handleResetDemo = () => {
+    setDemoName('New person 1')
+    setDemoZone(null)
+    setDemoAvatar('initials')
+    setDemoNotes([])
+    setDemoConnections([])
+    setIsFavorite(false)
+    setShowDemoDropdown(false)
+    setIsAddingDemoNote(false)
+    setDemoConnectionInput('')
   }
 
   return (
@@ -183,93 +221,261 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
 
             {/* Simulated Inspector Card */}
             <div className="demo-inspector-card">
-              <div className="demo-field-group">
-                <span className="demo-field-label">Person Name</span>
+              <div className="demo-inspector-header">
                 <input
                   type="text"
-                  className="demo-name-input"
+                  className="demo-inspector-name-input"
                   value={demoName}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => setDemoName(e.target.value)}
-                  placeholder="Enter name..."
+                  onChange={(e) => setDemoName(e.target.value)}
+                  placeholder="New person 1"
                 />
-              </div>
-
-              <div className="demo-field-group">
-                <span className="demo-field-label">Zone Selector</span>
-                <div className="demo-zone-selector">
-                  {(['Anthropic', 'Google', 'OpenAI'] as const).map((z) => (
-                    <button
-                      key={z}
-                      type="button"
-                      className={`demo-zone-btn ${demoZone === z ? 'is-active' : ''}`}
-                      data-ind-key={z}
-                      onClick={() => setDemoZone(z)}
-                    >
-                      {z}
-                    </button>
-                  ))}
-                  <SelectionIndicator activeKey={demoZone} variant="pill" />
-                </div>
-              </div>
-
-              <div className="demo-field-group">
-                <span className="demo-field-label">Photo/Avatar</span>
-                <div className="demo-avatar-row">
-                  <div className="demo-avatar-circle" onClick={handleCycleDemoAvatar} title="Click to cycle avatar">
-                    {demoAvatar === 'timofey' ? (
-                      <img src="/timofey_avatar.jpeg" alt="Avatar" />
-                    ) : demoAvatar === 'velizar' ? (
-                      <img src="/velizar_avatar.jpeg" alt="Avatar" />
-                    ) : (
-                      <span>{demoName ? demoName.charAt(0).toUpperCase() : 'A'}</span>
-                    )}
-                  </div>
-                  <span className="demo-avatar-text" onClick={handleCycleDemoAvatar}>
-                    Cycle mock picture
-                  </span>
-                </div>
-              </div>
-
-              <div className="demo-field-group">
-                <span className="demo-field-label">Connections</span>
-                <div className="demo-connections-chips">
-                  <div className="demo-connection-chip">
-                    <img className="demo-connection-chip-brand" src={linkedinIcon} alt="" />
-                    <span>LinkedIn Profile</span>
-                  </div>
-                  <div className="demo-connection-chip">
-                    <img className="demo-connection-chip-brand" src={telegramIcon} alt="" />
-                    <span>Telegram Chat</span>
-                  </div>
-                  <div className="demo-connection-chip">
-                    <img className="demo-connection-chip-brand" src={websiteIcon} alt="" />
-                    <span>Personal Blog</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="demo-field-group">
-                <span className="demo-field-label">Notes</span>
-                <div className="demo-notes-container">
-                  {demoNotes.map((note, index) => (
-                    <div key={index} className="demo-note-item">
-                      {note}
-                    </div>
-                  ))}
-                  <form onSubmit={handleAddDemoNote} className="demo-note-input-row">
-                    <input
-                      type="text"
-                      className="demo-note-input"
-                      value={newNoteText}
-                      onChange={(e: ChangeEvent<HTMLInputElement>) => setNewNoteText(e.target.value)}
-                      placeholder="Add a simulated note..."
+                <button
+                  type="button"
+                  className="demo-inspector-star-btn"
+                  onClick={() => setIsFavorite(!isFavorite)}
+                  title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                >
+                  <svg viewBox="0 0 24 24">
+                    <path
+                      d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
+                      fill={isFavorite ? '#ffd600' : 'none'}
+                      stroke={isFavorite ? '#d97706' : '#73777f'}
+                      strokeWidth={2}
                     />
-                    <button type="submit" className="demo-note-btn" aria-label="Add note">
-                      +
-                    </button>
-                  </form>
-                </div>
+                  </svg>
+                </button>
               </div>
+
+              <div className="demo-dropdown-avatar-row">
+                {/* Custom Select Dropdown */}
+                <div className="demo-dropdown-wrapper">
+                  <button
+                    type="button"
+                    className="demo-dropdown-trigger"
+                    onClick={() => setShowDemoDropdown(!showDemoDropdown)}
+                  >
+                    <span
+                      className="demo-dropdown-dot"
+                      style={{
+                        backgroundColor:
+                          demoZone === 'Anthropic'
+                            ? '#00629d'
+                            : demoZone === 'Google'
+                            ? '#d87a00'
+                            : demoZone === 'OpenAI'
+                            ? '#1e824a'
+                            : '#b0b8c4'
+                      }}
+                    />
+                    <span className="demo-dropdown-text">
+                      {demoZone || 'Select circle'}
+                    </span>
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="demo-dropdown-chevron"
+                      style={{
+                        transform: showDemoDropdown ? 'rotate(180deg)' : 'none'
+                      }}
+                    >
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </button>
+
+                  {showDemoDropdown && (
+                    <div className="demo-dropdown-menu">
+                      <button
+                        type="button"
+                        className="demo-dropdown-option"
+                        onClick={() => {
+                          setDemoZone(null)
+                          setShowDemoDropdown(false)
+                        }}
+                      >
+                        <span className="demo-dropdown-dot" style={{ backgroundColor: '#b0b8c4' }} />
+                        <span>Select circle</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="demo-dropdown-option"
+                        onClick={() => {
+                          setDemoZone('Anthropic')
+                          setShowDemoDropdown(false)
+                        }}
+                      >
+                        <span className="demo-dropdown-dot" style={{ backgroundColor: '#00629d' }} />
+                        <span>Anthropic</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="demo-dropdown-option"
+                        onClick={() => {
+                          setDemoZone('Google')
+                          setShowDemoDropdown(false)
+                        }}
+                      >
+                        <span className="demo-dropdown-dot" style={{ backgroundColor: '#d87a00' }} />
+                        <span>Google</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="demo-dropdown-option"
+                        onClick={() => {
+                          setDemoZone('OpenAI')
+                          setShowDemoDropdown(false)
+                        }}
+                      >
+                        <span className="demo-dropdown-dot" style={{ backgroundColor: '#1e824a' }} />
+                        <span>OpenAI</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Avatar Picker / Cycle */}
+                <button
+                  type="button"
+                  className="demo-avatar-btn"
+                  onClick={handleCycleDemoAvatar}
+                  title="Click to cycle avatar image"
+                >
+                  {demoAvatar === 'timofey' ? (
+                    <img src="/timofey_avatar.jpeg" alt="Avatar" />
+                  ) : demoAvatar === 'velizar' ? (
+                    <img src="/velizar_avatar.jpeg" alt="Avatar" />
+                  ) : (
+                    <svg viewBox="0 0 24 24" className="demo-avatar-icon">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                      <circle cx="12" cy="7" r="4" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+
+              {/* Notes Box */}
+              <div className="demo-box">
+                <h4 className="demo-box-title">Notes</h4>
+
+                {demoNotes.length > 0 && (
+                  <div className="demo-notes-list">
+                    {demoNotes.map((note, index) => (
+                      <div key={index} className="demo-note-item">
+                        <p className="demo-note-text">{note}</p>
+                        <button
+                          type="button"
+                          className="demo-note-delete"
+                          onClick={() => setDemoNotes(demoNotes.filter((_, i) => i !== index))}
+                          title="Delete note"
+                        >
+                          &times;
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {isAddingDemoNote ? (
+                  <form onSubmit={handleAddDemoNote} className="demo-note-composer">
+                    <textarea
+                      className="demo-note-textarea"
+                      value={newNoteText}
+                      onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setNewNoteText(e.target.value)}
+                      placeholder="Write a note..."
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault()
+                          if (newNoteText.trim()) {
+                            setDemoNotes([...demoNotes, newNoteText.trim()])
+                            setNewNoteText('')
+                            setIsAddingDemoNote(false)
+                          }
+                        } else if (e.key === 'Escape') {
+                          setIsAddingDemoNote(false)
+                          setNewNoteText('')
+                        }
+                      }}
+                    />
+                    <div className="demo-note-composer-actions">
+                      <button
+                        type="button"
+                        className="demo-note-save-btn"
+                        onClick={() => {
+                          if (newNoteText.trim()) {
+                            setDemoNotes([...demoNotes, newNoteText.trim()])
+                            setNewNoteText('')
+                            setIsAddingDemoNote(false)
+                          }
+                        }}
+                      >
+                        Save note
+                      </button>
+                      <button
+                        type="button"
+                        className="demo-note-cancel-btn"
+                        onClick={() => {
+                          setIsAddingDemoNote(false)
+                          setNewNoteText('')
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <button
+                    type="button"
+                    className="demo-note-add-btn"
+                    onClick={() => setIsAddingDemoNote(true)}
+                  >
+                    <span className="demo-note-add-plus">+</span> Add note
+                  </button>
+                )}
+              </div>
+
+              {/* Connections Box */}
+              <div className="demo-box">
+                <h4 className="demo-box-title">Connections</h4>
+
+                {demoConnections.length > 0 && (
+                  <div className="demo-connections-list">
+                    {demoConnections.map((c) => (
+                      <div key={c.id} className="demo-connection-item">
+                        <span className="demo-connection-label">{c.label}</span>
+                        <button
+                          type="button"
+                          className="demo-connection-delete"
+                          onClick={() => handleDeleteDemoConnection(c.id)}
+                          title="Delete connection"
+                        >
+                          &times;
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <form onSubmit={handleAddDemoConnection} className="demo-connection-input-row">
+                  <input
+                    type="text"
+                    className="demo-connection-input"
+                    value={demoConnectionInput}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => setDemoConnectionInput(e.target.value)}
+                    placeholder="Add link, @handle, or phone"
+                  />
+                  <button type="submit" className="demo-connection-save-btn">
+                    Save
+                  </button>
+                </form>
+              </div>
+
+              {/* Delete Person Button */}
+              <button
+                type="button"
+                className="demo-delete-person-btn"
+                onClick={handleResetDemo}
+              >
+                Delete person
+              </button>
             </div>
           </div>
         </section>
