@@ -233,7 +233,7 @@
   left: 50%;
   transform: translateX(-50%);
   width: 100%;
-  max-width: 1100px;
+  max-width: 1200px;
   z-index: 1;
   pointer-events: none;
 }

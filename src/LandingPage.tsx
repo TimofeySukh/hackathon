@@ -113,14 +113,14 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
               left: '50%',
               transform: 'translateX(-50%)',
               width: '100%',
-              maxWidth: '1100px',
+              maxWidth: '1200px',
               zIndex: 1,
               pointerEvents: 'none'
             }}
             aria-hidden="true"
           >
             <svg
-              viewBox="0 0 1100 650"
+              viewBox="0 0 1200 650"
               fill="none"
               preserveAspectRatio="none"
               style={{
@@ -132,7 +132,7 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
               }}
             >
               <path
-                d="M 80,0 L 80,60 C 80,140 130,140 180,140 C 250,140 250,260 320,260 L 380,260 C 450,260 430,420 500,420 L 580,420 C 660,420 660,540 740,540 C 780,540 820,580 820,600 L 820,650"
+                d="M 80,0 L 80,60 C 80,140 150,140 220,140 C 290,140 290,260 360,260 L 460,260 C 530,260 530,420 600,420 L 720,420 C 790,420 790,540 860,540 L 1080,540 C 1120,540 1160,580 1160,620 L 1160,650"
                 stroke="#00629d"
                 strokeWidth="84"
                 strokeLinecap="round"
@@ -140,7 +140,7 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
                 style={{ vectorEffect: 'non-scaling-stroke' }}
               />
               <path
-                d="M 80,0 L 80,60 C 80,140 130,140 180,140 C 250,140 250,260 320,260 L 380,260 C 450,260 430,420 500,420 L 580,420 C 660,420 660,540 740,540 C 780,540 820,580 820,600 L 820,650"
+                d="M 80,0 L 80,60 C 80,140 150,140 220,140 C 290,140 290,260 360,260 L 460,260 C 530,260 530,420 600,420 L 720,420 C 790,420 790,540 860,540 L 1080,540 C 1120,540 1160,580 1160,620 L 1160,650"
                 stroke="#d2e4ff"
                 strokeWidth="72"
                 strokeLinecap="round"
