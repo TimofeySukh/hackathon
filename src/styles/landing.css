@@ -122,13 +122,13 @@
 
 .landing-hero {
   display: grid;
-  align-items: center;
-  grid-template-columns: minmax(0, 0.95fr) minmax(360px, 1.05fr);
-  gap: clamp(28px, 5vw, 76px);
+  align-items: start;
+  grid-template-columns: minmax(0, 0.9fr) minmax(420px, 0.92fr);
+  gap: clamp(34px, 5vw, 72px);
   width: min(1180px, calc(100% - 36px));
   min-height: calc(100vh - 72px);
   margin: 0 auto;
-  padding: 42px 0 96px;
+  padding: clamp(46px, 7vh, 78px) 0 96px;
 }
 
 .landing-stairs {
@@ -161,7 +161,6 @@
 .landing-hero-copy {
   position: relative;
   max-width: 650px;
-  padding-top: 178px;
 }
 
 .landing-card {
@@ -175,22 +174,24 @@
   text-align: left;
 }
 
+.landing-hero-notes {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 0.82fr);
+  align-items: end;
+  gap: 16px;
+  max-width: 620px;
+  margin-bottom: 34px;
+}
+
 .landing-note {
-  position: absolute;
   padding: 15px 17px 17px;
 }
 
 .landing-note-a {
-  top: -18px;
-  left: 18px;
-  width: min(390px, 78%);
   transform: rotate(-2deg);
 }
 
 .landing-note-b {
-  top: 76px;
-  right: 0;
-  width: min(360px, 64%);
   transform: rotate(1.5deg);
 }
 
@@ -216,9 +217,9 @@
 .landing-note strong {
   display: block;
   margin-top: 10px;
-  font-size: clamp(18px, 1.8vw, 24px);
+  font-size: clamp(17px, 1.45vw, 21px);
   font-weight: 400;
-  line-height: 1.12;
+  line-height: 1.14;
 }
 
 .landing-kicker {
@@ -235,9 +236,9 @@
 }
 
 .landing-hero h1 {
-  max-width: 720px;
-  font-size: clamp(52px, 5.6vw, 82px);
-  line-height: 0.96;
+  max-width: 640px;
+  font-size: clamp(48px, 5vw, 72px);
+  line-height: 1;
 }
 
 .landing-hero p {
@@ -336,7 +337,10 @@
 
 .landing-product-demo {
   position: relative;
-  min-height: 600px;
+  width: 100%;
+  max-width: 540px;
+  min-height: 520px;
+  margin: 52px 0 0 auto;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--md-outline-variant) 70%, white);
   border-radius: var(--md-r-xl);
@@ -378,17 +382,17 @@
 }
 
 .landing-orbit-one {
-  top: 128px;
-  left: 72px;
-  width: 330px;
-  height: 330px;
+  top: 118px;
+  left: 58px;
+  width: 280px;
+  height: 280px;
 }
 
 .landing-orbit-two {
-  right: 58px;
-  bottom: 76px;
-  width: 260px;
-  height: 260px;
+  right: 48px;
+  bottom: 70px;
+  width: 218px;
+  height: 218px;
   border-color: color-mix(in srgb, #1e824a 54%, transparent);
   background: color-mix(in srgb, #d1e8d2 46%, transparent);
 }
@@ -415,32 +419,32 @@
 }
 
 .landing-node-1 {
-  top: 258px;
-  left: 204px;
-  min-width: 96px;
-  min-height: 96px;
+  top: 232px;
+  left: 190px;
+  min-width: 88px;
+  min-height: 88px;
   background: var(--md-primary);
   color: var(--md-on-primary);
 }
 
 .landing-node-2 {
-  top: 150px;
-  left: 104px;
+  top: 142px;
+  left: 92px;
 }
 
 .landing-node-3 {
-  top: 158px;
-  right: 122px;
+  top: 152px;
+  right: 84px;
 }
 
 .landing-node-4 {
-  right: 86px;
-  bottom: 190px;
+  right: 70px;
+  bottom: 172px;
 }
 
 .landing-node-5 {
-  bottom: 112px;
-  left: 136px;
+  bottom: 92px;
+  left: 120px;
 }
 
 .landing-product-demo:hover .landing-node-2 {
@@ -689,7 +693,9 @@
   }
 
   .landing-product-demo {
+    max-width: none;
     min-height: 560px;
+    margin-top: 0;
   }
 
   .landing-section-copy,
@@ -752,24 +758,23 @@
     stroke-width: 58px;
   }
 
-  .landing-hero-copy {
-    padding-top: 198px;
-  }
-
   .landing-note {
     padding: 12px 13px 14px;
   }
 
-  .landing-note-a {
-    top: 14px;
-    left: 0;
-    width: 78%;
+  .landing-hero-notes {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-bottom: 22px;
+  }
+
+  .landing-note-a,
+  .landing-note-b {
+    transform: rotate(-1deg);
   }
 
   .landing-note-b {
-    top: 100px;
-    right: 0;
-    width: 76%;
+    transform: rotate(1deg);
   }
 
   .landing-note strong {
@@ -777,7 +782,7 @@
   }
 
   .landing-hero h1 {
-    font-size: clamp(44px, 14vw, 62px);
+    font-size: clamp(40px, 12vw, 56px);
   }
 
   .landing-mode-switch {
