@@ -108,16 +108,16 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
           <div className="hero-stepped-path-container" aria-hidden="true">
             <svg width="100%" height="100%" viewBox="0 0 1100 650" fill="none" preserveAspectRatio="none" style={{ overflow: 'visible' }}>
               <path
-                d="M 80,-10 L 80,60 C 80,140 130,140 180,140 C 250,140 250,260 320,260 L 380,260 C 450,260 430,420 500,420 L 580,420 C 660,420 660,540 740,540 C 780,540 820,580 820,620 L 820,660"
+                d="M 80,-60 L 80,60 C 80,140 130,140 180,140 C 250,140 250,260 320,260 L 380,260 C 450,260 430,420 500,420 L 580,420 C 660,420 660,540 740,540 C 780,540 820,580 820,620 L 820,700"
                 stroke="#00629d"
-                strokeWidth="96"
+                strokeWidth="60"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
               <path
-                d="M 80,-10 L 80,60 C 80,140 130,140 180,140 C 250,140 250,260 320,260 L 380,260 C 450,260 430,420 500,420 L 580,420 C 660,420 660,540 740,540 C 780,540 820,580 820,620 L 820,660"
+                d="M 80,-60 L 80,60 C 80,140 130,140 180,140 C 250,140 250,260 320,260 L 380,260 C 450,260 430,420 500,420 L 580,420 C 660,420 660,540 740,540 C 780,540 820,580 820,620 L 820,700"
                 stroke="#d2e4ff"
-                strokeWidth="80"
+                strokeWidth="48"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
