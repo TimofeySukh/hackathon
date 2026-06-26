@@ -3,7 +3,10 @@
   width: 100%;
   min-height: 100%;
   overflow: hidden;
-  background: #ffffff;
+  background:
+    radial-gradient(circle at 12% 82%, rgba(210, 228, 255, 0.92) 0, rgba(210, 228, 255, 0.46) 24%, rgba(255, 255, 255, 0) 52%),
+    radial-gradient(circle at 82% 18%, rgba(174, 207, 234, 0.68) 0, rgba(210, 228, 255, 0.34) 27%, rgba(255, 255, 255, 0) 58%),
+    linear-gradient(135deg, #f7fbff 0%, #ffffff 45%, #eaf4ff 100%);
   color: #25282e;
   isolation: isolate;
 }
@@ -26,12 +29,12 @@
 
 .landing-stairs-outline {
   stroke: #00557f;
-  stroke-width: 88px;
+  stroke-width: 126px;
 }
 
 .landing-stairs-fill {
-  stroke: rgba(210, 228, 255, 0.82);
-  stroke-width: 74px;
+  stroke: rgba(210, 228, 255, 0.9);
+  stroke-width: 106px;
 }
 
 .landing-idea,
@@ -133,27 +136,27 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  min-height: 68px;
-  padding: 0 36px;
-  border: 0;
-  border-radius: 16px;
-  background: #006da8;
-  color: #ffffff;
+  min-height: 66px;
+  padding: 0 34px;
+  border: 4px solid #00557f;
+  border-radius: 999px;
+  background: rgba(210, 228, 255, 0.86);
+  color: #003b5c;
   font-size: clamp(24px, 2vw, 30px);
   line-height: 1;
   font-weight: 500;
   cursor: pointer;
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.3),
-    0 4px 10px rgba(0, 109, 168, 0.28);
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    0 2px 6px rgba(0, 85, 127, 0.12);
   transition:
     transform var(--md-dur-short) var(--md-ease-standard),
     background var(--md-dur-short) var(--md-ease-standard);
 }
 
 .landing-product-button:hover {
-  transform: scale(1.015);
-  background: #0078b8;
+  transform: scale(1.018);
+  background: rgba(191, 218, 245, 0.94);
 }
 
 .landing-product-button:active {
