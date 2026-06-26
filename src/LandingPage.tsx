@@ -6,14 +6,14 @@ export default function LandingPage() {
   return (
     <main className="landing-page" aria-label="Social Datanode landing">
       <svg className="landing-stairs" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
-        <path d="M120 92 H355 V188 H510 V326 H705 V410 H872 V560 H1078 V722 H1320" />
+        <path d="M0 150 H338 V268 H526 V402 H735 V526 H946 V660 H1144 V780 H1440" />
       </svg>
 
       <section className="landing-idea" aria-label="Project idea">
         <div className="landing-note-stack">
           <div className="landing-card landing-note landing-note-a">Structurise your network</div>
           <div className="landing-card landing-note landing-note-b">Brainstorm while looking at the graph</div>
-          <div className="landing-card landing-note landing-note-c">Keep people, notes, and context in one place</div>
+          <div className="landing-card landing-note landing-note-c">Keep people, notes, and context in one visual workspace</div>
         </div>
       </section>
 

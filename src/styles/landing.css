@@ -4,7 +4,7 @@
   min-height: 100%;
   overflow: hidden;
   background: #ffffff;
-  color: var(--md-on-surface);
+  color: #25282e;
   isolation: isolate;
 }
 
@@ -19,8 +19,8 @@
 
 .landing-stairs path {
   fill: none;
-  stroke: color-mix(in srgb, var(--md-primary) 78%, transparent);
-  stroke-width: 14px;
+  stroke: #006da8;
+  stroke-width: 30px;
   stroke-linecap: butt;
   stroke-linejoin: miter;
   vector-effect: non-scaling-stroke;
@@ -33,16 +33,16 @@
 }
 
 .landing-idea {
-  top: clamp(96px, 12vh, 132px);
-  right: clamp(40px, 7vw, 108px);
-  width: min(620px, 48vw);
-  height: 360px;
+  top: clamp(54px, 7.5vh, 82px);
+  right: clamp(58px, 8vw, 132px);
+  width: min(650px, 48vw);
+  height: 390px;
 }
 
 .landing-try {
-  left: clamp(44px, 8vw, 120px);
-  bottom: clamp(52px, 9vh, 96px);
-  width: min(430px, 35vw);
+  left: clamp(64px, 8vw, 126px);
+  bottom: clamp(58px, 8vh, 88px);
+  width: min(470px, 35vw);
 }
 
 .landing-note-stack {
@@ -52,87 +52,72 @@
 }
 
 .landing-card {
-  position: relative;
   display: block;
-  min-width: 0;
-  border: 1px solid #d4d8df;
-  border-radius: 14px;
+  box-sizing: border-box;
+  border: 1px solid #d5d9df;
+  border-radius: 18px;
   background: #ffffff;
-  color: #2f333a;
+  color: #2c3037;
   box-shadow:
     0 1px 1px rgba(0, 0, 0, 0.18),
-    0 2px 5px rgba(0, 0, 0, 0.14);
-  font-size: 29px;
-  line-height: 1.18;
-  font-weight: 400;
-  box-sizing: border-box;
+    0 4px 12px rgba(28, 34, 45, 0.14);
   text-align: left;
   white-space: normal;
-  overflow-wrap: normal;
   word-break: normal;
   cursor: default;
-  transition: none;
-  will-change: auto;
-}
-
-.landing-card:hover,
-.landing-card:focus-within,
-.landing-card:active {
-  background: #ffffff;
-  box-shadow:
-    0 1px 1px rgba(0, 0, 0, 0.18),
-    0 2px 5px rgba(0, 0, 0, 0.14);
 }
 
 .landing-note {
   position: absolute;
-  padding: 20px 24px;
+  padding: 24px 28px;
+  font-size: clamp(28px, 2.45vw, 38px);
+  line-height: 1.14;
+  font-weight: 400;
 }
 
 .landing-note-a {
-  top: 0;
-  right: 78px;
-  width: 440px;
-  transform: rotate(-2deg);
+  top: 8px;
+  right: 92px;
+  z-index: 3;
+  width: min(540px, 86%);
+  transform: rotate(-1.5deg);
 }
 
 .landing-note-b {
-  top: 104px;
-  right: 0;
-  width: 470px;
-  transform: rotate(1.4deg);
+  top: 108px;
+  right: 10px;
+  z-index: 2;
+  width: min(590px, 92%);
+  transform: rotate(0.9deg);
 }
 
 .landing-note-c {
   top: 220px;
-  right: 48px;
-  width: 500px;
-  transform: rotate(-0.8deg);
+  right: 76px;
+  z-index: 4;
+  width: min(570px, 88%);
+  transform: rotate(-0.6deg);
 }
 
 .landing-cta-note {
   width: 100%;
-  padding: 26px 28px 28px;
+  padding: 30px 32px 32px;
 }
 
 .landing-cta-note h2 {
-  display: block;
   margin: 0 0 18px;
-  color: #2b2e34;
-  font-size: 30px;
-  line-height: 1.12;
+  color: #25282e;
+  font-size: clamp(32px, 3vw, 44px);
+  line-height: 1.05;
   font-weight: 500;
-  white-space: normal;
 }
 
 .landing-cta-note p {
-  display: block;
-  width: 100%;
-  margin: 0 0 26px;
-  color: #2f333a;
-  font-size: 26px;
-  line-height: 1.22;
-  white-space: normal;
+  margin: 0 0 30px;
+  color: #343941;
+  font-size: clamp(23px, 2vw, 29px);
+  line-height: 1.2;
+  font-weight: 400;
 }
 
 .landing-product-button {
@@ -140,29 +125,31 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  min-height: 64px;
-  padding: 0 34px;
+  min-height: 68px;
+  padding: 0 36px;
   border: 0;
-  border-radius: 14px;
-  background: var(--md-primary);
-  color: var(--md-on-primary);
-  font-size: 26px;
+  border-radius: 16px;
+  background: #006da8;
+  color: #ffffff;
+  font-size: clamp(24px, 2vw, 30px);
   line-height: 1;
   font-weight: 500;
   cursor: pointer;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px rgba(0, 98, 157, 0.22);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 4px 10px rgba(0, 109, 168, 0.28);
   transition:
     transform var(--md-dur-short) var(--md-ease-standard),
     background var(--md-dur-short) var(--md-ease-standard);
 }
 
 .landing-product-button:hover {
-  transform: scale(1.02);
-  background: color-mix(in srgb, var(--md-primary) 92%, #ffffff);
+  transform: scale(1.015);
+  background: #0078b8;
 }
 
 .landing-product-button:active {
-  transform: scale(0.98);
+  transform: scale(0.985);
 }
 
 @media (max-width: 900px) {
@@ -171,8 +158,8 @@
     overflow-y: auto;
   }
 
-  .landing-stairs {
-    opacity: 0.75;
+  .landing-stairs path {
+    stroke-width: 20px;
   }
 
   .landing-idea,
@@ -183,66 +170,73 @@
     bottom: auto;
     left: auto;
     width: auto;
-    margin: 42px 22px;
+    margin-inline: 22px;
   }
 
-  .landing-idea {
-    height: 370px;
-  }
-
-  .landing-card,
-  .landing-product-button {
-    font-size: 23px;
-  }
-
-  .landing-cta-note p {
-    font-size: 23px;
-  }
-
-  .landing-cta-note h2 {
-    font-size: 26px;
-  }
-
-  .landing-note-a {
-    right: 26px;
-    width: min(430px, 86%);
-  }
-
-  .landing-note-b {
-    top: 108px;
-    right: 0;
-    width: min(450px, 88%);
-  }
-
-  .landing-note-c {
-    top: 224px;
-    right: 22px;
-    width: min(470px, 86%);
-  }
-}
-
-@media (max-width: 520px) {
   .landing-idea {
     height: 410px;
+    margin-top: 44px;
+  }
+
+  .landing-try {
+    margin-top: 16px;
+    margin-bottom: 34px;
   }
 
   .landing-note {
-    padding: 18px 20px;
+    padding: 20px 22px;
+    font-size: 25px;
   }
 
   .landing-note-a {
+    top: 0;
     right: 16px;
     width: 86%;
   }
 
   .landing-note-b {
-    top: 112px;
+    top: 116px;
+    right: 0;
     width: 88%;
   }
 
   .landing-note-c {
-    top: 242px;
-    right: 10px;
+    top: 236px;
+    right: 12px;
     width: 86%;
+  }
+}
+
+@media (max-width: 520px) {
+  .landing-stairs path {
+    stroke-width: 16px;
+  }
+
+  .landing-idea {
+    height: 430px;
+    margin-top: 36px;
+  }
+
+  .landing-note {
+    font-size: 23px;
+    line-height: 1.16;
+  }
+
+  .landing-note-a {
+    width: 88%;
+  }
+
+  .landing-note-b {
+    top: 120px;
+    width: 90%;
+  }
+
+  .landing-note-c {
+    top: 248px;
+    width: 88%;
+  }
+
+  .landing-cta-note {
+    padding: 28px 28px 30px;
   }
 }
