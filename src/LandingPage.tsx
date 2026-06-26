@@ -18,28 +18,37 @@ export default function LandingPage() {
 
       <section className="landing-idea" aria-label="Project idea">
         <div className="landing-note-stack">
-          <div className="landing-card landing-note landing-note-a">Structurise your network</div>
-          <div className="landing-card landing-note landing-note-b">Brainstorm while looking at the graph</div>
-          <div className="landing-card landing-note landing-note-c">Keep people, notes, and context in one visual workspace</div>
+          <div className="landing-card landing-note landing-note-a">
+            <span>Import people</span>
+            <strong>LinkedIn contacts land on one board.</strong>
+          </div>
+          <div className="landing-card landing-note landing-note-b">
+            <span>Think visually</span>
+            <strong>Cluster relationships by dragging circles.</strong>
+          </div>
+          <div className="landing-card landing-note landing-note-c">
+            <span>Use AI memory</span>
+            <strong>Find who to ask or reconnect with.</strong>
+          </div>
         </div>
       </section>
 
       <section className="landing-try" aria-label="Try the product">
         <article className="landing-card landing-cta-note">
           <span className="landing-kicker">Social Datanode</span>
-          <h1>Map your network like a living board</h1>
-          <p>Turn contacts, notes, and half-formed ideas into one visual graph you can think on.</p>
+          <h1>Your network, laid out like a thinking board</h1>
+          <p>Turn scattered contacts into a visual workspace for people, context, and next moves.</p>
           <div className="landing-proof-row" aria-label="Product highlights">
             <span>Private workspace</span>
             <span>LinkedIn import</span>
             <span>AI notes</span>
           </div>
           <div className="landing-action-row">
-            <button className="landing-product-button" type="button" onClick={openProduct}>
+            <button className="landing-product-button" type="button" aria-label="Open workspace" onClick={openProduct}>
               <span>Open workspace</span>
-              <span aria-hidden="true">→</span>
+              <span aria-hidden="true">-&gt;</span>
             </button>
-            <small>No setup needed</small>
+            <small>Starts with a blank board</small>
           </div>
         </article>
       </section>
