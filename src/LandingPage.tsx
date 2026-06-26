@@ -105,17 +105,41 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
         {/* First Viewport: Hero Section */}
         <section className="landing-section hero-section">
           {/* Stepped background ribbon using double stroke technique for perfect border & thickness */}
-          <div className="hero-stepped-path-container" aria-hidden="true">
-            <svg width="100%" height="100%" viewBox="0 0 1100 650" fill="none" preserveAspectRatio="none" style={{ overflow: 'visible' }}>
+          <div
+            className="hero-stepped-path-container"
+            style={{
+              position: 'absolute',
+              top: '-80px',
+              bottom: '-80px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: '100%',
+              maxWidth: '1100px',
+              zIndex: 1,
+              pointerEvents: 'none'
+            }}
+            aria-hidden="true"
+          >
+            <svg
+              viewBox="0 0 1100 650"
+              fill="none"
+              preserveAspectRatio="none"
+              style={{
+                width: '100%',
+                height: '100%',
+                display: 'block',
+                overflow: 'visible'
+              }}
+            >
               <path
-                d="M 80,0 L 80,60 C 80,140 130,140 180,140 C 250,140 250,260 320,260 L 380,260 C 450,260 430,420 500,420 L 580,420 C 660,420 660,540 740,540 C 780,540 820,580 820,600 L 820,650"
+                d="M 80,-100 L 80,60 C 80,140 130,140 180,140 C 250,140 250,260 320,260 L 380,260 C 450,260 430,420 500,420 L 580,420 C 660,420 660,540 740,540 C 780,540 820,580 820,600 L 820,800"
                 stroke="#00629d"
                 strokeWidth="60"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
               <path
-                d="M 80,0 L 80,60 C 80,140 130,140 180,140 C 250,140 250,260 320,260 L 380,260 C 450,260 430,420 500,420 L 580,420 C 660,420 660,540 740,540 C 780,540 820,580 820,600 L 820,650"
+                d="M 80,-100 L 80,60 C 80,140 130,140 180,140 C 250,140 250,260 320,260 L 380,260 C 450,260 430,420 500,420 L 580,420 C 660,420 660,540 740,540 C 780,540 820,580 820,600 L 820,800"
                 stroke="#d2e4ff"
                 strokeWidth="48"
                 strokeLinecap="round"
