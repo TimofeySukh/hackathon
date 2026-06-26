@@ -210,13 +210,10 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
           <div className="demo-container">
             <div className="demo-info-col">
               <span className="demo-eyebrow">Interactive Demo</span>
-              <h2 className="demo-title">Inspect & organize network nodes</h2>
+              <h2 className="demo-title">Organize your connections</h2>
               <p className="demo-desc">
-                Social Datanode allows you to edit contact properties, organize profiles into company-wide provider zones, and add encrypted interaction notes. Experiment with this live simulator:
+                Make notes on people to remember who they are and where you met them. Group people into circle zones to make sorting easier, and add key contacts to your favorites so you never lose them in the crowd.
               </p>
-              <button className="lp-btn lp-btn-filled" style={{ height: '44px' }} onClick={handleLaunchApp}>
-                Try Live Board Workspace
-              </button>
             </div>
 
             {/* Simulated Inspector Card */}
