@@ -10,8 +10,9 @@ selects the node and flies the camera to it at a comfortable zoom.
 
 - A magnifier pill sits in the top toolbar, immediately left of the settings gear.
   Collapsed it is an icon button; tapping it expands an inline text field and focuses it.
-- Typing filters live: people match on name **and** role; circles match on name. People
-  are listed first, then circles (labelled "Circle"); results are capped at 8.
+- Typing filters live: people match on name, owning circle, notes, and saved
+  connections; circles match on name. People are listed first, then circles
+  (labelled "Circle"); results are capped at 8.
 - Pasting a LinkedIn profile URL (`linkedin.com/in/...` or `linkedin.com/pub/...`)
   shows an "Add LinkedIn profile" action at the top of results. Clicking it, or
   pressing Enter while it is first, imports the profile into the board.
@@ -20,8 +21,8 @@ selects the node and flies the camera to it at a comfortable zoom.
   fields, then falls back to the URL slug when no backend enrichment is available.
 - Signed-in users get server-side LinkedIn profile enrichment for manual one-profile
   imports only. The result provides name, current company, headline, avatar, and profile
-  description when those fields are available. The description is saved as a regular
-  person note titled "Profile".
+  description when those fields are available. The headline and description are saved as
+  regular person notes titled "Headline" and "Profile".
 - Manual LinkedIn enrichment checks the existing graph first and then a local per-URL
   cache before calling the server, so repeated imports of the same profile avoid another
   provider request. LinkedIn ZIP import does not use server-side profile enrichment.
@@ -75,5 +76,4 @@ Reuses the Material 3 chrome language (see [`../DESIGN_SYSTEM.md`](../DESIGN_SYS
 
 ## Open questions / TODO
 
-- Possibly search note/connection text too, not just name/role.
 - Highlighting the matched substring in results.

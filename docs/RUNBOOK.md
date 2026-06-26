@@ -30,8 +30,9 @@ Current visible prototype behavior:
 - shows in-page instructions for the prototype controls
 - pans by dragging empty board space
 - zooms toward the cursor with the mouse wheel and through the toolbar
-- stores all visible prototype state only in the current browser session
-- does not call Supabase, auth, database persistence, LinkedIn import, notes, or AI search from the visible screen
+- stores signed-in board data in Supabase `user_graphs.graph`
+- stores signed-out board data in this browser's `localStorage`
+- supports LinkedIn ZIP import and signed-in manual LinkedIn profile enrichment
 There is no multiplayer or drawing toolset yet.
 
 ## Local Setup
@@ -42,32 +43,11 @@ Install dependencies from the lockfile:
 npm ci
 ```
 
-The visible prototype does not require Supabase environment variables. Copy the local environment example only when working on the existing persisted data layer or MCP data tools:
+Copy the local environment example when working with auth, synced boards, or LinkedIn profile enrichment:
 
 ```bash
 cp .env.example .env.local
 ```
-
-Project MCP configuration lives in `.mcp.json`. The repository now includes:
-
-- the local `hackathon-board` stdio server in `mcp/server.mjs`
-
-If you want the local MCP server to read and mutate live board data, create a separate MCP env file:
-
-```bash
-cp .env.mcp.example .env.mcp.local
-```
-
-Required MCP variable:
-
-- `HACKATHON_MCP_SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_SERVICE_ROLE_KEY`
-
-Optional MCP variable:
-
-- `HACKATHON_MCP_SUPABASE_URL`
-
-If `HACKATHON_MCP_SUPABASE_URL` is missing, the MCP server falls back to `VITE_SUPABASE_URL` from `.env.local`.
-Without a service-role key, the local MCP server still exposes project documentation resources but data tools return a setup error.
 
 Required Vite variables:
 
@@ -85,14 +65,20 @@ VITE_SUPABASE_ANON_KEY=
 If `VITE_SUPABASE_PUBLISHABLE_KEY` is present, `VITE_SUPABASE_ANON_KEY` may stay empty.
 `VITE_SUPABASE_ANON_KEY` is still supported for older local setups, but new local environments should use the Supabase publishable key.
 
+Required Supabase Edge Function secret for the graph API:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Keep it only in Supabase Edge Function secrets or local Supabase function env files. It is
+used by `graph-api` to verify hashed agent tokens and apply graph writes for the resolved
+owner user.
+
 Everything else the teammate needs is already in the repository:
 
 - application code
 - the Supabase migration
 - `.env.example`
-- `.env.mcp.example`
 - project documentation
-- project-scoped Supabase MCP skills
 
 The Google OAuth client secret is not needed in the app because it stays in the Supabase Dashboard.
 
@@ -102,30 +88,70 @@ Start the development server:
 npm run dev
 ```
 
-Start the local project MCP server manually when you want to test it outside the app:
+## Agent API, CLI, and MCP
+
+Signed-in users can create revocable agent tokens from Settings -> Agent API. The token is
+shown once and maps to that user's graph only.
+
+Use the generated values like this:
 
 ```bash
-npm run mcp:start
+export DATANODE_API_URL=https://<project-ref>.supabase.co/functions/v1/graph-api/v1
+export DATANODE_API_TOKEN=dn_live_<token>
 ```
 
-Seed a board with fake nodes from local service-role credentials:
+CLI examples:
 
+Using on-the-fly `npx` from anywhere (no clone needed):
 ```bash
-npm run seed:board -- --board-id <board-uuid> --count 1000 --connect-center
+npx -y --package github:TimofeySukh/hackathon datanode-cli meta
+npx -y --package github:TimofeySukh/hackathon datanode-cli search "alice"
+npx -y --package github:TimofeySukh/hackathon datanode-cli circles
+npx -y --package github:TimofeySukh/hackathon datanode-cli people:add <circle-id> "Alice Chen" "Met at conference"
+npx -y --package github:TimofeySukh/hackathon datanode-cli operations:run ./operations.json
 ```
 
-Optional seeding flags:
-
-- `--random-links <n>` adds extra random connections among the newly created people.
-- `--ring-start <pixels>` and `--ring-step <pixels>` control how far the generated nodes are placed from the origin.
-
-Seed one user's board with a reusable demo cluster of people, notes, AI summaries, and connections:
-
+Or install globally:
 ```bash
-npm run seed:demo-user -- --email <user-email>
+npm install -g github:TimofeySukh/hackathon
+datanode-cli search "alice"
 ```
 
-The demo seed is idempotent for the fixed contact set. Re-running it updates the seeded people, rebuilds their notes, and keeps the graph ready for search and live demos.
+Or from a local repository checkout:
+```bash
+npm run datanode:cli -- meta
+npm run datanode:cli -- search "alice"
+npm run datanode:cli -- circles
+npm run datanode:cli -- people:add <circle-id> "Alice Chen" "Met at conference"
+```
+
+MCP config:
+
+```json
+{
+  "mcpServers": {
+    "datanode": {
+      "command": "npx",
+      "args": ["-y", "github:TimofeySukh/hackathon"],
+      "env": {
+        "DATANODE_API_URL": "https://<project-ref>.supabase.co/functions/v1/graph-api/v1",
+        "DATANODE_API_TOKEN": "dn_live_<token>"
+      }
+    }
+  }
+}
+```
+
+All writes require the current graph revision. The CLI and MCP server read it before
+writing; if another tab or agent saves first, the API returns `409 Conflict` instead of
+overwriting data.
+
+MCP tool results are returned as a structured JSON envelope with `status`, `summary`,
+`data`, and `next_valid_actions`. The MCP tool registry exposes risk metadata and uses
+strict argument schemas. Agents can call `list_capabilities` to inspect a compact
+risk-aware tool list before choosing a detailed graph tool. For large, experimental, bulk,
+or destructive graph changes, agents should create a backup with `export_graph` or ask the
+user for confirmation before calling replacement, reset, or broad cleanup tools.
 
 ## Import Load Testing
 
@@ -151,8 +177,8 @@ This runs:
 3,000 connections, serializes it in the same shape stored in `user_graphs.graph`, and
 prints payload size without writing to Supabase.
 
-To write against a staging Supabase project, configure `.env.mcp.local` with the staging
-URL and service-role key, then opt in explicitly:
+To write against a staging Supabase project, set `HACKATHON_LOAD_TEST_SUPABASE_URL`
+and `HACKATHON_LOAD_TEST_SUPABASE_SERVICE_ROLE_KEY`, then opt in explicitly:
 
 ```bash
 HACKATHON_ALLOW_DATABASE_LOAD_TEST=true npm run test:db-load -- --write --cleanup
@@ -306,8 +332,6 @@ Teammate quick-start:
    ```
 
 5. Open the URL printed by Vite.
-6. Optional for MCP data tools: create `.env.mcp.local` from `.env.mcp.example` and add the service-role key.
-
 ## Supabase Setup
 
 Apply the database migration in `supabase/migrations/` to the target Supabase project.
@@ -322,21 +346,17 @@ For hosted dashboard workflows, paste and run the migration SQL in the Supabase 
 
 This repository includes Supabase Edge Functions in `supabase/functions/`.
 
-Deploy functions before testing AI features:
+Deploy the active Edge Function before testing signed-in manual LinkedIn profile import:
 
 ```bash
-supabase functions deploy sync-person-ai-note
-supabase functions deploy search-people-ai
 supabase functions deploy enrich-linkedin-profile
 ```
 
-`supabase/config.toml` sets AI and LinkedIn enrichment functions to `verify_jwt = false` at the Supabase gateway because each function performs its own user-token validation with `supabase.auth.getUser()`. Do not remove the in-function authorization checks.
+`supabase/config.toml` sets LinkedIn enrichment to `verify_jwt = false` at the Supabase gateway because the function performs its own user-token validation with `supabase.auth.getUser()`. Do not remove the in-function authorization check.
 
-Required AI function secrets:
+Required LinkedIn enrichment secret:
 
 ```bash
-supabase secrets set GEMINI_API_KEY=your-gemini-api-key
-supabase secrets set OPENROUTER_API_KEY=your-openrouter-api-key
 supabase secrets set LINKEDIN_ENRICHMENT_API_KEY=your-linkedin-enrichment-provider-api-key
 ```
 
@@ -357,16 +377,9 @@ or `::1`, has the matching `x-linkedin-enrichment-test-secret` header, and the E
 Function has `LINKEDIN_ENRICHMENT_ALLOW_TEST_AUTH=true`. Production must leave these
 test variables unset so unauthenticated enrichment still fails.
 
-Optional AI model overrides:
+Manual one-profile LinkedIn search imports call the profile enrichment Edge Function. LinkedIn ZIP import stays local to the uploaded archive.
 
-```bash
-supabase secrets set GEMINI_MODEL=gemini-2.5-flash
-supabase secrets set OPENROUTER_MODEL=openrouter/free
-```
-
-AI note sync and AI people search now run inside Supabase Edge Functions through direct provider API calls. The functions try Gemini first and fall back to OpenRouter for provider quota or availability errors. Manual one-profile LinkedIn search imports call the profile enrichment Edge Function; LinkedIn ZIP import stays local to the uploaded archive.
-
-The browser never calls Gemini, OpenRouter, or the LinkedIn enrichment provider directly. It invokes Edge Functions, and those functions authenticate the user, load user-owned graph context when needed, call providers with server-side API keys, and return or persist structured output.
+The browser never calls the LinkedIn enrichment provider directly. It invokes the Edge Function, and that function authenticates the user, calls the provider with a server-side API key, and returns normalized profile data.
 
 Configure Supabase Auth redirect URLs for each app URL used by the team, including:
 
@@ -500,22 +513,16 @@ Manual verification:
 27. Create a connection between two existing people, confirm reload preserves it, then click the widened line target and confirm `Delete connection` or Backspace removes it.
 28. Open the top-left Tags menu, create enough tags to overflow the panel, scroll to the lower tags, adjust a lower tag color, and confirm the palette remains reachable.
 29. Open the top-left Tags menu, create a tag, adjust its color, toggle one tag off with the visibility checkbox, and confirm both tagged nodes and their connections disappear. Use `Select all` and `Clear all` to confirm bulk visibility controls work.
-30. Open the search layer and verify that typing a person name, tag, or note text returns local matching people.
-31. Press Enter with a natural-language query and verify AI search returns ranked people with reasons.
-32. Click a search result and verify the board recenters on that person and opens the inspector.
-33. After creating a note, wait at least 3 seconds and confirm a `person_ai_notes` row for that person reaches `status = 'created'`.
-34. Edit an existing note, blur the input, wait at least 3 seconds, and confirm the same `person_ai_notes` row updates its `updated_at`, `summary`, and `structured_summary`.
-35. Sign out and confirm the anonymous board state returns.
+30. Open the search layer and verify that typing a person name, role, or circle name returns local matches.
+31. Click a search result and verify the board recenters on that person or circle and opens the inspector.
+32. Paste a LinkedIn profile URL into search while signed in and verify manual profile import creates or enriches a person.
+33. Sign out and confirm the anonymous board state returns.
 
 Supabase verification:
 
-1. Confirm a row exists in `profiles` for the signed-in user.
-2. Confirm a single row exists in `boards` for the signed-in user.
-3. Confirm a single root row exists in `people` for the signed-in user with `is_root = true`, `x = 0`, and `y = 0`.
-4. Confirm `tags`, `notes`, `person_ai_notes`, and `connections` rows are created for user actions.
-5. Confirm `person_ai_notes.status` moves through `pending` and then `created` after note create or update.
-6. Confirm `person_ai_notes.structured_summary` contains the keys `summary`, `traits`, `interests`, `relationship_context`, and `open_questions`.
-7. Confirm row-level security prevents reading or updating another user's board data.
+1. Confirm one `user_graphs` row exists for the signed-in user after the first edit.
+2. Confirm the `user_graphs.graph` JSON contains `circles`, `people`, and `connections`.
+3. Confirm row-level security prevents reading or updating another user's `user_graphs` row.
 
 ## Team Workflow
 
@@ -551,5 +558,5 @@ Supabase verification:
 - `npm run build`
 - `npm run lint`
 - `npm run test:load`
-- Manual browser check of drag navigation, wheel and trackpad navigation, theme persistence, persisted graph editing, debounced AI note sync, and AI people search
+- Manual browser check of drag navigation, wheel and trackpad navigation, theme persistence, persisted graph editing, local search, and LinkedIn import
 - Manual Supabase auth check when credentials and Google OAuth are configured

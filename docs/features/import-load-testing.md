@@ -86,8 +86,8 @@ npx playwright install chromium
 
 - Never run synthetic import checks from a real user account in production.
 - Use a separate Supabase project for staging and load tests.
-- Keep service-role keys only in `.env.mcp.local` or shell environment, never in `VITE_`
-  variables.
+- Keep service-role keys only in shell environment or a local ignored env file, never in
+  `VITE_` variables.
 - Test-only database writes require `HACKATHON_ALLOW_DATABASE_LOAD_TEST=true`.
 - The database load script compares the target URL with `.env.production` and exits before
   writing if they match.

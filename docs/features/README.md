@@ -21,7 +21,9 @@ design without reverse-engineering `src/App.tsx`.
   connections, pan/zoom, create menu, inspector.
 - [Person notes (Trello-Style)](person-notes.md) — Trello-style notes list column, cards, composer, and inline editing.
 - [Person connections](person-connections.md) — profile links, social handles, phone-app links, LinkedIn import links, and quick open/delete controls.
-- [Board search](board-search.md) — find a person (name/role) or circle (tag) from the toolbar and fly the camera to it.
+- [Board search](board-search.md) — find a person by name, notes, connections, or circle; find circles from the toolbar and fly the camera to them.
 - [Authentication](auth.md) — local editing, Google sign-in, email/password registration, confirmation resend, and password reset.
 - [Import load testing](import-load-testing.md) — isolated database load checks and browser responsiveness verification for large LinkedIn imports.
-- [Landing page](landing-page.md) — first viewport with a diagonal staircase layout and Trello-style notes.
+- [Landing page](landing-page.md) — clean, beautiful entry point introducing the product with animated orbits and view routing.
+- [Agent API](agent-api.md) — revocable agent tokens, graph API access, CLI, and MCP server setup.
+- [Real-time sync](realtime-sync.md) — automatic real-time sync with database edits via Supabase Realtime.

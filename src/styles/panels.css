@@ -507,6 +507,298 @@
   text-align: center;
 }
 
+.agent-settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: color-mix(in srgb, var(--md-on-surface) 42%, transparent);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity var(--md-dur-medium) var(--md-ease-standard),
+    visibility var(--md-dur-medium) var(--md-ease-standard);
+}
+
+.agent-settings-overlay.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.agent-settings-dialog {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  width: min(1080px, calc(100vw - 64px));
+  height: min(680px, calc(100vh - 64px));
+  overflow: hidden;
+  border-radius: var(--md-r-xl);
+  background: var(--md-surface-container-low);
+  box-shadow: var(--md-elev-3);
+  transform: scale(0.96) translateY(12px);
+  transition: transform var(--md-dur-medium) var(--md-ease-spring-gentle);
+}
+
+.agent-settings-overlay.is-open .agent-settings-dialog {
+  transform: scale(1) translateY(0);
+}
+
+.agent-settings-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 20px 10px;
+  border-right: 1px solid var(--md-outline-variant);
+  background: var(--md-surface-container);
+}
+
+.agent-settings-sidebar__section {
+  padding: 0 10px 8px;
+  color: var(--md-on-surface-variant);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.agent-settings-sidebar__item {
+  display: flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--md-r-sm);
+  background: transparent;
+  color: var(--md-on-surface-variant);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+}
+
+.agent-settings-sidebar__item.is-active {
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+.agent-settings-content {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 24px;
+  min-width: 0;
+  max-height: inherit;
+  overflow-y: auto;
+  padding: 28px 72px 36px 56px;
+}
+
+.agent-settings-close {
+  position: absolute;
+  top: 22px;
+  right: 24px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: var(--md-r-full);
+  background: transparent;
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  transition:
+    background-color 0.2s,
+    transform var(--md-dur-short) var(--md-ease-spring);
+}
+
+.agent-settings-close:hover {
+  background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+}
+
+.agent-settings-close:active {
+  transform: scale(0.92);
+}
+
+.agent-settings-close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.agent-settings-header h2 {
+  margin: 0;
+  color: var(--md-on-surface);
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.agent-settings-header p,
+.agent-settings-section__header p,
+.agent-settings-secret p {
+  margin: 6px 0 0;
+  color: var(--md-on-surface-variant);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.agent-settings-section {
+  display: grid;
+  gap: 14px;
+  width: min(760px, 100%);
+}
+
+.agent-settings-section__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.agent-settings-section__header h3,
+.agent-settings-secret h4 {
+  margin: 0;
+  color: var(--md-on-surface);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.agent-settings-create-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+}
+
+.agent-settings-name-input {
+  width: 100%;
+  min-width: 0;
+}
+
+.agent-settings-action,
+.agent-settings-refresh,
+.agent-settings-revoke,
+.agent-settings-copy-action {
+  width: auto;
+  white-space: nowrap;
+}
+
+.agent-settings-copy-action {
+  justify-self: end;
+}
+
+.agent-settings-status {
+  margin: 0;
+  color: var(--md-on-surface-variant);
+  font-size: 13px;
+}
+
+.agent-settings-secret {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-r-md);
+  background: var(--md-surface-container);
+}
+
+.agent-settings-secret textarea {
+  min-height: 82px;
+  resize: vertical;
+}
+
+.agent-settings-flow {
+  gap: 18px;
+}
+
+.agent-settings-step {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  padding: 16px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-r-md);
+  background: var(--md-surface-container-low);
+}
+
+.agent-settings-step h3 {
+  margin: 0;
+  color: var(--md-on-surface);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.agent-settings-step p {
+  margin: 6px 0 0;
+  color: var(--md-on-surface-variant);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.agent-settings-copybox {
+  width: 100%;
+  min-height: 168px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.agent-token-list {
+  display: grid;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-r-md);
+}
+
+.agent-token-empty,
+.agent-token-row {
+  padding: 14px;
+}
+
+.agent-token-empty {
+  color: var(--md-on-surface-variant);
+  font-size: 13px;
+}
+
+.agent-token-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  background: var(--md-surface-container-low);
+}
+
+.agent-token-row + .agent-token-row {
+  border-top: 1px solid var(--md-outline-variant);
+}
+
+.agent-token-row__main {
+  min-width: 0;
+}
+
+.agent-token-row__name {
+  overflow: hidden;
+  color: var(--md-on-surface);
+  font-size: 14px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-token-row__meta {
+  overflow: hidden;
+  margin-top: 3px;
+  color: var(--md-on-surface-variant);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Auth Modal Overlay & Card Transitions */
 .auth-overlay {
   position: fixed;
@@ -808,6 +1100,49 @@
 }
 
 @media (max-width: 480px) {
+  .agent-settings-overlay {
+    padding: 12px;
+  }
+
+  .agent-settings-dialog {
+    grid-template-columns: 1fr;
+    width: calc(100vw - 24px);
+    height: min(680px, calc(100vh - 24px));
+  }
+
+  .agent-settings-sidebar {
+    display: none;
+  }
+
+  .agent-settings-content {
+    padding: 24px 18px 28px;
+  }
+
+  .agent-settings-close {
+    top: 16px;
+    right: 14px;
+  }
+
+  .agent-settings-header {
+    padding-right: 42px;
+  }
+
+  .agent-settings-section__header {
+    display: grid;
+  }
+
+  .agent-settings-create-row,
+  .agent-token-row {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-settings-action,
+  .agent-settings-refresh,
+  .agent-settings-revoke,
+  .agent-settings-copy-action {
+    width: 100%;
+  }
+
   .auth-overlay {
     align-items: flex-end;
     padding: 12px;

@@ -11,12 +11,9 @@ Runtime boundaries:
 - CSS owns the visual board surface, graph styling, panel styling, and responsive layout.
 - The browser owns in-memory graph state for the current session.
 - Supabase owns Google authentication, email/password authentication, password recovery,
-  and user-owned graph records.
-- Supabase Edge Functions own server-side AI provider calls for AI note enrichment and people search.
-- Supabase Edge Functions own server-side LinkedIn profile enrichment calls.
-- Gemini owns the primary LLM execution path for structured summary generation and natural-language people search ranking.
-- OpenRouter owns the fallback LLM execution path when Gemini quota or availability errors occur.
-- The local MCP server owns agent-facing project documentation resources plus service-role scoped board graph tooling.
+  user-owned graph records, graph revisions, and hashed agent tokens.
+- Supabase Edge Functions own server-side LinkedIn profile enrichment calls and the
+  agent graph API.
 - Linear owns task state, status, ownership, priority, and blockers.
 - `docs/` owns durable product and repository knowledge.
 
@@ -36,20 +33,17 @@ circle) — there is no demo seed.
   `colors.ts`, `geometry.ts`, `layout.ts` (containment/collision), and
   `render.ts` (spatial index, hit-testing, the Canvas 2D draw layer).
 - `src/lib/graphPersistence.ts` loads/saves the graph blob (Supabase for
-  signed-in users, `localStorage` for anonymous sessions). It also contains the
-  legacy normalized-table fallback used when a user has older `boards` / `people`
-  / `notes` data but no `user_graphs` row yet.
+  signed-in users, `localStorage` for anonymous sessions) with optimistic graph
+  revision checks.
+- `src/lib/agentApi.ts` calls the `graph-api` Edge Function for agent token
+  management from the Settings panel.
 - `src/lib/supabase.ts` creates the browser Supabase client from Vite environment variables.
 - `src/lib/useAuth.ts` owns session loading, Google sign-in, email/password sign-in,
   registration, confirmation resend, password recovery, and sign-out.
-- `src/lib/useBoardGraph.ts` owns board graph loading, frontend mutation state, and debounced AI note refresh scheduling.
-- `src/lib/graphStorage.ts` owns Supabase CRUD for graph data, `person_ai_notes`, and Edge Function invocation.
-- `src/lib/userWorkspace.ts` upserts the user profile and ensures a single personal board plus root node.
-- `mcp/server.mjs` exposes repo docs as MCP resources and the persisted graph model as MCP tools and dynamic resources.
-- `supabase/functions/_shared/ai.ts` calls Gemini first and falls back to OpenRouter for structured AI responses.
-- `supabase/functions/sync-person-ai-note/index.ts` authenticates the caller, loads person context, calls the shared AI provider layer, and upserts `person_ai_notes`.
-- `supabase/functions/search-people-ai/index.ts` authenticates the caller, builds candidate context, calls the shared AI provider layer, and returns ranked people.
 - `supabase/functions/enrich-linkedin-profile/index.ts` authenticates the caller, calls the configured profile provider for one manually pasted LinkedIn profile URL, and returns normalized profile fields.
+- `supabase/functions/graph-api/index.ts` authenticates user sessions or revocable
+  agent tokens, resolves the owner user id from the credential, and exposes graph
+  search/write methods for API, CLI, and MCP clients.
 - `src/index.css` contains the visible circle graph prototype styling, including the grid board, creation menu, toolbar, and inspector.
 
 The board's hot visual path is rendered on a single Canvas 2D layer: circle fills and labels, center controls, people avatars and labels, curved links, selected handles, hover states, and the draft connector. React still owns the surrounding chrome, menus, inspector, and persisted graph state. Pointer events land on the board surface and use canvas hit testing against a lightweight spatial grid instead of DOM/SVG nodes.
@@ -70,8 +64,9 @@ Current scope:
   debounced autosave
 - anonymous editing persisted to `localStorage`
 - LinkedIn import (Connections.csv ZIP + single-profile enrichment)
-- per-person notes, tags, and connections; debounced AI note generation
-- local + AI-ranked board search
+- per-person notes, tags, and connections stored inside the graph blob
+- local board search
+- revocable agent tokens, graph API access, a local CLI, and a stdio MCP server
 
 Out of scope (still not built):
 
@@ -87,11 +82,14 @@ Out of scope (still not built):
 - Link implementation work back to the relevant Linear issue.
 - Preserve the clean-board product principle from `docs/product-vision.md`.
 - Keep all graph rows user-owned and protected by RLS keyed to `auth.uid()`.
+- Keep graph writes revision-checked. A stale browser tab, CLI, or MCP agent must get a
+  conflict instead of overwriting newer data.
+- Keep agent tokens hashed at rest, scoped, revocable, and mapped to one user. API
+  callers never provide `user_id`.
 - Never let a missing graph row silently overwrite a user's server data with a blank
   fresh graph; fallback or fail visibly before autosave.
 - Keep unsigned local graph data out of Supabase until the user signs in and an explicit migration path exists.
-- Keep Gemini, OpenRouter, and LinkedIn enrichment provider API keys out of the browser and only inside Supabase Edge Function secrets.
-- Keep `SUPABASE_SERVICE_ROLE_KEY` out of browser-exposed `VITE_` variables and only in local MCP env files or shell env.
+- Keep LinkedIn enrichment provider API keys out of the browser and only inside Supabase Edge Function secrets.
 - Keep the root person immutable in position and deletion semantics.
 - Keep Google OAuth and Supabase email redirect/origin configuration aligned with the real deployed frontend origins.
 

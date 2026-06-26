@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react'
 import type { User } from '@supabase/supabase-js'
 import * as zip from '@zip.js/zip.js'
@@ -15,7 +15,11 @@ import sdnLogo from './assets/sdn-logo.svg'
 zip.configure({ useWebWorkers: false })
 import { useAuth } from './lib/useAuth'
 import LandingPage from './LandingPage'
-import { loadGraphRecord, saveGraph, loadLocalGraph, saveLocalGraph } from './lib/graphPersistence'
+import DocsPage from './DocsPage'
+import { createAgentToken, getGraphApiBaseUrl, listAgentTokens, revokeAgentToken } from './lib/agentApi'
+import type { AgentScope, AgentTokenRecord } from './lib/agentApi'
+import { supabase } from './lib/supabase'
+import { GraphRevisionConflictError, loadGraphRecord, saveGraph, loadLocalGraph, saveLocalGraph } from './lib/graphPersistence'
 import { enrichLinkedInProfile } from './lib/linkedinEnrichment'
 import { OnboardingCoach } from './Onboarding'
 import { SelectionIndicator } from './components/SelectionIndicator'
@@ -60,6 +64,7 @@ import {
   MATERIAL_TONES,
   CIRCLE_COLOR_PRESETS,
   LINK_SERVICE_OPTIONS,
+  EMPTY_ANIM_FRAME,
 } from './lib/board/constants'
 import { getCircleColors, hexToHsv, hsvToHex } from './lib/board/colors'
 import { clamp } from './lib/board/geometry'
@@ -466,9 +471,31 @@ function markOnboardingSeen() {
   }
 }
 
+
 function App() {
-  const [appHash, setAppHash] = useState(() => window.location.hash || '#top')
-  const showLanding = appHash !== '#board'
+  const [viewMode, setViewMode] = useState<'landing' | 'board' | 'docs'>(() => {
+    // Show landing/docs page if explicitly requested in the URL hash
+    if (window.location.hash === '#landing') return 'landing';
+    if (window.location.hash === '#docs') return 'docs';
+    return 'board';
+  });
+
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      if (hash === '#landing') {
+        setViewMode('landing');
+      } else if (hash === '#docs') {
+        setViewMode('docs');
+      } else {
+        setViewMode('board');
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
   const surfaceRef = useRef<HTMLDivElement | null>(null)
   // Canvas 2D board renderer: circles, edges, people, labels, and interaction chrome.
   const peopleCanvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -484,22 +511,15 @@ function App() {
   // pan/zoom gesture) so a move event flood doesn't trigger a re-render storm.
   const dragRafRef = useRef<number | null>(null)
   const pendingGraphRef = useRef<((current: GraphState) => GraphState) | null>(null)
-  const loadedGraphSourceRef = useRef<'saved' | 'legacy' | 'empty' | 'local' | 'error'>('empty')
+  const loadedGraphSourceRef = useRef<'saved' | 'empty' | 'local' | 'error'>('empty')
   const loadedGraphSnapshotRef = useRef<string | null>(null)
+  const loadedGraphRevisionRef = useRef<number | null>(null)
+  const graphChannelId = useId()
   const pendingConnectorRef = useRef<DragConnector | null>(null)
   // Start from a blank board (just the "you" circle), never the old demo seed.
   // The real graph replaces this once loaded; keeping demo data here caused it to
   // flash for a few frames on some reloads before the loaded graph took over.
   const [graph, setGraph] = useState(createFreshGraph)
-
-  useEffect(() => {
-    const handleHashChange = () => {
-      setAppHash(window.location.hash || '#top')
-    }
-
-    window.addEventListener('hashchange', handleHashChange)
-    return () => window.removeEventListener('hashchange', handleHashChange)
-  }, [])
   // True once the current drag/resize gesture has recorded its undo snapshot.
   // Only touched from pointer event handlers, never during render.
   const gestureSnapshotTakenRef = useRef(false)
@@ -522,6 +542,68 @@ function App() {
   const [emailAuthNotice, setEmailAuthNotice] = useState<string | null>(null)
   const [emailAuthError, setEmailAuthError] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
+  const [agentTokens, setAgentTokens] = useState<AgentTokenRecord[]>([])
+  const [agentTokenName, setAgentTokenName] = useState('AI agent')
+  const [newAgentToken, setNewAgentToken] = useState<string | null>(null)
+  const [agentTokenStatus, setAgentTokenStatus] = useState<string | null>(null)
+  const [agentTokensBusy, setAgentTokensBusy] = useState(false)
+  const [agentSettingsTab, setAgentSettingsTab] = useState<'quick' | 'mcp' | 'cli' | 'api' | 'keys'>('quick')
+
+  const defaultAgentScopes: AgentScope[] = ['graph:read', 'search:read', 'people:write', 'notes:write', 'links:write', 'connections:write']
+
+  const refreshAgentTokens = async () => {
+    if (!auth.session) return
+    setAgentTokensBusy(true)
+    setAgentTokenStatus(null)
+    try {
+      const tokens = await listAgentTokens(auth.session)
+      setAgentTokens(tokens.filter((token) => !token.revoked_at))
+    } catch (error) {
+      setAgentTokenStatus(error instanceof Error ? error.message : 'Could not load agent tokens.')
+    } finally {
+      setAgentTokensBusy(false)
+    }
+  }
+
+  const handleCreateAgentToken = async () => {
+    if (!auth.session || agentTokensBusy) return
+    setAgentTokensBusy(true)
+    setAgentTokenStatus(null)
+    setNewAgentToken(null)
+    try {
+      const created = await createAgentToken(auth.session, agentTokenName.trim() || 'AI agent', defaultAgentScopes)
+      setNewAgentToken(created.token)
+      setAgentTokens((current) => [created.record, ...current])
+      setAgentTokenStatus('Token created. Copy it now; it will not be shown again.')
+    } catch (error) {
+      setAgentTokenStatus(error instanceof Error ? error.message : 'Could not create agent token.')
+    } finally {
+      setAgentTokensBusy(false)
+    }
+  }
+
+  const handleRevokeAgentToken = async (tokenId: string) => {
+    if (!auth.session || agentTokensBusy) return
+    setAgentTokensBusy(true)
+    setAgentTokenStatus(null)
+    try {
+      await revokeAgentToken(auth.session, tokenId)
+      setAgentTokens((current) => current.filter((token) => token.id !== tokenId))
+    } catch (error) {
+      setAgentTokenStatus(error instanceof Error ? error.message : 'Could not revoke agent token.')
+    } finally {
+      setAgentTokensBusy(false)
+    }
+  }
+
+  const handleCopyAgentText = async (value: string, notice: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setAgentTokenStatus(notice)
+    } catch {
+      setAgentTokenStatus('Could not copy automatically. Select the text and copy it manually.')
+    }
+  }
 
   const openSignInModal = () => {
     setEmailAuthMode('signin')
@@ -529,19 +611,6 @@ function App() {
     setEmailAuthError(null)
     auth.clearError()
     setShowSignInModal(true)
-  }
-
-  const openProductFromLanding = () => {
-    window.location.hash = '#board'
-  }
-
-  const openAuthFromLanding = (intent: 'signin' | 'signup') => {
-    setEmailAuthMode(intent)
-    setEmailAuthNotice(null)
-    setEmailAuthError(null)
-    auth.clearError()
-    setShowSignInModal(true)
-    window.location.hash = '#board'
   }
 
   const handleEmailAuthSubmit = async () => {
@@ -643,6 +712,95 @@ function App() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!('BroadcastChannel' in window)) return undefined
+    if (auth.status !== 'authenticated' || !userId) return undefined
+    const channel = new BroadcastChannel(`social-datanode-graph:${userId}`)
+    channel.onmessage = (event: MessageEvent<{ sourceId?: string; revision?: number }>) => {
+      if (event.data?.sourceId === graphChannelId) return
+      const incomingRevision = event.data?.revision
+      if (typeof incomingRevision !== 'number') return
+      const currentRevision = loadedGraphRevisionRef.current
+      if (currentRevision !== null && incomingRevision > currentRevision) {
+        loadedGraphSourceRef.current = 'error'
+        setGraphLoadError('This board changed in another tab or through an agent. To protect your data, reload before making more changes.')
+      }
+    }
+    return () => channel.close()
+  }, [auth.status, graphChannelId, userId])
+
+  const broadcastGraphRevision = useCallback((userIdValue: string, revision: number | null) => {
+    if (!('BroadcastChannel' in window) || revision === null) return
+    const channel = new BroadcastChannel(`social-datanode-graph:${userIdValue}`)
+    channel.postMessage({ sourceId: graphChannelId, revision })
+    channel.close()
+  }, [graphChannelId])
+
+  const graphRef = useRef(graph)
+  useEffect(() => {
+    graphRef.current = graph
+  }, [graph])
+
+  // Listen to remote changes on the user's graph row via Supabase Realtime
+  useEffect(() => {
+    if (auth.status !== 'authenticated' || !userId || !supabase || !auth.session) return
+
+    const channel = supabase
+      .channel(`user-graph-changes:${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'user_graphs',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const newRevision = payload.new?.revision
+          const newGraphData = payload.new?.graph
+
+          if (typeof newRevision !== 'number' || !newRevision || !newGraphData) return
+
+          // If the revision is equal or smaller, ignore it (it was written by this tab or is stale)
+          if (newRevision <= (loadedGraphRevisionRef.current ?? 0)) {
+            return
+          }
+
+          // Check if there are local unsaved modifications
+          const isUnsaved = (() => {
+            if (!loadedGraphSnapshotRef.current) return false
+            try {
+              const snap = JSON.parse(loadedGraphSnapshotRef.current) as GraphState
+              return !isGraphStateEqual(graphRef.current, snap)
+            } catch {
+              return true
+            }
+          })()
+
+          if (!isUnsaved) {
+            // No unsaved modifications: automatically apply the update in real-time
+            const base = sanitizeDefaultCircleStyles(newGraphData)
+            const stamped = stampYouIdentity(base, auth.session!.user)
+            loadedGraphSourceRef.current = 'saved'
+            loadedGraphSnapshotRef.current = JSON.stringify(stamped)
+            loadedGraphRevisionRef.current = newRevision
+            setGraph(stamped)
+          } else {
+            // There are unsaved changes: notify the user and enter error state to protect local edits
+            loadedGraphSourceRef.current = 'error'
+            setGraphLoadError(
+              'This board was updated elsewhere (e.g. via CLI or another tab). You have unsaved changes. To protect your data, reload the page to load the latest version.'
+            )
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      void channel.unsubscribe()
+    }
+  }, [auth.status, userId, auth.session])
+
   // Load the signed-in user's graph; a brand-new account starts from a blank
   // canvas with only their "you" circle — the local demo data is never persisted.
   useEffect(() => {
@@ -658,6 +816,7 @@ function App() {
         const stamped = stampYouIdentity(base, auth.session!.user)
         loadedGraphSourceRef.current = loaded.source
         loadedGraphSnapshotRef.current = JSON.stringify(stamped)
+        loadedGraphRevisionRef.current = loaded.revision
         setGraph(stamped)
         setGraphLoaded(true)
       })
@@ -667,6 +826,7 @@ function App() {
           const stamped = stampYouIdentity(createFreshGraph(), auth.session!.user)
           loadedGraphSourceRef.current = 'error'
           loadedGraphSnapshotRef.current = JSON.stringify(stamped)
+          loadedGraphRevisionRef.current = null
           setGraphLoadError('Failed to load your board from the database. To protect your data, changes will not be saved. Please reload the page.')
           setGraph(stamped)
           setGraphLoaded(true)
@@ -687,10 +847,24 @@ function App() {
       return
     }
     const timer = window.setTimeout(() => {
-      void saveGraph(userId, graph).catch((error) => console.error('Failed to save graph', error))
+      void saveGraph(userId, graph, loadedGraphRevisionRef.current)
+        .then((nextRevision) => {
+          loadedGraphRevisionRef.current = nextRevision
+          loadedGraphSourceRef.current = 'saved'
+          loadedGraphSnapshotRef.current = JSON.stringify(graph)
+          broadcastGraphRevision(userId, nextRevision)
+        })
+        .catch((error) => {
+          if (error instanceof GraphRevisionConflictError) {
+            loadedGraphSourceRef.current = 'error'
+            setGraphLoadError('This board changed in another tab or through an agent. To protect your data, reload before making more changes.')
+            return
+          }
+          console.error('Failed to save graph', error)
+        })
     }, 800)
     return () => window.clearTimeout(timer)
-  }, [graph, graphLoaded, auth.status, userId])
+  }, [graph, graphLoaded, auth.status, broadcastGraphRevision, userId])
 
   // Signed-out visitors aren't blocked: their board is restored from (and saved
   // to) localStorage so work survives a reload without an account. Signing in
@@ -707,10 +881,12 @@ function App() {
       const sanitized = sanitizeDefaultCircleStyles(saved)
       loadedGraphSourceRef.current = 'local'
       loadedGraphSnapshotRef.current = JSON.stringify(sanitized)
+      loadedGraphRevisionRef.current = null
       setGraph(sanitized)
     } else {
       loadedGraphSourceRef.current = 'empty'
       loadedGraphSnapshotRef.current = JSON.stringify(graph)
+      loadedGraphRevisionRef.current = null
     }
     setGraphLoaded(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -748,6 +924,8 @@ function App() {
   const animNowRef = useRef(0)
   const paintBoardRef = useRef<(now?: number) => void>(() => {})
 
+
+
   const [connector, setConnector] = useState<DragConnector | null>(null)
   const [marquee, setMarquee] = useState<MarqueeState | null>(null)
   const [createMenu, setCreateMenu] = useState<CreateMenu | null>(null)
@@ -774,6 +952,52 @@ function App() {
   useEffect(() => {
     onboardingStepRef.current = onboardingStep
   }, [onboardingStep])
+
+  const [onboardingOffset, setOnboardingOffset] = useState(0)
+
+  useEffect(() => {
+    const updateOffset = () => {
+      if (window.innerWidth > 720) {
+        setOnboardingOffset(0)
+        return
+      }
+
+      const inspectorEl = document.querySelector('.inspector')
+      const popoverEl = document.querySelector('.circle-style-popover.is-open')
+
+      let maxBottom = 0
+
+      if (inspectorEl) {
+        const rect = inspectorEl.getBoundingClientRect()
+        maxBottom = Math.max(maxBottom, rect.height + 16)
+      }
+
+      if (popoverEl) {
+        const rect = popoverEl.getBoundingClientRect()
+        maxBottom = Math.max(maxBottom, rect.height + 96)
+      }
+
+      setOnboardingOffset(maxBottom)
+    }
+
+    updateOffset()
+    const timer1 = setTimeout(updateOffset, 50)
+    const timer2 = setTimeout(updateOffset, 150)
+    const timer3 = setTimeout(updateOffset, 300)
+
+    window.addEventListener('resize', updateOffset)
+
+    const observer = new MutationObserver(updateOffset)
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true })
+
+    return () => {
+      clearTimeout(timer1)
+      clearTimeout(timer2)
+      clearTimeout(timer3)
+      window.removeEventListener('resize', updateOffset)
+      observer.disconnect()
+    }
+  }, [selectedItem, showCircleStylePanel, onboardingStep])
 
   // True during the brief "Great!" beat that plays after a gesture, before the
   // card advances to the next step.
@@ -866,14 +1090,16 @@ function App() {
   const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight })
 
   const [showSettings, setShowSettings] = useState(false)
+
+
+  const [showAgentSettings, setShowAgentSettings] = useState(false)
   const [showLinkedInGuide, setShowLinkedInGuide] = useState(false)
-  const [demoMode, setDemoMode] = useState(false)
-  const [showCircleLabels, setShowCircleLabels] = useState(true)
-  const [showPersonLabels, setShowPersonLabels] = useState(true)
-  const [circleShapeMode, setCircleShapeMode] = useState<CircleShapeMode>('circles')
-  const [circleFillMode, setCircleFillMode] = useState<CircleFillMode>('transparent')
+  const showCircleLabels = true
+  const showPersonLabels = true
+  const circleShapeMode: CircleShapeMode = 'circles'
+  const circleFillMode: CircleFillMode = 'transparent'
   const [circleCreationDefaults] = useState(loadCircleCreationDefaults)
-  const [centerBehavior, setCenterBehavior] = useState<'connect' | 'move'>('connect')
+  const centerBehavior = 'connect'
   const [hoveredConnId, setHoveredConnId] = useState<string | null>(null)
   const [openNotesPersonId, setOpenNotesPersonId] = useState<string | null>(null)
   const [newNoteBody, setNewNoteBody] = useState('')
@@ -890,7 +1116,14 @@ function App() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const graphFileInputRef = useRef<HTMLInputElement>(null)
 
-  // Search: a pill in the top toolbar that finds people (by name/role) and
+  useEffect(() => {
+    if (auth.status !== 'authenticated' || !auth.session || !showAgentSettings) return
+    const timer = window.setTimeout(() => void refreshAgentTokens(), 0)
+    return () => window.clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth.status, auth.session, showAgentSettings])
+
+  // Search: a pill in the top toolbar that finds people and circles and
   // circles (the "tags"), then flies the camera to the picked node.
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -1716,7 +1949,8 @@ function App() {
   const circlesById = useMemo(() => new Map(displayCircles.map((circle) => [circle.id, circle])), [displayCircles])
   const peopleById = useMemo(() => new Map(displayPeople.map((person) => [person.id, person])), [displayPeople])
 
-  // Live search results: people matched on name/role, circles ("tags") on name.
+  // Live search results: people matched on name, owning circle, notes, and links;
+  // circles ("tags") match on name.
   // Capped so the dropdown stays compact; people first since finding a person is
   // the primary use, circles after.
   const searchResults = useMemo<SearchResult[]>(() => {
@@ -1732,14 +1966,19 @@ function App() {
         }]
       : []
     const people: SearchResult[] = displayPeople
-      .filter((p) => p.name.toLowerCase().includes(q) || (p.role || '').toLowerCase().includes(q))
+      .filter((p) => {
+        const circle = circlesById.get(p.circleId)
+        const noteText = (p.notes ?? []).map((note) => `${note.title} ${note.body}`).join(' ')
+        const linkText = (p.links ?? []).map((link) => `${link.label} ${link.url}`).join(' ')
+        return [p.name, circle?.name, noteText, linkText].filter(Boolean).join(' ').toLowerCase().includes(q)
+      })
       .map((p) => {
         const circle = circlesById.get(p.circleId)
         return {
           kind: 'person',
           id: p.id,
           name: p.name,
-          sub: p.role || circle?.name || '',
+          sub: circle?.name || '',
           avatarUrl: p.imageUrl,
           initials: makeInitials(p.name),
           color: circle ? getCircleColors(circle).centerBg : undefined,
@@ -1809,10 +2048,11 @@ function App() {
 
 
   // Push the live camera onto the dotted grid without going through React.
-  function applyDomCamera(cam: Camera) {
+  function applyDomCamera() {
     const surface = surfaceRef.current
-    if (surface) {
-      const minor = 32 * cam.scale
+    const cam = cameraRef.current
+    if (surface && cam) {
+      const minor = 20 * cam.scale
       const major = 160 * cam.scale
       surface.style.backgroundSize = `${major}px ${major}px, ${minor}px ${minor}px`
       surface.style.backgroundPosition = `${cam.x}px ${cam.y}px`
@@ -1823,7 +2063,7 @@ function App() {
   // people canvas at the live camera, so newly revealed people fill in mid-pan.
   function applyLiveCamera() {
     const cam = cameraRef.current
-    applyDomCamera(cam)
+    applyDomCamera()
     const canvas = peopleCanvasRef.current
     const surface = surfaceRef.current
     if (canvas && surface) {
@@ -1844,6 +2084,7 @@ function App() {
         marqueeRef.current,
         selectedCircleIds,
         hoveredCircleEdgeId,
+        EMPTY_ANIM_FRAME,
       )
     }
   }
@@ -1892,7 +2133,7 @@ function App() {
   useLayoutEffect(() => {
     driveCameraRef.current = driveCamera
     settleGestureRef.current = settleGesture
-    if (gestureActiveRef.current) applyDomCamera(cameraRef.current)
+    if (gestureActiveRef.current) applyDomCamera()
   })
 
   useEffect(() => () => {
@@ -1923,7 +2164,7 @@ function App() {
     drawBoardLayer(
       canvas,
       surface,
-      camera,
+      cameraRef.current,
       boardIndex,
       selectedItem,
       hoveredPersonId,
@@ -1962,6 +2203,9 @@ function App() {
         active = true
       }
     }
+
+
+
     paintBoardRef.current(now)
     if (active) {
       boardAnimRafRef.current = window.requestAnimationFrame(tickBoardAnims)
@@ -2004,6 +2248,7 @@ function App() {
     marquee,
     selectedCircleIds,
     hoveredCircleEdgeId,
+    viewMode,
   ])
 
   useEffect(() => {
@@ -2046,7 +2291,7 @@ function App() {
     return () => {
       surface.removeEventListener('wheel', handleWheel)
     }
-  }, [])
+  }, [viewMode])
 
   function screenToWorld(point: { x: number; y: number }) {
     const liveCamera = cameraRef.current
@@ -2086,6 +2331,8 @@ function App() {
     if (event.pointerType !== 'touch' && event.button !== 0 && event.button !== 2) return
     const isRightClick = event.pointerType !== 'touch' && event.button === 2
     isRightClickDragRef.current = isRightClick
+
+
 
     event.currentTarget.focus({ preventScroll: true })
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -2131,7 +2378,7 @@ function App() {
       return
     }
 
-    if (!demoMode) setCreateMenu(null)
+    setCreateMenu(null)
     setOpenNotesPersonId(null)
     // A fresh gesture hasn't recorded its undo snapshot yet.
     gestureSnapshotTakenRef.current = false
@@ -2312,6 +2559,9 @@ function App() {
       p.pointerId === event.pointerId ? event.nativeEvent : p
     )
 
+
+
+
     if (marqueeRef.current) {
       marqueeRef.current.currentX = event.clientX
       marqueeRef.current.currentY = event.clientY
@@ -2415,6 +2665,8 @@ function App() {
         deltaY,
       )
       paintBoard()
+
+
     }
 
     const movingPerson = movePersonRef.current
@@ -2435,6 +2687,8 @@ function App() {
         deltaY,
       )
       paintBoard()
+
+
     }
 
     const resizing = resizeCircleRef.current
@@ -2448,6 +2702,8 @@ function App() {
         world,
       )
       paintBoard()
+
+
     }
 
     if (connector) {
@@ -2732,7 +2988,7 @@ function App() {
 
   function handleSurfaceContextMenu(event: ReactMouseEvent<HTMLDivElement>) {
     event.preventDefault()
-    if (demoMode) return
+
     const hit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
       x: event.clientX,
       y: event.clientY,
@@ -2899,7 +3155,7 @@ function App() {
   // the board never reflows or visibly jumps around the new person.
   function handleSurfaceDoubleClick(event: React.MouseEvent<HTMLDivElement>) {
     if (event.button !== 0) return
-    if (demoMode) return
+
     if (cameraRef.current.scale < ZONE_ONLY_SCALE) return
     const hit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
       x: event.clientX,
@@ -2927,7 +3183,6 @@ function App() {
         {
           id,
           name: `New person ${current.people.length + 1}`,
-          role: circleId ? `Inside ${circlesById.get(circleId)?.name ?? ''}` : '',
           x: world.x,
           y: world.y,
           circleId,
@@ -2939,6 +3194,7 @@ function App() {
       ],
     }))
     setSelectedPeopleIds([])
+
     selectItem({ type: 'person', id })
     // Grow the new person in so it feels placed, not blinked into existence.
     startBoardAnim('pop:' + id, 360)
@@ -3069,7 +3325,6 @@ function App() {
           {
             id,
             name: `New person ${current.people.length + 1}`,
-            role: circleId ? `Inside ${circlesById.get(circleId)?.name ?? ''}` : '',
             x: createMenu.x,
             y: createMenu.y,
             circleId,
@@ -3085,6 +3340,7 @@ function App() {
       }
       return nextGraph
     })
+
     selectItem({ type: 'person', id })
     // Grow the new person in so it feels placed, not blinked into existence.
     startBoardAnim('pop:' + id, 360)
@@ -3141,35 +3397,13 @@ function App() {
       }
       return nextGraph
     })
+
     selectItem({ type: 'circle', id })
     setCreateMenu(null)
     notifyOnboarding('create')
   }
 
-  /* Commented out to hide from menu, keeping in code for future use
-  function addDemoCluster() {
-    const source = selectedCircle ?? circlesById.get('you')
-    if (!source) return
 
-    const nextIndex = graph.people.length + 1
-    const points = [-58, 0, 58].map((offset, index) => {
-      const sides = Math.floor(Math.random() * 5) + 8
-      return {
-        id: `person-${Date.now()}-${index}`,
-        name: ['Alex', 'Daria', 'Sam'][index],
-        role: `Added to ${source.name}`,
-        x: source.x + offset,
-        y: source.y + source.radius * 0.42 + index * 18,
-        circleId: source.id,
-        avatar: makeAvatar(nextIndex + index),
-        shapeType: 'wavy' as ShapeType,
-        sides,
-        amplitude: 1,
-      }
-    })
-    setGraph((current) => ensureContainment({ ...current, people: [...current.people, ...points] }))
-  }
-  */
 
 
 
@@ -3207,20 +3441,7 @@ function App() {
     }))
   }
 
-  function applyCircleShapeMode(nextMode: CircleShapeMode) {
-    setCircleShapeMode(nextMode)
-    if (nextMode !== 'figures') return
 
-    setGraph((current) => ({
-      ...current,
-      circles: current.circles.map((circle) => ({
-        ...circle,
-        shapeType: 'wavy',
-        sides: circle.sides ?? Math.max(8, Math.round(circle.radius / 10)),
-        amplitude: Math.max(4, circle.amplitude && circle.amplitude > 0 ? circle.amplitude : Math.round(circle.radius * 0.055)),
-      })),
-    }))
-  }
 
   function handleImageUpload(event: React.ChangeEvent<HTMLInputElement>, onComplete: (base64: string) => void) {
     const file = event.target.files?.[0]
@@ -3294,28 +3515,106 @@ function App() {
           : authDialogMode === 'update'
             ? 'Update password'
             : 'Sign in with email'
+  const agentApiUrl = getGraphApiBaseUrl() ?? ''
+  const agentTokenForInstructions = newAgentToken ?? '<create-a-key-first>'
+  const agentCopyInstruction = `You are allowed to connect to my DataNode graph through MCP.
 
-  // Keep references to unused features so they remain in codebase for future use and satisfy TS/ESLint checks
-  if (false as boolean) {
-    console.log(setDemoMode, setShowCircleLabels, setShowPersonLabels, setCircleFillMode, setCenterBehavior, applyCircleShapeMode, CheckIcon, SubsetIcon)
+Use this configuration:
+
+DATANODE_API_URL=${agentApiUrl}
+DATANODE_API_TOKEN=${agentTokenForInstructions}
+
+MCP server config:
+{
+  "mcpServers": {
+    "datanode": {
+      "command": "npx",
+      "args": ["-y", "github:TimofeySukh/hackathon"],
+      "env": {
+        "DATANODE_API_URL": "${agentApiUrl}",
+        "DATANODE_API_TOKEN": "${agentTokenForInstructions}"
+      }
+    }
   }
+}
 
-  if (showLanding) {
-    const landingRoute = appHash === '#docs' ? 'docs' : appHash === '#contact' ? 'contact' : 'home'
+Developer Wiki & Docs:
+Full API reference, CLI usage guide, and interactive docs are available publicly at:
+${window.location.origin}/#docs
 
+CLI Client:
+To run the CLI on-the-fly or install globally:
+- Run via npx: npx -y --package github:TimofeySukh/hackathon datanode-cli <command>
+- Install globally: npm install -g github:TimofeySukh/hackathon
+
+Available actions:
+- search people, circles, notes, and saved links
+- list circles and choose the correct circleId
+- add people to exactly one direct circle
+- add notes, links, and relationship connections
+
+If an API write returns 409 Conflict, reload graph metadata and retry the intended operation once.`
+  const mcpConfigSnippet = `{
+  "mcpServers": {
+    "datanode": {
+      "command": "npx",
+      "args": ["-y", "github:TimofeySukh/hackathon"],
+      "env": {
+        "DATANODE_API_URL": "${agentApiUrl}",
+        "DATANODE_API_TOKEN": "${agentTokenForInstructions}"
+      }
+    }
+  }
+}`
+  const cliSnippet = `# 1. Set environment variables
+export DATANODE_API_URL=${agentApiUrl}
+export DATANODE_API_TOKEN=${agentTokenForInstructions}
+
+# Option A: Run on-the-fly via npx from anywhere
+npx -y --package github:TimofeySukh/hackathon datanode-cli search "Alice"
+npx -y --package github:TimofeySukh/hackathon datanode-cli circles
+npx -y --package github:TimofeySukh/hackathon datanode-cli people:add <circle-id> "Alice Chen" "Met at conference"
+
+# Option B: Install globally and run
+npm install -g github:TimofeySukh/hackathon
+datanode-cli search "Alice"
+datanode-cli circles
+datanode-cli people:add <circle-id> "Alice Chen" "Met at conference"
+
+# Option C: Run from the repository checkout
+npm run datanode:cli -- search "Alice"
+npm run datanode:cli -- circles
+npm run datanode:cli -- people:add <circle-id> "Alice Chen" "Met at conference"`
+  const apiSnippet = `GET ${agentApiUrl}/search?q=alice
+Authorization: Bearer ${agentTokenForInstructions}
+
+POST ${agentApiUrl}/people
+Authorization: Bearer ${agentTokenForInstructions}
+Content-Type: application/json
+
+{
+  "expectedRevision": 42,
+  "circleId": "<circle-id>",
+  "name": "Alice Chen",
+  "notes": [{ "body": "Met at conference" }]
+}`
+
+
+
+  if (viewMode === 'landing') {
     return (
       <div className="app-shell">
-        <LandingPage
-          route={landingRoute}
-          onOpenProduct={openProductFromLanding}
-          onAuthIntent={openAuthFromLanding}
-        />
+        <LandingPage />
       </div>
     )
   }
 
+  if (viewMode === 'docs') {
+    return <DocsPage />
+  }
+
   return (
-    <main className={`app-shell ${demoMode ? 'is-demo-mode' : ''} ${searchOpen ? 'is-search-open' : ''} ${showSettings ? 'is-settings-open' : ''}`}>
+    <main className={`app-shell ${searchOpen ? 'is-search-open' : ''} ${showSettings ? 'is-settings-open' : ''} ${selectedItem ? 'is-inspector-open' : ''}`}>
       {graphLoadError && (
         <div style={{
           position: 'absolute',
@@ -3458,7 +3757,7 @@ function App() {
             </div>
           )}
         </div>
-        <div className={`toolbar__group ${demoMode ? 'toolbar__group--demo' : ''}`}>
+        <div className="toolbar__group">
           <button
             ref={settingsButtonRef}
             type="button"
@@ -3470,9 +3769,34 @@ function App() {
             style={{
               background: showSettings ? 'var(--md-secondary-container)' : 'transparent',
               color: showSettings ? 'var(--md-on-secondary-container)' : 'var(--md-on-surface-variant)',
+              position: 'relative',
             }}
           >
             <SettingsIcon />
+            {auth.status === 'anonymous' && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '4px',
+                  right: '4px',
+                  width: '14px',
+                  height: '14px',
+                  borderRadius: '50%',
+                  backgroundColor: 'var(--md-error, #ba1a1a)',
+                  color: '#ffffff',
+                  fontSize: '10px',
+                  fontWeight: 'bold',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '1.5px solid var(--md-surface-container, #ecedf2)',
+                  lineHeight: 1,
+                }}
+                aria-hidden="true"
+              >
+                !
+              </span>
+            )}
           </button>
         </div>
       </div>
@@ -3550,8 +3874,16 @@ function App() {
 
                     if (userId && canSave) {
                       try {
-                        await saveGraph(userId, graph)
+                        const nextRevision = await saveGraph(userId, graph, loadedGraphRevisionRef.current)
+                        loadedGraphRevisionRef.current = nextRevision
+                        loadedGraphSourceRef.current = 'saved'
+                        loadedGraphSnapshotRef.current = JSON.stringify(graph)
+                        broadcastGraphRevision(userId, nextRevision)
                       } catch (error) {
+                        if (error instanceof GraphRevisionConflictError) {
+                          setGraphLoadError('This board changed in another tab or through an agent. To protect your data, reload before signing out.')
+                          return
+                        }
                         console.error('Failed to save before sign-out', error)
                       }
                     }
@@ -3559,6 +3891,25 @@ function App() {
                   }}
                 >
                   Sign out
+                </button>
+              </div>
+            )}
+            {auth.status === 'authenticated' && (
+              <div className="settings-graph-section">
+                <label className="settings-section-label">
+                  Agent API
+                </label>
+                <button
+                  type="button"
+                  className="m3-primary-button"
+                  onClick={() => {
+                    setShowSettings(false)
+                    setNewAgentToken(null)
+                    setAgentTokenStatus(null)
+                    setShowAgentSettings(true)
+                  }}
+                >
+                  Manage API keys
                 </button>
               </div>
             )}
@@ -3617,6 +3968,8 @@ function App() {
                 onChange={handleGraphImport}
               />
             </div>
+
+
 
           </div>
         </div>
@@ -3689,7 +4042,7 @@ function App() {
         className="graph-surface"
         tabIndex={0}
         style={{
-          backgroundSize: `${160 * camera.scale}px ${160 * camera.scale}px, ${32 * camera.scale}px ${32 * camera.scale}px`,
+          backgroundSize: `${160 * camera.scale}px ${160 * camera.scale}px, ${20 * camera.scale}px ${20 * camera.scale}px`,
           backgroundPosition: `${camera.x}px ${camera.y}px`,
         }}
         onPointerDown={handleSurfacePointerDown}
@@ -3758,7 +4111,7 @@ function App() {
         </div>
       )}
 
-      {!demoMode && selectedItem && (
+      {selectedItem && (
       <aside key={`${selectedItem.type}:${selectedItem.id}`} className="inspector" aria-label="Selection details" style={{ overflow: 'visible', maxHeight: 'calc(100vh - 120px)' }}>
 
             {selectedItem.type !== 'connection' ? (
@@ -4044,11 +4397,7 @@ function App() {
 
                 {/* Sticky Actions at Bottom */}
                 <div className="inspector-actions-section" style={{ borderTop: 'none', paddingTop: 0 }}>
-                  {/* Commented out Add 3 demo people to hide from menu, keeping in code for future use
-                  <button type="button" className="primary-action" onClick={addDemoCluster}>
-                    Add 3 demo people
-                  </button>
-                  */}
+
 
                   {selectedCircle.id !== 'you' && (
                     <button
@@ -4187,27 +4536,6 @@ function App() {
                     </div>
                   );
                 })()}
-
-                {/* Commented out Role to hide from menu, keeping in code for future use
-                <div className="inspector-field" style={{ marginTop: '4px' }}>
-                  <label>Role</label>
-                  <input
-                    type="text"
-                    value={selectedPerson.role}
-                    onChange={(e) => {
-                      const newRole = e.target.value
-                      setGraph((current) => ({
-                        ...current,
-                        people: current.people.map((p) =>
-                          p.id === selectedPerson.id ? { ...p, role: newRole } : p
-                        ),
-                      }))
-                    }}
-                    placeholder="E.g., Software Developer"
-                    className="m3-input-field"
-                  />
-                </div>
-                */}
 
                 {/* Notes Section (Trello-Style) */}
                 <div className="trello-list">
@@ -4542,6 +4870,271 @@ function App() {
         </div>
       )}
 
+      {showAgentSettings && (
+        <div
+          className="agent-settings-overlay is-open"
+          onClick={() => setShowAgentSettings(false)}
+        >
+          <section
+            className="agent-settings-dialog"
+            aria-modal="true"
+            role="dialog"
+            aria-labelledby="agent-settings-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <aside className="agent-settings-sidebar">
+              <div className="agent-settings-sidebar__section">Agent access</div>
+              {[
+                ['quick', 'Quick setup'],
+                ['mcp', 'MCP'],
+                ['cli', 'CLI'],
+                ['api', 'API'],
+                ['keys', 'Keys'],
+              ].map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={`agent-settings-sidebar__item ${agentSettingsTab === id ? 'is-active' : ''}`}
+                  onClick={() => setAgentSettingsTab(id as typeof agentSettingsTab)}
+                >
+                  {label}
+                </button>
+              ))}
+              <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid var(--md-outline-variant)' }}>
+                <button
+                  type="button"
+                  className="agent-settings-sidebar__item"
+                  style={{ color: 'var(--md-primary)', gap: '8px' }}
+                  onClick={() => {
+                    setShowAgentSettings(false)
+                    window.location.hash = '#docs'
+                  }}
+                >
+                  <span style={{ fontSize: '16px' }}>📖</span> Full Wiki & Docs
+                </button>
+              </div>
+            </aside>
+            <div className="agent-settings-content">
+              <button
+                type="button"
+                className="agent-settings-close"
+                aria-label="Close"
+                onClick={() => setShowAgentSettings(false)}
+              >
+                <CloseIcon />
+              </button>
+              <header className="agent-settings-header">
+                <div>
+                  <h2 id="agent-settings-title">
+                    {agentSettingsTab === 'quick' ? 'Quick setup' : agentSettingsTab === 'mcp' ? 'MCP setup' : agentSettingsTab === 'cli' ? 'CLI setup' : agentSettingsTab === 'api' ? 'API reference' : 'API keys'}
+                  </h2>
+                  <p>
+                    {agentSettingsTab === 'quick'
+                      ? 'Create one key and copy the instruction into an AI agent.'
+                      : agentSettingsTab === 'mcp'
+                        ? 'Connect DataNode as an MCP server.'
+                        : agentSettingsTab === 'cli'
+                          ? 'Use the same key from a terminal.'
+                          : agentSettingsTab === 'api'
+                            ? 'Call the graph API directly.'
+                            : 'Create and revoke agent keys.'}
+                  </p>
+                </div>
+              </header>
+
+              {agentSettingsTab === 'quick' && (
+                <section className="agent-settings-section agent-settings-flow">
+                  <div className="agent-settings-step">
+                    <div>
+                      <h3>1. Create a key</h3>
+                      <p>This creates a revocable key with the default agent permissions.</p>
+                    </div>
+                    <div className="agent-settings-create-row">
+                      <input
+                        type="text"
+                        value={agentTokenName}
+                        onChange={(event) => setAgentTokenName(event.target.value)}
+                        className="m3-input-field agent-settings-name-input"
+                        placeholder="Token name"
+                      />
+                      <button
+                        type="button"
+                        className="m3-primary-button agent-settings-action"
+                        disabled={agentTokensBusy}
+                        onClick={handleCreateAgentToken}
+                      >
+                        Create key
+                      </button>
+                    </div>
+                  </div>
+                  <div className="agent-settings-step">
+                    <div>
+                      <h3>2. Copy this for the AI agent</h3>
+                      <p>Paste it as-is. The agent does not need to understand the key internals.</p>
+                    </div>
+                    <textarea
+                      readOnly
+                      className="m3-input-field agent-settings-copybox"
+                      value={agentCopyInstruction}
+                      rows={13}
+                      onFocus={(event) => event.currentTarget.select()}
+                    />
+                    <button
+                      type="button"
+                      className="m3-primary-button agent-settings-copy-action"
+                      disabled={!newAgentToken}
+                      onClick={() => void handleCopyAgentText(agentCopyInstruction, 'Instruction copied.')}
+                    >
+                      Copy instruction
+                    </button>
+                  </div>
+                  {agentTokenStatus && <p className="agent-settings-status">{agentTokenStatus}</p>}
+                </section>
+              )}
+
+              {agentSettingsTab === 'mcp' && (
+                <section className="agent-settings-section agent-settings-flow">
+                  <div className="agent-settings-step">
+                    <h3>MCP config</h3>
+                    <p>Use this when an AI app asks for MCP server JSON.</p>
+                    <textarea
+                      readOnly
+                      className="m3-input-field agent-settings-copybox"
+                      value={mcpConfigSnippet}
+                      rows={12}
+                      onFocus={(event) => event.currentTarget.select()}
+                    />
+                    <button
+                      type="button"
+                      className="m3-primary-button agent-settings-copy-action"
+                      onClick={() => void handleCopyAgentText(mcpConfigSnippet, 'MCP config copied.')}
+                    >
+                      Copy MCP config
+                    </button>
+                  </div>
+                </section>
+              )}
+
+              {agentSettingsTab === 'cli' && (
+                <section className="agent-settings-section agent-settings-flow">
+                  <div className="agent-settings-step">
+                    <h3>CLI commands</h3>
+                    <p>Install globally, or run on-the-fly via npx from anywhere:</p>
+                    <textarea
+                      readOnly
+                      className="m3-input-field agent-settings-copybox"
+                      value={cliSnippet}
+                      rows={16}
+                      onFocus={(event) => event.currentTarget.select()}
+                    />
+                    <button
+                      type="button"
+                      className="m3-primary-button agent-settings-copy-action"
+                      onClick={() => void handleCopyAgentText(cliSnippet, 'CLI snippet copied.')}
+                    >
+                      Copy CLI snippet
+                    </button>
+                  </div>
+                </section>
+              )}
+
+              {agentSettingsTab === 'api' && (
+                <section className="agent-settings-section agent-settings-flow">
+                  <div className="agent-settings-step">
+                    <h3>Direct API</h3>
+                    <p>All writes use the current graph revision and return 409 when another client saved first.</p>
+                    <textarea
+                      readOnly
+                      className="m3-input-field agent-settings-copybox"
+                      value={apiSnippet}
+                      rows={15}
+                      onFocus={(event) => event.currentTarget.select()}
+                    />
+                    <button
+                      type="button"
+                      className="m3-primary-button agent-settings-copy-action"
+                      onClick={() => void handleCopyAgentText(apiSnippet, 'API example copied.')}
+                    >
+                      Copy API example
+                    </button>
+                  </div>
+                </section>
+              )}
+
+              {agentSettingsTab === 'keys' && (
+                <section className="agent-settings-section agent-settings-flow">
+                  <div className="agent-settings-step">
+                    <div>
+                      <h3>Create key</h3>
+                      <p>Use this if you need another key for a different agent or machine.</p>
+                    </div>
+                    <div className="agent-settings-create-row">
+                      <input
+                        type="text"
+                        value={agentTokenName}
+                        onChange={(event) => setAgentTokenName(event.target.value)}
+                        className="m3-input-field agent-settings-name-input"
+                        placeholder="Token name"
+                      />
+                      <button
+                        type="button"
+                        className="m3-primary-button agent-settings-action"
+                        disabled={agentTokensBusy}
+                        onClick={handleCreateAgentToken}
+                      >
+                        Create key
+                      </button>
+                    </div>
+                  </div>
+                  {newAgentToken && (
+                    <div className="agent-settings-secret">
+                      <div>
+                        <h4>New key</h4>
+                        <p>Copy it now. It is stored as a hash and will not be shown again.</p>
+                      </div>
+                      <input
+                        type="text"
+                        readOnly
+                        value={newAgentToken}
+                        className="m3-input-field"
+                        onFocus={(event) => event.currentTarget.select()}
+                      />
+                    </div>
+                  )}
+                  {agentTokenStatus && <p className="agent-settings-status">{agentTokenStatus}</p>}
+                  <div className="agent-token-list">
+                    {agentTokens.length === 0 && (
+                      <div className="agent-token-empty">
+                        No active agent keys.
+                      </div>
+                    )}
+                    {agentTokens.map((token) => (
+                      <div key={token.id} className="agent-token-row">
+                        <div className="agent-token-row__main">
+                          <div className="agent-token-row__name">{token.name}</div>
+                          <div className="agent-token-row__meta">
+                            {token.token_prefix} · active
+                            {token.last_used_at ? ` · last used ${new Date(token.last_used_at).toLocaleDateString()}` : ''}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="m3-primary-button m3-primary-button--danger agent-settings-revoke"
+                          disabled={agentTokensBusy}
+                          onClick={() => handleRevokeAgentToken(token.id)}
+                        >
+                          Revoke
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
+
       {showAuthDialog && (
         <div
           className={`auth-overlay ${showAuthDialog ? 'is-open' : ''}`}
@@ -4723,20 +5316,7 @@ function App() {
         </div>
       )}
 
-      {auth.status === 'anonymous' && (
-        <div className="local-save-hint" role="note">
-          <span>Sign in to save your data — your board is kept locally for now.</span>
-          <button
-            type="button"
-            className="local-save-hint__action"
-            onClick={() => openSignInModal()}
-          >
-            Sign in
-          </button>
-        </div>
-      )}
- 
-      {graphLoaded && !demoMode && onboardingStep >= 0 && (
+      {graphLoaded && onboardingStep >= 0 && (
         <OnboardingCoach
           step={onboardingStep}
           celebrating={onboardingCelebrating}
@@ -4752,6 +5332,7 @@ function App() {
             }
             window.requestAnimationFrame(() => searchInputRef.current?.focus())
           }}
+          offset={onboardingOffset}
         />
       )}
     </main>
@@ -4995,7 +5576,6 @@ async function buildLinkedInConnectionsGraph(
       nextPeople.push({
         id: personId,
         name,
-        role: position || 'Connection',
         x: companyCircle.x + offset.x,
         y: companyCircle.y + offset.y,
         circleId: companyCircle.id,
@@ -5171,7 +5751,14 @@ function ensureLinkedInCompanyCircle(current: GraphState, profile: LinkedInProfi
 }
 
 function buildLinkedInProfileNotes(profile: LinkedInProfileImport, existingNotes: PersonNote[] = []) {
-  const notes = existingNotes.filter((note) => note.title !== 'Profile' && note.title !== 'Enrichment')
+  const notes = existingNotes.filter((note) => note.title !== 'Profile' && note.title !== 'Headline' && note.title !== 'Enrichment')
+  if (profile.headline) {
+    notes.push({
+      id: `note-headline-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+      title: 'Headline',
+      body: profile.headline,
+    })
+  }
   if (profile.description) {
     notes.push({
       id: `note-profile-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
@@ -5198,7 +5785,6 @@ function updateLinkedInProfileInGraph(
   const updatedPerson: PersonNode = {
     ...existingPerson,
     name: profile.name || existingPerson.name,
-    role: profile.headline || existingPerson.role,
     x: shouldReposition ? resizedCompanyCircle.x + offset.x : existingPerson.x,
     y: shouldReposition ? resizedCompanyCircle.y + offset.y : existingPerson.y,
     circleId: resizedCompanyCircle.id,
@@ -5248,7 +5834,6 @@ function addLinkedInProfileToGraph(
   const person: PersonNode = {
     id: personId,
     name: profile.name,
-    role: profile.headline || 'LinkedIn connection',
     x: resizedCompanyCircle.x + offset.x,
     y: resizedCompanyCircle.y + offset.y,
     circleId: resizedCompanyCircle.id,
@@ -5276,6 +5861,58 @@ function addLinkedInProfileToGraph(
     }),
     person,
   }
+}
+
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+  if (a && b && typeof a === 'object' && typeof b === 'object') {
+    if (Array.isArray(a)) {
+      if (!Array.isArray(b) || a.length !== b.length) return false
+      for (let i = 0; i < a.length; i++) {
+        if (!deepEqual(a[i], b[i])) return false
+      }
+      return true
+    }
+    const aObj = a as Record<string, unknown>
+    const bObj = b as Record<string, unknown>
+    const keys = Object.keys(aObj)
+    if (keys.length !== Object.keys(bObj).length) return false
+    for (const key of keys) {
+      if (!Object.prototype.hasOwnProperty.call(bObj, key)) return false
+      if (!deepEqual(aObj[key], bObj[key])) return false
+    }
+    return true
+  }
+  return false
+}
+
+function isGraphStateEqual(g1: GraphState | null, g2: GraphState | null): boolean {
+  if (g1 === g2) return true
+  if (!g1 || !g2) return false
+
+  if (g1.circles.length !== g2.circles.length) return false
+  if (g1.people.length !== g2.people.length) return false
+  if (g1.connections.length !== g2.connections.length) return false
+
+  const c1 = [...g1.circles].sort((a, b) => a.id.localeCompare(b.id))
+  const c2 = [...g2.circles].sort((a, b) => a.id.localeCompare(b.id))
+  for (let i = 0; i < c1.length; i++) {
+    if (!deepEqual(c1[i], c2[i])) return false
+  }
+
+  const p1 = [...g1.people].sort((a, b) => a.id.localeCompare(b.id))
+  const p2 = [...g2.people].sort((a, b) => a.id.localeCompare(b.id))
+  for (let i = 0; i < p1.length; i++) {
+    if (!deepEqual(p1[i], p2[i])) return false
+  }
+
+  const conn1 = [...g1.connections].sort((a, b) => a.id.localeCompare(b.id))
+  const conn2 = [...g2.connections].sort((a, b) => a.id.localeCompare(b.id))
+  for (let i = 0; i < conn1.length; i++) {
+    if (!deepEqual(conn1[i], conn2[i])) return false
+  }
+
+  return true
 }
 
 // Put the signed-in user's Google avatar + name on the "you" circle. Only fills
@@ -5369,14 +6006,7 @@ function PersonIcon() {
   )
 }
 
-function SubsetIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="8" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  )
-}
+
 
 function CircleIcon() {
   return (
@@ -5409,26 +6039,7 @@ function SettingsIcon() {
   )
 }
 
-function CheckIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      style={{
-        width: '14px',
-        height: '14px',
-        fill: 'none',
-        stroke: 'currentColor',
-        strokeWidth: 3,
-        strokeLinecap: 'round',
-        strokeLinejoin: 'round',
-        marginRight: '6px',
-      }}
-    >
-      <path d="M20 6L9 17l-5-5" />
-    </svg>
-  )
-}
+
 
 function UploadIcon() {
   return (

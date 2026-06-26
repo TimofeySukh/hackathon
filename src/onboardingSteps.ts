@@ -32,22 +32,22 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     body: 'Drag empty space to pan the canvas, or scroll/pinch to zoom. Give it a try →',
   },
   {
-    trigger: 'move',
+    trigger: 'create',
     eyebrow: 'Step 2 of 5',
+    title: 'Add something',
+    body: 'Double-click empty space to drop a person. Right-click a circle — or drag out from its center — to add a person or a nested circle.',
+  },
+  {
+    trigger: 'move',
+    eyebrow: 'Step 3 of 5',
     title: 'Move people or circles',
     body: 'Drag any circle or person to reposition it on the board.',
   },
   {
     trigger: 'resize',
-    eyebrow: 'Step 3 of 5',
+    eyebrow: 'Step 4 of 5',
     title: 'Resize a circle',
     body: 'Grab a circle’s edge and drag to grow or shrink it. Its center moves the whole group; its edge resizes it.',
-  },
-  {
-    trigger: 'create',
-    eyebrow: 'Step 4 of 5',
-    title: 'Add something',
-    body: 'Double-click empty space to drop a person. Right-click a circle — or drag out from its center — to add a person or a nested circle.',
   },
   {
     trigger: 'import',

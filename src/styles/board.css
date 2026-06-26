@@ -8,12 +8,10 @@
      driven from JS based on the actual gesture / what's under the pointer. */
   cursor: default;
   touch-action: none;
-  /* Dotted world grid. background-size / background-position are set inline
-     from the camera so the dots pan and zoom together with the canvas. */
   background-color: var(--md-surface);
   background-image:
-    radial-gradient(circle, rgba(61, 71, 78, 0.18) 1.3px, transparent 1.7px),
-    radial-gradient(circle, rgba(61, 71, 78, 0.09) 1px, transparent 1.4px);
+    radial-gradient(circle, rgba(61, 71, 78, 0.09) 1.3px, transparent 1.7px),
+    radial-gradient(circle, rgba(61, 71, 78, 0.04) 1px, transparent 1.4px);
   background-repeat: repeat, repeat;
 }
 

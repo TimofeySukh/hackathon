@@ -1,6 +1,6 @@
 # Hackathon Board
 
-A local social circle graph prototype built with React, Vite, and TypeScript.
+A social circle graph app built with React, Vite, TypeScript, and Supabase.
 
 ## Current Experience
 
@@ -22,7 +22,8 @@ A local social circle graph prototype built with React, Vite, and TypeScript.
 - Add three demo people to the selected circle from the inspector
 - Drag non-root circle centers to reposition circles
 - Pan the board by dragging empty space and zoom with the mouse wheel or toolbar
-- Local browser-session state only; no backend, database, auth, or Supabase calls are used by this prototype screen
+- Google and email/password auth with per-user graph persistence in Supabase
+- Signed-out editing persisted to this browser's `localStorage`
 
 ## Local Development
 
@@ -33,15 +34,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open the local or network Vite URL in your browser. This branch's visible prototype runs entirely locally and does not require Supabase values.
-
-If you want the local project MCP server to read and mutate live board data, also create:
-
-```bash
-cp .env.mcp.example .env.mcp.local
-```
-
-Then fill in a non-browser `HACKATHON_MCP_SUPABASE_SERVICE_ROLE_KEY`. The MCP server also accepts `HACKATHON_MCP_SUPABASE_URL`, but it can fall back to `VITE_SUPABASE_URL` from `.env.local`.
+Open the local or network Vite URL in your browser. Supabase variables are required for auth, synced boards, and server-side LinkedIn profile enrichment. Without them, the app still supports signed-out local editing.
 
 Recommended local env format:
 
@@ -60,9 +53,7 @@ Everything needed for a teammate is already in the repository:
 - application code
 - the Supabase migration
 - `.env.example`
-- `.env.mcp.example`
 - project documentation
-- project-scoped Supabase MCP skills
 
 The Google OAuth client secret is not needed in the app. It stays in the Supabase Dashboard.
 
@@ -73,7 +64,6 @@ Teammates only need to:
 3. Fill in `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`.
 4. Run `npm run dev`.
 5. Open the local Vite URL shown in the terminal, or the network URL from another device on the same LAN.
-6. Optional for MCP data tools: create `.env.mcp.local` from `.env.mcp.example` and add the service-role key.
 
 If Vite starts on a different local port such as `5173`, `5174`, or `5175`, or the app is opened through a LAN IP such as `http://10.29.0.117:5173`, that exact origin must be added to the Supabase Auth redirect allow list and to Google Cloud Authorized JavaScript origins.
 For multi-device login, deploy the frontend on one stable server origin and add that exact origin to both configurations.
@@ -84,7 +74,6 @@ For multi-device login, deploy the frontend on one stable server origin and add 
 - `npm run build` creates a production build.
 - `npm run preview` previews the production build on all local network interfaces.
 - `npm run lint` runs ESLint.
-- `npm run mcp:start` starts the local Hackathon board MCP server over stdio.
 
 ## Product Direction
 

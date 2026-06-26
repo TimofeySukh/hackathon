@@ -17,17 +17,65 @@ rediscover, write it here.
 
 ## Entries
 
-### 2026-06-26 — Reframe landing around sorting relationship chaos
+### 2026-06-25 — Agent Best Practices and MCP Contract Hardening
 
-- Decision: replaced the generic startup landing composition with a focused
-  "sort the chaos" entry screen: Linear-like black header, three hero slogans,
-  stepped divider, blue board CTA note, and a concrete local-only person
-  inspector demo.
-- Decision: header Log in and Sign up now enter the real board auth dialog, and
-  Docs moved to its own landing route for API, CLI, and MCP material.
-- Why: the landing should communicate the product's core job — turning loose
-  relationship data into an organized board — instead of presenting an abstract
-  marketing preview.
+- Decision: added `docs/AGENT_BEST_PRACTICES.md` as the project-local summary of the
+  local `agents-best-practices` rules for MCP tools, permissions, structured results,
+  and API/CLI/MCP parity.
+- Decision: the MCP server now exposes strict schemas, risk metadata, MCP annotations,
+  compact `list_capabilities` discovery, and structured JSON result envelopes with
+  `status`, `summary`, `data`, and `next_valid_actions`.
+- Decision: API `/operations` parity is extended to the shared API client, CLI
+  `operations:run`, and MCP `batch_operations`.
+- Why: agent-facing tools need narrow contracts, legible results, and synchronized public
+  documentation so remote agents can safely inspect and edit the user-owned graph.
+
+### 2026-06-24 — Real-time Synchronization via Supabase Realtime
+
+- Decision: enable Supabase Realtime Database Changes on the `user_graphs` table, allowing the frontend to subscribe to the row modifications matching the logged-in user's ID.
+- Decision: when a remote change is received, the frontend checks if the user has unsaved modifications. If not, the UI is updated automatically. If yes, a conflict warning banner is displayed and autosaving is paused to protect user data from overwriting.
+- Why: allows multi-tab and multi-device/CLI/agent edits to sync automatically without requiring page reloads or polling the database, while maintaining strict optimistic concurrency control.
+
+### 2026-06-24 — Universal MCP and CLI Execution and Height Stability
+
+- Decision: the agent settings dialog `.agent-settings-dialog` is given a stable height of `height: min(680px, calc(100vh - 64px))` on desktop and `height: min(680px, calc(100vh - 24px))` on mobile.
+- Decision: the package name is renamed to `datanode-mcp` and two `bin` executables are exposed in `package.json` (`datanode-mcp` and `datanode-cli`), allowing both the MCP server and CLI tool to be run/installed universally via `npx` or `npm install -g` anywhere.
+- Decision: keeping the public web developer documentation (`src/DocsPage.tsx`) synchronized with any API, CLI, or MCP modifications is added as an explicit rule in `AGENTS.md`.
+- Why: switching tabs in settings was causing vertical dialog height shifts depending on the tab's content. Universal `npx` execution allows any remote AI agent or user to install and launch the MCP server/CLI without requiring a local clone. Keeping public docs synchronized ensures that remote agents or external builders can always read accurate API schemas on the live site.
+
+### 2026-06-24 — API Writes Are Revision-Checked
+
+- Decision: signed-in autosave, CLI, and MCP/API writes use `user_graphs.revision` as an
+  optimistic concurrency guard. Stale writers are rejected with a conflict and must reload
+  before saving again.
+- Why: multiple browser tabs or remote agents can otherwise overwrite a newer graph blob
+  with older local state.
+
+### 2026-06-24 — Agent Access Uses Revocable Scoped Tokens
+
+- Decision: remote agent access goes through the `graph-api` Edge Function and hashed
+  `agent_tokens`, not direct Supabase credentials. Tokens resolve to one owner user and
+  carry explicit scopes.
+- Why: MCP/CLI clients need copy-paste setup, revocation, and user isolation without
+  exposing service-role keys or accepting caller-provided user ids.
+
+### 2026-06-24 — Person Data Has No Hidden Role Field
+
+- Decision: `PersonNode.role` was removed from the app model. People expose name,
+  owning circle, notes, connections, avatar, favorite state, and visual placement/style.
+  LinkedIn headlines and ZIP import positions are stored as notes instead of a hidden
+  subtitle field.
+- Why: the product UI no longer has a role/title field, and keeping an invisible field
+  made API planning and search behavior confusing.
+
+### 2026-06-24 — Remove Pre-User Legacy Data Paths
+
+- Decision: the app now uses only the `user_graphs` blob for signed-in board persistence
+  and `localStorage` for signed-out editing. The old normalized-table frontend layer,
+  AI note/search Edge Functions, local MCP server, demo seed scripts, and legacy graph
+  fallback were removed.
+- Why: there are no existing production users to migrate, so keeping unused storage paths
+  and service-role tooling adds security and maintenance risk without product value.
 
 ### 2026-06-23 — Protect Graph Persistence During Backend Migrations
 
@@ -672,3 +720,42 @@ rediscover, write it here.
   screen is one palette.
 - Why: visual coherence with the already-Material canvas, and a single token system new
   features can build on instead of re-deriving styles each time.
+
+### 2026-06-24 — Onboarding Step Reordering and Context-Aware Mobile Layout
+
+- Decision: Rearranged the onboarding flow step order so that adding a person/circle (`'create'`) is Step 2 (right after panned/zoomed canvas gestures in Step 1). Moving (`'move'`) and resizing (`'resize'`) steps are shifted to Steps 3 and 4, respectively.
+- Why: Users shouldn't be asked to move or resize elements before having created any. Putting the creation step first ensures they have elements on the canvas to interact with.
+- Decision: Implemented context-aware positioning for the onboarding coach card on mobile. The card dynamically floats at the top if the inspector (notes) is open (`selectedItem !== null`) to avoid overlapping notes, and at the bottom if the search panel is open (preventing overlap with search) or by default.
+- Decision: Repositioned the anonymous sign-in banner (`.local-save-hint`) from top-left to bottom-left on desktop, and bottom-stretch on mobile. It is hidden completely on mobile when search, settings, or the inspector panel are open.
+- Why: Having the banner at the top-left caused it to overlap the brand logo/settings buttons. Positioning it at the bottom keeps it clean, and hiding it when panels are open avoids any screen clutter on small devices.
+
+### 2026-06-24 — Remove Sign-in Popup, Add Settings Alert Badge, and Dynamic Onboarding Offset
+
+- Decision: Removed the floating anonymous sign-in banner (`.local-save-hint`) completely. Instead, added an alert exclamation badge (`!`) on the Settings gear button for anonymous users, which prompts them to open settings where the account sign-in block is located.
+- Why: The popup banner was intrusive, cluttered mobile viewports, and clashed/overlapped with logo and onboarding controls. The badge is much quieter, spec-compliant, and cleanly guides users to their settings.
+- Decision: Replaced fixed top/bottom classes for the mobile onboarding coach with a dynamic JS offset measurement. A MutationObserver and window listeners monitor the height of the bottom inspector and the circle style popover, setting an inline `bottom` offset so the coach card dynamically glides up and down, floating exactly 12px above whichever bottom sheet is active.
+- Why: Pushing the onboarding coach to the top of the screen on mobile avoided the bottom notes but ended up covering the search dropdown and other top-level elements. Pushing it up just enough to float above bottom sheets keeps the top area completely clear.
+
+### 2026-06-25 — Enhanced Grid Ripple Visibility & Settings Toggle Switch
+
+- Decision: Optimised background grid dot ripple rendering by separating the base grid drawing path (fast batched path) from the interactive overlay pass. Lit dots now grow dynamically in radius (up to 4x their base size) and increase their opacity (up to 0.9/0.95 of a vibrant primary blue tone) as a wave crest passes.
+- Why: Faint ripples were previously invisible to the human eye due to low opacities and lack of size scaling, especially at different zoom levels. Dynamic sizing and higher opacity make ripples look like clear, fluid water droplets/pulses.
+- Decision: Converted pointer-move and drag distance calculations to screen-space coordinates by multiplying world-space distances by the camera scale. Added a sub-pixel jitter filter (`distScreen > 2` pixels) to only spawn ripples on actual pointer move.
+- Why: Using raw world distance meant that ripple trails were dense at far zoom-out levels but extremely sparse/hard to trigger at close zoom-in levels. Screen-space distance keeps gesture ripple trails size-invariant across all camera scale factors.
+- Decision: Replaced the standard checkbox toggle for ripples in the settings panel with the Material 3 Switch (`.m3-switch` class).
+- Why: The native checkbox looked cheap and cluttered the display panel. The M3 Switch is cleaner, fits the design system tokens, and matches other custom inputs.
+
+### 2026-06-25 — Round Grid Dots, Dense Grid Spacing, Perimeter Waves & Style Change Ripples
+
+- Decision: Changed grid dots rendering shape from squares (`ctx.rect`) to circles (`ctx.arc`). Reduced base minor dot opacity to 0.04 (from 0.09) and major dot opacity to 0.09 (from 0.18), and decreased peak lit dot opacity to 0.7/0.75 and radius growth to 2.0x/1.8x.
+- Why: Circular dots look much softer and blend better with the round aesthetic. Reducing the opacities and growth sizes makes the waves subtle and elegant rather than distracting.
+- Decision: Decreased the default grid spacing from 32 to 20 world units.
+- Why: This creates a denser, more natural-looking backdrop grid. With LOD, screen-space spacing is kept between 10px and 20px.
+- Decision: Removed the `isMajor` skip filter from the minor dots drawing loop. Minor dots are now drawn at every coordinate, and major dots are drawn on top.
+- Why: Previously, when the camera zoomed out, major dots faded out but the corresponding minor dots were skipped, leaving empty "holes" in the grid every 5 dots, which made the grid look crooked (uneven/irregular). Keeping the minor dots grid complete solves the alignment issue.
+- Decision: Extended the grid ripples math to support `sourceRadius`. When a circle is created, dragged, or resized, the ripple wave propagates outward and inward from the circle's actual boundary rather than its center.
+- Why: Visual waves look much more realistic when they emanate directly from the circle's physical perimeter (the hull) rather than its center point.
+- Decision: Integrated throttled (150ms) style-change ripples in `updateCircleStyle` when shape, rounding, sides, opacity, tone, custom color, or image properties are updated.
+- Why: Gives real-time tactile wave feedback to the canvas when modifying any visual settings of a circle.
+
+

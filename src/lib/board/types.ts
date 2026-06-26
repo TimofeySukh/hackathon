@@ -54,7 +54,6 @@ export type PersonLink = {
 export type PersonNode = {
   id: string
   name: string
-  role: string
   x: number
   y: number
   circleId: string
