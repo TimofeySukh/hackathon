@@ -14,7 +14,6 @@ import sdnLogo from './assets/sdn-logo.svg'
 
 zip.configure({ useWebWorkers: false })
 import { useAuth } from './lib/useAuth'
-import LandingPage from './LandingPage'
 import { loadGraphRecord, saveGraph, loadLocalGraph, saveLocalGraph } from './lib/graphPersistence'
 import { enrichLinkedInProfile } from './lib/linkedinEnrichment'
 import { OnboardingCoach } from './Onboarding'
@@ -467,21 +466,6 @@ function markOnboardingSeen() {
 }
 
 function App() {
-  const [viewMode, setViewMode] = useState<'landing' | 'board'>(() => {
-    // Show landing page only if #landing is explicitly requested in the URL
-    return window.location.hash === '#landing' ? 'landing' : 'board';
-  });
-
-
-  useEffect(() => {
-    const handleHashChange = () => {
-      const isLanding = window.location.hash === '#landing';
-      setViewMode(isLanding ? 'landing' : 'board');
-    };
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []);
-
   const surfaceRef = useRef<HTMLDivElement | null>(null)
   // Canvas 2D board renderer: circles, edges, people, labels, and interaction chrome.
   const peopleCanvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -1995,7 +1979,6 @@ function App() {
     marquee,
     selectedCircleIds,
     hoveredCircleEdgeId,
-    viewMode,
   ])
 
   useEffect(() => {
@@ -2038,7 +2021,7 @@ function App() {
     return () => {
       surface.removeEventListener('wheel', handleWheel)
     }
-  }, [viewMode])
+  }, [])
 
   function screenToWorld(point: { x: number; y: number }) {
     const liveCamera = cameraRef.current
@@ -3290,14 +3273,6 @@ function App() {
   // Keep references to unused features so they remain in codebase for future use and satisfy TS/ESLint checks
   if (false as boolean) {
     console.log(setDemoMode, setShowCircleLabels, setShowPersonLabels, setCircleFillMode, setCenterBehavior, applyCircleShapeMode, CheckIcon, SubsetIcon)
-  }
-
-  if (viewMode === 'landing') {
-    return (
-      <div className="app-shell">
-        <LandingPage />
-      </div>
-    )
   }
 
   return (
