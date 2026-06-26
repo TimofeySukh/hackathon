@@ -128,7 +128,8 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
                 width: '100%',
                 height: '100%',
                 display: 'block',
-                overflow: 'visible'
+                overflow: 'visible',
+                objectFit: 'fill'
               }}
             >
               <path
