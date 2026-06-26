@@ -389,7 +389,6 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
                           if (newNoteText.trim()) {
                             setDemoNotes([...demoNotes, newNoteText.trim()])
                             setNewNoteText('')
-                            setIsAddingDemoNote(false)
                           }
                         } else if (e.key === 'Escape') {
                           setIsAddingDemoNote(false)
