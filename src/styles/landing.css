@@ -390,12 +390,46 @@
   margin: 0 0 16px 0;
 }
 
-.demo-desc {
-  font-size: 15px;
-  line-height: 1.6;
-  color: var(--lp-text-secondary);
-  margin: 0 0 24px 0;
+.demo-notes-deck {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
   max-width: 480px;
+  margin-top: 16px;
+}
+
+.demo-deck-card {
+  background-color: #ffffff;
+  border: 1px solid rgba(195, 199, 207, 0.4);
+  border-radius: var(--r-md);
+  padding: 16px 24px;
+  font-size: 14.5px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--lp-text-secondary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+  transition: transform var(--dur-medium) var(--ease-spring), 
+              box-shadow var(--dur-medium) var(--ease-spring);
+  text-align: left;
+}
+
+.demo-deck-card:nth-child(1) {
+  transform: rotate(-1deg) translateX(-4px);
+}
+
+.demo-deck-card:nth-child(2) {
+  transform: rotate(0.8deg) translateX(6px);
+}
+
+.demo-deck-card:nth-child(3) {
+  transform: rotate(-0.5deg) translateX(-2px);
+}
+
+.demo-deck-card:hover {
+  transform: scale(1.02) rotate(0deg);
+  box-shadow: 0 8px 20px rgba(0, 98, 157, 0.08);
+  color: var(--lp-text-primary);
 }
 
 /* Simulated Inspector Card (Replica of the actual app's inspector screenshot) */
@@ -1046,6 +1080,17 @@
   .demo-inspector-card {
     margin: 0 auto;
     text-align: left;
+  }
+
+  .demo-notes-deck {
+    margin: 16px auto 0;
+  }
+
+  .demo-deck-card:nth-child(1),
+  .demo-deck-card:nth-child(2),
+  .demo-deck-card:nth-child(3) {
+    transform: none;
+    text-align: center;
   }
 }
 

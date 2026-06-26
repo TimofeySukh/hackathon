@@ -211,9 +211,11 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
             <div className="demo-info-col">
               <span className="demo-eyebrow">Interactive Demo</span>
               <h2 className="demo-title">Organize your connections</h2>
-              <p className="demo-desc">
-                Make notes on people to remember who they are and where you met them. Group people into circle zones to make sorting easier, and add key contacts to your favorites so you never lose them in the crowd.
-              </p>
+              <div className="demo-notes-deck">
+                <div className="demo-deck-card">Make notes on people to remember who they are and where you met them</div>
+                <div className="demo-deck-card">Group people into circle zones to make sorting easier later</div>
+                <div className="demo-deck-card">Add people to favorites so you never lose them in the crowd</div>
+              </div>
             </div>
 
             {/* Simulated Inspector Card */}
