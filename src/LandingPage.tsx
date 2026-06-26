@@ -3,6 +3,7 @@ import sdnLogo from './assets/sdn-logo.svg'
 import linkedinIcon from './assets/brands/linkedin.svg'
 import telegramIcon from './assets/brands/telegram.svg'
 import websiteIcon from './assets/brands/website.svg'
+import { SelectionIndicator } from './components/SelectionIndicator'
 
 interface LandingPageProps {
   onLogin: () => void
@@ -201,11 +202,13 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
                       key={z}
                       type="button"
                       className={`demo-zone-btn ${demoZone === z ? 'is-active' : ''}`}
+                      data-ind-key={z}
                       onClick={() => setDemoZone(z)}
                     >
                       {z}
                     </button>
                   ))}
+                  <SelectionIndicator activeKey={demoZone} variant="pill" />
                 </div>
               </div>
 

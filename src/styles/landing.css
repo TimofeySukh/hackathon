@@ -447,14 +447,17 @@
 
 /* Zone Selector Segmented button style */
 .demo-zone-selector {
+  position: relative;
   display: flex;
   background-color: var(--lp-surface-container-low);
   padding: 4px;
   border-radius: var(--r-full);
   border: 1px solid rgba(195, 199, 207, 0.5);
+  z-index: 1;
 }
 
 .demo-zone-btn {
+  position: relative;
   flex: 1;
   background: transparent;
   border: none;
@@ -465,12 +468,20 @@
   color: var(--lp-text-secondary);
   cursor: pointer;
   transition: all var(--dur-short) var(--ease-standard);
+  z-index: 1;
 }
 
 .demo-zone-btn.is-active {
-  background-color: var(--lp-primary-container);
   color: var(--lp-on-primary-container);
   font-weight: 600;
+  background-color: transparent !important;
+}
+
+.demo-zone-selector .selection-indicator--pill {
+  background-color: var(--lp-primary-container) !important;
+  box-shadow: none;
+  border-radius: var(--r-full);
+  z-index: 0;
 }
 
 /* Photo Avatar upload simulator */
