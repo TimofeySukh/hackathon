@@ -20,7 +20,8 @@ opening viewport while the page is rebuilt section by section.
   rounded bends.
 - The upper-right triangle contains separate overlapping Trello-style note cards that
   explain the project idea. They are not wrapped in a board/list container.
-- The lower-left triangle contains one standalone Trello-style product note with the CTA.
+- The lower-left triangle contains one standalone Trello-style hero note with the product
+  promise, concise supporting copy, three proof chips, and one primary CTA.
 
 ## Code
 

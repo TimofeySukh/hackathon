@@ -26,11 +26,21 @@ export default function LandingPage() {
 
       <section className="landing-try" aria-label="Try the product">
         <article className="landing-card landing-cta-note">
-          <h2>Try our product</h2>
-          <p>Open the workspace and start mapping your own relationship graph.</p>
-          <button className="landing-product-button" type="button" onClick={openProduct}>
-            Open product
-          </button>
+          <span className="landing-kicker">Social Datanode</span>
+          <h1>Map your network like a living board</h1>
+          <p>Turn contacts, notes, and half-formed ideas into one visual graph you can think on.</p>
+          <div className="landing-proof-row" aria-label="Product highlights">
+            <span>Private workspace</span>
+            <span>LinkedIn import</span>
+            <span>AI notes</span>
+          </div>
+          <div className="landing-action-row">
+            <button className="landing-product-button" type="button" onClick={openProduct}>
+              <span>Open workspace</span>
+              <span aria-hidden="true">→</span>
+            </button>
+            <small>No setup needed</small>
+          </div>
         </article>
       </section>
     </main>
