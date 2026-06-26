@@ -102,8 +102,7 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
       {/* Main Content */}
       <main className="landing-main">
         
-        {/* First Viewport: Hero Section */}
-        <section className="landing-section hero-section">
+        <section className="landing-section hero-section" style={{ padding: '0 24px', position: 'relative', overflow: 'hidden', minHeight: '650px' }}>
           {/* Stepped background ribbon using double stroke technique for perfect border & thickness */}
           <div
             className="hero-stepped-path-container"
