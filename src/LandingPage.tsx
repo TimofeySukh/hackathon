@@ -109,8 +109,8 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
             className="hero-stepped-path-container"
             style={{
               position: 'absolute',
-              top: '-80px',
-              bottom: '-80px',
+              top: '-40px',
+              bottom: '-40px',
               left: '50%',
               transform: 'translateX(-50%)',
               width: '100%',
@@ -133,7 +133,7 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
               }}
             >
               <path
-                d="M 80,-100 L 80,60 C 80,140 130,140 180,140 C 250,140 250,260 320,260 L 380,260 C 450,260 430,420 500,420 L 580,420 C 660,420 660,540 740,540 C 780,540 820,580 820,600 L 820,800"
+                d="M 80,0 L 80,60 C 80,140 130,140 180,140 C 250,140 250,260 320,260 L 380,260 C 450,260 430,420 500,420 L 580,420 C 660,420 660,540 740,540 C 780,540 820,580 820,600 L 820,650"
                 stroke="#00629d"
                 strokeWidth="84"
                 strokeLinecap="round"
@@ -141,7 +141,7 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
                 style={{ vectorEffect: 'non-scaling-stroke' }}
               />
               <path
-                d="M 80,-100 L 80,60 C 80,140 130,140 180,140 C 250,140 250,260 320,260 L 380,260 C 450,260 430,420 500,420 L 580,420 C 660,420 660,540 740,540 C 780,540 820,580 820,600 L 820,800"
+                d="M 80,0 L 80,60 C 80,140 130,140 180,140 C 250,140 250,260 320,260 L 380,260 C 450,260 430,420 500,420 L 580,420 C 660,420 660,540 740,540 C 780,540 820,580 820,600 L 820,650"
                 stroke="#d2e4ff"
                 strokeWidth="72"
                 strokeLinecap="round"
