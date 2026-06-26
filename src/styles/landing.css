@@ -228,8 +228,8 @@
 /* Winding Stepped ribbon */
 .hero-stepped-path-container {
   position: absolute;
-  top: 0;
-  bottom: 0;
+  top: -80px;
+  bottom: -80px;
   left: 50%;
   transform: translateX(-50%);
   width: 100%;
@@ -239,6 +239,8 @@
 }
 
 .hero-stepped-path-container svg {
+  width: 100%;
+  height: 100%;
   overflow: visible;
 }
 
