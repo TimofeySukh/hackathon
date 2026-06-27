@@ -1,16 +1,19 @@
 // Keep in sync with src/lib/search/graphSearch.ts
 
+import { buildPersonSearchSummary, personSearchHaystack, refreshPersonSearchSummary } from './searchSummary.ts'
+
 type CircleNode = { id: string; name: string; parentId: string | null }
 type PersonNote = { id: string; title: string; body: string }
 type PersonLink = { id: string; label: string; url: string }
-type PersonNode = {
+export type PersonNode = {
   id: string
   name: string
   circleId: string
   notes?: PersonNote[]
   links?: PersonLink[]
+  searchSummary?: string
 }
-type GraphState = { circles: CircleNode[]; people: PersonNode[]; connections: unknown[] }
+export type GraphState = { circles: CircleNode[]; people: PersonNode[]; connections: unknown[] }
 
 export type CirclePathItem = { id: string; name: string }
 
@@ -83,7 +86,10 @@ export function getPersonPosition(person: PersonNode) {
   return undefined
 }
 
-function buildPersonHaystack(person: PersonNode, circlePath: CircleNode[]) {
+function buildPersonHaystack(person: PersonNode, circlePath: CircleNode[], graph?: GraphState) {
+  if (graph && person.searchSummary?.trim()) {
+    return normalizeText(personSearchHaystack(graph, person))
+  }
   const noteText = (person.notes ?? []).map((note) => `${note.title} ${note.body}`).join(' ')
   const linkText = (person.links ?? []).map((link) => `${link.label} ${link.url}`).join(' ')
   const pathText = circlePath.map((circle) => circle.name).join(' ')
@@ -186,12 +192,12 @@ function buildCircleSubtitle(path: CircleNode[]) {
   return pathLabel || 'Circle'
 }
 
-function scorePerson(person: PersonNode, intent: SearchIntent, circlePath: CircleNode[]): number {
+function scorePerson(person: PersonNode, intent: SearchIntent, circlePath: CircleNode[], graph: GraphState): number {
   const pathNames = circlePath.map((circle) => normalizeText(circle.name))
   const { score: circleScore, matches } = scoreCircleFilters(pathNames, intent.circleNames)
   if (intent.circleNames?.length && !matches) return 0
 
-  const haystack = buildPersonHaystack(person, circlePath)
+  const haystack = buildPersonHaystack(person, circlePath, graph)
   const position = getPersonPosition(person)
   let score = circleScore
   score += scoreNameTokens(person.name, intent.nameTokens ?? [])
@@ -229,7 +235,7 @@ export function rankGraphSearch(graph: GraphState, intent: SearchIntent, limit: 
   const peopleResults: GraphSearchPersonResult[] = graph.people
     .map((person) => {
       const circlePath = getCirclePath(graph, person.circleId)
-      const score = scorePerson(person, intent, circlePath)
+      const score = scorePerson(person, intent, circlePath, graph)
       if (score <= 0) return null
       return {
         type: 'person' as const,
@@ -353,47 +359,78 @@ export type PersonCandidateSummary = {
   id: string
   name: string
   circle: string
-  notes: string[]
+  summary: string
 }
 
-function scorePersonLoose(person: PersonNode, terms: string[], circlePath: CircleNode[]) {
-  if (terms.length === 0) return 0
-  const haystack = buildPersonHaystack(person, circlePath)
+function isSpecificTerm(needle: string) {
+  return needle.includes(' ') || needle.length >= 8 || /[\d@._-]/.test(needle)
+}
+
+function termFieldScore(needle: string, field: 'position' | 'note' | 'name' | 'path' | 'summary') {
+  const specific = isSpecificTerm(needle)
+  switch (field) {
+    case 'position': return specific ? 35 : 12
+    case 'note': return specific ? 22 : 10
+    case 'name': return 18
+    case 'path': return 4
+    case 'summary': return 8
+  }
+}
+
+/** Weighted term score: role/notes >> name >> circle path. Generic single tokens score lower. */
+export function scorePersonByTerms(graph: GraphState, person: PersonNode, terms: string[]): number {
+  const circlePath = getCirclePath(graph, person.circleId)
+  const position = getPersonPosition(person)
+  const normalizedPosition = position ? normalizeText(position) : ''
+  const nameHay = normalizeText(person.name)
+  const noteHay = normalizeText((person.notes ?? []).map((note) => `${note.title} ${note.body}`).join(' '))
+  const pathHay = normalizeText(circlePath.map((circle) => circle.name).join(' '))
+  const summaryHay = normalizeText(personSearchHaystack(graph, person))
+
   let score = 0
   for (const term of terms) {
     const needle = normalizeText(term)
-    if (!needle) continue
-    if (haystack.includes(needle)) score += 10
+    if (!needle || needle.length < 2) continue
+    if (normalizedPosition.includes(needle)) score += termFieldScore(needle, 'position')
+    else if (noteHay.includes(needle)) score += termFieldScore(needle, 'note')
+    else if (nameHay.includes(needle)) score += termFieldScore(needle, 'name')
+    else if (summaryHay.includes(needle) && !pathHay.includes(needle)) score += termFieldScore(needle, 'summary')
+    else if (pathHay.includes(needle)) score += termFieldScore(needle, 'path')
+    else if (summaryHay.includes(needle)) score += termFieldScore(needle, 'summary')
   }
   return score
 }
 
+function scorePersonLoose(person: PersonNode, terms: string[], _circlePath: CircleNode[], graph: GraphState) {
+  return scorePersonByTerms(graph, person, terms)
+}
+
 export function buildPersonCandidateSummary(graph: GraphState, person: PersonNode): PersonCandidateSummary {
+  if (!person.searchSummary?.trim()) {
+    refreshPersonSearchSummary(graph, person)
+  }
   const circlePath = getCirclePath(graph, person.circleId)
   return {
     id: person.id,
     name: person.name,
     circle: formatCirclePath(circlePath.map((circle) => ({ id: circle.id, name: circle.name }))),
-    notes: (person.notes ?? [])
-      .slice(0, 8)
-      .map((note) => `${note.title}: ${note.body}`.trim())
-      .filter(Boolean)
-      .map((line) => line.slice(0, 240)),
+    summary: person.searchSummary ?? buildPersonSearchSummary(graph, person),
   }
 }
 
-export function collectPersonCandidates(
+export function rankPeopleByTerms(
   graph: GraphState,
   terms: string[],
-  options: { max: number; includeAllNoted: boolean },
+  options: { max: number; includeAllNoted?: boolean; minScore?: number },
 ) {
   const ranked: Array<{ person: PersonNode; score: number }> = []
   const seen = new Set<string>()
+  const minScore = options.minScore ?? 1
 
   for (const person of graph.people) {
     const circlePath = getCirclePath(graph, person.circleId)
-    const score = scorePersonLoose(person, terms, circlePath)
-    if (score <= 0) continue
+    const score = scorePersonLoose(person, terms, circlePath, graph)
+    if (score < minScore) continue
     ranked.push({ person, score })
     seen.add(person.id)
   }
@@ -409,6 +446,18 @@ export function collectPersonCandidates(
 
   ranked.sort((left, right) => right.score - left.score || left.person.name.localeCompare(right.person.name))
   return ranked.slice(0, options.max).map((entry) => entry.person)
+}
+
+export function collectPersonCandidates(
+  graph: GraphState,
+  terms: string[],
+  options: { max: number; includeAllNoted: boolean },
+) {
+  return rankPeopleByTerms(graph, terms, {
+    max: options.max,
+    includeAllNoted: options.includeAllNoted,
+    minScore: 1,
+  })
 }
 
 export function toApiSearchResults(

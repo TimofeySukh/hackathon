@@ -5,8 +5,8 @@ import {
   type SearchIntent,
 } from './graphSearch.ts'
 
-const DEFAULT_MODEL = 'qwen3.6-35b-a3b-noreason'
-const DEFAULT_BASE_URL = 'https://api.neuraldeep.ru/v1'
+import { callHelperLlm, getPrimaryLlmProvider, isAiSearchConfigured as isLlmConfigured } from './llmProvider.ts'
+
 const INTENT_CACHE_TTL_MS = 5 * 60 * 1000
 
 const intentCache = new Map<string, { intent: SearchIntent; expiresAt: number }>()
@@ -36,17 +36,17 @@ function normalizeCacheKey(query: string) {
 }
 
 export function getAiSearchConfig() {
-  const apiKey = Deno.env.get('AI_SEARCH_API_KEY')
-  if (!apiKey) return null
+  const primary = getPrimaryLlmProvider()
+  if (!primary) return null
   return {
-    apiKey,
-    baseUrl: (Deno.env.get('AI_SEARCH_API_BASE_URL') ?? DEFAULT_BASE_URL).replace(/\/$/, ''),
-    model: Deno.env.get('AI_SEARCH_MODEL') ?? DEFAULT_MODEL,
+    apiKey: primary.apiKey,
+    baseUrl: primary.baseUrl,
+    model: primary.model,
   }
 }
 
 export function isAiSearchConfigured() {
-  return Boolean(getAiSearchConfig())
+  return isLlmConfigured()
 }
 
 export async function callNeuralDeepIntent(query: string, circleNames: string[]): Promise<SearchIntent | null> {
@@ -57,43 +57,14 @@ export async function callNeuralDeepIntent(query: string, circleNames: string[])
   const cached = intentCache.get(cacheKey)
   if (cached && cached.expiresAt > Date.now()) return cached.intent
 
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 8000)
-
   try {
-    const response = await fetch(`${config.baseUrl}/chat/completions`, {
-      method: 'POST',
-      signal: controller.signal,
-      headers: {
-        Authorization: `Bearer ${config.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: config.model,
-        temperature: 0,
-        max_tokens: 220,
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          {
-            role: 'user',
-            content: JSON.stringify({
-              query,
-              circles: circleNames.slice(0, 250),
-            }),
-          },
-        ],
-      }),
+    const { content } = await callHelperLlm({
+      system: SYSTEM_PROMPT,
+      user: { query, circles: circleNames.slice(0, 250) },
+      maxTokens: 220,
+      temperature: 0,
+      timeoutMs: 8000,
     })
-
-    if (!response.ok) {
-      console.error('AI search provider error', response.status, await response.text())
-      return null
-    }
-
-    const payload = await response.json() as {
-      choices?: Array<{ message?: { content?: string } }>
-    }
-    const content = payload.choices?.[0]?.message?.content
     if (!content) return null
 
     const intent = parseSearchIntentJson(content)
@@ -104,8 +75,6 @@ export async function callNeuralDeepIntent(query: string, circleNames: string[])
   } catch (error) {
     console.error('AI search interpret failed', error)
     return null
-  } finally {
-    clearTimeout(timeout)
   }
 }
 

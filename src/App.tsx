@@ -21,13 +21,21 @@ import PrivacyPage from './PrivacyPage'
 import DocsPage from './DocsPage'
 import WorkspaceModeToggle from './components/WorkspaceModeToggle'
 import { readWorkspaceMode, writeWorkspaceMode, type WorkspaceMode } from './lib/workspaceMode'
+import SearchLabPage from './SearchLabPage'
 import { createAgentToken, getGraphApiBaseUrl, listAgentTokens, revokeAgentToken } from './lib/agentApi'
 import type { AgentScope, AgentTokenRecord } from './lib/agentApi'
 import { supabase } from './lib/supabase'
 import { GraphRevisionConflictError, loadGraphRecord, saveGraph, loadLocalGraph, saveLocalGraph } from './lib/graphPersistence'
 import { enrichLinkedInProfile } from './lib/linkedinEnrichment'
 import { searchGraphByQuery } from './lib/search/graphSearch'
+import { refreshPersonSearchSummary } from './lib/search/searchSummary'
 import { mapSmartSearchResults, shouldUseSmartSearch, smartSearchGraph, type AgentSearchStep } from './lib/smartSearch'
+import {
+  discoverPeopleGraph,
+  shouldOfferDiscovery,
+  type AgentDiscoveryResponse,
+} from './lib/agentDiscovery'
+import { AgentDiscoveryView } from './components/AgentDiscoveryView'
 import { OnboardingCoach } from './Onboarding'
 import { SelectionIndicator } from './components/SelectionIndicator'
 import { M3Slider } from './components/M3Slider'
@@ -499,8 +507,9 @@ function AuthPrivacyNotice() {
 }
 
 function App() {
-  const [viewMode, setViewMode] = useState<'landing' | 'board' | 'docs' | 'contact' | 'privacy'>(() => {
+  const [viewMode, setViewMode] = useState<'landing' | 'board' | 'docs' | 'contact' | 'privacy' | 'search-lab'>(() => {
     if (window.location.hash === '#board') return 'board';
+    if (window.location.hash === '#search-lab') return 'search-lab';
     if (window.location.hash === '#docs' || window.location.hash.startsWith('#docs/')) return 'docs';
     if (window.location.hash === '#contact') return 'contact';
     if (window.location.hash === '#privacy') return 'privacy';
@@ -523,6 +532,8 @@ function App() {
       const hash = window.location.hash;
       if (hash === '#board') {
         setViewMode('board');
+      } else if (hash === '#search-lab') {
+        setViewMode('search-lab');
       } else if (hash === '#docs' || hash.startsWith('#docs/')) {
         setViewMode('docs');
       } else if (hash === '#contact') {
@@ -1202,6 +1213,11 @@ function App() {
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([])
   const [isSmartSearching, setIsSmartSearching] = useState(false)
   const smartSearchRequestRef = useRef(0)
+  const [discoveryOpen, setDiscoveryOpen] = useState(false)
+  const [discoveryData, setDiscoveryData] = useState<AgentDiscoveryResponse | null>(null)
+  const [discoveryError, setDiscoveryError] = useState<string | null>(null)
+  const [isDiscovering, setIsDiscovering] = useState(false)
+  const discoveryRequestRef = useRef(0)
   const [isImportingLinkedInProfile, setIsImportingLinkedInProfile] = useState(false)
   const [isImportingLinkedInZip, setIsImportingLinkedInZip] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -1352,6 +1368,49 @@ function App() {
       focusCameraOnWorld(circle.x, circle.y, scale)
     }
     closeSearch()
+  }
+
+  const runPeopleDiscovery = useCallback((queryOverride?: string) => {
+    const query = (queryOverride ?? searchQuery).trim()
+    if (!query || auth.status !== 'authenticated' || !auth.session) return
+
+    const requestId = discoveryRequestRef.current + 1
+    discoveryRequestRef.current = requestId
+    setDiscoveryOpen(true)
+    setDiscoveryError(null)
+    setDiscoveryData((current) => (current?.query === query ? current : null))
+    setIsDiscovering(true)
+    closeSearch()
+
+    void discoverPeopleGraph(auth.session, query)
+      .then((response) => {
+        if (requestId !== discoveryRequestRef.current) return
+        setDiscoveryData(response)
+        setDiscoveryError(null)
+      })
+      .catch((error: unknown) => {
+        if (requestId !== discoveryRequestRef.current) return
+        setDiscoveryError(error instanceof Error ? error.message : String(error))
+      })
+      .finally(() => {
+        if (requestId === discoveryRequestRef.current) {
+          setIsDiscovering(false)
+        }
+      })
+  }, [auth.status, auth.session, searchQuery])
+
+  function handleDiscoverySelectPerson(personId: string) {
+    const person = graph.people.find((entry) => entry.id === personId)
+    if (!person) return
+    setDiscoveryOpen(false)
+    selectItem({ type: 'person', id: person.id })
+    focusCameraOnWorld(person.x, person.y, 1.5)
+  }
+
+  function closeDiscovery() {
+    discoveryRequestRef.current += 1
+    setDiscoveryOpen(false)
+    setIsDiscovering(false)
   }
 
   // Snapshot the current graph before a mutating action so Ctrl+Z can restore
@@ -1532,12 +1591,12 @@ function App() {
     setGraph((current) => ({
       ...current,
       people: current.people.map((p) => {
-        if (p.id === personId) {
-          const notes = p.notes ? [...p.notes] : []
-          notes.push({ id: `note-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, title, body })
-          return { ...p, notes }
-        }
-        return p
+        if (p.id !== personId) return p
+        const notes = p.notes ? [...p.notes] : []
+        notes.push({ id: `note-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, title, body })
+        const nextPerson = { ...p, notes }
+        refreshPersonSearchSummary(current, nextPerson)
+        return nextPerson
       }),
     }))
   }
@@ -1564,13 +1623,13 @@ function App() {
     setGraph((current) => ({
       ...current,
       people: current.people.map((p) => {
-        if (p.id === personId && p.notes) {
-          const notes = p.notes.map((n) =>
-            n.id === noteId ? { ...n, title, body } : n
-          )
-          return { ...p, notes }
-        }
-        return p
+        if (p.id !== personId || !p.notes) return p
+        const notes = p.notes.map((n) =>
+          n.id === noteId ? { ...n, title, body } : n
+        )
+        const nextPerson = { ...p, notes }
+        refreshPersonSearchSummary(current, nextPerson)
+        return nextPerson
       }),
     }))
   }
@@ -1580,11 +1639,11 @@ function App() {
     setGraph((current) => ({
       ...current,
       people: current.people.map((p) => {
-        if (p.id === personId && p.notes) {
-          const notes = p.notes.filter((n) => n.id !== noteId)
-          return { ...p, notes }
-        }
-        return p
+        if (p.id !== personId || !p.notes) return p
+        const notes = p.notes.filter((n) => n.id !== noteId)
+        const nextPerson = { ...p, notes }
+        refreshPersonSearchSummary(current, nextPerson)
+        return nextPerson
       }),
     }))
   }
@@ -2085,6 +2144,7 @@ function App() {
   }, [searchQuery, isImportingLinkedInProfile, displayPeople, displayCircles, displayConnections, circlesById, peopleById])
 
   const isAiSearchActive = auth.status === 'authenticated' && shouldUseSmartSearch(searchQuery.trim())
+  const canOpenDiscovery = auth.status === 'authenticated' && shouldOfferDiscovery(searchQuery.trim())
   const searchResults = isAiSearchActive
     ? (isSmartSearching ? [] : (aiSearchResults ?? localSearchResults))
     : localSearchResults
@@ -3985,8 +4045,21 @@ Content-Type: application/json
     return <DocsPage />
   }
 
+  if (viewMode === 'search-lab') {
+    return (
+      <SearchLabPage
+        onBack={() => {
+          window.location.hash = '#board'
+          setViewMode('board')
+        }}
+        session={auth.session}
+        isAuthenticated={auth.status === 'authenticated'}
+      />
+    )
+  }
+
   return (
-    <main className={`app-shell ${searchOpen ? 'is-search-open' : ''} ${showSettings ? 'is-settings-open' : ''} ${selectedItem ? 'is-inspector-open' : ''} ${workspaceMode === 'agent' ? 'is-agent-mode' : ''}`}>
+    <main className={`app-shell ${searchOpen ? 'is-search-open' : ''} ${showSettings ? 'is-settings-open' : ''} ${selectedItem ? 'is-inspector-open' : ''} ${workspaceMode === 'agent' ? 'is-agent-mode' : ''} ${discoveryOpen ? 'is-discovery-open' : ''}`}>
       {graphLoadError && (
         <div style={{
           position: 'absolute',
@@ -4093,6 +4166,21 @@ Content-Type: application/json
                   }
                 }}
               />
+              {import.meta.env.DEV && (
+                <div className="search-box__lab-link">
+                  <button
+                    type="button"
+                    className="search-box__lab-button"
+                    onClick={() => {
+                      closeSearch()
+                      window.location.hash = '#search-lab'
+                      setViewMode('search-lab')
+                    }}
+                  >
+                    Search Lab — synthetic data, local
+                  </button>
+                </div>
+              )}
               {searchQuery.trim() !== '' && (
                 <button type="button" className="search-box__clear" aria-label="Clear search" onClick={() => { setSearchQuery(''); searchInputRef.current?.focus() }}>
                   ×
@@ -4144,6 +4232,33 @@ Content-Type: application/json
                           </button>
                         ))}
                       </div>
+                    </div>
+                  )}
+                  {canOpenDiscovery && (
+                    <div className="search-results__discovery-action">
+                      <button
+                        type="button"
+                        className="search-results__discovery-button"
+                        disabled={isDiscovering}
+                        onClick={() => runPeopleDiscovery()}
+                      >
+                        {isDiscovering ? 'Building discovery map…' : 'Open discovery map'}
+                      </button>
+                    </div>
+                  )}
+                  {import.meta.env.DEV && (
+                    <div className="search-results__discovery-action">
+                      <button
+                        type="button"
+                        className="search-results__discovery-button search-results__discovery-button--lab"
+                        onClick={() => {
+                          closeSearch()
+                          window.location.hash = '#search-lab'
+                          setViewMode('search-lab')
+                        }}
+                      >
+                        Open Search Lab (synthetic, local)
+                      </button>
                     </div>
                   )}
                 </div>
@@ -5749,6 +5864,16 @@ Content-Type: application/json
         </div>
       )}
 
+      {discoveryOpen && (
+        <AgentDiscoveryView
+          data={discoveryData}
+          loading={isDiscovering}
+          error={discoveryError}
+          onClose={closeDiscovery}
+          onSelectPerson={handleDiscoverySelectPerson}
+          onRetry={() => runPeopleDiscovery(discoveryData?.query ?? searchQuery)}
+        />
+      )}
       {graphLoaded && onboardingStep >= 0 && workspaceMode !== 'agent' && (
         <OnboardingCoach
           step={onboardingStep}

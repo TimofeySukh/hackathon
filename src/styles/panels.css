@@ -351,6 +351,23 @@
   }
 }
 
+.search-box__lab-link {
+  flex: 0 0 100%;
+  order: 10;
+  padding: 4px 4px 0;
+}
+
+.search-box__lab-button {
+  border: none;
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: var(--md-tertiary-container, var(--md-secondary-container));
+  color: var(--md-on-tertiary-container, var(--md-on-secondary-container));
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
 .search-results {
   position: absolute;
   top: calc(100% + 8px);

@@ -4,7 +4,9 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 
 import { isAiSearchConfigured } from './interpretSearch.ts'
 import { runAgentSearch } from './agentSearch.ts'
+import { runAgentDiscovery } from './agentDiscovery.ts'
 import { searchGraphByQuery, toApiSearchResults } from './graphSearch.ts'
+import { refreshPersonSearchSummary } from './searchSummary.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -65,6 +67,7 @@ type PersonNode = {
   isFavorite?: boolean
   notes?: PersonNote[]
   links?: PersonLink[]
+  searchSummary?: string
 }
 
 type Connection = { id: string; fromId: string; toId: string }
@@ -546,6 +549,7 @@ function createPerson(graph: GraphState, data: Record<string, unknown>) {
     links,
   }
   graph.people.push(person)
+  refreshPersonSearchSummary(graph, person)
   refitParents(graph, circleId)
   return person
 }
@@ -585,6 +589,12 @@ function clampSearchLimit(value: unknown, fallback = 10) {
   const parsed = Number(value)
   if (!Number.isFinite(parsed)) return fallback
   return Math.min(Math.max(Math.trunc(parsed), 1), 50)
+}
+
+function clampDiscoveryLimit(value: unknown, fallback = 12) {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return fallback
+  return Math.min(Math.max(Math.trunc(parsed), 1), 24)
 }
 
 function parseBody(body: unknown): Record<string, unknown> {
@@ -731,6 +741,45 @@ async function handleGraphRoutes(req: Request, path: string, auth: AuthContext, 
       })
     }
     return jsonResponse(await runAgentSearch(graph, query, limit))
+  }
+
+  if (req.method === 'POST' && path === '/v1/search/discover') {
+    if (!auth.scopes.has('search:read')) return jsonResponse({ error: 'Missing scope: search:read' }, 403)
+    if (!isAiSearchConfigured()) return jsonResponse({ error: 'AI search is not configured on the server.' }, 503)
+    const query = typeof body.query === 'string' ? body.query.trim() : ''
+    if (!query) return jsonResponse({ error: 'query is required.' }, 400)
+    const perGroupLimit = body.perGroupLimit != null || body.limit != null
+      ? clampDiscoveryLimit(body.perGroupLimit ?? body.limit)
+      : undefined
+    const { graph } = await readGraph(auth.userId)
+    if (!graph) {
+      return jsonResponse({
+        query,
+        mode: 'discovery',
+        explanation: 'No graph loaded yet.',
+        steps: [],
+        suggestions: [],
+        groups: [],
+        totalScanned: 0,
+        perGroupLimit: perGroupLimit ?? 0,
+        llmCalls: 0,
+      })
+    }
+    return jsonResponse(await runAgentDiscovery(graph, query, perGroupLimit))
+  }
+
+  if (req.method === 'POST' && path === '/v1/search/discover-lab') {
+    if (!auth.scopes.has('search:read')) return jsonResponse({ error: 'Missing scope: search:read' }, 403)
+    if (!isAiSearchConfigured()) return jsonResponse({ error: 'AI search is not configured on the server.' }, 503)
+    const query = typeof body.query === 'string' ? body.query.trim() : ''
+    if (!query) return jsonResponse({ error: 'query is required.' }, 400)
+    const graph = body.graph
+    if (!isGraphState(graph)) return jsonResponse({ error: 'graph is required and must be a valid GraphState.' }, 400)
+    if (graph.people.length > 5000) return jsonResponse({ error: 'Lab graph exceeds 5000 people.' }, 400)
+    const perGroupLimit = body.perGroupLimit != null || body.limit != null
+      ? clampDiscoveryLimit(body.perGroupLimit ?? body.limit)
+      : undefined
+    return jsonResponse(await runAgentDiscovery(graph, query, perGroupLimit))
   }
 
   if (req.method === 'GET' && path === '/v1/circles') {
@@ -881,6 +930,7 @@ async function handleGraphRoutes(req: Request, path: string, auth: AuthContext, 
         graph.people.push(person)
       }
 
+      refreshPersonSearchSummary(graph, person)
       refitParents(graph, companyCircle.id)
       return person
     })
@@ -906,6 +956,7 @@ async function handleGraphRoutes(req: Request, path: string, auth: AuthContext, 
       if (typeof body.name === 'string' && body.name.trim()) person.name = body.name.trim()
       if (typeof body.imageUrl === 'string') person.imageUrl = body.imageUrl
       if (typeof body.isFavorite === 'boolean') person.isFavorite = body.isFavorite
+      refreshPersonSearchSummary(graph, person)
       return person
     })
   }
@@ -932,6 +983,7 @@ async function handleGraphRoutes(req: Request, path: string, auth: AuthContext, 
       person.x = position.x
       person.y = position.y
       refitParents(graph, circleId)
+      refreshPersonSearchSummary(graph, person)
       return person
     })
   }
@@ -946,6 +998,7 @@ async function handleGraphRoutes(req: Request, path: string, auth: AuthContext, 
       if (req.method === 'POST' && !notesMatch[2]) {
         const [note] = normalizeNotes([body])
         person.notes.push(note)
+        refreshPersonSearchSummary(graph, person)
         return note
       }
       if (req.method === 'PATCH' && notesMatch[2]) {
@@ -953,10 +1006,12 @@ async function handleGraphRoutes(req: Request, path: string, auth: AuthContext, 
         if (!note) throw new Response('Note not found.', { status: 404 })
         if (typeof body.title === 'string' && body.title.trim()) note.title = body.title.trim()
         if (typeof body.body === 'string' && body.body.trim()) note.body = body.body.trim()
+        refreshPersonSearchSummary(graph, person)
         return note
       }
       if (req.method === 'DELETE' && notesMatch[2]) {
         person.notes = person.notes.filter((note) => note.id !== notesMatch[2])
+        refreshPersonSearchSummary(graph, person)
         return { deleted: notesMatch[2] }
       }
       throw new Response('Method not allowed.', { status: 405 })

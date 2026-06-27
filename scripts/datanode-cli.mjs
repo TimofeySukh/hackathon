@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { readFileSync } from 'node:fs'
 import {
   addLink,
   addNote,
@@ -10,6 +11,8 @@ import {
   listCircles,
   search,
   smartSearch,
+  discoverPeople,
+  discoverPeopleLab,
   importLinkedInPerson,
   deletePerson,
   deleteNote,
@@ -29,6 +32,8 @@ function usage() {
   datanode meta
   datanode search <query> [limit]
   datanode search:smart <query> [limit]
+  datanode search:discover <query> [perGroupLimit]
+  datanode search:discover-lab <query> <graph.json> [perGroupLimit]
   datanode circles
   datanode people:add <circleId> <name> [note]
   datanode people:import-linkedin <url>
@@ -78,6 +83,23 @@ async function main() {
 
   if (command === 'search:smart') {
     console.log(JSON.stringify(await smartSearch(getArg(3, 'query'), Number(process.argv[4] ?? 10)), null, 2))
+    return
+  }
+
+  if (command === 'search:discover') {
+    const limitArg = process.argv[4]
+    const perGroupLimit = limitArg != null && limitArg !== '' ? Number(limitArg) : undefined
+    console.log(JSON.stringify(await discoverPeople(getArg(3, 'query'), perGroupLimit), null, 2))
+    return
+  }
+
+  if (command === 'search:discover-lab') {
+    const query = getArg(3, 'query')
+    const graphPath = getArg(4, 'graph.json')
+    const graph = JSON.parse(readFileSync(graphPath, 'utf8'))
+    const limitArg = process.argv[5]
+    const perGroupLimit = limitArg != null && limitArg !== '' ? Number(limitArg) : undefined
+    console.log(JSON.stringify(await discoverPeopleLab(query, graph, perGroupLimit), null, 2))
     return
   }
 

@@ -10,6 +10,8 @@ import {
   listCircles,
   search,
   smartSearch,
+  discoverPeople,
+  discoverPeopleLab,
   importLinkedInPerson,
   deletePerson,
   deleteNote,
@@ -153,6 +155,29 @@ const toolDefinitions = [
       query: { type: 'string' },
       limit: { type: 'number', default: 10, minimum: 1, maximum: 50 },
     }, ['query']),
+    annotations: { readOnlyHint: true },
+  }),
+  tool({
+    name: 'discover_people',
+    description: 'Exoskeleton people discovery: LLM plans groups, code prefilters thousands of profiles, AI matches in batches, returns clustered people with layout coordinates for map visualization. Best for multi-group queries (speakers + investors, who can help with X).',
+    riskClass: 'search_only',
+    sideEffect: 'none',
+    schema: strictObject({
+      query: { type: 'string' },
+      perGroupLimit: { type: 'number', minimum: 1, maximum: 24 },
+    }, ['query']),
+    annotations: { readOnlyHint: true },
+  }),
+  tool({
+    name: 'discover_people_lab',
+    description: 'LLM people discovery on a provided graph JSON (Search Lab / synthetic bench). Same exoskeleton pipeline as discover_people but graph is sent in the request body instead of the saved board.',
+    riskClass: 'search_only',
+    sideEffect: 'none',
+    schema: strictObject({
+      query: { type: 'string' },
+      graph: { type: 'object' },
+      perGroupLimit: { type: 'number', minimum: 1, maximum: 24 },
+    }, ['query', 'graph']),
     annotations: { readOnlyHint: true },
   }),
   tool({
@@ -448,9 +473,10 @@ function errorEnvelope(toolName, error) {
 }
 
 function nextActionsFor(toolName) {
-  if (toolName === 'list_capabilities') return ['search_people_and_circles', 'smart_search_people_and_circles', 'list_circles']
+  if (toolName === 'list_capabilities') return ['search_people_and_circles', 'smart_search_people_and_circles', 'discover_people', 'discover_people_lab', 'list_circles']
   if (toolName === 'search_people_and_circles') return ['list_circles', 'create_person', 'add_note']
-  if (toolName === 'smart_search_people_and_circles') return ['list_circles', 'create_person', 'add_note']
+  if (toolName === 'smart_search_people_and_circles') return ['discover_people', 'list_circles', 'create_person', 'add_note']
+  if (toolName === 'discover_people') return ['smart_search_people_and_circles', 'list_circles', 'add_note']
   if (toolName === 'list_circles') return ['create_person', 'create_circle', 'search_people_and_circles']
   if (toolName === 'export_graph') return ['import_graph', 'clear_graph', 'batch_operations']
   if (['import_graph', 'clear_graph'].includes(toolName)) return ['list_circles', 'search_people_and_circles']
@@ -480,6 +506,13 @@ async function callTool(name, args = {}) {
       return resultEnvelope(name, await search(args.query, Math.min(args.limit ?? 10, 50)))
     case 'smart_search_people_and_circles':
       return resultEnvelope(name, await smartSearch(args.query, Math.min(args.limit ?? 10, 50)))
+    case 'discover_people':
+      return resultEnvelope(name, await discoverPeople(
+        args.query,
+        args.perGroupLimit == null ? undefined : Math.min(args.perGroupLimit, 24),
+      ))
+    case 'discover_people_lab':
+      return resultEnvelope(name, await discoverPeopleLab(args.query, args.graph, args.perGroupLimit))
     case 'list_circles':
       return resultEnvelope(name, await listCircles())
     case 'create_person': {

@@ -43,6 +43,26 @@ export async function smartSearch(query, limit = 10) {
   })
 }
 
+export async function discoverPeople(query, perGroupLimit) {
+  const body = { query }
+  if (perGroupLimit != null && Number.isFinite(Number(perGroupLimit))) {
+    body.perGroupLimit = Number(perGroupLimit)
+  }
+  return await datanodeFetch('/search/discover', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function discoverPeopleLab(query, graph, perGroupLimit) {
+  const body = { query, graph }
+  if (perGroupLimit != null) body.perGroupLimit = perGroupLimit
+  return await datanodeFetch('/search/discover-lab', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
 export async function listCircles() {
   return await datanodeFetch('/circles')
 }

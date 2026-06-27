@@ -806,3 +806,67 @@ rediscover, write it here.
   MCP, and `datanode-cli`.
 - Why: Full LinkedIn graph exports can exceed 1M tokens. Agents need deterministic local
   retrieval that returns large groups in compact chunks before involving an LLM.
+
+## 2026-06-27 — Group search in agent mode
+
+- Decision: Analyze pass returns `wantMultiple`; group queries use a separate match prompt,
+  synonym expansion, `response_format: json_object`, normalized match parsing (including
+  string-id arrays), and local term fallback when the LLM returns nothing.
+- Why: Groq benchmarks on ~300-person synthetic graphs showed group queries (startups,
+  engineers) need multi-result output and stable JSON; English group queries were unreliable
+  without local fallback even when candidates were in the pool.
+
+## 2026-06-27 — searchSummary + agent search eval suite
+
+- Decision: Store `person.searchSummary` on note/link/name/circle changes (deterministic,
+  no extra LLM). Agent match sends compact `summary` per candidate. Add
+  `scripts/test-agent-search-eval.mjs` (local prefilter/fallback gates) and CI workflow
+  `.github/workflows/agent-search-eval.yml`.
+- Why: agents-best-practices: keep context tight, validate with evals, deterministic harness
+  fallback when the model returns nothing.
+
+## 2026-06-27 — Exoskeleton people discovery map
+
+- Decision: Add `POST /v1/search/discover` using BitGN exoskeleton pattern (LLM plans
+  groups → code prefilters all profiles → batched AI match → code layout). UI opens a
+  full-screen **Discovery map** with group rings and clustered nodes. LLM provider chain:
+  Groq GPT-OSS 120B → NeuralDeep/OpenAI via `llmProvider.ts`.
+- Why: Smart search caps at ~60 candidates; users need multi-group discovery across
+  thousands of contacts with visual clustering, not a flat result list.
+
+## 2026-06-27 — Exoskeleton mini/nano + validated search harness
+
+- Decision: Split LLM roles (`SEARCH_HELPER_MODEL` plan/verify vs `SEARCH_WORKER_MODEL`
+  match). New `searchHarness.ts`: weighted prefilter, helper verify, query-scoped strong-tier
+  guards, full-graph recall audit. Eval gates at ~100% on 300-person synthetic graph.
+- Why: BitGN exoskeleton — model proposes, code disposes and validates; naive term cap
+  gave ~60% startup recall.
+
+## 2026-06-27 — GPT-5.4 mini/nano defaults + LinkedIn-scale eval
+
+- Decision: OpenAI defaults → `gpt-5.4-nano` (helper) and `gpt-5.4-mini` (worker) in
+  `llmProvider.ts`; Groq GPT-OSS remains fallback when `OPENAI_API_KEY` is absent.
+  LinkedIn Basic Export parser builds ~3k-person eval graph from `Connections.csv`
+  (Position + Company tags only, no private notes). `npm run test:agent-search:linkedin`.
+- Why: Match exoskeleton nano/mini split; validate harness at real network scale with
+  unlabeled data where ground truth is inferred from LinkedIn Position/Company fields.
+
+## 2026-06-27 — Large synthetic search bench (~3k)
+
+- Decision: `scripts/lib/synthetic-large-graph.mjs` + `npm run test:agent-search:bench`
+  generate ~3k people with decoys and 10 hard cases (conjunctive, relational, multi-group).
+  Baseline compares naive single OR pass (top-36) vs harness; multi-discovery requires
+  separate passes per group.
+- Why: Prove exoskeleton-style validation at scale; queries like "YC investors AND AI
+  speakers AND Globex seniors" cannot be solved by one capped OR scan.
+
+## 2026-06-27 — LLM-first discovery planning and profile details
+
+- Decision: Discovery now requires a valid LLM planner response for group creation; planner
+  failures return an API error instead of silently falling back to one generic `Matches`
+  circle. Production search harnesses removed domain-specific query guards and synonym
+  expansions in favor of LLM-supplied terms plus generic token/phrase scoring. Discovery
+  responses include selected people's notes, links, `llmCalls`, and `llmProviders`.
+- Why: Users expect natural-language requests to be interpreted by the model, while code
+  should only enforce contracts, prefilter candidates, validate ids, and expose evidence.
+  Provider telemetry also makes it clear when calls go to Groq/AI_SEARCH instead of OpenAI.

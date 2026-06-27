@@ -1,4 +1,5 @@
 import type { CircleNode, GraphState, PersonNode } from '../board/types'
+import { personSearchHaystack } from './searchSummary'
 
 export type CirclePathItem = { id: string; name: string }
 
@@ -73,7 +74,10 @@ export function getPersonPosition(person: PersonNode) {
   return undefined
 }
 
-function buildPersonHaystack(person: PersonNode, circlePath: CircleNode[]) {
+function buildPersonHaystack(person: PersonNode, circlePath: CircleNode[], graph: GraphState) {
+  if (person.searchSummary?.trim()) {
+    return normalizeText(personSearchHaystack(graph, person))
+  }
   const noteText = (person.notes ?? []).map((note) => `${note.title} ${note.body}`).join(' ')
   const linkText = (person.links ?? []).map((link) => `${link.label} ${link.url}`).join(' ')
   const pathText = circlePath.map((circle) => circle.name).join(' ')
@@ -176,12 +180,12 @@ function buildCircleSubtitle(path: CircleNode[]) {
   return pathLabel || 'Circle'
 }
 
-function scorePerson(person: PersonNode, intent: SearchIntent, circlePath: CircleNode[]): number {
+function scorePerson(person: PersonNode, intent: SearchIntent, circlePath: CircleNode[], graph: GraphState): number {
   const pathNames = circlePath.map((circle) => normalizeText(circle.name))
   const { score: circleScore, matches } = scoreCircleFilters(pathNames, intent.circleNames)
   if (intent.circleNames?.length && !matches) return 0
 
-  const haystack = buildPersonHaystack(person, circlePath)
+  const haystack = buildPersonHaystack(person, circlePath, graph)
   const position = getPersonPosition(person)
   let score = circleScore
   score += scoreNameTokens(person.name, intent.nameTokens ?? [])
@@ -219,7 +223,7 @@ export function rankGraphSearch(graph: GraphState, intent: SearchIntent, limit: 
   const peopleResults: GraphSearchPersonResult[] = graph.people
     .map((person) => {
       const circlePath = getCirclePath(graph, person.circleId)
-      const score = scorePerson(person, intent, circlePath)
+      const score = scorePerson(person, intent, circlePath, graph)
       if (score <= 0) return null
       return {
         type: 'person' as const,

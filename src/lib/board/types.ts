@@ -65,6 +65,7 @@ export type PersonNode = {
   isFavorite?: boolean
   notes?: PersonNote[]
   links?: PersonLink[]
+  searchSummary?: string
 }
 
 export type Connection = {

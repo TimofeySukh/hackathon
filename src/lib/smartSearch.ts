@@ -78,20 +78,16 @@ export function mapSmartSearchResults(results: SmartSearchResponse['results']): 
   })
 }
 
-const RELATIONAL_PATTERN =
-  /\b(?:my|mine|our|who|find|search|looking|love|girlfriend|boyfriend|partner|wife|husband|friend|colleague|boss|девушк|парн|жена|муж|любим|найти|ищу|мой|моя|мою|кого|кто)\b/i
-
 export function shouldUseSmartSearch(query: string) {
   const trimmed = query.trim()
   if (trimmed.length < 3) return false
   const tokens = trimmed.split(/\s+/).filter(Boolean)
-  if (tokens.length >= 2) return true
-  return RELATIONAL_PATTERN.test(trimmed)
+  return tokens.length >= 2
 }
 
 export function isSimpleNameLookup(query: string) {
   const trimmed = query.trim()
   if (!trimmed) return true
   const tokens = trimmed.split(/\s+/).filter(Boolean)
-  return tokens.length === 1 && !RELATIONAL_PATTERN.test(trimmed) && trimmed.length <= 24
+  return tokens.length === 1 && trimmed.length <= 24
 }

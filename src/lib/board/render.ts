@@ -355,6 +355,7 @@ export function drawBoardLayer(
   selectedCircleIds: string[] = [],
   hoveredCircleEdgeId: string | null = null,
   anim: AnimFrame = EMPTY_ANIM_FRAME,
+  searchMatchPersonIds: readonly string[] = [],
 ) {
   const { dpr, width, height } = resizeCanvas(canvas, surface)
   const ctx = canvas.getContext('2d')
@@ -388,7 +389,7 @@ export function drawBoardLayer(
     drawPersonEdges(ctx, visiblePeople, index, camera.scale, selectedItem, hoveredConnId)
     drawCustomConnections(ctx, visiblePeopleIds, visibleCircleIds, index, selectedItem, hoveredConnId, camera.scale)
     drawCircleDetails(ctx, visibleCircles, camera.scale, circleFillMode, showCircleLabels, anim.scales)
-    drawPeople(ctx, visiblePeople, index, selectedItem, hoveredPersonId, camera.scale, dpr, showPersonLabels, selectedPeopleIds, anim.scales)
+    drawPeople(ctx, visiblePeople, index, selectedItem, hoveredPersonId, camera.scale, dpr, showPersonLabels, selectedPeopleIds, anim.scales, searchMatchPersonIds)
     if (connector) drawConnector(ctx, connector, camera.scale)
     drawSelectionHandles(ctx, selectedItem, index, camera.scale)
   }
@@ -776,6 +777,19 @@ function drawCircleLabel(ctx: CanvasRenderingContext2D, circle: CircleNode, scal
   ctx.restore()
 }
 
+function drawSearchMatchOutline(ctx: CanvasRenderingContext2D, person: PersonNode, scale: number) {
+  const drawRadius = PERSON_VISUAL_RADIUS
+  const ringWidth = 2 / scale
+  const ringGap = 1.25 / scale
+  ctx.save()
+  ctx.beginPath()
+  ctx.arc(person.x, person.y, drawRadius + ringGap + ringWidth / 2, 0, Math.PI * 2)
+  ctx.strokeStyle = 'rgba(0, 98, 157, 0.72)'
+  ctx.lineWidth = ringWidth
+  ctx.stroke()
+  ctx.restore()
+}
+
 function drawPeople(
   ctx: CanvasRenderingContext2D,
   people: PersonNode[],
@@ -787,7 +801,9 @@ function drawPeople(
   showPersonLabels: boolean,
   selectedPeopleIds: string[] = [],
   scales: Map<string, number> = EMPTY_ANIM_FRAME.scales,
+  searchMatchPersonIds: readonly string[] = [],
 ) {
+  const searchMatches = searchMatchPersonIds.length > 0 ? new Set(searchMatchPersonIds) : null
   const spriteRes = pickSpriteTier(PERSON_VISUAL_RADIUS * 2 * scale * dpr)
   ctx.imageSmoothingEnabled = true
   ctx.imageSmoothingQuality = 'high'
@@ -824,7 +840,8 @@ function drawPeople(
       ctx.stroke()
       ctx.restore()
     }
-    if (person.isFavorite) drawFavoritePersonOutline(ctx, person, '#ffd600', scale)
+    if (person.isFavorite && !searchMatches?.has(person.id)) drawFavoritePersonOutline(ctx, person, '#ffd600', scale)
+    if (searchMatches?.has(person.id)) drawSearchMatchOutline(ctx, person, scale)
     if (showPersonLabels && (scale >= 0.70 || isSelected || isHovered)) drawPersonLabel(ctx, person, scale)
   }
 }

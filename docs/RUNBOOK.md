@@ -380,23 +380,52 @@ Required LinkedIn enrichment secret:
 supabase secrets set LINKEDIN_ENRICHMENT_API_KEY=your-linkedin-enrichment-provider-api-key
 ```
 
-Required secrets for signed-in natural-language smart search (`POST /v1/search/smart`):
+Required secrets for signed-in natural-language smart search (`POST /v1/search/smart`) and
+people discovery (`POST /v1/search/discover`). The Edge Function chooses providers in order:
+**OpenAI → Groq → AI_SEARCH** for both helper and worker roles (first configured wins for
+each role; role fallbacks are attempted on error).
 
 ```bash
+# OpenAI helper/worker split
+supabase secrets set OPENAI_API_KEY=sk-...
+supabase secrets set OPENAI_HELPER_MODEL=gpt-5.4-nano
+supabase secrets set OPENAI_WORKER_MODEL=gpt-5.4-mini
+
+# Or Groq GPT-OSS 120B (fast, good group matching)
+supabase secrets set GROQ_API_KEY=gsk_...
+
+# Or NeuralDeep (OpenAI-compatible, hosts GPT-OSS 120B in RF)
 supabase secrets set AI_SEARCH_API_KEY=your-neuraldeep-sk-key
 supabase secrets set AI_SEARCH_API_BASE_URL=https://api.neuraldeep.ru/v1
-supabase secrets set AI_SEARCH_MODEL=qwen3.6-35b-a3b-noreason
+supabase secrets set AI_SEARCH_MODEL=openai/gpt-oss-120b
+
 ```
 
-Provider docs: [NeuralDeep](https://neuraldeep.ru/docs). Default model `qwen3.6-35b-a3b-noreason` is the fastest
-MoE chat model on the free tier (DaisyGPT / Qwen 3.6, reasoning disabled). `AI_SEARCH_API_BASE_URL` and
-`AI_SEARCH_MODEL` are optional overrides.
+Provider docs: [NeuralDeep](https://neuraldeep.ru/docs), [Groq](https://console.groq.com/docs).
+For local `supabase functions serve`, export the same vars in your shell or `.env.local`.
+If only `GROQ_API_KEY` or `AI_SEARCH_API_KEY` is configured, OpenAI dashboard logs will not
+show these calls.
 
 Redeploy `graph-api` after setting secrets:
 
 ```bash
 supabase functions deploy graph-api
 ```
+
+Agent search evals (local, no API key):
+
+```bash
+npm run test:agent-search
+```
+
+Optional Groq LLM benchmark (requires `GROQ_API_KEY` in the environment):
+
+```bash
+GROQ_API_KEY=gsk_... npm run test:agent-search:groq -- --model openai/gpt-oss-120b --delay-ms 18000
+GROQ_API_KEY=gsk_... npm run test:groq-search-scale -- --people 300 --model openai/gpt-oss-20b --delay-ms 15000
+```
+
+CI runs `node scripts/test-agent-search-eval.mjs --people 300` on graph-api/search changes.
 
 For local manual LinkedIn profile import testing without signing in, set a throwaway
 secret in local Vite and in the Edge Function environment:

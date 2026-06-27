@@ -668,22 +668,22 @@ ${pinnedCmd}`}</code>
     "limit": 8
   }'`
         const response = `{
-  "query": "find my girlfriend",
+  "query": "people who can invest in my startup",
   "mode": "agent",
-  "explanation": "Looking for a close romantic partner in your graph.",
+  "explanation": "Looking for people whose notes or circles suggest investment relevance.",
   "steps": [
     { "id": "read", "label": "Reading your question" },
     { "id": "scan", "label": "Scanning contacts and notes" },
-    { "id": "pick", "label": "AI picked matches", "detail": "1 suggestion" }
+    { "id": "pick", "label": "AI picked a group (worker)", "detail": "6 suggestions" }
   ],
-  "suggestions": ["Search by her name", "Add a note like \\"my girlfriend\\""],
+  "suggestions": ["Try a more specific role, company, event, or relationship phrase"],
   "results": [
     {
       "type": "person",
       "id": "person-123",
       "name": "Alice Chen",
-      "subtitle": "Personal › Close",
-      "aiReason": "Note says \\"i love her\\" — likely your partner"
+      "subtitle": "Work › Investors · Angel investor",
+      "aiReason": "Profile notes mention angel investing and seed-stage startups"
     }
   ]
 }`
@@ -697,7 +697,7 @@ ${pinnedCmd}`}</code>
               Runs multi-step agent search: analyze the query, scan note-backed candidates,
               match with AI (with an optional retry pass), then return ranked people/circles with
               `aiReason`, visible `steps`, and follow-up `suggestions`. Requires the
-              <code>search:read</code> scope and Edge Function secret <code>AI_SEARCH_API_KEY</code>.
+              <code>search:read</code> scope and at least one configured LLM provider secret.
             </p>
 
             <h3>Request Body</h3>
@@ -745,6 +745,162 @@ ${pinnedCmd}`}</code>
               </div>
               <pre className="docs-code-pre">
                 <code className="docs-code">{response}</code>
+              </pre>
+            </div>
+          </div>
+        )
+      }
+    },
+    {
+      id: 'post-search-discover',
+      category: 'api',
+      title: 'POST /search/discover',
+      badge: 'post',
+      keywords: ['post', '/search/discover', 'discovery', 'cluster', 'map', 'groups', 'exoskeleton'],
+      render: (copy) => {
+        const curl = `curl -X POST "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/search/discover" \\
+  -H "Authorization: Bearer dn_live_your_token" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "query": "conference speakers with AI ideas and investors who fund devtools"
+  }'`
+        const response = `{
+  "query": "conference speakers with AI ideas and investors who fund devtools",
+  "mode": "discovery",
+  "explanation": "Looking for speakers and investors in two clusters.",
+  "llmCalls": 6,
+  "llmProviders": ["openai-helper", "openai-worker"],
+  "steps": [
+    { "id": "plan", "label": "Planning discovery groups", "detail": "2 clusters: Speakers, Investors" },
+    { "id": "scan", "label": "Scanning all profiles", "detail": "842 people in graph" },
+    { "id": "layout", "label": "Arranging clusters on map", "detail": "9 people across 2 groups" }
+  ],
+  "suggestions": [],
+  "totalScanned": 842,
+  "perGroupLimit": 12,
+  "groups": [
+    {
+      "id": "group-1",
+      "label": "Speakers",
+      "description": "People who speak about AI",
+      "tone": "blue",
+      "people": [
+        {
+          "id": "person-123",
+          "name": "Alice Chen",
+          "subtitle": "Community › Hackathon · Researcher",
+          "aiReason": "Notes mention AI keynote at WebConf",
+          "confidence": 0.82,
+          "x": 0.72,
+          "y": 0.38,
+          "notes": [{ "id": "note-1", "title": "Event", "body": "AI keynote at WebConf" }],
+          "links": [{ "id": "link-1", "service": "linkedin", "label": "LinkedIn", "url": "https://www.linkedin.com/in/alice/" }]
+        }
+      ]
+    }
+  ]
+}`
+        return (
+          <div>
+            <div className="docs-endpoint-title">
+              <span className="docs-method-badge post">POST</span>
+              <span className="docs-endpoint-path">/search/discover</span>
+            </div>
+            <p>
+              Exoskeleton people discovery for large graphs: the LLM plans 1–4 groups, code
+              prefilters all profiles, AI matches candidates in batches, then code returns
+              clustered people with normalized map coordinates and profile notes/links for
+              the selected matches. The planner must return valid JSON; otherwise the endpoint
+              returns an error instead of silently falling back to a single generic group.
+              Requires <code>search:read</code> and an LLM provider secret (<code>OPENAI_API_KEY</code>,
+              <code>GROQ_API_KEY</code>, or <code>AI_SEARCH_API_KEY</code>).
+            </p>
+
+            <h3>Request Body</h3>
+            <table className="docs-table">
+              <thead>
+                <tr>
+                  <th>Field</th>
+                  <th>Type</th>
+                  <th>Required</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="docs-param-name">query</td>
+                  <td className="docs-param-type">string</td>
+                  <td><span className="docs-param-required">Required</span></td>
+                  <td>Natural-language discovery text; compound queries become multiple groups.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">perGroupLimit</td>
+                  <td className="docs-param-type">number</td>
+                  <td><span className="docs-param-optional">Optional</span></td>
+                  <td>Max people per group (1–24). Omit for the automatic strong-tier cap. Alias: <code>limit</code>.</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <h3>Request Example</h3>
+            <div className="docs-code-container">
+              <div className="docs-code-header">
+                <span>cURL</span>
+                <button className="docs-code-copy-btn" onClick={() => copy(curl, 'cURL copied!')}>Copy</button>
+              </div>
+              <pre className="docs-code-pre">
+                <code className="docs-code">{curl}</code>
+              </pre>
+            </div>
+
+            <h3>Response Example</h3>
+            <div className="docs-code-container">
+              <div className="docs-code-header">
+                <span>JSON Response</span>
+                <button className="docs-code-copy-btn" onClick={() => copy(response, 'JSON response copied!')}>Copy</button>
+              </div>
+              <pre className="docs-code-pre">
+                <code className="docs-code">{response}</code>
+              </pre>
+            </div>
+          </div>
+        )
+      }
+    },
+    {
+      id: 'post-search-discover-lab',
+      category: 'api',
+      title: 'POST /search/discover-lab',
+      badge: 'post',
+      keywords: ['post', '/search/discover-lab', 'search lab', 'synthetic', 'graph'],
+      render: (copy) => {
+        const curl = `curl -X POST "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/search/discover-lab" \\
+  -H "Authorization: Bearer dn_live_your_token" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "query": "YC investors and AI speakers",
+    "graph": { "circles": [], "people": [], "connections": [] }
+  }'`
+        return (
+          <div>
+            <div className="docs-endpoint-title">
+              <span className="docs-method-badge post">POST</span>
+              <span className="docs-endpoint-path">/search/discover-lab</span>
+            </div>
+            <p>
+              Same exoskeleton discovery as <code>/search/discover</code>, but runs on a
+              client-provided <code>graph</code> (Search Lab synthetic data). Requires{' '}
+              <code>search:read</code> and LLM secrets. Max 5000 people. Response includes{' '}
+              <code>llmCalls</code> and <code>llmProviders</code>. Optional <code>perGroupLimit</code>; omit for auto cap.
+            </p>
+            <h3>Request Example</h3>
+            <div className="docs-code-container">
+              <div className="docs-code-header">
+                <span>cURL</span>
+                <button className="docs-code-copy-btn" onClick={() => copy(curl, 'cURL copied!')}>Copy</button>
+              </div>
+              <pre className="docs-code-pre">
+                <code className="docs-code">{curl}</code>
               </pre>
             </div>
           </div>
