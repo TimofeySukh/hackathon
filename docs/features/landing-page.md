@@ -107,9 +107,7 @@ After the hero, the landing page includes:
    private sync, and no collaboration yet.
 3. **Interactive demo** — inspector simulator (see above).
 4. **LinkedIn import** — deck cards plus CTA to open the board for import.
-5. **FAQ** — question cards on the left, answer cards on the right, using the
-   same tilted deck-card visual language as the hero slogans.
-6. **CTA banner** — final launch-board call to action.
+5. **CTA banner** — final launch-board call to action.
 
 Deck cards across these sections share the white rounded-card, slight rotation,
 and hover straightening behavior from the hero slogan stack.

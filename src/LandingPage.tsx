@@ -30,29 +30,6 @@ const LINKEDIN_POINTS = [
   'Enrich one profile at a time when you need more detail',
 ] as const
 
-const FAQ_ITEMS = [
-  {
-    question: 'Do I need an account to try it?',
-    answer: 'No. Open the board anonymously and your graph is saved locally in the browser.',
-  },
-  {
-    question: 'Does the landing demo save my edits?',
-    answer: 'No. The interactive inspector on this page is a local preview only.',
-  },
-  {
-    question: 'Where does my graph go after sign-in?',
-    answer: 'Your personal graph syncs to your private Supabase record, not a shared workspace.',
-  },
-  {
-    question: 'Can agents access my board?',
-    answer: 'Only if you create a token in Settings. See Docs for MCP, CLI, and API setup.',
-  },
-  {
-    question: 'How does LinkedIn import work?',
-    answer: 'Upload a Connections.csv ZIP from the board. Bulk import stays local; single-profile enrichment runs server-side.',
-  },
-] as const
-
 interface LandingPageProps {
   onLogin: () => void
   onSignUp: () => void
@@ -601,34 +578,6 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
                 </div>
               ))}
             </div>
-          </div>
-        </section>
-
-        {/* FAQ */}
-        <section className="landing-section faq-section">
-          <div className="section-header">
-            <span className="demo-eyebrow">FAQ</span>
-            <h2 className="section-title">Common questions</h2>
-          </div>
-          <div className="faq-list">
-            {FAQ_ITEMS.map((item, index) => (
-              <div key={item.question} className="faq-row">
-                <div className={`faq-question lp-deck-card lp-deck-card--faq-q lp-deck-card--tilt-${(index % 3) + 1}`}>
-                  {item.question}
-                </div>
-                <div className={`faq-answer lp-deck-card lp-deck-card--faq-a lp-deck-card--tilt-${((index + 1) % 3) + 1}`}>
-                  {item.answer}
-                  {index === 3 && (
-                    <>
-                      {' '}
-                      <button type="button" className="faq-inline-link" onClick={handleDocs}>
-                        Open docs
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
           </div>
         </section>
 
