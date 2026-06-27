@@ -17,6 +17,16 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-27 — Public Privacy Policy Page at `#privacy`
+
+- Decision: ship a dedicated Privacy Policy screen at `#privacy` (`PrivacyPage.tsx`) instead
+  of burying legal text in the landing footer. Link it from footers and the auth dialog.
+- Why: OAuth and compliance forms require a stable public URL that matches actual data
+  handling (Supabase auth/graph storage, browser localStorage for anonymous users, Bright
+  Data LinkedIn enrichment, hashed agent tokens).
+- Rejected: a generic template that claims analytics, sharing, or features the product does
+  not implement.
+
 ### 2026-06-25 — Agent Best Practices and MCP Contract Hardening
 
 - Decision: added `docs/AGENT_BEST_PRACTICES.md` as the project-local summary of the

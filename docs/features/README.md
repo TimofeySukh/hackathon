@@ -25,5 +25,6 @@ design without reverse-engineering `src/App.tsx`.
 - [Authentication](auth.md) — local editing, Google sign-in, email/password registration, confirmation resend, and password reset.
 - [Import load testing](import-load-testing.md) — isolated database load checks and browser responsiveness verification for large LinkedIn imports.
 - [Landing page](landing-page.md) — clean, beautiful entry point introducing the product with animated orbits and view routing.
+- [Privacy policy](privacy-policy.md) — public privacy page at `#privacy` for OAuth and user data transparency.
 - [Agent API](agent-api.md) — revocable agent tokens, graph API access, CLI, and MCP server setup.
 - [Real-time sync](realtime-sync.md) — automatic real-time sync with database edits via Supabase Realtime.

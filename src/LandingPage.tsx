@@ -1,32 +1,6 @@
 import { useState, type MouseEvent, type ChangeEvent, type FormEvent } from 'react'
 import sdnLogo from './assets/sdn-logo.svg'
-import linkedinBrand from './assets/brands/linkedin.svg'
 import productBoardInspector from './assets/landing/product-board-inspector.png'
-
-type TeamContact = {
-  name: string
-  role: string
-  avatarUrl: string
-  linkedinUrl: string
-  email?: string
-}
-
-const TEAM_CONTACTS: TeamContact[] = [
-  {
-    name: 'Velizar Seleznev',
-    role: 'Co-founder',
-    avatarUrl: '/velizar_avatar.jpeg',
-    linkedinUrl: 'https://www.linkedin.com/in/velizar-seleznev/',
-    email: 'velizar.seleznev@gmail.com',
-  },
-  {
-    name: 'Timofey Sukhov',
-    role: 'Co-founder',
-    avatarUrl: '/timofey_avatar.jpeg',
-    linkedinUrl: 'https://www.linkedin.com/in/timofey-sukhov-775b38404/',
-    email: 'timasukhovm@gmail.com',
-  },
-]
 
 const HOW_IT_WORKS_STEPS = [
   {
@@ -109,9 +83,14 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
     window.location.hash = '#docs'
   }
 
-  const handleScrollToContact = (e: MouseEvent) => {
+  const handleContact = (e: MouseEvent) => {
     e.preventDefault()
-    document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })
+    window.location.hash = '#contact'
+  }
+
+  const handlePrivacy = (e: MouseEvent) => {
+    e.preventDefault()
+    window.location.hash = '#privacy'
   }
 
   const handleAddDemoNote = (e: FormEvent) => {
@@ -185,7 +164,7 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
               <a href="#docs" className="landing-nav-link" onClick={handleDocs}>
                 Docs
               </a>
-              <a href="#contact" className="landing-nav-link" onClick={handleScrollToContact}>
+              <a href="#contact" className="landing-nav-link" onClick={handleContact}>
                 Contact
               </a>
             </div>
@@ -609,52 +588,6 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
           </div>
         </section>
 
-        {/* CTA Banner Section */}
-        <section className="landing-section banner-section">
-          <div className="banner-card">
-            <h2 className="banner-title">Ready to map your network?</h2>
-            <p className="banner-desc">
-              Start from a blank board, map your circles, and keep the people who matter in one place.
-            </p>
-          </div>
-        </section>
-
-        <section id="contact" className="landing-section contact-section">
-          <div className="section-header">
-            <span className="demo-eyebrow">Contact</span>
-            <h2 className="section-title">Talk to the team</h2>
-          </div>
-          <div className="contact-team-grid">
-            {TEAM_CONTACTS.map((person, index) => (
-              <article
-                key={person.name}
-                className={`contact-card lp-deck-card lp-deck-card--tilt-${(index % 3) + 1}`}
-              >
-                <img className="contact-avatar" src={person.avatarUrl} alt="" />
-                <div className="contact-card-body">
-                  <h3 className="contact-name">{person.name}</h3>
-                  <p className="contact-role">{person.role}</p>
-                  <div className="contact-links">
-                    {person.email ? (
-                      <a className="contact-link" href={`mailto:${person.email}`}>
-                        {person.email}
-                      </a>
-                    ) : null}
-                    <a
-                      className="contact-link contact-link--linkedin"
-                      href={person.linkedinUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <img src={linkedinBrand} alt="" aria-hidden="true" />
-                      LinkedIn
-                    </a>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
       </main>
 
       {/* Footer */}
@@ -664,9 +597,14 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
             <img className="footer-logo-mark" src={sdnLogo} alt="" aria-hidden="true" />
             <span className="footer-logo-text">Social Datanode</span>
           </a>
-          <span className="footer-copyright">
-            &copy; {new Date().getFullYear()} Social Datanode. All rights reserved.
-          </span>
+          <div className="footer-legal">
+            <a href="#privacy" className="footer-legal-link" onClick={handlePrivacy}>
+              Privacy Policy
+            </a>
+            <span className="footer-copyright">
+              &copy; {new Date().getFullYear()} Social Datanode. All rights reserved.
+            </span>
+          </div>
         </div>
       </footer>
     </div>

@@ -41,7 +41,7 @@ Header requirements:
 - It should follow the clear structure of the Linear reference.
 - It should not become a huge black banner.
 - It should not dominate the first screen.
-- `Contact` can be inert for now.
+- `Contact` opens a separate contact screen at `#contact`.
 
 Auth behavior:
 
@@ -110,8 +110,6 @@ After the hero, the landing page includes:
 3. **Interactive demo** — inspector simulator (see above).
 4. **Core Capabilities** — five human-readable scatter cards; the agent card links to Docs.
 5. **LinkedIn import** — deck cards describing the import flow.
-6. **CTA banner** — short closing message without a duplicate board button.
-7. **Contact** — founder cards with preset avatars, LinkedIn links, and optional email.
 
 The hero is the only primary board CTA: an **Open board** button plus a clickable product screenshot.
 
@@ -144,16 +142,18 @@ view.
 
 ## Contact
 
-`Contact` scrolls to a team section with the founders.
+`Contact` in the header opens a separate screen at `#contact`, similar to `#docs`.
 
-Each contact card shows:
+Founder cards show:
 
 - avatar from the existing LinkedIn import presets in `public/`
-- name and role
+- name and role (Timofey Sukhov — CEO, Velizar Seleznev — CTO)
 - LinkedIn profile link
 - email when provided in `TEAM_CONTACTS`
 
 Do not invent contact details beyond what the team provides.
+
+- Main component: [`ContactPage.tsx`](../../src/ContactPage.tsx)
 
 ## CTA Style
 
@@ -184,4 +184,4 @@ Buttons should feel consistent across the landing page.
 - Main component: [`LandingPage.tsx`](../../src/LandingPage.tsx)
 - Board preview screenshots: [`src/assets/landing/`](../../src/assets/landing/)
 - Stylesheet: [`landing.css`](../../src/styles/landing.css)
-- App integration: [`App.tsx`](../../src/App.tsx)
+- App integration: [`App.tsx`](../../src/App.tsx) (`#contact`, `#privacy` view modes)

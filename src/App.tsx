@@ -15,6 +15,8 @@ import sdnLogo from './assets/sdn-logo.svg'
 zip.configure({ useWebWorkers: false })
 import { useAuth } from './lib/useAuth'
 import LandingPage from './LandingPage'
+import ContactPage from './ContactPage'
+import PrivacyPage from './PrivacyPage'
 import DocsPage from './DocsPage'
 import { createAgentToken, getGraphApiBaseUrl, listAgentTokens, revokeAgentToken } from './lib/agentApi'
 import type { AgentScope, AgentTokenRecord } from './lib/agentApi'
@@ -472,10 +474,30 @@ function markOnboardingSeen() {
 }
 
 
+function AuthPrivacyNotice() {
+  return (
+    <p className="auth-card__privacy">
+      By creating an account, you agree to our{' '}
+      <a
+        href="#privacy"
+        onClick={(event) => {
+          event.preventDefault()
+          window.location.hash = '#privacy'
+        }}
+      >
+        Privacy Policy
+      </a>
+      .
+    </p>
+  )
+}
+
 function App() {
-  const [viewMode, setViewMode] = useState<'landing' | 'board' | 'docs'>(() => {
+  const [viewMode, setViewMode] = useState<'landing' | 'board' | 'docs' | 'contact' | 'privacy'>(() => {
     if (window.location.hash === '#board') return 'board';
     if (window.location.hash === '#docs') return 'docs';
+    if (window.location.hash === '#contact') return 'contact';
+    if (window.location.hash === '#privacy') return 'privacy';
     return 'landing';
   });
 
@@ -486,6 +508,10 @@ function App() {
         setViewMode('board');
       } else if (hash === '#docs') {
         setViewMode('docs');
+      } else if (hash === '#contact') {
+        setViewMode('contact');
+      } else if (hash === '#privacy') {
+        setViewMode('privacy');
       } else {
         setViewMode('landing');
       }
@@ -3599,26 +3625,30 @@ Content-Type: application/json
 
 
 
-  if (viewMode === 'landing') {
+  if (viewMode === 'landing' || viewMode === 'contact' || viewMode === 'privacy') {
+    const landingAuthProps = {
+      onLogin: () => {
+        setEmailAuthMode('signin')
+        setEmailAuthNotice(null)
+        setEmailAuthError(null)
+        auth.clearError()
+        setShowSignInModal(true)
+      },
+      onSignUp: () => {
+        setEmailAuthMode('signup')
+        setEmailAuthNotice(null)
+        setEmailAuthError(null)
+        auth.clearError()
+        setShowSignInModal(true)
+      },
+      isAuthenticated: auth.status === 'authenticated',
+    }
+
     return (
       <div className="app-shell">
-        <LandingPage
-          onLogin={() => {
-            setEmailAuthMode('signin')
-            setEmailAuthNotice(null)
-            setEmailAuthError(null)
-            auth.clearError()
-            setShowSignInModal(true)
-          }}
-          onSignUp={() => {
-            setEmailAuthMode('signup')
-            setEmailAuthNotice(null)
-            setEmailAuthError(null)
-            auth.clearError()
-            setShowSignInModal(true)
-          }}
-          isAuthenticated={auth.status === 'authenticated'}
-        />
+        {viewMode === 'landing' && <LandingPage {...landingAuthProps} />}
+        {viewMode === 'contact' && <ContactPage {...landingAuthProps} />}
+        {viewMode === 'privacy' && <PrivacyPage {...landingAuthProps} />}
         {showAuthDialog && (
           <div
             className={`auth-overlay ${showAuthDialog ? 'is-open' : ''}`}
@@ -3796,6 +3826,7 @@ Content-Type: application/json
               {(emailAuthError || (authDialogMode !== 'reset' ? auth.error : null)) && (
                 <p className="auth-card__error" role="alert">{emailAuthError || auth.error}</p>
               )}
+              {(authDialogMode === 'signin' || authDialogMode === 'signup') && <AuthPrivacyNotice />}
             </div>
           </div>
         )}
@@ -5506,6 +5537,7 @@ Content-Type: application/json
             {(emailAuthError || (authDialogMode !== 'reset' ? auth.error : null)) && (
               <p className="auth-card__error" role="alert">{emailAuthError || auth.error}</p>
             )}
+            {(authDialogMode === 'signin' || authDialogMode === 'signup') && <AuthPrivacyNotice />}
           </div>
         </div>
       )}
