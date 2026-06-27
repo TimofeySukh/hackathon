@@ -2,6 +2,10 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
+import { isAiSearchConfigured } from './interpretSearch.ts'
+import { runAgentSearch } from './agentSearch.ts'
+import { searchGraphByQuery, toApiSearchResults } from './graphSearch.ts'
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -577,34 +581,10 @@ function normalizeLinks(values: unknown[]): PersonLink[] {
   })
 }
 
-function searchGraph(graph: GraphState, query: string, limit: number) {
-  const q = query.trim().toLowerCase()
-  if (!q) return []
-  const circlesById = new Map(graph.circles.map((circle) => [circle.id, circle]))
-  const people = graph.people
-    .filter((person) => {
-      const circle = circlesById.get(person.circleId)
-      const notes = (person.notes ?? []).map((note) => `${note.title} ${note.body}`).join(' ')
-      const links = (person.links ?? []).map((link) => `${link.label} ${link.url}`).join(' ')
-      return [person.name, circle?.name, notes, links].filter(Boolean).join(' ').toLowerCase().includes(q)
-    })
-    .map((person) => ({
-      type: 'person',
-      id: person.id,
-      name: person.name,
-      circleId: person.circleId,
-      circlePath: getCirclePath(graph, person.circleId).map((circle) => ({ id: circle.id, name: circle.name })),
-    }))
-  const circles = graph.circles
-    .filter((circle) => circle.name.toLowerCase().includes(q))
-    .map((circle) => ({
-      type: 'circle',
-      id: circle.id,
-      name: circle.name,
-      parentId: circle.parentId,
-      path: getCirclePath(graph, circle.id).map((item) => ({ id: item.id, name: item.name })),
-    }))
-  return [...people, ...circles].slice(0, limit)
+function clampSearchLimit(value: unknown, fallback = 10) {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return fallback
+  return Math.min(Math.max(Math.trunc(parsed), 1), 50)
 }
 
 function parseBody(body: unknown): Record<string, unknown> {
@@ -726,9 +706,31 @@ async function handleGraphRoutes(req: Request, path: string, auth: AuthContext, 
   }
 
   if (req.method === 'GET' && path === '/v1/search') {
+    if (!auth.scopes.has('search:read')) return jsonResponse({ error: 'Missing scope: search:read' }, 403)
     const { graph } = await readGraph(auth.userId)
     if (!graph) return jsonResponse({ results: [] })
-    return jsonResponse({ results: searchGraph(graph, url.searchParams.get('q') ?? '', Math.min(Number(url.searchParams.get('limit') ?? 10), 50)) })
+    const limit = clampSearchLimit(url.searchParams.get('limit'))
+    return jsonResponse({ results: toApiSearchResults(searchGraphByQuery(graph, url.searchParams.get('q') ?? '', limit)) })
+  }
+
+  if (req.method === 'POST' && path === '/v1/search/smart') {
+    if (!auth.scopes.has('search:read')) return jsonResponse({ error: 'Missing scope: search:read' }, 403)
+    if (!isAiSearchConfigured()) return jsonResponse({ error: 'AI search is not configured on the server.' }, 503)
+    const query = typeof body.query === 'string' ? body.query.trim() : ''
+    if (!query) return jsonResponse({ error: 'query is required.' }, 400)
+    const limit = clampSearchLimit(body.limit)
+    const { graph } = await readGraph(auth.userId)
+    if (!graph) {
+      return jsonResponse({
+        query,
+        mode: 'agent',
+        explanation: 'No graph loaded yet.',
+        steps: [],
+        suggestions: [],
+        results: [],
+      })
+    }
+    return jsonResponse(await runAgentSearch(graph, query, limit))
   }
 
   if (req.method === 'GET' && path === '/v1/circles') {

@@ -10,9 +10,10 @@ selects the node and flies the camera to it at a comfortable zoom.
 
 - A magnifier pill sits in the top toolbar, immediately left of the settings gear.
   Collapsed it is an icon button; tapping it expands an inline text field and focuses it.
-- Typing filters live: people match on name, owning circle, notes, and saved
-  connections; circles match on name. People are listed first, then circles
-  (labelled "Circle"); results are capped at 8.
+- Typing filters live: people match on name, owning circle path, notes (including Position/Headline), and saved
+  connections; circles match on name and path. People are listed first, then circles
+  (labelled "Circle"); results are capped at 8. Subtitles show `Circle › … · role` when available.
+- Signed-in users can type natural-language queries (multi-word or `at`/`in`/`в` scopes). After a short pause the app calls `POST /v1/search/smart` and replaces results with AI-ranked matches. See [`smart-search.md`](smart-search.md).
 - Pasting a LinkedIn profile URL (`linkedin.com/in/...` or `linkedin.com/pub/...`)
   shows an "Add LinkedIn profile" action at the top of results. Clicking it, or
   pressing Enter while it is first, imports the profile into the board.

@@ -9,6 +9,7 @@ import {
   getMeta,
   listCircles,
   search,
+  smartSearch,
   importLinkedInPerson,
   deletePerson,
   deleteNote,
@@ -135,6 +136,17 @@ const toolDefinitions = [
   tool({
     name: 'search_people_and_circles',
     description: 'Search the user-owned DataNode graph by person name, circle, notes, links, or circle name. Read-only and result-limited.',
+    riskClass: 'search_only',
+    sideEffect: 'none',
+    schema: strictObject({
+      query: { type: 'string' },
+      limit: { type: 'number', default: 10, minimum: 1, maximum: 50 },
+    }, ['query']),
+    annotations: { readOnlyHint: true },
+  }),
+  tool({
+    name: 'smart_search_people_and_circles',
+    description: 'Natural-language search over the graph. The server interprets the query with AI, then ranks people and circles using circle hierarchy, notes, and roles. Requires server-side AI search configuration.',
     riskClass: 'search_only',
     sideEffect: 'none',
     schema: strictObject({
@@ -436,8 +448,9 @@ function errorEnvelope(toolName, error) {
 }
 
 function nextActionsFor(toolName) {
-  if (toolName === 'list_capabilities') return ['search_people_and_circles', 'list_circles']
+  if (toolName === 'list_capabilities') return ['search_people_and_circles', 'smart_search_people_and_circles', 'list_circles']
   if (toolName === 'search_people_and_circles') return ['list_circles', 'create_person', 'add_note']
+  if (toolName === 'smart_search_people_and_circles') return ['list_circles', 'create_person', 'add_note']
   if (toolName === 'list_circles') return ['create_person', 'create_circle', 'search_people_and_circles']
   if (toolName === 'export_graph') return ['import_graph', 'clear_graph', 'batch_operations']
   if (['import_graph', 'clear_graph'].includes(toolName)) return ['list_circles', 'search_people_and_circles']
@@ -465,6 +478,8 @@ async function callTool(name, args = {}) {
       })
     case 'search_people_and_circles':
       return resultEnvelope(name, await search(args.query, Math.min(args.limit ?? 10, 50)))
+    case 'smart_search_people_and_circles':
+      return resultEnvelope(name, await smartSearch(args.query, Math.min(args.limit ?? 10, 50)))
     case 'list_circles':
       return resultEnvelope(name, await listCircles())
     case 'create_person': {

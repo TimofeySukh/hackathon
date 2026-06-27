@@ -360,6 +360,24 @@ Required LinkedIn enrichment secret:
 supabase secrets set LINKEDIN_ENRICHMENT_API_KEY=your-linkedin-enrichment-provider-api-key
 ```
 
+Required secrets for signed-in natural-language smart search (`POST /v1/search/smart`):
+
+```bash
+supabase secrets set AI_SEARCH_API_KEY=your-neuraldeep-sk-key
+supabase secrets set AI_SEARCH_API_BASE_URL=https://api.neuraldeep.ru/v1
+supabase secrets set AI_SEARCH_MODEL=qwen3.6-35b-a3b-noreason
+```
+
+Provider docs: [NeuralDeep](https://neuraldeep.ru/docs). Default model `qwen3.6-35b-a3b-noreason` is the fastest
+MoE chat model on the free tier (DaisyGPT / Qwen 3.6, reasoning disabled). `AI_SEARCH_API_BASE_URL` and
+`AI_SEARCH_MODEL` are optional overrides.
+
+Redeploy `graph-api` after setting secrets:
+
+```bash
+supabase functions deploy graph-api
+```
+
 For local manual LinkedIn profile import testing without signing in, set a throwaway
 secret in local Vite and in the Edge Function environment:
 
