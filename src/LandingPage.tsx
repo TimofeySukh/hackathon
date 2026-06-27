@@ -159,8 +159,8 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
 
           {/* Central Navigation Links */}
           <div className="landing-nav-links">
-            <a href="#product" className="landing-nav-link" onClick={handleScrollToProduct}>
-              Product
+            <a href="#product-demo" className="landing-nav-link" onClick={handleScrollToProduct}>
+              Interactive demo
             </a>
             <a href="#docs" className="landing-nav-link" onClick={handleDocs}>
               Docs

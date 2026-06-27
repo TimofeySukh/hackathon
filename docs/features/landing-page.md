@@ -28,7 +28,7 @@ and proportions matter more than decorative styling.
 
 Required header items:
 
-- `Product`
+- `Interactive demo`
 - `Docs`
 - `Contact`
 - `Log in`
