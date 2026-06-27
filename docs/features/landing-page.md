@@ -61,6 +61,7 @@ Required elements:
 1. Header at the top.
 2. A real product screenshot of the board with the inspector open.
 3. A short headline, lead line, and three deck-style slogans beside the screenshot.
+4. A single primary **Open board** button and a clickable product screenshot.
 
 Do not bring back the stepped-path ribbon as the main hero element.
 
@@ -106,8 +107,11 @@ After the hero, the landing page includes:
 2. **Trust strip** — four compact deck cards about anonymous use, local save,
    private sync, and no collaboration yet.
 3. **Interactive demo** — inspector simulator (see above).
-4. **LinkedIn import** — deck cards plus CTA to open the board for import.
-5. **CTA banner** — final launch-board call to action.
+4. **Core Capabilities** — five human-readable scatter cards; the agent card links to Docs.
+5. **LinkedIn import** — deck cards describing the import flow.
+6. **CTA banner** — short closing message without a duplicate board button.
+
+The hero is the only primary board CTA: an **Open board** button plus a clickable product screenshot.
 
 Deck cards across these sections share the white rounded-card, slight rotation,
 and hover straightening behavior from the hero slogan stack.

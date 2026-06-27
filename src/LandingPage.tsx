@@ -24,6 +24,30 @@ const TRUST_ITEMS = [
   'No collaboration or shared boards yet',
 ] as const
 
+const CORE_CAPABILITIES = [
+  {
+    label: 'Visual graph',
+    description: 'Map people and circles on an infinite board you can pan and zoom.',
+  },
+  {
+    label: 'Rich contacts',
+    description: 'Keep notes, links, and photos on each person without leaving the graph.',
+  },
+  {
+    label: 'LinkedIn import',
+    description: 'Bring exported connections onto the board in organized circle zones.',
+  },
+  {
+    label: 'Private workspace',
+    description: 'Try anonymously in your browser or sign in to sync your own graph.',
+  },
+  {
+    label: 'Agent access',
+    description: 'Connect AI tools and scripts when you need them. Details are in Docs.',
+    docsLink: true,
+  },
+] as const
+
 const LINKEDIN_POINTS = [
   'Import a LinkedIn Connections.csv ZIP to the board',
   'Contacts pack into circle zones automatically',
@@ -178,18 +202,26 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
                 Circles, people, and links on one infinite canvas — pan, zoom, and grow without leaving the visual surface.
               </p>
               <div className="lp-deck lp-deck--compact">
-                <div className="lp-deck-card lp-deck-card--tilt-1">Structurise your network</div>
+                <div className="lp-deck-card lp-deck-card--tilt-1">Structure your network</div>
                 <div className="lp-deck-card lp-deck-card--tilt-2">Brainstorm while looking at the graph</div>
                 <div className="lp-deck-card lp-deck-card--tilt-3">Keep people, notes, and context in one visual workspace</div>
               </div>
+              <button type="button" className="lp-btn lp-btn-filled landing-hero-cta" onClick={handleLaunchApp}>
+                Open board
+              </button>
             </div>
-            <figure className="board-preview-frame">
+            <button
+              type="button"
+              className="board-preview-frame board-preview-shot-btn"
+              onClick={handleLaunchApp}
+              aria-label="Open board"
+            >
               <img
                 src={productBoardInspector}
-                alt="Social Datanode board with circle zones and the person inspector open"
+                alt=""
                 className="board-preview-image"
               />
-            </figure>
+            </button>
           </div>
         </section>
 
@@ -499,62 +531,41 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
           </div>
         </section>
 
-        {/* Feature Grid Section */}
+        {/* Core Capabilities */}
         <section className="landing-section features-section" style={{ overflow: 'visible' }}>
           <div className="section-header">
             <span className="demo-eyebrow">Core Capabilities</span>
-            <h2 className="section-title">Designed for agents and humans</h2>
+            <h2 className="section-title">Built for your network first</h2>
           </div>
 
           <div className="capabilities-scatter-board">
-            <div className="capabilities-scatter-card scatter-card--1">
-              <span className="demo-field-label">AI-Native</span>
-              <p className="feature-card-description">AI-Native mutations: Scoped keys and structured JSON envelope mutations designed for AI agent integration.</p>
-            </div>
-            <div className="capabilities-scatter-card scatter-card--2">
-              <span className="demo-field-label">MCP Protocol</span>
-              <p className="feature-card-description">Stdio MCP server: Standard Model Context Protocol server exposing graph tools to AI clients like Claude.</p>
-            </div>
-            <div className="capabilities-scatter-card scatter-card--3">
-              <span className="demo-field-label">Remote API</span>
-              <p className="feature-card-description">Remote API access: Query and update relationship nodes remotely without exposing Supabase secrets.</p>
-            </div>
-            <div className="capabilities-scatter-card scatter-card--4">
-              <span className="demo-field-label">CLI Tool</span>
-              <p className="feature-card-description">datanode-cli tool: A local command-line interface helper for fast batch mutations and database scripts.</p>
-            </div>
-            <div className="capabilities-scatter-card scatter-card--5">
-              <span className="demo-field-label">Concurrency</span>
-              <p className="feature-card-description">Expected Revisions: Concurrency controls using expectedRevision parameters to prevent collision conflicts.</p>
-            </div>
-            <div className="capabilities-scatter-card scatter-card--6">
-              <span className="demo-field-label">Security</span>
-              <p className="feature-card-description">Vault-encrypted tokens: Revocable API keys hashed at rest and securely verified by Edge Functions.</p>
-            </div>
-            <div className="capabilities-scatter-card scatter-card--7">
-              <span className="demo-field-label">Visual Layout</span>
-              <p className="feature-card-description">Sunflower packaging: Contacts clustered into neat sunflower spiral layouts inside boundaries without lag.</p>
-            </div>
-            <div className="capabilities-scatter-card scatter-card--8">
-              <span className="demo-field-label">2D Canvas</span>
-              <p className="feature-card-description">Lightweight canvas: High performance 2D drawing pipeline with lightweight spatial grid hit testing.</p>
-            </div>
-            <div className="capabilities-scatter-card scatter-card--9">
-              <span className="demo-field-label">Physics Engine</span>
-              <p className="feature-card-description">Collision repulsion: Layout collision physics engine that repels adjacent nodes to keep labels visible.</p>
-            </div>
-            <div className="capabilities-scatter-card scatter-card--10">
-              <span className="demo-field-label">Enrichment</span>
-              <p className="feature-card-description">LinkedIn enrichment: Supabase Edge Function that resolves and imports manual LinkedIn profile details.</p>
-            </div>
-            <div className="capabilities-scatter-card scatter-card--11">
-              <span className="demo-field-label">Containment</span>
-              <p className="feature-card-description">Auto-containment: Automatic sizing and subset fitting when circles are drag-resized.</p>
-            </div>
-            <div className="capabilities-scatter-card scatter-card--12">
-              <span className="demo-field-label">Database</span>
-              <p className="feature-card-description">Privacy first RLS: Safe database access and Google authentication protected by Row-Level Security.</p>
-            </div>
+            {CORE_CAPABILITIES.map((capability, index) => {
+              const card = (
+                <>
+                  <span className="demo-field-label">{capability.label}</span>
+                  <p className="feature-card-description">{capability.description}</p>
+                </>
+              )
+
+              if ('docsLink' in capability && capability.docsLink) {
+                return (
+                  <button
+                    key={capability.label}
+                    type="button"
+                    className={`capabilities-scatter-card scatter-card--${index + 1} capabilities-scatter-card--link`}
+                    onClick={handleDocs}
+                  >
+                    {card}
+                  </button>
+                )
+              }
+
+              return (
+                <div key={capability.label} className={`capabilities-scatter-card scatter-card--${index + 1}`}>
+                  {card}
+                </div>
+              )
+            })}
           </div>
         </section>
 
@@ -567,9 +578,6 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
               <p className="section-lead">
                 Upload your exported connections and let the board pack them into readable circle zones.
               </p>
-              <button className="lp-btn lp-btn-filled linkedin-cta" type="button" onClick={handleLaunchApp}>
-                Open board to import
-              </button>
             </div>
             <div className="lp-deck">
               {LINKEDIN_POINTS.map((point, index) => (
@@ -586,11 +594,8 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
           <div className="banner-card">
             <h2 className="banner-title">Ready to map your network?</h2>
             <p className="banner-desc">
-              Organize your workspace, visualize connections, and gain insights with Social Datanode today. Free, open, and secure.
+              Start from a blank board, map your circles, and keep the people who matter in one place.
             </p>
-            <button className="lp-btn lp-btn-filled" style={{ height: '48px', padding: '0 32px' }} onClick={handleLaunchApp}>
-              Launch Board
-            </button>
           </div>
         </section>
       </main>
