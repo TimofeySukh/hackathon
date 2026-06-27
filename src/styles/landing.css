@@ -110,11 +110,18 @@
   color: var(--lp-text-primary);
 }
 
-/* Center Navigation Links */
+/* Header links and auth grouped on the right */
+.landing-nav-right {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  margin-left: auto;
+}
+
 .landing-nav-links {
   display: flex;
   align-items: center;
-  gap: 32px;
+  gap: 24px;
 }
 
 .landing-nav-link {
@@ -1166,8 +1173,16 @@
 }
 
 @media (max-width: 768px) {
+  .landing-nav-right {
+    gap: 12px;
+  }
+
   .landing-nav-links {
-    display: none; /* Hide center links on smaller viewports */
+    gap: 16px;
+  }
+
+  .landing-nav-link {
+    font-size: 13px;
   }
 
   .banner-card {

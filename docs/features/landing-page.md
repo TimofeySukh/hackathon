@@ -28,11 +28,12 @@ and proportions matter more than decorative styling.
 
 Required header items:
 
-- `Interactive demo` — scrolls to the landing inspector demo section
 - `Docs`
 - `Contact`
 - `Log in`
 - `Sign up`
+
+Docs and Contact sit on the right side of the header, next to the auth actions.
 
 Header requirements:
 

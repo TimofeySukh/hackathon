@@ -157,21 +157,17 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
             <span className="landing-logo-text">Social Datanode</span>
           </a>
 
-          {/* Central Navigation Links */}
-          <div className="landing-nav-links">
-            <a href="#product-demo" className="landing-nav-link" onClick={handleScrollToProduct}>
-              Interactive demo
-            </a>
-            <a href="#docs" className="landing-nav-link" onClick={handleDocs}>
-              Docs
-            </a>
-            <a href="#contact" className="landing-nav-link" onClick={(e) => e.preventDefault()}>
-              Contact
-            </a>
-          </div>
+          <div className="landing-nav-right">
+            <div className="landing-nav-links">
+              <a href="#docs" className="landing-nav-link" onClick={handleDocs}>
+                Docs
+              </a>
+              <a href="#contact" className="landing-nav-link" onClick={(e) => e.preventDefault()}>
+                Contact
+              </a>
+            </div>
 
-          {/* Right actions: Auth */}
-          <div className="landing-nav-actions">
+            <div className="landing-nav-actions">
             {isAuthenticated ? (
               <button className="lp-btn lp-btn-filled" onClick={handleLaunchApp}>
                 Launch App
@@ -186,6 +182,7 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
                 </button>
               </>
             )}
+            </div>
           </div>
         </nav>
       </header>
