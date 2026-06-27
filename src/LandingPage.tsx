@@ -83,14 +83,6 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
     window.location.hash = '#docs'
   }
 
-  const handleScrollToProduct = (e: MouseEvent) => {
-    e.preventDefault()
-    const element = document.getElementById('product-demo')
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' })
-    }
-  }
-
   const handleAddDemoNote = (e: FormEvent) => {
     e.preventDefault()
     if (!newNoteText.trim()) return
