@@ -191,82 +191,23 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
 
       {/* Main Content */}
       <main className="landing-main">
-        
-        <section className="landing-section hero-section" style={{ padding: '0 24px', position: 'relative', overflow: 'hidden', minHeight: '650px' }}>
-          <div
-            className="hero-stepped-path-container"
-            style={{
-              position: 'absolute',
-              top: '-40px',
-              bottom: '-40px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: '100%',
-              maxWidth: '1200px',
-              zIndex: 1,
-              pointerEvents: 'none',
-            }}
-            aria-hidden="true"
-          >
-            <svg
-              viewBox="0 0 1200 650"
-              fill="none"
-              preserveAspectRatio="none"
-              style={{
-                width: '100%',
-                height: '100%',
-                display: 'block',
-                overflow: 'visible',
-                objectFit: 'fill',
-              }}
-            >
-              <path
-                d="M 40,0 L 40,60 C 40,140 110,140 180,140 C 250,140 250,260 320,260 L 460,260 C 530,260 530,420 600,420 L 720,420 C 790,420 790,540 860,540 L 1080,540 C 1120,540 1160,580 1160,620 L 1160,650"
-                stroke="#00629d"
-                strokeWidth="84"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{ vectorEffect: 'non-scaling-stroke' }}
-              />
-              <path
-                d="M 40,0 L 40,60 C 40,140 110,140 180,140 C 250,140 250,260 320,260 L 460,260 C 530,260 530,420 600,420 L 720,420 C 790,420 790,540 860,540 L 1080,540 C 1120,540 1160,580 1160,620 L 1160,650"
-                stroke="#d2e4ff"
-                strokeWidth="72"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{ vectorEffect: 'non-scaling-stroke' }}
-              />
-            </svg>
-          </div>
 
-          <div className="hero-slogans-deck">
-            <div className="hero-slogan-card">Structurise your network</div>
-            <div className="hero-slogan-card">Brainstorm while looking at the graph</div>
-            <div className="hero-slogan-card">Keep people, notes, and context in one visual workspace</div>
-          </div>
-
-          <a href="#board" className="hero-cta-note" onClick={handleLaunchApp}>
-            <span className="hero-cta-note-title">Try our product</span>
-            <span className="hero-cta-note-desc">
-              Open the workspace and start mapping your own relationship graph.
-            </span>
-          </a>
-        </section>
-
-        {/* Board Preview */}
-        <section id="board-preview" className="landing-section board-preview-section">
+        <section id="board-preview" className="landing-section landing-hero-section">
           <div className="board-preview-layout">
             <div className="board-preview-copy">
-              <span className="demo-eyebrow">The board</span>
-              <h2 className="demo-title">See your network as a graph</h2>
+              <span className="demo-eyebrow">Social Datanode</span>
+              <h1 className="demo-title">See your network as a graph</h1>
               <p className="section-lead">
                 Circles, people, and links on one infinite canvas — pan, zoom, and grow without leaving the visual surface.
               </p>
               <div className="lp-deck lp-deck--compact">
-                <div className="lp-deck-card lp-deck-card--tilt-1">Central You circle with company zones like OpenAI, Anthropic, and Google</div>
-                <div className="lp-deck-card lp-deck-card--tilt-2">People packed inside circles with names, notes, and connection links</div>
-                <div className="lp-deck-card lp-deck-card--tilt-3">Inspector panel on the side for the person you select on the board</div>
+                <div className="lp-deck-card lp-deck-card--tilt-1">Structurise your network</div>
+                <div className="lp-deck-card lp-deck-card--tilt-2">Brainstorm while looking at the graph</div>
+                <div className="lp-deck-card lp-deck-card--tilt-3">Keep people, notes, and context in one visual workspace</div>
               </div>
+              <button type="button" className="lp-btn lp-btn-filled landing-hero-cta" onClick={handleLaunchApp}>
+                Try our product
+              </button>
             </div>
             <figure className="board-preview-frame">
               <img

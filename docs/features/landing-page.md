@@ -53,26 +53,19 @@ Auth behavior:
 
 ## First Viewport
 
-The first viewport should repeat the sketch, but polished.
+The first viewport is the product screenshot hero. It replaces the older
+stepped-path sketch screen.
 
 Required elements:
 
 1. Header at the top.
-2. Three main slogans near the top of the hero.
-3. A stepped divider/shape under the slogans.
-4. A single blue-ish note/CTA under the stepped divider.
-5. The note opens the board.
+2. A real product screenshot of the board with the inspector open.
+3. A short headline, lead line, and three deck-style slogans beside the screenshot.
+4. A primary `Try our product` button that opens the board.
 
-The three slogans should not become three oversized generic feature cards. They
-are part of the hero composition from the sketch.
+Do not bring back the stepped-path ribbon as the main hero element.
 
-The three slogans should not become three oversized generic feature cards. They
-are part of the hero composition from the sketch.
-
-The stepped divider should be a central design element. It should look clean and
-intentional, but it should still clearly come from the sketch.
-
-The blue note should feel clickable. It is the first-screen CTA.
+The three slogans should stay as compact deck cards, not oversized feature cards.
 
 ## Copy
 
@@ -109,17 +102,15 @@ it feels like the product, not a separate marketing illustration.
 
 After the hero, the landing page includes:
 
-1. **Board preview** — real product screenshot of the board with inspector open,
-   plus short deck-style note cards.
-2. **How it works** — three step cards describing start-from-You, drag-to-create,
+1. **How it works** — three step cards describing start-from-You, drag-to-create,
    and organize-in-place gestures.
-3. **Trust strip** — four compact deck cards about anonymous use, local save,
+2. **Trust strip** — four compact deck cards about anonymous use, local save,
    private sync, and no collaboration yet.
-4. **Interactive demo** — inspector simulator (see above).
-5. **LinkedIn import** — deck cards plus CTA to open the board for import.
-6. **FAQ** — question cards on the left, answer cards on the right, using the
+3. **Interactive demo** — inspector simulator (see above).
+4. **LinkedIn import** — deck cards plus CTA to open the board for import.
+5. **FAQ** — question cards on the left, answer cards on the right, using the
    same tilted deck-card visual language as the hero slogans.
-7. **CTA banner** — final launch-board call to action.
+6. **CTA banner** — final launch-board call to action.
 
 Deck cards across these sections share the white rounded-card, slight rotation,
 and hover straightening behavior from the hero slogan stack.
@@ -168,7 +159,8 @@ Buttons should feel consistent across the landing page.
 
 - Do not make the page dark.
 - Do not create a large black header.
-- Do not replace the sketch with a generic SaaS feature-card layout.
+- Do not restore the stepped-path ribbon hero.
+- Do not replace the product screenshot hero with a generic SaaS feature-card layout.
 - Do not invent docs content.
 - Do not put fake API/CLI/MCP summaries on the main landing page.
 - Do not turn the three hero slogans into unrelated oversized cards.
