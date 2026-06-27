@@ -111,6 +111,7 @@ After the hero, the landing page includes:
 4. **Core Capabilities** — five human-readable scatter cards; the agent card links to Docs.
 5. **LinkedIn import** — deck cards describing the import flow.
 6. **CTA banner** — short closing message without a duplicate board button.
+7. **Contact** — founder cards with preset avatars, LinkedIn links, and optional email.
 
 The hero is the only primary board CTA: an **Open board** button plus a clickable product screenshot.
 
@@ -143,8 +144,16 @@ view.
 
 ## Contact
 
-`Contact` does not need a finished flow yet. It may be inert or a placeholder
-until the contact experience is defined.
+`Contact` scrolls to a team section with the founders.
+
+Each contact card shows:
+
+- avatar from the existing LinkedIn import presets in `public/`
+- name and role
+- LinkedIn profile link
+- email when provided in `TEAM_CONTACTS`
+
+Do not invent contact details beyond what the team provides.
 
 ## CTA Style
 
