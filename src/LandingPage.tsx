@@ -24,19 +24,10 @@ const TRUST_ITEMS = [
   'No collaboration or shared boards yet',
 ] as const
 
-const LINKEDIN_IMPORT_STEPS = [
-  {
-    title: 'Upload your ZIP',
-    body: 'Import a LinkedIn Connections.csv ZIP from the board.',
-  },
-  {
-    title: 'Pack into circles',
-    body: 'Contacts pack into circle zones automatically.',
-  },
-  {
-    title: 'Enrich one profile',
-    body: 'Add more detail to a single profile when you need it.',
-  },
+const LINKEDIN_POINTS = [
+  'Import a LinkedIn Connections.csv ZIP from the board',
+  'Contacts pack into circle zones automatically',
+  'Enrich one profile at a time when you need more detail',
 ] as const
 
 const FAQ_ITEMS = [
@@ -592,18 +583,24 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
 
         {/* LinkedIn Import */}
         <section className="landing-section linkedin-section">
-          <div className="section-header">
-            <span className="demo-eyebrow">LinkedIn import</span>
-            <h2 className="section-title">Bring contacts onto the board</h2>
-          </div>
-          <div className="how-it-works-grid">
-            {LINKEDIN_IMPORT_STEPS.map((step, index) => (
-              <div key={step.title} className={`how-step lp-deck-card lp-deck-card--tilt-${(index % 3) + 1}`}>
-                <span className="how-step-number">{index + 1}</span>
-                <h3 className="how-step-title">{step.title}</h3>
-                <p className="how-step-body">{step.body}</p>
-              </div>
-            ))}
+          <div className="linkedin-layout">
+            <div className="linkedin-copy">
+              <span className="demo-eyebrow">LinkedIn import</span>
+              <h2 className="demo-title">Bring contacts onto the board</h2>
+              <p className="section-lead">
+                Upload your exported connections and let the board pack them into readable circle zones.
+              </p>
+              <button className="lp-btn lp-btn-filled linkedin-cta" type="button" onClick={handleLaunchApp}>
+                Open board to import
+              </button>
+            </div>
+            <div className="lp-deck">
+              {LINKEDIN_POINTS.map((point, index) => (
+                <div key={point} className={`lp-deck-card lp-deck-card--tilt-${(index % 3) + 1}`}>
+                  {point}
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 

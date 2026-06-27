@@ -106,7 +106,7 @@ After the hero, the landing page includes:
 2. **Trust strip** — four compact deck cards about anonymous use, local save,
    private sync, and no collaboration yet.
 3. **Interactive demo** — inspector simulator (see above).
-4. **LinkedIn import** — three numbered step cards in the same layout as How it works.
+4. **LinkedIn import** — deck cards plus CTA to open the board for import.
 5. **FAQ** — question cards on the left, answer cards on the right, using the
    same tilted deck-card visual language as the hero slogans.
 6. **CTA banner** — final launch-board call to action.
