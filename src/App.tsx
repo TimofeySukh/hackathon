@@ -23,6 +23,8 @@ import type { AgentScope, AgentTokenRecord } from './lib/agentApi'
 import { supabase } from './lib/supabase'
 import { GraphRevisionConflictError, loadGraphRecord, saveGraph, loadLocalGraph, saveLocalGraph } from './lib/graphPersistence'
 import { enrichLinkedInProfile } from './lib/linkedinEnrichment'
+import { searchGraphByQuery } from './lib/search/graphSearch'
+import { mapSmartSearchResults, shouldUseSmartSearch, smartSearchGraph, type AgentSearchStep } from './lib/smartSearch'
 import { OnboardingCoach } from './Onboarding'
 import { SelectionIndicator } from './components/SelectionIndicator'
 import { M3Slider } from './components/M3Slider'
@@ -154,6 +156,7 @@ type SearchResult = {
   id: string
   name: string
   sub: string
+  aiReason?: string
   avatarUrl?: string
   initials?: string
   color?: string
@@ -495,7 +498,7 @@ function AuthPrivacyNotice() {
 function App() {
   const [viewMode, setViewMode] = useState<'landing' | 'board' | 'docs' | 'contact' | 'privacy'>(() => {
     if (window.location.hash === '#board') return 'board';
-    if (window.location.hash === '#docs') return 'docs';
+    if (window.location.hash === '#docs' || window.location.hash.startsWith('#docs/')) return 'docs';
     if (window.location.hash === '#contact') return 'contact';
     if (window.location.hash === '#privacy') return 'privacy';
     return 'landing';
@@ -506,7 +509,7 @@ function App() {
       const hash = window.location.hash;
       if (hash === '#board') {
         setViewMode('board');
-      } else if (hash === '#docs') {
+      } else if (hash === '#docs' || hash.startsWith('#docs/')) {
         setViewMode('docs');
       } else if (hash === '#contact') {
         setViewMode('contact');
@@ -1152,6 +1155,12 @@ function App() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeSearchIndex, setActiveSearchIndex] = useState(0)
+  const [aiSearchResults, setAiSearchResults] = useState<SearchResult[] | null>(null)
+  const [aiSearchExplanation, setAiSearchExplanation] = useState<string | null>(null)
+  const [aiSearchSteps, setAiSearchSteps] = useState<AgentSearchStep[]>([])
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([])
+  const [isSmartSearching, setIsSmartSearching] = useState(false)
+  const smartSearchRequestRef = useRef(0)
   const [isImportingLinkedInProfile, setIsImportingLinkedInProfile] = useState(false)
   const [isImportingLinkedInZip, setIsImportingLinkedInZip] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -1211,6 +1220,42 @@ function App() {
     setSearchOpen(false)
     setSearchQuery('')
     setActiveSearchIndex(0)
+    setAiSearchResults(null)
+    setAiSearchExplanation(null)
+    setAiSearchSteps([])
+    setAiSuggestions([])
+    setIsSmartSearching(false)
+    smartSearchRequestRef.current += 1
+  }
+
+  function graphSearchResultsToUi(
+    results: ReturnType<typeof searchGraphByQuery>,
+  ): SearchResult[] {
+    return results.map((result) => {
+      if (result.type === 'person') {
+        const person = peopleById.get(result.id)
+        const circle = circlesById.get(result.circleId)
+        return {
+          kind: 'person' as const,
+          id: result.id,
+          name: result.name,
+          sub: result.subtitle,
+          aiReason: result.aiReason,
+          avatarUrl: person?.imageUrl,
+          initials: makeInitials(result.name),
+          color: circle ? getCircleColors(circle).centerBg : undefined,
+        }
+      }
+      const circle = circlesById.get(result.id)
+      return {
+        kind: 'circle' as const,
+        id: result.id,
+        name: result.name,
+        sub: result.subtitle || 'Circle',
+        aiReason: result.aiReason,
+        color: circle ? getCircleColors(circle).centerBg : undefined,
+      }
+    })
   }
 
   async function handleImportLinkedInProfileFromSearch() {
@@ -1977,8 +2022,8 @@ function App() {
   // circles ("tags") match on name.
   // Capped so the dropdown stays compact; people first since finding a person is
   // the primary use, circles after.
-  const searchResults = useMemo<SearchResult[]>(() => {
-    const q = searchQuery.trim().toLowerCase()
+  const localSearchResults = useMemo<SearchResult[]>(() => {
+    const q = searchQuery.trim()
     if (!q) return []
     const linkedInUrl = getLinkedInProfileImportUrl(searchQuery)
     const linkedInImport: SearchResult[] = linkedInUrl
@@ -1989,30 +2034,90 @@ function App() {
           sub: isImportingLinkedInProfile ? linkedInUrl : linkedInUrl,
         }]
       : []
-    const people: SearchResult[] = displayPeople
-      .filter((p) => {
-        const circle = circlesById.get(p.circleId)
-        const noteText = (p.notes ?? []).map((note) => `${note.title} ${note.body}`).join(' ')
-        const linkText = (p.links ?? []).map((link) => `${link.label} ${link.url}`).join(' ')
-        return [p.name, circle?.name, noteText, linkText].filter(Boolean).join(' ').toLowerCase().includes(q)
-      })
-      .map((p) => {
-        const circle = circlesById.get(p.circleId)
-        return {
-          kind: 'person',
-          id: p.id,
-          name: p.name,
-          sub: circle?.name || '',
-          avatarUrl: p.imageUrl,
-          initials: makeInitials(p.name),
-          color: circle ? getCircleColors(circle).centerBg : undefined,
-        }
-      })
-    const circles: SearchResult[] = displayCircles
-      .filter((c) => c.name.toLowerCase().includes(q))
-      .map((c) => ({ kind: 'circle', id: c.id, name: c.name, sub: 'Circle', color: getCircleColors(c).centerBg }))
-    return [...linkedInImport, ...people, ...circles].slice(0, 8)
-  }, [searchQuery, isImportingLinkedInProfile, displayPeople, displayCircles, circlesById])
+    const ranked = graphSearchResultsToUi(searchGraphByQuery(
+      { circles: displayCircles, people: displayPeople, connections: displayConnections },
+      q,
+      8,
+    ))
+    return [...linkedInImport, ...ranked].slice(0, 8)
+  }, [searchQuery, isImportingLinkedInProfile, displayPeople, displayCircles, displayConnections, circlesById, peopleById])
+
+  const isAiSearchActive = auth.status === 'authenticated' && shouldUseSmartSearch(searchQuery.trim())
+  const searchResults = isAiSearchActive
+    ? (isSmartSearching ? [] : (aiSearchResults ?? localSearchResults))
+    : localSearchResults
+
+  useEffect(() => {
+    const query = searchQuery.trim()
+    if (!query) {
+      setAiSearchResults(null)
+      setAiSearchExplanation(null)
+      setAiSearchSteps([])
+      setAiSuggestions([])
+      setIsSmartSearching(false)
+      return
+    }
+    if (auth.status !== 'authenticated' || !auth.session || !shouldUseSmartSearch(query)) {
+      setAiSearchResults(null)
+      setAiSearchExplanation(null)
+      setAiSearchSteps([])
+      setAiSuggestions([])
+      setIsSmartSearching(false)
+      return
+    }
+
+    const requestId = smartSearchRequestRef.current + 1
+    smartSearchRequestRef.current = requestId
+    setIsSmartSearching(true)
+    setAiSearchResults(null)
+    setAiSearchExplanation(null)
+    setAiSearchSteps([])
+    setAiSuggestions([])
+
+    const timer = window.setTimeout(() => {
+      void smartSearchGraph(auth.session!, query, 8)
+        .then((response) => {
+          if (requestId !== smartSearchRequestRef.current) return
+          const linkedInUrl = getLinkedInProfileImportUrl(searchQuery)
+          const linkedInImport: SearchResult[] = linkedInUrl
+            ? [{
+                kind: 'linkedin-profile',
+                id: linkedInUrl,
+                name: isImportingLinkedInProfile ? 'Importing profile...' : 'Add LinkedIn profile',
+                sub: isImportingLinkedInProfile ? linkedInUrl : linkedInUrl,
+              }]
+            : []
+          const ranked = graphSearchResultsToUi(mapSmartSearchResults(response.results))
+          setAiSearchResults([...linkedInImport, ...ranked].slice(0, 8))
+          setAiSearchExplanation(response.explanation || null)
+          setAiSearchSteps(response.steps ?? [])
+          setAiSuggestions(response.suggestions ?? [])
+        })
+        .catch((error) => {
+          if (requestId !== smartSearchRequestRef.current) return
+          console.error(error)
+          setAiSearchResults(null)
+          setAiSearchExplanation('AI search failed. Showing quick matches instead.')
+          setAiSearchSteps([{ id: 'error', label: 'AI search unavailable', detail: error instanceof Error ? error.message : String(error) }])
+          setAiSuggestions([])
+        })
+        .finally(() => {
+          if (requestId === smartSearchRequestRef.current) {
+            setIsSmartSearching(false)
+          }
+        })
+    }, 450)
+
+    return () => window.clearTimeout(timer)
+  }, [searchQuery, auth.status, auth.session, isImportingLinkedInProfile, displayPeople, displayCircles, displayConnections, circlesById, peopleById])
+
+  const aiPanelSteps = isSmartSearching && aiSearchSteps.length === 0
+    ? [
+        { id: 'read', label: 'Reading your question' },
+        { id: 'scan', label: 'Scanning contacts and notes' },
+        { id: 'match', label: 'AI matching by meaning' },
+      ]
+    : aiSearchSteps
 
   const currentSearchIndex = searchResults.length > 0
     ? clamp(activeSearchIndex, 0, searchResults.length - 1)
@@ -3879,7 +3984,7 @@ Content-Type: application/json
       <div className="toolbar" aria-label="Graph controls" style={{ justifyContent: 'flex-end' }}>
         <div
           ref={searchPanelRef}
-          className={`search-box ${searchOpen ? 'is-open' : ''}`}
+          className={`search-box ${searchOpen ? 'is-open' : ''} ${isAiSearchActive ? 'is-ai-search' : ''}`}
         >
           <button
             type="button"
@@ -3904,13 +4009,17 @@ Content-Type: application/json
                 className="search-box__input"
                 type="text"
                 value={searchQuery}
-                placeholder="Search people or circles…"
+                placeholder={auth.status === 'authenticated' ? 'Ask AI to find someone…' : 'Search people or circles…'}
                 aria-label="Search people or circles"
                 aria-controls="board-search-results"
                 aria-activedescendant={searchResults.length > 0 ? `search-result-${searchResults[currentSearchIndex]?.kind}-${searchResults[currentSearchIndex]?.id}` : undefined}
                 onChange={(event) => {
                   setSearchQuery(event.target.value)
                   setActiveSearchIndex(0)
+                  setAiSearchResults(null)
+                  setAiSearchExplanation(null)
+                  setAiSearchSteps([])
+                  setAiSuggestions([])
                 }}
                 onKeyDown={(event) => {
                   if (event.key === 'Escape') {
@@ -3942,10 +4051,56 @@ Content-Type: application/json
             </>
           )}
           {searchOpen && searchQuery.trim() !== '' && (
-            <div id="board-search-results" className="search-results" role="listbox">
-              {searchResults.length === 0 ? (
-                <div className="search-results__empty">No matches</div>
-              ) : (
+            <div id="board-search-results" className={`search-results ${isAiSearchActive ? 'search-results--ai' : ''}`} role="listbox">
+              {isAiSearchActive && (
+                <div className="search-results__ai-panel" aria-live="polite">
+                  <div className="search-results__ai-header">
+                    <span className={`search-results__ai-badge ${isSmartSearching ? 'is-active' : ''}`}>AI search</span>
+                    {aiSearchExplanation ? (
+                      <p className="search-results__ai-explanation">{aiSearchExplanation}</p>
+                    ) : isSmartSearching ? (
+                      <p className="search-results__ai-explanation">Looking through your graph with multiple AI passes…</p>
+                    ) : null}
+                  </div>
+                  {aiPanelSteps.length > 0 && (
+                    <ol className="search-results__steps">
+                      {aiPanelSteps.map((step, index) => (
+                        <li
+                          key={step.id}
+                          className={`search-results__step ${isSmartSearching && index === aiPanelSteps.length - 1 ? 'is-active' : 'is-done'}`}
+                        >
+                          <span className="search-results__step-label">{step.label}</span>
+                          {step.detail ? <span className="search-results__step-detail">{step.detail}</span> : null}
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                  {!isSmartSearching && aiSuggestions.length > 0 && (
+                    <div className="search-results__suggestions">
+                      <span className="search-results__suggestions-title">AI suggests</span>
+                      <div className="search-results__suggestion-list">
+                        {aiSuggestions.map((suggestion) => (
+                          <button
+                            key={suggestion}
+                            type="button"
+                            className="search-results__suggestion"
+                            onClick={() => {
+                              setSearchQuery(suggestion)
+                              setActiveSearchIndex(0)
+                              searchInputRef.current?.focus()
+                            }}
+                          >
+                            {suggestion}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              {searchResults.length === 0 && !isSmartSearching ? (
+                <div className="search-results__empty">{isAiSearchActive ? 'AI found no matches yet' : 'No matches'}</div>
+              ) : searchResults.length === 0 ? null : (
                 searchResults.map((result, index) => (
                   <button
                     key={`${result.kind}:${result.id}`}
@@ -3975,6 +4130,7 @@ Content-Type: application/json
                     <span className="search-results__text">
                       <span className="search-results__name">{result.name || 'Untitled'}</span>
                       {result.sub ? <span className="search-results__sub">{result.sub}</span> : null}
+                      {result.aiReason ? <span className="search-results__ai-reason">{result.aiReason}</span> : null}
                     </span>
                   </button>
                 ))

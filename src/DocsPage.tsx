@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import sdnLogo from './assets/sdn-logo.svg'
 
 type Article = {
@@ -10,10 +10,116 @@ type Article = {
   render: (copyFn: (text: string, msg: string) => void) => React.ReactNode
 }
 
+type NavGroup = {
+  id: string
+  title: string
+  articleIds: string[]
+}
+
+type NavSection = {
+  title: string
+  groups: NavGroup[]
+  collapsible?: boolean
+}
+
+const DOC_SECTIONS: NavSection[] = [
+  {
+    title: '',
+    groups: [{ id: 'intro', title: 'Getting started', articleIds: ['welcome'] }],
+  },
+  {
+    title: 'Integrations',
+    groups: [{ id: 'integrations', title: 'Clients', articleIds: ['mcp-server', 'cli-tool'] }],
+  },
+  {
+    title: 'REST API',
+    collapsible: true,
+    groups: [
+      { id: 'api-meta', title: 'Meta', articleIds: ['get-meta'] },
+      { id: 'api-search', title: 'Search', articleIds: ['get-search', 'post-search-smart'] },
+      {
+        id: 'api-people',
+        title: 'People',
+        articleIds: [
+          'post-people',
+          'post-people-import-linkedin',
+          'post-notes',
+          'post-links',
+          'delete-person',
+          'delete-notes',
+          'delete-links',
+          'post-people-avatar',
+        ],
+      },
+      {
+        id: 'api-circles',
+        title: 'Circles',
+        articleIds: ['get-circles', 'post-circles', 'patch-circles', 'delete-circles', 'post-circles-avatar'],
+      },
+      {
+        id: 'api-connections',
+        title: 'Connections',
+        articleIds: ['post-connections', 'delete-connection'],
+      },
+      {
+        id: 'api-graph',
+        title: 'Graph & batch',
+        articleIds: ['get-graph', 'put-graph', 'clear-graph', 'batch-operations'],
+      },
+    ],
+  },
+]
+
+const DEFAULT_COLLAPSED = new Set(
+  DOC_SECTIONS.flatMap((section) =>
+    section.collapsible ? section.groups.map((group) => group.id) : [],
+  ),
+)
+
+function readArticleIdFromHash(): string {
+  const hash = window.location.hash
+  if (hash.startsWith('#docs/')) {
+    return hash.slice('#docs/'.length) || 'welcome'
+  }
+  return 'welcome'
+}
+
+function tokenizeSearch(query: string): string[] {
+  return query
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+}
+
+function scoreArticle(article: Article, tokens: string[]): number {
+  if (tokens.length === 0) return 1
+
+  const title = article.title.toLowerCase()
+  const id = article.id.toLowerCase()
+  const keywordBlob = article.keywords.join(' ').toLowerCase()
+
+  let score = 0
+  for (const token of tokens) {
+    if (!title.includes(token) && !id.includes(token) && !keywordBlob.includes(token)) {
+      return 0
+    }
+    if (title.includes(token)) score += 12
+    if (id.includes(token)) score += 10
+    if (keywordBlob.includes(token)) score += 6
+    if (article.badge === token) score += 8
+  }
+  return score
+}
+
 export default function DocsPage() {
   const [searchQuery, setSearchQuery] = useState('')
-  const [activeArticleId, setActiveArticleId] = useState('welcome')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [activeArticleId, setActiveArticleId] = useState(readArticleIdFromHash)
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set(DEFAULT_COLLAPSED))
   const [copiedStatus, setCopiedStatus] = useState<string | null>(null)
+  const contentRef = useRef<HTMLElement>(null)
+  const searchRef = useRef<HTMLDivElement>(null)
 
   const handleCopy = (text: string, msg: string) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -480,6 +586,104 @@ ${npxCmd}`}</code>
               </div>
               <pre className="docs-code-pre">
                 <code className="docs-code">{curl}</code>
+              </pre>
+            </div>
+          </div>
+        )
+      }
+    },
+    {
+      id: 'post-search-smart',
+      category: 'api',
+      title: 'POST /search/smart',
+      badge: 'post',
+      keywords: ['post', '/search/smart', 'natural language', 'ai', 'semantic', 'query'],
+      render: (copy) => {
+        const curl = `curl -X POST "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/search/smart" \\
+  -H "Authorization: Bearer dn_live_your_token" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "query": "product managers at Google",
+    "limit": 8
+  }'`
+        const response = `{
+  "query": "find my girlfriend",
+  "mode": "agent",
+  "explanation": "Looking for a close romantic partner in your graph.",
+  "steps": [
+    { "id": "read", "label": "Reading your question" },
+    { "id": "scan", "label": "Scanning contacts and notes" },
+    { "id": "pick", "label": "AI picked matches", "detail": "1 suggestion" }
+  ],
+  "suggestions": ["Search by her name", "Add a note like \\"my girlfriend\\""],
+  "results": [
+    {
+      "type": "person",
+      "id": "person-123",
+      "name": "Alice Chen",
+      "subtitle": "Personal › Close",
+      "aiReason": "Note says \\"i love her\\" — likely your partner"
+    }
+  ]
+}`
+        return (
+          <div>
+            <div className="docs-endpoint-title">
+              <span className="docs-method-badge post">POST</span>
+              <span className="docs-endpoint-path">/search/smart</span>
+            </div>
+            <p>
+              Runs multi-step agent search: analyze the query, scan note-backed candidates,
+              match with AI (with an optional retry pass), then return ranked people/circles with
+              `aiReason`, visible `steps`, and follow-up `suggestions`. Requires the
+              <code>search:read</code> scope and Edge Function secret <code>AI_SEARCH_API_KEY</code>.
+            </p>
+
+            <h3>Request Body</h3>
+            <table className="docs-table">
+              <thead>
+                <tr>
+                  <th>Field</th>
+                  <th>Type</th>
+                  <th>Required</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="docs-param-name">query</td>
+                  <td className="docs-param-type">string</td>
+                  <td><span className="docs-param-required">Required</span></td>
+                  <td>Natural-language search text.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">limit</td>
+                  <td className="docs-param-type">number</td>
+                  <td><span className="docs-param-optional">Optional</span></td>
+                  <td>Maximum results (1–50). Defaults to 10.</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <h3>Request Example</h3>
+            <div className="docs-code-container">
+              <div className="docs-code-header">
+                <span>cURL</span>
+                <button className="docs-code-copy-btn" onClick={() => copy(curl, 'cURL copied!')}>Copy</button>
+              </div>
+              <pre className="docs-code-pre">
+                <code className="docs-code">{curl}</code>
+              </pre>
+            </div>
+
+            <h3>Response Example</h3>
+            <div className="docs-code-container">
+              <div className="docs-code-header">
+                <span>JSON Response</span>
+                <button className="docs-code-copy-btn" onClick={() => copy(response, 'JSON response copied!')}>Copy</button>
+              </div>
+              <pre className="docs-code-pre">
+                <code className="docs-code">{response}</code>
               </pre>
             </div>
           </div>
@@ -1416,21 +1620,94 @@ ${npxCmd}`}</code>
     }
   ], [])
 
-  const filteredArticles = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase()
-    if (!query) return articles
-    return articles.filter(a =>
-      a.title.toLowerCase().includes(query) ||
-      a.keywords.some(k => k.toLowerCase().includes(query))
-    )
-  }, [searchQuery, articles])
+  const articleById = useMemo(() => new Map(articles.map((article) => [article.id, article])), [articles])
 
-  // auto adjust active section if current is filtered out
-  const displayedArticle = useMemo(() => {
-    const active = filteredArticles.find(a => a.id === activeArticleId)
-    if (active) return active
-    return filteredArticles[0] || null
-  }, [filteredArticles, activeArticleId])
+  const searchTokens = useMemo(() => tokenizeSearch(searchQuery), [searchQuery])
+
+  const searchResults = useMemo(() => {
+    if (searchTokens.length === 0) return []
+    return articles
+      .map((article) => ({ article, score: scoreArticle(article, searchTokens) }))
+      .filter((entry) => entry.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 10)
+  }, [articles, searchTokens])
+
+  const matchesSearch = useCallback(
+    (articleId: string) => {
+      if (searchTokens.length === 0) return true
+      const article = articleById.get(articleId)
+      return article ? scoreArticle(article, searchTokens) > 0 : false
+    },
+    [articleById, searchTokens],
+  )
+
+  const displayedArticle = articleById.get(activeArticleId) ?? articleById.get('welcome') ?? null
+
+  const selectArticle = useCallback((id: string) => {
+    setActiveArticleId(id)
+    setSearchQuery('')
+    setSearchOpen(false)
+    window.location.hash = `#docs/${id}`
+    contentRef.current?.scrollTo({ top: 0 })
+  }, [])
+
+  const toggleGroup = useCallback((groupId: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(groupId)) next.delete(groupId)
+      else next.add(groupId)
+      return next
+    })
+  }, [])
+
+  useEffect(() => {
+    const syncFromHash = () => {
+      const id = readArticleIdFromHash()
+      if (articleById.has(id)) setActiveArticleId(id)
+    }
+    window.addEventListener('hashchange', syncFromHash)
+    return () => window.removeEventListener('hashchange', syncFromHash)
+  }, [articleById])
+
+  useEffect(() => {
+    for (const section of DOC_SECTIONS) {
+      for (const group of section.groups) {
+        if (group.articleIds.includes(activeArticleId)) {
+          setCollapsedGroups((prev) => {
+            if (!prev.has(group.id)) return prev
+            const next = new Set(prev)
+            next.delete(group.id)
+            return next
+          })
+        }
+      }
+    }
+  }, [activeArticleId])
+
+  useEffect(() => {
+    if (searchTokens.length === 0) return
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev)
+      for (const section of DOC_SECTIONS) {
+        if (!section.collapsible) continue
+        for (const group of section.groups) {
+          if (group.articleIds.some((id) => matchesSearch(id))) next.delete(group.id)
+        }
+      }
+      return next
+    })
+  }, [searchTokens, matchesSearch])
+
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!searchRef.current?.contains(event.target as Node)) {
+        setSearchOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handlePointerDown)
+    return () => document.removeEventListener('mousedown', handlePointerDown)
+  }, [])
 
   return (
     <div className="docs-container">
@@ -1456,97 +1733,182 @@ ${npxCmd}`}</code>
       <header className="docs-header">
         <div className="docs-brand">
           <img src={sdnLogo} alt="" aria-hidden="true" />
-          <h1>DataNode Developer Docs & Wiki</h1>
+          <h1>Developer Docs</h1>
         </div>
         <div className="docs-controls">
-          <div className="docs-search-wrapper">
-            <svg className="docs-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <div className="docs-search-wrapper" ref={searchRef}>
+            <svg className="docs-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <circle cx="11" cy="11" r="8"></circle>
               <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
             </svg>
             <input
-              type="text"
-              placeholder="Search docs..."
+              type="search"
+              placeholder="Search endpoints, tools, topics…"
               className="docs-search-input"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              aria-expanded={searchOpen && searchResults.length > 0}
+              aria-controls="docs-search-results"
+              onFocus={() => setSearchOpen(true)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value)
+                setSearchOpen(true)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && searchResults[0]) {
+                  e.preventDefault()
+                  selectArticle(searchResults[0].article.id)
+                }
+                if (e.key === 'Escape') {
+                  setSearchQuery('')
+                  setSearchOpen(false)
+                }
+              }}
             />
+            {searchQuery && (
+              <button
+                type="button"
+                className="docs-search-clear"
+                aria-label="Clear search"
+                onClick={() => {
+                  setSearchQuery('')
+                  setSearchOpen(false)
+                }}
+              >
+                ×
+              </button>
+            )}
+            {searchOpen && searchQuery.trim() && (
+              <div className="docs-search-dropdown" id="docs-search-results" role="listbox">
+                {searchResults.length > 0 ? (
+                  searchResults.map(({ article }) => (
+                    <button
+                      key={article.id}
+                      type="button"
+                      role="option"
+                      className="docs-search-result"
+                      onClick={() => selectArticle(article.id)}
+                    >
+                      <span className="docs-search-result__title">{article.title}</span>
+                      <span className="docs-search-result__meta">
+                        {article.category === 'api' ? 'REST API' : article.category === 'mcp' ? 'MCP' : article.category === 'cli' ? 'CLI' : 'Guide'}
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <div className="docs-search-empty">No matches for “{searchQuery.trim()}”</div>
+                )}
+              </div>
+            )}
           </div>
           <button
             type="button"
-            className="m3-primary-button"
-            style={{ borderRadius: 'var(--md-r-sm)', padding: '0 16px', height: '38px', fontSize: '13px' }}
+            className="m3-primary-button docs-back-btn"
             onClick={() => { window.location.hash = '#board' }}
           >
-            Return to Board
+            Back to board
           </button>
         </div>
       </header>
 
       <aside className="docs-sidebar">
-        <div>
-          <div className="docs-sidebar-section__title">Introduction</div>
-          <div className="docs-sidebar-list">
-            {filteredArticles.filter(a => a.category === 'getting-started').map(a => (
-              <button
-                key={a.id}
-                type="button"
-                className={`docs-sidebar-item ${displayedArticle?.id === a.id ? 'is-active' : ''}`}
-                onClick={() => setActiveArticleId(a.id)}
-              >
-                {a.title}
-              </button>
-            ))}
-          </div>
-        </div>
+        {DOC_SECTIONS.map((section) => {
+          const visibleGroups = section.groups
+            .map((group) => ({
+              ...group,
+              articles: group.articleIds
+                .map((id) => articleById.get(id))
+                .filter((article): article is Article => Boolean(article))
+                .filter((article) => matchesSearch(article.id)),
+            }))
+            .filter((group) => group.articles.length > 0)
 
-        <div>
-          <div className="docs-sidebar-section__title">Integrations</div>
-          <div className="docs-sidebar-list">
-            {filteredArticles.filter(a => a.category === 'mcp' || a.category === 'cli').map(a => (
-              <button
-                key={a.id}
-                type="button"
-                className={`docs-sidebar-item ${displayedArticle?.id === a.id ? 'is-active' : ''}`}
-                onClick={() => setActiveArticleId(a.id)}
-              >
-                {a.title}
-              </button>
-            ))}
-          </div>
-        </div>
+          if (visibleGroups.length === 0) return null
 
-        <div>
-          <div className="docs-sidebar-section__title">REST API Reference</div>
-          <div className="docs-sidebar-list">
-            {filteredArticles.filter(a => a.category === 'api').map(a => (
-              <button
-                key={a.id}
-                type="button"
-                className={`docs-sidebar-item ${displayedArticle?.id === a.id ? 'is-active' : ''}`}
-                onClick={() => setActiveArticleId(a.id)}
-              >
-                <span>{a.title.replace(/^(GET|POST)\s+/, '')}</span>
-                {a.badge && (
-                  <span className={`docs-sidebar-item__badge ${a.badge}`}>
-                    {a.badge}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
+          return (
+            <div key={section.title || 'root'} className="docs-sidebar-section">
+              {section.title && (
+                <div className="docs-sidebar-section__title">{section.title}</div>
+              )}
+              {visibleGroups.map((group) => {
+                const isCollapsed = section.collapsible && collapsedGroups.has(group.id)
+                return (
+                  <div key={group.id} className="docs-sidebar-group">
+                    {section.collapsible ? (
+                      <button
+                        type="button"
+                        className="docs-sidebar-group__toggle"
+                        aria-expanded={!isCollapsed}
+                        onClick={() => toggleGroup(group.id)}
+                      >
+                        <span>{group.title}</span>
+                        <svg className={`docs-sidebar-group__chevron ${isCollapsed ? '' : 'is-open'}`} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                          <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                      </button>
+                    ) : (
+                      <div className="docs-sidebar-group__label">{group.title}</div>
+                    )}
+                    {!isCollapsed && (
+                      <div className="docs-sidebar-list">
+                        {group.articles.map((article) => (
+                          <button
+                            key={article.id}
+                            type="button"
+                            className={`docs-sidebar-item ${activeArticleId === article.id ? 'is-active' : ''}`}
+                            onClick={() => selectArticle(article.id)}
+                          >
+                            <span>{article.title.replace(/^(GET|POST|PUT|PATCH|DELETE)\s+/, '')}</span>
+                            {article.badge && (
+                              <span className={`docs-sidebar-item__badge ${article.badge}`}>
+                                {article.badge}
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })}
       </aside>
 
-      <main className="docs-content">
+      <main className="docs-content" ref={contentRef}>
+        {activeArticleId === 'welcome' && searchTokens.length === 0 && (
+          <div className="docs-quick-nav">
+            <button type="button" className="docs-quick-card" onClick={() => selectArticle('welcome')}>
+              <span className="docs-quick-card__label">Start here</span>
+              <strong>Authentication & basics</strong>
+              <span className="docs-quick-card__hint">Tokens, scopes, revision checks</span>
+            </button>
+            <button type="button" className="docs-quick-card" onClick={() => selectArticle('mcp-server')}>
+              <span className="docs-quick-card__label">MCP</span>
+              <strong>Connect an AI client</strong>
+              <span className="docs-quick-card__hint">Cursor, Claude Desktop, Windsurf</span>
+            </button>
+            <button type="button" className="docs-quick-card" onClick={() => selectArticle('cli-tool')}>
+              <span className="docs-quick-card__label">CLI</span>
+              <strong>Terminal commands</strong>
+              <span className="docs-quick-card__hint">npx or global install</span>
+            </button>
+            <button type="button" className="docs-quick-card" onClick={() => selectArticle('get-meta')}>
+              <span className="docs-quick-card__label">REST API</span>
+              <strong>HTTP reference</strong>
+              <span className="docs-quick-card__hint">Grouped by resource in the sidebar</span>
+            </button>
+          </div>
+        )}
+
         {displayedArticle ? (
           <article className="docs-article is-visible" key={displayedArticle.id}>
             {displayedArticle.render(handleCopy)}
           </article>
         ) : (
           <div className="docs-no-results">
-            <h4>No matching documentation found</h4>
-            <p>Try searching for other keywords like "mcp", "POST", or "revision".</p>
+            <h4>Page not found</h4>
+            <p>Pick a topic from the sidebar or use search above.</p>
           </div>
         )}
       </main>

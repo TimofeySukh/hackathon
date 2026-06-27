@@ -9,6 +9,7 @@ import {
   getMeta,
   listCircles,
   search,
+  smartSearch,
   importLinkedInPerson,
   deletePerson,
   deleteNote,
@@ -27,6 +28,7 @@ function usage() {
   console.log(`Usage:
   datanode meta
   datanode search <query> [limit]
+  datanode search:smart <query> [limit]
   datanode circles
   datanode people:add <circleId> <name> [note]
   datanode people:import-linkedin <url>
@@ -71,6 +73,11 @@ async function main() {
 
   if (command === 'search') {
     console.log(JSON.stringify(await search(getArg(3, 'query'), Number(process.argv[4] ?? 10)), null, 2))
+    return
+  }
+
+  if (command === 'search:smart') {
+    console.log(JSON.stringify(await smartSearch(getArg(3, 'query'), Number(process.argv[4] ?? 10)), null, 2))
     return
   }
 

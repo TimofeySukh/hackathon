@@ -768,4 +768,21 @@ rediscover, write it here.
 - Decision: Integrated throttled (150ms) style-change ripples in `updateCircleStyle` when shape, rounding, sides, opacity, tone, custom color, or image properties are updated.
 - Why: Gives real-time tactile wave feedback to the canvas when modifying any visual settings of a circle.
 
+## 2026-06-27 — Hybrid natural-language smart search
+
+- Decision: Smart search uses NeuralDeep (`https://api.neuraldeep.ru/v1`) with model
+  `qwen3.6-35b-a3b-noreason` only to parse queries into structured filters; ranking stays
+  deterministic in `graphSearch.ts` using circle paths, notes, and roles. Signed-in users
+  get AI mode; anonymous users get the same ranker without LLM.
+- Why: MoE 3B-active model is the fastest option on NeuralDeep's free tier; parse-only LLM
+  keeps latency and cost low while hierarchy (company circles, nested subsets) handles
+  scoped queries like "people at Acme".
+
+## 2026-06-27 — Agent search with visible steps and note reading
+
+- Decision: Replace single intent-parse with multi-pass agent search: analyze query,
+  collect note-backed candidates, LLM match, optional semantic retry, suggestions on miss.
+  UI shows AI badge, step list, explanation, suggestion chips, and per-result `aiReason`.
+- Why: Users expect LLM search to read notes and try harder than substring match; one-shot
+  JSON filters could not connect "my girlfriend" to "i love her".
 

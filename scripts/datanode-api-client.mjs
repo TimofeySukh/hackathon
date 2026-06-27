@@ -36,6 +36,13 @@ export async function search(query, limit = 10) {
   return await datanodeFetch(`/search?q=${encodeURIComponent(query)}&limit=${encodeURIComponent(String(limit))}`)
 }
 
+export async function smartSearch(query, limit = 10) {
+  return await datanodeFetch('/search/smart', {
+    method: 'POST',
+    body: JSON.stringify({ query, limit }),
+  })
+}
+
 export async function listCircles() {
   return await datanodeFetch('/circles')
 }

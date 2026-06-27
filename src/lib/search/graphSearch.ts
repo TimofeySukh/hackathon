@@ -1,0 +1,340 @@
+import type { CircleNode, GraphState, PersonNode } from '../board/types'
+
+export type CirclePathItem = { id: string; name: string }
+
+export type SearchIntent = {
+  nameTokens?: string[]
+  keywords?: string[]
+  circleNames?: string[]
+  role?: string
+  preferCircles?: boolean
+}
+
+export type GraphSearchPersonResult = {
+  type: 'person'
+  id: string
+  name: string
+  circleId: string
+  circlePath: CirclePathItem[]
+  score: number
+  subtitle: string
+  aiReason?: string
+}
+
+export type GraphSearchCircleResult = {
+  type: 'circle'
+  id: string
+  name: string
+  parentId: string | null
+  path: CirclePathItem[]
+  score: number
+  subtitle: string
+  aiReason?: string
+}
+
+export type GraphSearchResult = GraphSearchPersonResult | GraphSearchCircleResult
+
+const POSITION_NOTE_TITLES = new Set(['position', 'headline', 'title', 'role'])
+
+function normalizeText(value: string) {
+  return value.trim().toLowerCase()
+}
+
+function tokenize(value: string) {
+  return normalizeText(value)
+    .split(/[\s,;]+/)
+    .map((token) => token.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, ''))
+    .filter((token) => token.length > 0)
+}
+
+export function getCirclePath(graph: GraphState, circleId: string | null): CircleNode[] {
+  const circlesById = new Map(graph.circles.map((circle) => [circle.id, circle]))
+  const path: CircleNode[] = []
+  let current = circleId ? circlesById.get(circleId) : undefined
+  const seen = new Set<string>()
+  while (current && !seen.has(current.id)) {
+    path.unshift(current)
+    seen.add(current.id)
+    current = current.parentId ? circlesById.get(current.parentId) : undefined
+  }
+  return path
+}
+
+export function formatCirclePath(path: CirclePathItem[]) {
+  return path.map((item) => item.name).filter(Boolean).join(' › ')
+}
+
+export function getPersonPosition(person: PersonNode) {
+  for (const note of person.notes ?? []) {
+    if (POSITION_NOTE_TITLES.has(note.title.trim().toLowerCase())) {
+      return note.body.trim()
+    }
+  }
+  return undefined
+}
+
+function buildPersonHaystack(person: PersonNode, circlePath: CircleNode[]) {
+  const noteText = (person.notes ?? []).map((note) => `${note.title} ${note.body}`).join(' ')
+  const linkText = (person.links ?? []).map((link) => `${link.label} ${link.url}`).join(' ')
+  const pathText = circlePath.map((circle) => circle.name).join(' ')
+  return normalizeText([person.name, pathText, noteText, linkText].filter(Boolean).join(' '))
+}
+
+function circleNameMatches(pathNames: string[], target: string) {
+  const needle = normalizeText(target)
+  if (!needle) return false
+  return pathNames.some((name) => name.includes(needle) || needle.includes(name))
+}
+
+function scoreNameTokens(name: string, tokens: string[]) {
+  let score = 0
+  const normalizedName = normalizeText(name)
+  const parts = normalizedName.split(/\s+/).filter(Boolean)
+  for (const token of tokens) {
+    if (!token) continue
+    if (normalizedName === token) score += 120
+    else if (normalizedName.includes(token)) score += 100
+    else if (parts.some((part) => part.startsWith(token))) score += 80
+  }
+  return score
+}
+
+function scoreKeywords(haystack: string, position: string | undefined, keywords: string[]) {
+  let score = 0
+  const normalizedPosition = position ? normalizeText(position) : ''
+  for (const keyword of keywords) {
+    if (!keyword) continue
+    if (normalizedPosition.includes(keyword)) score += 40
+    else if (haystack.includes(keyword)) score += 20
+  }
+  return score
+}
+
+function scoreCircleFilters(pathNames: string[], circleNames: string[] | undefined) {
+  if (!circleNames?.length) return { score: 0, matches: true }
+  const matches = circleNames.some((circleName) => circleNameMatches(pathNames, circleName))
+  return { score: matches ? 50 : 0, matches }
+}
+
+export function parseSimpleQuery(raw: string): SearchIntent {
+  const intent: SearchIntent = {}
+  let text = raw.trim()
+  if (!text) return intent
+
+  const scopedMatch = text.match(
+    /\b(?:at|@|in|from|inside|within|из|в|от)\s+([^,?;]+?)(?=$|\s+(?:who|with|named|called|named|named|named)\b)/iu,
+  )
+  if (scopedMatch) {
+    intent.circleNames = [scopedMatch[1].trim()]
+    text = `${text.slice(0, scopedMatch.index)} ${text.slice((scopedMatch.index ?? 0) + scopedMatch[0].length)}`.trim()
+  }
+
+  const tokens = tokenize(text)
+  if (tokens.length === 1) {
+    intent.nameTokens = tokens
+  } else if (tokens.length > 1) {
+    intent.keywords = tokens
+  }
+
+  if (/\bcircle\b|\bкруг\b|\bzone\b|\btag\b/i.test(raw)) {
+    intent.preferCircles = true
+  }
+
+  return intent
+}
+
+export function mergeSearchIntent(base: SearchIntent, extra: SearchIntent): SearchIntent {
+  return {
+    nameTokens: [...(base.nameTokens ?? []), ...(extra.nameTokens ?? [])],
+    keywords: [...(base.keywords ?? []), ...(extra.keywords ?? [])],
+    circleNames: [...(base.circleNames ?? []), ...(extra.circleNames ?? [])],
+    role: extra.role ?? base.role,
+    preferCircles: extra.preferCircles ?? base.preferCircles,
+  }
+}
+
+export function buildSearchIntentFromQuery(raw: string): SearchIntent {
+  const trimmed = raw.trim()
+  if (!trimmed) return {}
+  const parsed = parseSimpleQuery(trimmed)
+  const fallbackTokens = tokenize(trimmed)
+  if (!parsed.nameTokens?.length && !parsed.keywords?.length && fallbackTokens.length) {
+    return mergeSearchIntent(parsed, { keywords: fallbackTokens })
+  }
+  return parsed
+}
+
+function buildPersonSubtitle(person: PersonNode, circlePath: CircleNode[]) {
+  const position = getPersonPosition(person)
+  const pathLabel = formatCirclePath(circlePath.map((circle) => ({ id: circle.id, name: circle.name })))
+  if (position && pathLabel) return `${pathLabel} · ${position}`
+  return pathLabel || position || ''
+}
+
+function buildCircleSubtitle(path: CircleNode[]) {
+  const pathLabel = formatCirclePath(path.map((circle) => ({ id: circle.id, name: circle.name })))
+  return pathLabel || 'Circle'
+}
+
+function scorePerson(person: PersonNode, intent: SearchIntent, circlePath: CircleNode[]): number {
+  const pathNames = circlePath.map((circle) => normalizeText(circle.name))
+  const { score: circleScore, matches } = scoreCircleFilters(pathNames, intent.circleNames)
+  if (intent.circleNames?.length && !matches) return 0
+
+  const haystack = buildPersonHaystack(person, circlePath)
+  const position = getPersonPosition(person)
+  let score = circleScore
+  score += scoreNameTokens(person.name, intent.nameTokens ?? [])
+  score += scoreKeywords(haystack, position, intent.keywords ?? [])
+  if (intent.role) {
+    const role = normalizeText(intent.role)
+    if (position && normalizeText(position).includes(role)) score += 45
+    else if (haystack.includes(role)) score += 15
+  }
+
+  if (score === 0 && intent.circleNames?.length) return 0
+  return score
+}
+
+function scoreCircle(circle: CircleNode, intent: SearchIntent, path: CircleNode[]): number {
+  const pathNames = path.map((item) => normalizeText(item.name))
+  const name = normalizeText(circle.name)
+  let score = 0
+
+  for (const token of intent.nameTokens ?? []) {
+    if (name.includes(token)) score += 90
+  }
+  for (const keyword of intent.keywords ?? []) {
+    if (name.includes(keyword)) score += 35
+    else if (pathNames.some((part) => part.includes(keyword))) score += 20
+  }
+  for (const circleName of intent.circleNames ?? []) {
+    if (circleNameMatches(pathNames, circleName) || name.includes(normalizeText(circleName))) score += 60
+  }
+  if (intent.preferCircles) score += 10
+  return score
+}
+
+export function rankGraphSearch(graph: GraphState, intent: SearchIntent, limit: number): GraphSearchResult[] {
+  const peopleResults: GraphSearchPersonResult[] = graph.people
+    .map((person) => {
+      const circlePath = getCirclePath(graph, person.circleId)
+      const score = scorePerson(person, intent, circlePath)
+      if (score <= 0) return null
+      return {
+        type: 'person' as const,
+        id: person.id,
+        name: person.name,
+        circleId: person.circleId,
+        circlePath: circlePath.map((circle) => ({ id: circle.id, name: circle.name })),
+        score,
+        subtitle: buildPersonSubtitle(person, circlePath),
+      }
+    })
+    .filter((result): result is GraphSearchPersonResult => result !== null)
+
+  const circleResults: GraphSearchCircleResult[] = graph.circles
+    .map((circle) => {
+      const path = getCirclePath(graph, circle.id)
+      const score = scoreCircle(circle, intent, path)
+      if (score <= 0) return null
+      return {
+        type: 'circle' as const,
+        id: circle.id,
+        name: circle.name,
+        parentId: circle.parentId,
+        path: path.map((item) => ({ id: item.id, name: item.name })),
+        score,
+        subtitle: buildCircleSubtitle(path),
+      }
+    })
+    .filter((result): result is GraphSearchCircleResult => result !== null)
+
+  const preferCircles = intent.preferCircles === true
+  const sorted = [...peopleResults, ...circleResults].sort((left, right) => {
+    if (preferCircles) {
+      if (left.type !== right.type) {
+        if (left.type === 'circle') return -1
+        if (right.type === 'circle') return 1
+      }
+    } else if (left.type !== right.type) {
+      if (left.type === 'person') return -1
+      if (right.type === 'person') return 1
+    }
+    return right.score - left.score || left.name.localeCompare(right.name)
+  })
+
+  return sorted.slice(0, limit)
+}
+
+export function searchGraphByQuery(graph: GraphState, query: string, limit: number): GraphSearchResult[] {
+  const trimmed = query.trim()
+  if (!trimmed) return []
+
+  const intent = buildSearchIntentFromQuery(trimmed)
+  const ranked = rankGraphSearch(graph, intent, limit)
+  if (ranked.length > 0) return ranked
+
+  const legacyNeedle = normalizeText(trimmed)
+  const circlesById = new Map(graph.circles.map((circle) => [circle.id, circle]))
+  const legacyPeople = graph.people
+    .filter((person) => {
+      const circle = circlesById.get(person.circleId)
+      const noteText = (person.notes ?? []).map((note) => `${note.title} ${note.body}`).join(' ')
+      const linkText = (person.links ?? []).map((link) => `${link.label} ${link.url}`).join(' ')
+      return [person.name, circle?.name, noteText, linkText].filter(Boolean).join(' ').toLowerCase().includes(legacyNeedle)
+    })
+    .map((person) => {
+      const circlePath = getCirclePath(graph, person.circleId)
+      return {
+        type: 'person' as const,
+        id: person.id,
+        name: person.name,
+        circleId: person.circleId,
+        circlePath: circlePath.map((circle) => ({ id: circle.id, name: circle.name })),
+        score: 1,
+        subtitle: buildPersonSubtitle(person, circlePath),
+      }
+    })
+
+  const legacyCircles = graph.circles
+    .filter((circle) => circle.name.toLowerCase().includes(legacyNeedle))
+    .map((circle) => {
+      const path = getCirclePath(graph, circle.id)
+      return {
+        type: 'circle' as const,
+        id: circle.id,
+        name: circle.name,
+        parentId: circle.parentId,
+        path: path.map((item) => ({ id: item.id, name: item.name })),
+        score: 1,
+        subtitle: buildCircleSubtitle(path),
+      }
+    })
+
+  return [...legacyPeople, ...legacyCircles].slice(0, limit)
+}
+
+export function parseSearchIntentJson(raw: string): SearchIntent | null {
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  const jsonText = trimmed.match(/\{[\s\S]*\}/)?.[0] ?? trimmed
+  try {
+    const parsed = JSON.parse(jsonText) as Record<string, unknown>
+    const intent: SearchIntent = {}
+    if (Array.isArray(parsed.nameTokens)) {
+      intent.nameTokens = parsed.nameTokens.filter((value): value is string => typeof value === 'string').map(normalizeText)
+    }
+    if (Array.isArray(parsed.keywords)) {
+      intent.keywords = parsed.keywords.filter((value): value is string => typeof value === 'string').map(normalizeText)
+    }
+    if (Array.isArray(parsed.circleNames)) {
+      intent.circleNames = parsed.circleNames.filter((value): value is string => typeof value === 'string').map((value) => value.trim())
+    }
+    if (typeof parsed.role === 'string' && parsed.role.trim()) intent.role = parsed.role.trim()
+    if (typeof parsed.preferCircles === 'boolean') intent.preferCircles = parsed.preferCircles
+    return intent
+  } catch {
+    return null
+  }
+}
