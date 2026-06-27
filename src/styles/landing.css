@@ -927,26 +927,6 @@
   padding-bottom: 80px;
 }
 
-.linkedin-layout {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 56px;
-  align-items: center;
-}
-
-.linkedin-copy .demo-title {
-  margin-bottom: 12px;
-}
-
-.linkedin-cta {
-  margin-top: 8px;
-}
-
-.linkedin-layout .lp-deck {
-  max-width: 480px;
-  margin-left: auto;
-}
-
 /* FAQ */
 .faq-section {
   border-top: 1px solid rgba(195, 199, 207, 0.5);
@@ -1128,25 +1108,21 @@
     padding-bottom: 56px;
   }
 
-  .board-preview-layout,
-  .linkedin-layout {
+  .board-preview-layout {
     grid-template-columns: 1fr;
     gap: 40px;
   }
 
-  .board-preview-copy,
-  .linkedin-copy {
+  .board-preview-copy {
     text-align: center;
   }
 
-  .board-preview-copy .section-lead,
-  .linkedin-copy .section-lead {
+  .board-preview-copy .section-lead {
     margin-left: auto;
     margin-right: auto;
   }
 
-  .board-preview-copy .lp-deck,
-  .linkedin-layout .lp-deck {
+  .board-preview-copy .lp-deck {
     margin: 0 auto;
   }
 
