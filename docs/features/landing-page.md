@@ -61,7 +61,6 @@ Required elements:
 1. Header at the top.
 2. A real product screenshot of the board with the inspector open.
 3. A short headline, lead line, and three deck-style slogans beside the screenshot.
-4. A primary `Try our product` button that opens the board.
 
 Do not bring back the stepped-path ribbon as the main hero element.
 

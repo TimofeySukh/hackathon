@@ -205,9 +205,6 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
                 <div className="lp-deck-card lp-deck-card--tilt-2">Brainstorm while looking at the graph</div>
                 <div className="lp-deck-card lp-deck-card--tilt-3">Keep people, notes, and context in one visual workspace</div>
               </div>
-              <button type="button" className="lp-btn lp-btn-filled landing-hero-cta" onClick={handleLaunchApp}>
-                Try our product
-              </button>
             </div>
             <figure className="board-preview-frame">
               <img

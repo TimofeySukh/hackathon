@@ -223,12 +223,6 @@
   padding-bottom: 72px;
 }
 
-.landing-hero-cta {
-  margin-top: 8px;
-  height: 44px;
-  padding: 0 28px;
-}
-
 /* Interactive Demo Inspector Section */
 .interactive-demo-section {
   border-top: 1px solid rgba(195, 199, 207, 0.5);
@@ -1154,11 +1148,6 @@
   .board-preview-copy .lp-deck,
   .linkedin-layout .lp-deck {
     margin: 0 auto;
-  }
-
-  .landing-hero-cta {
-    margin-left: auto;
-    margin-right: auto;
   }
 
   .board-preview-frame {
