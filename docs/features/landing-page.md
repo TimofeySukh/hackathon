@@ -66,6 +66,9 @@ Required elements:
 The three slogans should not become three oversized generic feature cards. They
 are part of the hero composition from the sketch.
 
+The three slogans should not become three oversized generic feature cards. They
+are part of the hero composition from the sketch.
+
 The stepped divider should be a central design element. It should look clean and
 intentional, but it should still clearly come from the sketch.
 
@@ -101,6 +104,27 @@ the real board graph.
 
 The UI should resemble the real board inspector/menu style closely enough that
 it feels like the product, not a separate marketing illustration.
+
+## Below-the-fold Sections
+
+After the hero, the landing page includes:
+
+1. **Board preview** — real product screenshot of the board with inspector open,
+   plus short deck-style note cards.
+2. **How it works** — three step cards describing start-from-You, drag-to-create,
+   and organize-in-place gestures.
+3. **Trust strip** — four compact deck cards about anonymous use, local save,
+   private sync, and no collaboration yet.
+4. **Interactive demo** — inspector simulator (see above).
+5. **LinkedIn import** — deck cards plus CTA to open the board for import.
+6. **FAQ** — question cards on the left, answer cards on the right, using the
+   same tilted deck-card visual language as the hero slogans.
+7. **CTA banner** — final launch-board call to action.
+
+Deck cards across these sections share the white rounded-card, slight rotation,
+and hover straightening behavior from the hero slogan stack.
+
+Do not add a generic multi-column feature grid to the main landing page.
 
 ## Docs
 
@@ -155,5 +179,6 @@ Buttons should feel consistent across the landing page.
 ## Code
 
 - Main component: [`LandingPage.tsx`](../../src/LandingPage.tsx)
+- Board preview screenshots: [`src/assets/landing/`](../../src/assets/landing/)
 - Stylesheet: [`landing.css`](../../src/styles/landing.css)
 - App integration: [`App.tsx`](../../src/App.tsx)

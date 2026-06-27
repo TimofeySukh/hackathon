@@ -1,6 +1,57 @@
 import { useState, type MouseEvent, type ChangeEvent, type FormEvent } from 'react'
 import sdnLogo from './assets/sdn-logo.svg'
+import productBoardInspector from './assets/landing/product-board-inspector.png'
 
+const HOW_IT_WORKS_STEPS = [
+  {
+    title: 'Start from You',
+    body: 'Open the board with a single central circle and grow outward from there.',
+  },
+  {
+    title: 'Drag to create',
+    body: 'Double-tap to add people or drag from a circle center to connect new zones.',
+  },
+  {
+    title: 'Organize in place',
+    body: 'Add notes, links, and circle groups while the graph stays visual and readable.',
+  },
+] as const
+
+const TRUST_ITEMS = [
+  'Try without signing in',
+  'Anonymous edits stay in your browser',
+  'Sign in to sync a private graph',
+  'No collaboration or shared boards yet',
+] as const
+
+const LINKEDIN_POINTS = [
+  'Import a LinkedIn Connections.csv ZIP from the board',
+  'Contacts pack into circle zones automatically',
+  'Enrich one profile at a time when you need more detail',
+] as const
+
+const FAQ_ITEMS = [
+  {
+    question: 'Do I need an account to try it?',
+    answer: 'No. Open the board anonymously and your graph is saved locally in the browser.',
+  },
+  {
+    question: 'Does the landing demo save my edits?',
+    answer: 'No. The interactive inspector on this page is a local preview only.',
+  },
+  {
+    question: 'Where does my graph go after sign-in?',
+    answer: 'Your personal graph syncs to your private Supabase record, not a shared workspace.',
+  },
+  {
+    question: 'Can agents access my board?',
+    answer: 'Only if you create a token in Settings. See Docs for MCP, CLI, and API setup.',
+  },
+  {
+    question: 'How does LinkedIn import work?',
+    answer: 'Upload a Connections.csv ZIP from the board. Bulk import stays local; single-profile enrichment runs server-side.',
+  },
+] as const
 
 interface LandingPageProps {
   onLogin: () => void
@@ -142,7 +193,6 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
       <main className="landing-main">
         
         <section className="landing-section hero-section" style={{ padding: '0 24px', position: 'relative', overflow: 'hidden', minHeight: '650px' }}>
-          {/* Stepped background ribbon using double stroke technique for perfect border & thickness */}
           <div
             className="hero-stepped-path-container"
             style={{
@@ -154,7 +204,7 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
               width: '100%',
               maxWidth: '1200px',
               zIndex: 1,
-              pointerEvents: 'none'
+              pointerEvents: 'none',
             }}
             aria-hidden="true"
           >
@@ -167,7 +217,7 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
                 height: '100%',
                 display: 'block',
                 overflow: 'visible',
-                objectFit: 'fill'
+                objectFit: 'fill',
               }}
             >
               <path
@@ -189,20 +239,74 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
             </svg>
           </div>
 
-          {/* Slogans stacked deck (top-right) */}
           <div className="hero-slogans-deck">
             <div className="hero-slogan-card">Structurise your network</div>
             <div className="hero-slogan-card">Brainstorm while looking at the graph</div>
             <div className="hero-slogan-card">Keep people, notes, and context in one visual workspace</div>
           </div>
 
-          {/* "Try our product" CTA clickable note (bottom-left) */}
           <a href="#board" className="hero-cta-note" onClick={handleLaunchApp}>
             <span className="hero-cta-note-title">Try our product</span>
             <span className="hero-cta-note-desc">
               Open the workspace and start mapping your own relationship graph.
             </span>
           </a>
+        </section>
+
+        {/* Board Preview */}
+        <section id="board-preview" className="landing-section board-preview-section">
+          <div className="board-preview-layout">
+            <div className="board-preview-copy">
+              <span className="demo-eyebrow">The board</span>
+              <h2 className="demo-title">See your network as a graph</h2>
+              <p className="section-lead">
+                Circles, people, and links on one infinite canvas — pan, zoom, and grow without leaving the visual surface.
+              </p>
+              <div className="lp-deck lp-deck--compact">
+                <div className="lp-deck-card lp-deck-card--tilt-1">Central You circle with company zones like OpenAI, Anthropic, and Google</div>
+                <div className="lp-deck-card lp-deck-card--tilt-2">People packed inside circles with names, notes, and connection links</div>
+                <div className="lp-deck-card lp-deck-card--tilt-3">Inspector panel on the side for the person you select on the board</div>
+              </div>
+            </div>
+            <figure className="board-preview-frame">
+              <img
+                src={productBoardInspector}
+                alt="Social Datanode board with circle zones and the person inspector open"
+                className="board-preview-image"
+              />
+            </figure>
+          </div>
+        </section>
+
+        {/* How it works */}
+        <section className="landing-section how-it-works-section">
+          <div className="section-header">
+            <span className="demo-eyebrow">How it works</span>
+            <h2 className="section-title">Three gestures to get started</h2>
+          </div>
+          <div className="how-it-works-grid">
+            {HOW_IT_WORKS_STEPS.map((step, index) => (
+              <div key={step.title} className={`how-step lp-deck-card lp-deck-card--tilt-${(index % 3) + 1}`}>
+                <span className="how-step-number">{index + 1}</span>
+                <h3 className="how-step-title">{step.title}</h3>
+                <p className="how-step-body">{step.body}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Trust strip */}
+        <section className="trust-strip-section" aria-label="Privacy and data ownership">
+          <div className="trust-strip">
+            {TRUST_ITEMS.map((item, index) => (
+              <div
+                key={item}
+                className={`trust-strip-card lp-deck-card lp-deck-card--tilt-${(index % 3) + 1}`}
+              >
+                {item}
+              </div>
+            ))}
+          </div>
         </section>
 
         {/* Interactive Demo Section */}
@@ -481,70 +585,112 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
         </section>
 
         {/* Feature Grid Section */}
-        <section className="landing-section features-section">
+        <section className="landing-section features-section" style={{ overflow: 'visible' }}>
           <div className="section-header">
-            <h2 className="section-title">Core Capabilities</h2>
-            <p className="section-subtitle">
-              Designed from the ground up for privacy, fluid movement, and intelligent networking.
-            </p>
+            <span className="demo-eyebrow">Core Capabilities</span>
+            <h2 className="section-title">Designed for agents and humans</h2>
           </div>
 
-          <div className="features-grid">
-            {/* Feature 1 */}
-            <div className="feature-card">
-              <div className="feature-icon-wrapper">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <circle cx="12" cy="12" r="10" />
-                  <circle cx="12" cy="12" r="4" />
-                  <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-                </svg>
-              </div>
-              <h3 className="feature-card-title">Infinite Spatial Canvas</h3>
-              <p className="feature-card-description">
-                Pan, zoom, and grow your graph seamlessly. The layout engine automatically repels sibling elements to maintain visual clarity without overlaps.
-              </p>
+          <div className="capabilities-scatter-board">
+            <div className="capabilities-scatter-card scatter-card--1">
+              <span className="demo-field-label">AI-Native</span>
+              <p className="feature-card-description">AI-Native mutations: Scoped keys and structured JSON envelope mutations designed for AI agent integration.</p>
             </div>
+            <div className="capabilities-scatter-card scatter-card--2">
+              <span className="demo-field-label">MCP Protocol</span>
+              <p className="feature-card-description">Stdio MCP server: Standard Model Context Protocol server exposing graph tools to AI clients like Claude.</p>
+            </div>
+            <div className="capabilities-scatter-card scatter-card--3">
+              <span className="demo-field-label">Remote API</span>
+              <p className="feature-card-description">Remote API access: Query and update relationship nodes remotely without exposing Supabase secrets.</p>
+            </div>
+            <div className="capabilities-scatter-card scatter-card--4">
+              <span className="demo-field-label">CLI Tool</span>
+              <p className="feature-card-description">datanode-cli tool: A local command-line interface helper for fast batch mutations and database scripts.</p>
+            </div>
+            <div className="capabilities-scatter-card scatter-card--5">
+              <span className="demo-field-label">Concurrency</span>
+              <p className="feature-card-description">Expected Revisions: Concurrency controls using expectedRevision parameters to prevent collision conflicts.</p>
+            </div>
+            <div className="capabilities-scatter-card scatter-card--6">
+              <span className="demo-field-label">Security</span>
+              <p className="feature-card-description">Vault-encrypted tokens: Revocable API keys hashed at rest and securely verified by Edge Functions.</p>
+            </div>
+            <div className="capabilities-scatter-card scatter-card--7">
+              <span className="demo-field-label">Visual Layout</span>
+              <p className="feature-card-description">Sunflower packaging: Contacts clustered into neat sunflower spiral layouts inside boundaries without lag.</p>
+            </div>
+            <div className="capabilities-scatter-card scatter-card--8">
+              <span className="demo-field-label">2D Canvas</span>
+              <p className="feature-card-description">Lightweight canvas: High performance 2D drawing pipeline with lightweight spatial grid hit testing.</p>
+            </div>
+            <div className="capabilities-scatter-card scatter-card--9">
+              <span className="demo-field-label">Physics Engine</span>
+              <p className="feature-card-description">Collision repulsion: Layout collision physics engine that repels adjacent nodes to keep labels visible.</p>
+            </div>
+            <div className="capabilities-scatter-card scatter-card--10">
+              <span className="demo-field-label">Enrichment</span>
+              <p className="feature-card-description">LinkedIn enrichment: Supabase Edge Function that resolves and imports manual LinkedIn profile details.</p>
+            </div>
+            <div className="capabilities-scatter-card scatter-card--11">
+              <span className="demo-field-label">Containment</span>
+              <p className="feature-card-description">Auto-containment: Automatic sizing and subset fitting when circles are drag-resized.</p>
+            </div>
+            <div className="capabilities-scatter-card scatter-card--12">
+              <span className="demo-field-label">Database</span>
+              <p className="feature-card-description">Privacy first RLS: Safe database access and Google authentication protected by Row-Level Security.</p>
+            </div>
+          </div>
+        </section>
 
-            {/* Feature 2 */}
-            <div className="feature-card">
-              <div className="feature-icon-wrapper">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                </svg>
-              </div>
-              <h3 className="feature-card-title">Connections Clustering</h3>
-              <p className="feature-card-description">
-                Imported contacts are packed into neat sunflower spirals grouped inside boundary circles. No messy overlap clumps or lags, even at 3,000+ nodes.
+        {/* LinkedIn Import */}
+        <section className="landing-section linkedin-section">
+          <div className="linkedin-layout">
+            <div className="linkedin-copy">
+              <span className="demo-eyebrow">LinkedIn import</span>
+              <h2 className="demo-title">Bring contacts onto the board</h2>
+              <p className="section-lead">
+                Upload your exported connections and let the board pack them into readable circle zones.
               </p>
+              <button className="lp-btn lp-btn-filled linkedin-cta" type="button" onClick={handleLaunchApp}>
+                Open board to import
+              </button>
             </div>
+            <div className="lp-deck">
+              {LINKEDIN_POINTS.map((point, index) => (
+                <div key={point} className={`lp-deck-card lp-deck-card--tilt-${(index % 3) + 1}`}>
+                  {point}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
 
-            {/* Feature 3 */}
-            <div className="feature-card">
-              <div className="feature-icon-wrapper">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                </svg>
+        {/* FAQ */}
+        <section className="landing-section faq-section">
+          <div className="section-header">
+            <span className="demo-eyebrow">FAQ</span>
+            <h2 className="section-title">Common questions</h2>
+          </div>
+          <div className="faq-list">
+            {FAQ_ITEMS.map((item, index) => (
+              <div key={item.question} className="faq-row">
+                <div className={`faq-question lp-deck-card lp-deck-card--faq-q lp-deck-card--tilt-${(index % 3) + 1}`}>
+                  {item.question}
+                </div>
+                <div className={`faq-answer lp-deck-card lp-deck-card--faq-a lp-deck-card--tilt-${((index + 1) % 3) + 1}`}>
+                  {item.answer}
+                  {index === 3 && (
+                    <>
+                      {' '}
+                      <button type="button" className="faq-inline-link" onClick={handleDocs}>
+                        Open docs
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
-              <h3 className="feature-card-title">Privacy First Architecture</h3>
-              <p className="feature-card-description">
-                All data is processed directly inside your browser. Save local offline files or sync with your private, encrypted database.
-              </p>
-            </div>
-
-            {/* Feature 4 */}
-            <div className="feature-card">
-              <div className="feature-icon-wrapper">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <circle cx="11" cy="11" r="8" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                  <path d="M8 11h6M11 8v6" />
-                </svg>
-              </div>
-              <h3 className="feature-card-title">Semantic Smart Search</h3>
-              <p className="feature-card-description">
-                Use built-in query processing to filter contacts by tags, notes, name, or company title. Find anyone instantly in your network.
-              </p>
-            </div>
+            ))}
           </div>
         </section>
 
@@ -563,7 +709,7 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
       </main>
 
       {/* Footer */}
-      <footer className="landing-footer">
+      <footer id="contact" className="landing-footer">
         <div className="footer-content">
           <a href="#" className="footer-logo" onClick={handleLaunchApp}>
             <img className="footer-logo-mark" src={sdnLogo} alt="" aria-hidden="true" />
