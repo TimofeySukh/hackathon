@@ -28,7 +28,7 @@ and proportions matter more than decorative styling.
 
 Required header items:
 
-- `Interactive demo`
+- `Interactive demo` — scrolls to the landing inspector demo section
 - `Docs`
 - `Contact`
 - `Log in`
