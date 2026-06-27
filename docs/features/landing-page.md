@@ -99,6 +99,9 @@ Required content:
 The interaction is a demo only. It must not save to Supabase, localStorage, or
 the real board graph.
 
+The default photo/avatar control uses a calm neutral abstract avatar, not a real
+team photo, so the landing demo feels generic and product-focused.
+
 The UI should resemble the real board inspector/menu style closely enough that
 it feels like the product, not a separate marketing illustration.
 

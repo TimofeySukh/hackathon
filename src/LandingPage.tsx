@@ -1,5 +1,6 @@
 import { useState, type MouseEvent, type ChangeEvent, type FormEvent } from 'react'
 import sdnLogo from './assets/sdn-logo.svg'
+import landingDemoAvatar from './assets/landing-demo-avatar.svg'
 
 
 interface LandingPageProps {
@@ -12,7 +13,7 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
   // Interactive Inspector Simulator local state
   const [demoName, setDemoName] = useState('New person 1')
   const [demoZone, setDemoZone] = useState<'Anthropic' | 'Google' | 'OpenAI' | null>(null)
-  const [demoAvatar, setDemoAvatar] = useState<string | null>(null)
+  const [demoAvatar, setDemoAvatar] = useState(landingDemoAvatar)
   const [demoNotes, setDemoNotes] = useState<string[]>([])
   const [newNoteText, setNewNoteText] = useState('')
   const [demoConnections, setDemoConnections] = useState<Array<{ id: string; label: string; url: string; service: 'linkedin' | 'telegram' | 'website' }>>([])
@@ -86,7 +87,7 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
   const handleResetDemo = () => {
     setDemoName('New person 1')
     setDemoZone(null)
-    setDemoAvatar('initials')
+    setDemoAvatar(landingDemoAvatar)
     setDemoNotes([])
     setDemoConnections([])
     setIsFavorite(false)
@@ -341,14 +342,7 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
                     style={{ display: 'none' }}
                     onChange={handleDemoAvatarUpload}
                   />
-                  {demoAvatar ? (
-                    <img src={demoAvatar} alt="Avatar" />
-                  ) : (
-                    <svg viewBox="0 0 24 24" className="demo-avatar-icon">
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                      <circle cx="12" cy="7" r="4" />
-                    </svg>
-                  )}
+                  <img src={demoAvatar} alt="Demo avatar" />
                 </label>
               </div>
 
