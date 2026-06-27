@@ -25,7 +25,7 @@ const TRUST_ITEMS = [
 ] as const
 
 const LINKEDIN_POINTS = [
-  'Import a LinkedIn Connections.csv ZIP from the board',
+  'Import a LinkedIn Connections.csv ZIP to the board',
   'Contacts pack into circle zones automatically',
   'Enrich one profile at a time when you need more detail',
 ] as const
