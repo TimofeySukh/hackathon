@@ -469,6 +469,7 @@ export function toApiSearchResults(
     if (result.type === 'person') {
       return {
         type: 'person',
+        reference: `person:${result.id}`,
         id: result.id,
         name: result.name,
         circleId: result.circleId,
@@ -480,6 +481,7 @@ export function toApiSearchResults(
     }
     return {
       type: 'circle',
+      reference: `circle:${result.id}`,
       id: result.id,
       name: result.name,
       parentId: result.parentId,

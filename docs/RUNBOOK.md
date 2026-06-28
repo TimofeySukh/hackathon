@@ -106,6 +106,8 @@ Using on-the-fly `npx` from anywhere (no clone needed):
 ```bash
 npx -y --package github:TimofeySukh/hackathon datanode-cli meta
 npx -y --package github:TimofeySukh/hackathon datanode-cli search "alice"
+npx -y --package github:TimofeySukh/hackathon datanode-cli search:batch ./queries.json 25
+npx -y --package github:TimofeySukh/hackathon datanode-cli people:batch ./person-ids.json
 npx -y --package github:TimofeySukh/hackathon datanode-cli circles
 npx -y --package github:TimofeySukh/hackathon datanode-cli people:add <circle-id> "Alice Chen" "Met at conference"
 npx -y --package github:TimofeySukh/hackathon datanode-cli operations:run ./operations.json
@@ -121,6 +123,8 @@ Or from a local repository checkout:
 ```bash
 npm run datanode:cli -- meta
 npm run datanode:cli -- search "alice"
+npm run datanode:cli -- search:batch ./queries.json 25
+npm run datanode:cli -- people:batch ./person-ids.json
 npm run datanode:cli -- circles
 npm run datanode:cli -- people:add <circle-id> "Alice Chen" "Met at conference"
 ```
@@ -149,9 +153,13 @@ overwriting data.
 MCP tool results are returned as a structured JSON envelope with `status`, `summary`,
 `data`, and `next_valid_actions`. The MCP tool registry exposes risk metadata and uses
 strict argument schemas. Agents can call `list_capabilities` to inspect a compact
-risk-aware tool list before choosing a detailed graph tool. For large, experimental, bulk,
-or destructive graph changes, agents should create a backup with `export_graph` or ask the
-user for confirmation before calling replacement, reset, or broad cleanup tools.
+risk-aware tool list before choosing a detailed graph tool. For large read tasks, agents
+should use `batch_search_people_and_circles` to gather references, then `get_people` to
+fetch exact compact profiles for up to 250 requested ids. Mutation responses intentionally
+return only `revision`, graph `counts`, and compact results; they do not include the full
+graph or image/base64 payloads. For large, experimental, bulk, or destructive graph
+changes, agents should create a backup with `export_graph` or ask the user for
+confirmation before calling replacement, reset, or broad cleanup tools.
 
 ## Local LinkedIn Agent Search
 

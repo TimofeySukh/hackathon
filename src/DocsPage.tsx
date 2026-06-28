@@ -36,12 +36,14 @@ const DOC_SECTIONS: NavSection[] = [
     collapsible: true,
     groups: [
       { id: 'api-meta', title: 'Meta', articleIds: ['get-meta'] },
-      { id: 'api-search', title: 'Search', articleIds: ['get-search', 'post-search-smart'] },
+      { id: 'api-search', title: 'Search', articleIds: ['get-search', 'post-search-batch', 'post-search-smart'] },
       {
         id: 'api-people',
         title: 'People',
         articleIds: [
           'post-people',
+          'get-people',
+          'post-people-batch',
           'post-people-import-linkedin',
           'post-notes',
           'post-links',
@@ -243,6 +245,14 @@ export default function DocsPage() {
                   <td>Search the graph by person name, circle, notes, links, or circle name.</td>
                 </tr>
                 <tr>
+                  <td className="docs-param-name">batch_search_people_and_circles</td>
+                  <td>Run up to 20 compact searches in one call and return person/circle references.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">get_people</td>
+                  <td>Fetch compact profiles for specific person ids without image/base64 payloads.</td>
+                </tr>
+                <tr>
                   <td className="docs-param-name">list_circles</td>
                   <td>List circles with ids, parent ids, paths, and people counts.</td>
                 </tr>
@@ -388,9 +398,24 @@ ${npxCmd}`}</code>
                   <td>Search people, circles, and notes.</td>
                 </tr>
                 <tr>
+                  <td className="docs-param-name">search:batch</td>
+                  <td><code>&lt;queries.json|comma-separated-queries&gt; [limit]</code></td>
+                  <td>Run multiple compact searches in one request.</td>
+                </tr>
+                <tr>
                   <td className="docs-param-name">circles</td>
                   <td>None</td>
                   <td>List all circles.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">people:get</td>
+                  <td><code>&lt;personId&gt; [--no-notes] [--no-links] [--no-circle-path] [--summary]</code></td>
+                  <td>Fetch one compact profile without image/base64 payloads.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">people:batch</td>
+                  <td><code>&lt;ids.json|comma-separated-ids&gt; [--no-notes] [--no-links] [--no-circle-path] [--summary]</code></td>
+                  <td>Fetch compact profiles for specific person ids.</td>
                 </tr>
                  <tr>
                   <td className="docs-param-name">people:add</td>
@@ -638,6 +663,46 @@ ${pinnedCmd}`}</code>
                 </tr>
               </tbody>
             </table>
+
+            <h3>Request Example</h3>
+            <div className="docs-code-container">
+              <div className="docs-code-header">
+                <span>cURL</span>
+                <button className="docs-code-copy-btn" onClick={() => copy(curl, 'cURL copied!')}>Copy</button>
+              </div>
+              <pre className="docs-code-pre">
+                <code className="docs-code">{curl}</code>
+              </pre>
+            </div>
+          </div>
+        )
+      }
+    },
+    {
+      id: 'post-search-batch',
+      category: 'api',
+      title: 'POST /search/batch',
+      badge: 'post',
+      keywords: ['post', '/search/batch', 'batch search', 'people references'],
+      render: (copy) => {
+        const payload = `{
+  "queries": ["angel investors", "founders in Copenhagen"],
+  "limit": 25
+}`
+        const curl = `curl -X POST "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/search/batch" \\
+  -H "Authorization: Bearer dn_live_your_token" \\
+  -H "Content-Type: application/json" \\
+  -d '${payload}'`
+        return (
+          <div>
+            <div className="docs-endpoint-title">
+              <span className="docs-method-badge post">POST</span>
+              <span className="docs-endpoint-path">/search/batch</span>
+            </div>
+            <p>
+              Runs up to 20 compact graph searches in one request. Results include stable
+              <code> reference</code> values such as <code>person:person-123</code>, so agents can gather ids first and then call <code>/people/batch</code>.
+            </p>
 
             <h3>Request Example</h3>
             <div className="docs-code-container">
@@ -1005,6 +1070,104 @@ ${pinnedCmd}`}</code>
                 </tr>
               </tbody>
             </table>
+
+            <h3>Request Example</h3>
+            <div className="docs-code-container">
+              <div className="docs-code-header">
+                <span>cURL</span>
+                <button className="docs-code-copy-btn" onClick={() => copy(curl, 'cURL copied!')}>Copy</button>
+              </div>
+              <pre className="docs-code-pre">
+                <code className="docs-code">{curl}</code>
+              </pre>
+            </div>
+          </div>
+        )
+      }
+    },
+    {
+      id: 'get-people',
+      category: 'api',
+      title: 'GET /people/:id',
+      badge: 'get',
+      keywords: ['get', '/people/:id', 'person profile', 'compact profile'],
+      render: (copy) => {
+        const curl = `curl -X GET "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/people/person-123?includeNotes=true&includeLinks=true" \\
+  -H "Authorization: Bearer dn_live_your_token"`
+        return (
+          <div>
+            <div className="docs-endpoint-title">
+              <span className="docs-method-badge get">GET</span>
+              <span className="docs-endpoint-path">/people/:personId</span>
+            </div>
+            <p>
+              Retrieves one compact person profile with notes, links, and circle path by default.
+              Image/base64 fields are intentionally omitted from agent-facing profile responses.
+            </p>
+
+            <h3>Optional Query Parameters</h3>
+            <table className="docs-table">
+              <tbody>
+                <tr>
+                  <td className="docs-param-name">includeNotes</td>
+                  <td>Boolean, defaults to true.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">includeLinks</td>
+                  <td>Boolean, defaults to true.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">includeCirclePath</td>
+                  <td>Boolean, defaults to true.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">includeSearchSummary</td>
+                  <td>Boolean, defaults to false.</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <h3>Request Example</h3>
+            <div className="docs-code-container">
+              <div className="docs-code-header">
+                <span>cURL</span>
+                <button className="docs-code-copy-btn" onClick={() => copy(curl, 'cURL copied!')}>Copy</button>
+              </div>
+              <pre className="docs-code-pre">
+                <code className="docs-code">{curl}</code>
+              </pre>
+            </div>
+          </div>
+        )
+      }
+    },
+    {
+      id: 'post-people-batch',
+      category: 'api',
+      title: 'POST /people/batch',
+      badge: 'post',
+      keywords: ['post', '/people/batch', 'batch people', 'profiles', 'references'],
+      render: (copy) => {
+        const payload = `{
+  "ids": ["person-123", "person-456"],
+  "includeNotes": true,
+  "includeLinks": true,
+  "includeCirclePath": true
+}`
+        const curl = `curl -X POST "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/people/batch" \\
+  -H "Authorization: Bearer dn_live_your_token" \\
+  -H "Content-Type: application/json" \\
+  -d '${payload}'`
+        return (
+          <div>
+            <div className="docs-endpoint-title">
+              <span className="docs-method-badge post">POST</span>
+              <span className="docs-endpoint-path">/people/batch</span>
+            </div>
+            <p>
+              Fetches compact profiles for up to 250 specific person ids, preserving request order and returning
+              <code> missingIds</code> for unresolved ids. It never returns image/base64 payloads or unrelated people.
+            </p>
 
             <h3>Request Example</h3>
             <div className="docs-code-container">

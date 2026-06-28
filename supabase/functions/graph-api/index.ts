@@ -74,9 +74,17 @@ type Connection = { id: string; fromId: string; toId: string }
 type GraphState = { circles: CircleNode[]; people: PersonNode[]; connections: Connection[] }
 type GraphRecord = { graph: GraphState | null; revision: number | null }
 type AuthContext = { userId: string; scopes: Set<string>; authType: 'session' | 'agent'; tokenId?: string }
+type PersonProfileOptions = {
+  includeNotes: boolean
+  includeLinks: boolean
+  includeCirclePath: boolean
+  includeSearchSummary: boolean
+}
 
 const DEFAULT_AGENT_SCOPES: Scope[] = ['graph:read', 'search:read', 'people:write', 'notes:write', 'links:write', 'connections:write', 'circles:write']
 const PERSON_RADIUS = 30
+const MAX_BATCH_PEOPLE = 250
+const MAX_BATCH_SEARCH_QUERIES = 20
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -367,6 +375,87 @@ function graphMeta(graph: GraphState | null, revision: number | null) {
   }
 }
 
+function parseBooleanOption(value: unknown, fallback: boolean) {
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'string') {
+    if (value === 'true') return true
+    if (value === 'false') return false
+  }
+  return fallback
+}
+
+function getPersonProfileOptions(source: URLSearchParams | Record<string, unknown>): PersonProfileOptions {
+  const read = (key: string) => source instanceof URLSearchParams ? source.get(key) : source[key]
+  return {
+    includeNotes: parseBooleanOption(read('includeNotes'), true),
+    includeLinks: parseBooleanOption(read('includeLinks'), true),
+    includeCirclePath: parseBooleanOption(read('includeCirclePath'), true),
+    includeSearchSummary: parseBooleanOption(read('includeSearchSummary'), false),
+  }
+}
+
+function toPersonReference(person: PersonNode) {
+  return {
+    type: 'person',
+    reference: `person:${person.id}`,
+    id: person.id,
+    name: person.name,
+    circleId: person.circleId,
+  }
+}
+
+function toCircleReference(circle: CircleNode) {
+  return {
+    type: 'circle',
+    reference: `circle:${circle.id}`,
+    id: circle.id,
+    name: circle.name,
+    parentId: circle.parentId,
+  }
+}
+
+function toCompactPersonProfile(graph: GraphState, person: PersonNode, options: PersonProfileOptions) {
+  return {
+    ...toPersonReference(person),
+    avatar: person.avatar,
+    isFavorite: person.isFavorite === true,
+    circlePath: options.includeCirclePath
+      ? getCirclePath(graph, person.circleId).map((circle) => toCircleReference(circle))
+      : undefined,
+    notes: options.includeNotes ? person.notes ?? [] : undefined,
+    links: options.includeLinks ? person.links ?? [] : undefined,
+    searchSummary: options.includeSearchSummary ? person.searchSummary : undefined,
+  }
+}
+
+function compactMutationResult(result: unknown): unknown {
+  if (Array.isArray(result)) return result.map((item) => compactMutationResult(item))
+  if (!result || typeof result !== 'object') return result
+  const record = result as Record<string, unknown>
+
+  if (typeof record.id === 'string' && typeof record.name === 'string' && typeof record.circleId === 'string') {
+    return {
+      type: 'person',
+      reference: `person:${record.id}`,
+      id: record.id,
+      name: record.name,
+      circleId: record.circleId,
+    }
+  }
+
+  if (typeof record.id === 'string' && typeof record.name === 'string' && typeof record.radius === 'number') {
+    return {
+      type: 'circle',
+      reference: `circle:${record.id}`,
+      id: record.id,
+      name: record.name,
+      parentId: typeof record.parentId === 'string' ? record.parentId : null,
+    }
+  }
+
+  return result
+}
+
 function findFreePersonPosition(graph: GraphState, circleId: string) {
   const circle = graph.circles.find((candidate) => candidate.id === circleId)
   const peopleInCircle = graph.people.filter((person) => person.circleId === circleId)
@@ -635,7 +724,11 @@ async function mutateGraph(req: Request, auth: AuthContext, body: Record<string,
   const result = mutate(current.graph)
   const response = await writeGraph(auth.userId, current.graph, expectedRevision)
   const payload = await response.json()
-  return jsonResponse({ ...payload, result }, response.status)
+  return jsonResponse({
+    revision: payload.revision,
+    counts: graphMeta(current.graph, payload.revision).counts,
+    result: compactMutationResult(result),
+  }, response.status)
 }
 
 async function handleTokenRoutes(req: Request, path: string, auth: AuthContext, body: Record<string, unknown>) {
@@ -723,6 +816,29 @@ async function handleGraphRoutes(req: Request, path: string, auth: AuthContext, 
     return jsonResponse({ results: toApiSearchResults(searchGraphByQuery(graph, url.searchParams.get('q') ?? '', limit)) })
   }
 
+  if (req.method === 'POST' && path === '/v1/search/batch') {
+    if (!auth.scopes.has('search:read')) return jsonResponse({ error: 'Missing scope: search:read' }, 403)
+    const queries = Array.isArray(body.queries)
+      ? body.queries.filter((query): query is string => typeof query === 'string' && query.trim().length > 0).slice(0, MAX_BATCH_SEARCH_QUERIES)
+      : []
+    if (queries.length === 0) return jsonResponse({ error: 'queries must contain at least one search string.' }, 400)
+    const { graph, revision } = await readGraph(auth.userId)
+    const limit = clampSearchLimit(body.limit)
+    if (!graph) {
+      return jsonResponse({
+        revision,
+        results: queries.map((query) => ({ query, results: [] })),
+      })
+    }
+    return jsonResponse({
+      revision,
+      results: queries.map((query) => ({
+        query,
+        results: toApiSearchResults(searchGraphByQuery(graph, query, limit)),
+      })),
+    })
+  }
+
   if (req.method === 'POST' && path === '/v1/search/smart') {
     if (!auth.scopes.has('search:read')) return jsonResponse({ error: 'Missing scope: search:read' }, 403)
     if (!isAiSearchConfigured()) return jsonResponse({ error: 'AI search is not configured on the server.' }, 503)
@@ -799,7 +915,8 @@ async function handleGraphRoutes(req: Request, path: string, auth: AuthContext, 
   if (req.method === 'GET' && circlePeopleMatch) {
     const { graph, revision } = await readGraph(auth.userId)
     const people = graph?.people.filter((person) => person.circleId === circlePeopleMatch[1]) ?? []
-    return jsonResponse({ people, revision })
+    const options = getPersonProfileOptions(url.searchParams)
+    return jsonResponse({ people: graph ? people.map((person) => toCompactPersonProfile(graph, person, options)) : [], revision })
   }
 
   if (req.method === 'POST' && path === '/v1/people/import-linkedin') {
@@ -941,11 +1058,36 @@ async function handleGraphRoutes(req: Request, path: string, auth: AuthContext, 
     return await mutateGraph(req, auth, body, (graph) => createPerson(graph, body))
   }
 
+  if (req.method === 'POST' && path === '/v1/people/batch') {
+    if (!auth.scopes.has('graph:read')) return jsonResponse({ error: 'Missing scope: graph:read' }, 403)
+    const ids = Array.isArray(body.ids)
+      ? body.ids.filter((id): id is string => typeof id === 'string' && id.trim().length > 0).slice(0, MAX_BATCH_PEOPLE)
+      : []
+    if (ids.length === 0) return jsonResponse({ error: 'ids must contain at least one person id.' }, 400)
+    const { graph, revision } = await readGraph(auth.userId)
+    if (!graph) return jsonResponse({ people: [], missingIds: ids, revision })
+    const options = getPersonProfileOptions(body)
+    const peopleById = new Map(graph.people.map((person) => [person.id, person]))
+    const people: unknown[] = []
+    const missingIds: string[] = []
+    const seen = new Set<string>()
+    for (const rawId of ids) {
+      const id = rawId.trim()
+      if (seen.has(id)) continue
+      seen.add(id)
+      const person = peopleById.get(id)
+      if (person) people.push(toCompactPersonProfile(graph, person, options))
+      else missingIds.push(id)
+    }
+    return jsonResponse({ people, missingIds, revision, limit: MAX_BATCH_PEOPLE })
+  }
+
   const personMatch = path.match(/^\/v1\/people\/([^/]+)$/)
   if (personMatch && req.method === 'GET') {
     const { graph, revision } = await readGraph(auth.userId)
     const person = graph?.people.find((candidate) => candidate.id === personMatch[1]) ?? null
-    return person ? jsonResponse({ person, revision }) : jsonResponse({ error: 'Person not found.' }, 404)
+    const options = getPersonProfileOptions(url.searchParams)
+    return person && graph ? jsonResponse({ person: toCompactPersonProfile(graph, person, options), revision }) : jsonResponse({ error: 'Person not found.' }, 404)
   }
 
   if (personMatch && req.method === 'PATCH') {
@@ -1083,6 +1225,7 @@ async function handleGraphRoutes(req: Request, path: string, auth: AuthContext, 
             person.notes ??= []
             const [note] = normalizeNotes([data])
             person.notes.push(note)
+            refreshPersonSearchSummary(graph, person)
             results.push(note)
             break
           }
@@ -1094,6 +1237,7 @@ async function handleGraphRoutes(req: Request, path: string, auth: AuthContext, 
             person.links ??= []
             const [link] = normalizeLinks([data])
             person.links.push(link)
+            refreshPersonSearchSummary(graph, person)
             results.push(link)
             break
           }

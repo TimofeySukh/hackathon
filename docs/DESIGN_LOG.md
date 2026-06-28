@@ -870,3 +870,13 @@ rediscover, write it here.
 - Why: Users expect natural-language requests to be interpreted by the model, while code
   should only enforce contracts, prefilter candidates, validate ids, and expose evidence.
   Provider telemetry also makes it clear when calls go to Groq/AI_SEARCH instead of OpenAI.
+
+## 2026-06-28 — Compact MCP reads for large contact graphs
+
+- Decision: Agent-facing write responses return only `revision`, graph `counts`, and
+  compact operation results. Search results include stable `person:<id>` and `circle:<id>`
+  references. Added batch search plus exact person batch fetch, with profile responses
+  omitting image/base64 fields and preserving requested id order.
+- Why: Agents working over 10k+ contacts need to collect many references and fetch 100+
+  relevant profiles without accidentally receiving the whole graph, unrelated people, or
+  large avatar payloads after every write.

@@ -3,9 +3,11 @@
 import {
   addLink,
   addNote,
+  batchSearch,
   batchOperations,
   createConnection,
   createPerson,
+  getPeople,
   getMeta,
   listCircles,
   search,
@@ -124,6 +126,13 @@ const operationSchema = strictObject({
   },
 }, ['type', 'data'])
 
+const profileOptionsSchema = {
+  includeNotes: { type: 'boolean', description: 'Include person notes. Defaults to true.' },
+  includeLinks: { type: 'boolean', description: 'Include person links. Defaults to true.' },
+  includeCirclePath: { type: 'boolean', description: 'Include circle path references. Defaults to true.' },
+  includeSearchSummary: { type: 'boolean', description: 'Include compact search summary. Defaults to false.' },
+}
+
 const toolDefinitions = [
   tool({
     name: 'list_capabilities',
@@ -144,6 +153,17 @@ const toolDefinitions = [
       query: { type: 'string' },
       limit: { type: 'number', default: 10, minimum: 1, maximum: 50 },
     }, ['query']),
+    annotations: { readOnlyHint: true },
+  }),
+  tool({
+    name: 'batch_search_people_and_circles',
+    description: 'Run up to 20 independent compact graph searches in one call. Use this to gather person references from large graphs before fetching exact profiles with get_people.',
+    riskClass: 'search_only',
+    sideEffect: 'none',
+    schema: strictObject({
+      queries: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 20 },
+      limit: { type: 'number', default: 10, minimum: 1, maximum: 50 },
+    }, ['queries']),
     annotations: { readOnlyHint: true },
   }),
   tool({
@@ -186,6 +206,17 @@ const toolDefinitions = [
     riskClass: 'read_only',
     sideEffect: 'none',
     schema: strictObject({}),
+    annotations: { readOnlyHint: true },
+  }),
+  tool({
+    name: 'get_people',
+    description: 'Fetch compact profiles for specific person ids. Returns only requested people, preserves id order, includes notes/links by default, and never returns image/base64 payloads.',
+    riskClass: 'read_only',
+    sideEffect: 'none',
+    schema: strictObject({
+      ids: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 250 },
+      ...profileOptionsSchema,
+    }, ['ids']),
     annotations: { readOnlyHint: true },
   }),
   tool({
@@ -427,7 +458,17 @@ function summarizeValue(value) {
       const counts = value.counts
       return `Graph has ${counts.people ?? 0} people, ${counts.circles ?? 0} circles, and ${counts.connections ?? 0} connections.`
     }
-    if (value.results && Array.isArray(value.results)) return `Found ${value.results.length} result(s).`
+    if (value.results && Array.isArray(value.results)) {
+      if (value.results.every((entry) => entry && typeof entry === 'object' && Array.isArray(entry.results))) {
+        const total = value.results.reduce((sum, entry) => sum + entry.results.length, 0)
+        return `Ran ${value.results.length} search(es), found ${total} result(s).`
+      }
+      return `Found ${value.results.length} result(s).`
+    }
+    if (value.people && Array.isArray(value.people)) {
+      const missingCount = Array.isArray(value.missingIds) ? value.missingIds.length : 0
+      return `Fetched ${value.people.length} people${missingCount ? `; ${missingCount} missing id(s)` : ''}.`
+    }
     if (value.circles && Array.isArray(value.circles)) return `Listed ${value.circles.length} circle(s).`
     if (value.capabilities && Array.isArray(value.capabilities)) return `Listed ${value.capabilities.length} capability/capabilities.`
     if (value.revision !== undefined && value.graph) {
@@ -473,8 +514,10 @@ function errorEnvelope(toolName, error) {
 }
 
 function nextActionsFor(toolName) {
-  if (toolName === 'list_capabilities') return ['search_people_and_circles', 'smart_search_people_and_circles', 'discover_people', 'discover_people_lab', 'list_circles']
-  if (toolName === 'search_people_and_circles') return ['list_circles', 'create_person', 'add_note']
+  if (toolName === 'list_capabilities') return ['search_people_and_circles', 'batch_search_people_and_circles', 'get_people', 'smart_search_people_and_circles', 'discover_people', 'discover_people_lab', 'list_circles']
+  if (toolName === 'search_people_and_circles') return ['get_people', 'batch_search_people_and_circles', 'list_circles', 'create_person', 'add_note']
+  if (toolName === 'batch_search_people_and_circles') return ['get_people', 'search_people_and_circles', 'smart_search_people_and_circles', 'add_note']
+  if (toolName === 'get_people') return ['batch_search_people_and_circles', 'search_people_and_circles', 'add_note', 'add_link']
   if (toolName === 'smart_search_people_and_circles') return ['discover_people', 'list_circles', 'create_person', 'add_note']
   if (toolName === 'discover_people') return ['smart_search_people_and_circles', 'list_circles', 'add_note']
   if (toolName === 'list_circles') return ['create_person', 'create_circle', 'search_people_and_circles']
@@ -504,6 +547,8 @@ async function callTool(name, args = {}) {
       })
     case 'search_people_and_circles':
       return resultEnvelope(name, await search(args.query, Math.min(args.limit ?? 10, 50)))
+    case 'batch_search_people_and_circles':
+      return resultEnvelope(name, await batchSearch(args.queries, Math.min(args.limit ?? 10, 50)))
     case 'smart_search_people_and_circles':
       return resultEnvelope(name, await smartSearch(args.query, Math.min(args.limit ?? 10, 50)))
     case 'discover_people':
@@ -515,6 +560,13 @@ async function callTool(name, args = {}) {
       return resultEnvelope(name, await discoverPeopleLab(args.query, args.graph, args.perGroupLimit))
     case 'list_circles':
       return resultEnvelope(name, await listCircles())
+    case 'get_people':
+      return resultEnvelope(name, await getPeople(args.ids, {
+        includeNotes: args.includeNotes ?? true,
+        includeLinks: args.includeLinks ?? true,
+        includeCirclePath: args.includeCirclePath ?? true,
+        includeSearchSummary: args.includeSearchSummary ?? false,
+      }))
     case 'create_person': {
       const meta = await getMeta()
       return resultEnvelope(name, await createPerson({ expectedRevision: meta.revision, ...args }))

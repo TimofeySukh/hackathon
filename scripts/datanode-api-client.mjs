@@ -36,6 +36,13 @@ export async function search(query, limit = 10) {
   return await datanodeFetch(`/search?q=${encodeURIComponent(query)}&limit=${encodeURIComponent(String(limit))}`)
 }
 
+export async function batchSearch(queries, limit = 10) {
+  return await datanodeFetch('/search/batch', {
+    method: 'POST',
+    body: JSON.stringify({ queries, limit }),
+  })
+}
+
 export async function smartSearch(query, limit = 10) {
   return await datanodeFetch('/search/smart', {
     method: 'POST',
@@ -71,6 +78,22 @@ export async function createPerson(input) {
   return await datanodeFetch('/people', {
     method: 'POST',
     body: JSON.stringify(input),
+  })
+}
+
+export async function getPerson(personId, options = {}) {
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(options)) {
+    if (value !== undefined) params.set(key, String(value))
+  }
+  const suffix = params.toString() ? `?${params.toString()}` : ''
+  return await datanodeFetch(`/people/${encodeURIComponent(personId)}${suffix}`)
+}
+
+export async function getPeople(ids, options = {}) {
+  return await datanodeFetch('/people/batch', {
+    method: 'POST',
+    body: JSON.stringify({ ids, ...options }),
   })
 }
 

@@ -21,9 +21,16 @@ Supabase project secrets or allowing access to another user's graph.
   `graph:replace` scope.
 - All graph writes require `expectedRevision`. Stale writers receive `409 Conflict`
   instead of overwriting a newer board.
+- Agent-facing mutation responses are compact: they return `revision`, graph `counts`,
+  and the operation `result`, but not the full graph. Person and circle mutation results
+  are reduced to stable references (`person:<id>`, `circle:<id>`) and never include
+  image/base64 payloads.
 - MCP tool results use a structured JSON envelope with `status`, `summary`, `data`, and
   `next_valid_actions`; tool definitions expose risk metadata and strict argument schemas.
 - MCP includes `list_capabilities` for compact risk-aware tool discovery.
+- Large graph lookup uses a two-step flow: batch/search tools return compact references,
+  then `get_people` / `POST /people/batch` fetch exact profiles for up to 250 requested
+  people, preserving id order and omitting unrelated people.
 - Large, bulk, experimental, or destructive MCP operations should be preceded by an
   `export_graph` backup or explicit user confirmation.
 - People have exactly one direct `circleId`. Nested membership is derived from the
@@ -56,6 +63,8 @@ Supabase project secrets or allowing access to another user's graph.
   - `listAgentTokens`, `createAgentToken`, `revokeAgentToken`
   - `graph-api` Edge Function token auth and graph mutation handlers
   - `datanode:cli`, `datanode:mcp`, and `operations:run` batch CLI support
+  - `search:batch`, `people:get`, `people:batch`, `batch_search_people_and_circles`,
+    and `get_people` for large graph agent reads
 - Related state / hooks:
   - `agentTokens`, `newAgentToken`, `agentTokensBusy`, `agentTokenStatus`
   - `loadedGraphRevisionRef` for browser-side optimistic concurrency

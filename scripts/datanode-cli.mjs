@@ -4,9 +4,12 @@ import { readFileSync } from 'node:fs'
 import {
   addLink,
   addNote,
+  batchSearch,
   batchOperations,
   createConnection,
   createPerson,
+  getPerson,
+  getPeople,
   getMeta,
   listCircles,
   search,
@@ -31,10 +34,13 @@ function usage() {
   console.log(`Usage:
   datanode meta
   datanode search <query> [limit]
+  datanode search:batch <queries.json|comma-separated-queries> [limit]
   datanode search:smart <query> [limit]
   datanode search:discover <query> [perGroupLimit]
   datanode search:discover-lab <query> <graph.json> [perGroupLimit]
   datanode circles
+  datanode people:get <personId> [--no-notes] [--no-links] [--no-circle-path] [--summary]
+  datanode people:batch <ids.json|comma-separated-ids> [--no-notes] [--no-links] [--no-circle-path] [--summary]
   datanode people:add <circleId> <name> [note]
   datanode people:import-linkedin <url>
   datanode notes:add <personId> <body>
@@ -64,6 +70,27 @@ function getArg(index, name) {
   return value
 }
 
+function readListArg(value, field) {
+  let raw = value
+  if (value.endsWith('.json')) raw = readFileSync(value, 'utf8')
+  if (raw.trim().startsWith('[') || raw.trim().startsWith('{')) {
+    const parsed = JSON.parse(raw)
+    const list = Array.isArray(parsed) ? parsed : parsed[field]
+    if (!Array.isArray(list)) throw new Error(`${field} must be an array.`)
+    return list.filter((item) => typeof item === 'string' && item.trim()).map((item) => item.trim())
+  }
+  return raw.split(',').map((item) => item.trim()).filter(Boolean)
+}
+
+function getProfileOptions(args) {
+  return {
+    includeNotes: !args.includes('--no-notes'),
+    includeLinks: !args.includes('--no-links'),
+    includeCirclePath: !args.includes('--no-circle-path'),
+    includeSearchSummary: args.includes('--summary'),
+  }
+}
+
 async function main() {
   const command = process.argv[2]
   if (!command || command === 'help' || command === '--help') {
@@ -78,6 +105,12 @@ async function main() {
 
   if (command === 'search') {
     console.log(JSON.stringify(await search(getArg(3, 'query'), Number(process.argv[4] ?? 10)), null, 2))
+    return
+  }
+
+  if (command === 'search:batch') {
+    const queries = readListArg(getArg(3, 'queries'), 'queries')
+    console.log(JSON.stringify(await batchSearch(queries, Number(process.argv[4] ?? 10)), null, 2))
     return
   }
 
@@ -105,6 +138,17 @@ async function main() {
 
   if (command === 'circles') {
     console.log(JSON.stringify(await listCircles(), null, 2))
+    return
+  }
+
+  if (command === 'people:get') {
+    console.log(JSON.stringify(await getPerson(getArg(3, 'personId'), getProfileOptions(process.argv.slice(4))), null, 2))
+    return
+  }
+
+  if (command === 'people:batch') {
+    const ids = readListArg(getArg(3, 'ids'), 'ids')
+    console.log(JSON.stringify(await getPeople(ids, getProfileOptions(process.argv.slice(4))), null, 2))
     return
   }
 
