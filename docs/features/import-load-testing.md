@@ -35,6 +35,10 @@ not thousands of per-contact database writes.
   neighboring company circles during a deliberate bulk import.
 - Large imports are processed in chunks that yield back to the browser between batches,
   so the settings panel can repaint and the event loop is not blocked for the whole import.
+- After a successful import, the resulting graph is written immediately to the active
+  storage backend (Supabase for signed-in users, `localStorage` for anonymous users)
+  before the success alert is shown. The normal debounced autosave then skips the same
+  unchanged snapshot.
 - The import button is disabled while a ZIP import is running and shows `Importing...`.
 - Duplicate imported people are skipped by generated LinkedIn person id.
 

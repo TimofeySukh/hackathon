@@ -74,8 +74,9 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
 - **Graph file actions**: the bottom of Settings includes graph import, export, and
   clear actions. Export downloads the current board as a JSON file. Import accepts a
   board graph JSON with `circles`, `people`, and `connections` arrays, then replaces the
-  current board and keeps the action undoable. Clear resets the board to a fresh single
-  `You` circle after confirmation and is also undoable.
+  current board, immediately flushes the replacement to the active storage backend, and
+  keeps the action undoable. Clear resets the board to a fresh single `You` circle after
+  confirmation and is also undoable.
 - **Persistence safety**: signed-in boards load only from the `user_graphs` blob.
   A brand-new empty graph is not immediately autosaved on load, so a temporary
   backend/schema mismatch cannot overwrite an existing board with a single `You` circle.

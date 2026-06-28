@@ -884,15 +884,14 @@ function App() {
     if (!graphLoaded || auth.status !== 'authenticated' || !userId) return
     if (loadedGraphSourceRef.current === 'error') return
     if (loadedGraphSourceRef.current === 'local') return
-    if (loadedGraphSourceRef.current === 'empty' && loadedGraphSnapshotRef.current === JSON.stringify(graph)) {
-      return
-    }
+    const graphJson = JSON.stringify(graph)
+    if (loadedGraphSnapshotRef.current === graphJson) return
     const timer = window.setTimeout(() => {
       void saveGraph(userId, graph, loadedGraphRevisionRef.current)
         .then((nextRevision) => {
           loadedGraphRevisionRef.current = nextRevision
           loadedGraphSourceRef.current = 'saved'
-          loadedGraphSnapshotRef.current = JSON.stringify(graph)
+          loadedGraphSnapshotRef.current = graphJson
           broadcastGraphRevision(userId, nextRevision)
         })
         .catch((error) => {
@@ -941,6 +940,34 @@ function App() {
     }, 800)
     return () => window.clearTimeout(timer)
   }, [graph, graphLoaded, isLocalMode])
+
+  async function persistGraphImmediately(nextGraph: GraphState) {
+    if (auth.status === 'authenticated' && userId) {
+      try {
+        const graphJson = JSON.stringify(nextGraph)
+        const nextRevision = await saveGraph(userId, nextGraph, loadedGraphRevisionRef.current)
+        loadedGraphRevisionRef.current = nextRevision
+        loadedGraphSourceRef.current = 'saved'
+        loadedGraphSnapshotRef.current = graphJson
+        setGraph(nextGraph)
+        broadcastGraphRevision(userId, nextRevision)
+      } catch (error) {
+        if (error instanceof GraphRevisionConflictError) {
+          loadedGraphSourceRef.current = 'error'
+          setGraphLoadError('This board changed in another tab or through an agent. To protect your data, reload before making more changes.')
+        }
+        throw error
+      }
+      return
+    }
+
+    if (isLocalMode) {
+      saveLocalGraph(nextGraph)
+      loadedGraphSourceRef.current = 'local'
+      loadedGraphSnapshotRef.current = JSON.stringify(nextGraph)
+    }
+    setGraph(nextGraph)
+  }
 
   const [camera, setCamera] = useState<Camera>({ x: window.innerWidth / 2, y: window.innerHeight / 2, scale: 0.82 })
   // cameraRef holds the *live* camera during a pan/zoom gesture. `camera` state
@@ -1408,7 +1435,7 @@ function App() {
 
       const result = await buildLinkedInConnectionsGraph(graph, csvText)
       pushHistory()
-      setGraph(result.graph)
+      await persistGraphImmediately(result.graph)
       notifyOnboarding('import')
 
       alert(`LinkedIn data imported successfully: ${result.importedPeople} people across ${result.importedCompanies} companies.`)
@@ -1434,10 +1461,11 @@ function App() {
       }
 
       const importedGraph = sanitizeDefaultCircleStyles(parsed)
-      pushHistory()
-      setGraph(auth.status === 'authenticated' && auth.session
+      const nextGraph = auth.status === 'authenticated' && auth.session
         ? stampYouIdentity(importedGraph, auth.session.user)
-        : importedGraph)
+        : importedGraph
+      pushHistory()
+      await persistGraphImmediately(nextGraph)
       selectItem(null)
       setSelectedPeopleIds([])
       setCreateMenu(null)
@@ -5854,8 +5882,12 @@ async function buildLinkedInConnectionsGraph(
     }
   }
 
-  const nextCircles = [...current.circles]
-  const nextPeople = [...current.people]
+  const nextCircles = current.circles.map((circle) => ({ ...circle }))
+  const nextPeople = current.people.map((person) => ({
+    ...person,
+    notes: person.notes ? person.notes.map((note) => ({ ...note })) : person.notes,
+    links: person.links ? person.links.map((link) => ({ ...link })) : person.links,
+  }))
   const existingPersonIds = new Set(nextPeople.map((person) => person.id))
   const circlesById = new Map(nextCircles.map((circle) => [circle.id, circle]))
   const youCircle = circlesById.get('you')

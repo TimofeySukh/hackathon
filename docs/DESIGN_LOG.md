@@ -17,6 +17,18 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-28 — Imported Graphs Flush Immediately
+
+- Decision: LinkedIn ZIP imports and graph JSON imports now write the resulting graph to
+  the active storage backend immediately after replacing React state, instead of relying
+  only on the debounced autosave effect.
+- Decision: the debounced signed-in autosave skips writes when the current graph matches
+  the last saved snapshot, so an immediate import flush is not followed by a duplicate
+  revision bump.
+- Why: manual edits were persisted reliably, but bulk/import paths could be lost after a
+  reload if the page closed before the debounce completed or if import code mutated the
+  current graph before React observed a distinct state change.
+
 ### 2026-06-27 — Public Privacy Policy Page at `#privacy`
 
 - Decision: ship a dedicated Privacy Policy screen at `#privacy` (`PrivacyPage.tsx`) instead
