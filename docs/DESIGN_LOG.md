@@ -17,6 +17,14 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-28 — Hide Database Load Failure During Demo
+
+- Decision: when a signed-in board fails to load from Supabase, the app now falls back to
+  a fresh local-only graph without showing the blocking database reload banner.
+- Why: the zero-to-demo video flow should keep the board and agent mode usable even when
+  the database is unavailable or misconfigured. The fallback does not write the fresh graph
+  back to Supabase.
+
 ### 2026-06-28 — Prepared Agent Referral Demo
 
 - Decision: agent chat now includes a local deterministic zero-to-demo referral scenario

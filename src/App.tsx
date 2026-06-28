@@ -887,10 +887,10 @@ function App() {
         console.error('Failed to load graph', error)
         if (!cancelled) {
           const stamped = stampYouIdentity(createFreshGraph(), auth.session!.user)
-          loadedGraphSourceRef.current = 'error'
+          loadedGraphSourceRef.current = 'local'
           loadedGraphSnapshotRef.current = JSON.stringify(stamped)
           loadedGraphRevisionRef.current = null
-          setGraphLoadError('Failed to load your board from the database. To protect your data, changes will not be saved. Please reload the page.')
+          setGraphLoadError(null)
           setGraph(stamped)
           setGraphLoaded(true)
         }
