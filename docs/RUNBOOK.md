@@ -258,22 +258,32 @@ If Playwright's Chromium is not installed on the machine:
 npx playwright install chromium
 ```
 
-## Production Auto-Deploy
+## Production Push Deploy
 
-The `social.datanode.live` deployment can run a lightweight user-level auto-deploy loop on the server.
+The `social.datanode.live` deployment is triggered by GitHub Actions immediately after
+a push to `main`. The workflow connects to the production server over SSH and runs the
+server-side deploy script once for that commit.
 
 Files:
 
+- `.github/workflows/deploy-social-datanode-live.yml`
 - `deploy/social-datanode-live/auto-deploy/social-datanode-live-autodeploy.sh`
-- `deploy/social-datanode-live/auto-deploy/social-datanode-live-autodeploy.cron`
 
 What it does:
 
-- checks `main` on GitHub every 3 minutes from cron
-- exits immediately when the remote commit did not change
-- only runs `npm ci`, `npm run build`, and `docker compose up -d --build` when `main` changed
+- starts on `push` to `main`, with a manual `workflow_dispatch` fallback
+- uses GitHub Actions concurrency so production deploys run one at a time
+- connects to the server with the deploy SSH key from GitHub repository secrets
+- runs `npm ci`, `npm run build`, and `docker compose up -d --build` only when `main` changed
 - stores the last deployed commit SHA on the server to avoid unnecessary rebuilds
 - loads optional build-time Vite variables from `$HOME/apps/social-datanode-live-autodeploy/deploy.env` before `npm run build`
+
+Required GitHub repository secrets:
+
+- `SOCIAL_DATANODE_DEPLOY_HOST`: production server hostname or IP.
+- `SOCIAL_DATANODE_DEPLOY_USER`: production server user, currently expected to be `egg`.
+- `SOCIAL_DATANODE_DEPLOY_SSH_PRIVATE_KEY`: private key allowed to SSH as the deploy user.
+- `SOCIAL_DATANODE_DEPLOY_PORT`: optional SSH port; defaults to `22` when omitted.
 
 Create the server-only build env file before the first production build:
 
@@ -285,24 +295,28 @@ VITE_SUPABASE_ANON_KEY=
 EOF
 ```
 
-Suggested server install for user `egg`:
+Install the server-side deploy script for user `egg`:
 
 ```bash
 mkdir -p ~/.local/bin ~/.local/share/social-datanode-live-autodeploy
 install -m 755 deploy/social-datanode-live/auto-deploy/social-datanode-live-autodeploy.sh ~/.local/bin/social-datanode-live-autodeploy
+~/.local/bin/social-datanode-live-autodeploy
+```
+
+Remove the old polling cron entry if it was installed previously:
+
+```bash
 crontab -l > /tmp/current-crontab 2>/dev/null || true
 grep -v 'social-datanode-live-autodeploy' /tmp/current-crontab > /tmp/next-crontab || true
-cat deploy/social-datanode-live/auto-deploy/social-datanode-live-autodeploy.cron >> /tmp/next-crontab
 crontab /tmp/next-crontab
 rm -f /tmp/current-crontab /tmp/next-crontab
-~/.local/bin/social-datanode-live-autodeploy
 ```
 
 Check status:
 
 ```bash
-crontab -l
-tail -n 100 ~/.local/share/social-datanode-live-autodeploy/cron.log
+gh run list --workflow deploy-social-datanode-live.yml --limit 5
+gh run view <run-id> --log
 ```
 
 Vite listens on all network interfaces in this repository, so it prints both a local URL and a network URL in the terminal. Open either URL in a browser.
@@ -574,7 +588,7 @@ Supabase verification:
 - Before starting new repo work, run `git fetch` and then `git pull --ff-only` when the working tree is clean, so local work starts from the latest GitHub state without creating automatic merge commits.
 - Create a commit after repository changes.
 - Do not push automatically after every change; push only when the user asks for it or the release workflow requires it.
-- Commits on `main` are deployed to the primary production site within about 3 minutes after they reach GitHub.
+- Commits on `main` trigger the primary production deploy immediately through GitHub Actions.
 
 ## Current Priorities
 
