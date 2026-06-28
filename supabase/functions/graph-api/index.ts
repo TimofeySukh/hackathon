@@ -841,7 +841,7 @@ async function handleGraphRoutes(req: Request, path: string, auth: AuthContext, 
 
   if (req.method === 'POST' && path === '/v1/search/smart') {
     if (!auth.scopes.has('search:read')) return jsonResponse({ error: 'Missing scope: search:read' }, 403)
-    if (!isAiSearchConfigured()) return jsonResponse({ error: 'AI search is not configured on the server.' }, 503)
+    if (!isAiSearchConfigured()) return jsonResponse({ error: 'AI search is not configured on the server. Set OPENAI_API_KEY for graph-api.' }, 503)
     const query = typeof body.query === 'string' ? body.query.trim() : ''
     if (!query) return jsonResponse({ error: 'query is required.' }, 400)
     const limit = clampSearchLimit(body.limit)
@@ -861,7 +861,7 @@ async function handleGraphRoutes(req: Request, path: string, auth: AuthContext, 
 
   if (req.method === 'POST' && path === '/v1/search/discover') {
     if (!auth.scopes.has('search:read')) return jsonResponse({ error: 'Missing scope: search:read' }, 403)
-    if (!isAiSearchConfigured()) return jsonResponse({ error: 'AI search is not configured on the server.' }, 503)
+    if (!isAiSearchConfigured()) return jsonResponse({ error: 'AI search is not configured on the server. Set OPENAI_API_KEY for graph-api.' }, 503)
     const query = typeof body.query === 'string' ? body.query.trim() : ''
     if (!query) return jsonResponse({ error: 'query is required.' }, 400)
     const perGroupLimit = body.perGroupLimit != null || body.limit != null
@@ -886,7 +886,7 @@ async function handleGraphRoutes(req: Request, path: string, auth: AuthContext, 
 
   if (req.method === 'POST' && path === '/v1/search/discover-lab') {
     if (!auth.scopes.has('search:read')) return jsonResponse({ error: 'Missing scope: search:read' }, 403)
-    if (!isAiSearchConfigured()) return jsonResponse({ error: 'AI search is not configured on the server.' }, 503)
+    if (!isAiSearchConfigured()) return jsonResponse({ error: 'AI search is not configured on the server. Set OPENAI_API_KEY for graph-api.' }, 503)
     const query = typeof body.query === 'string' ? body.query.trim() : ''
     if (!query) return jsonResponse({ error: 'query is required.' }, 400)
     const graph = body.graph

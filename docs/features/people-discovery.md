@@ -40,8 +40,8 @@ Exoskeleton-style split (see [bitgn-ecom1-exoskeleton](https://github.com/muxx/b
 
 | Role | Env | Default | Tasks |
 |------|-----|---------|-------|
-| Helper (nano) | `SEARCH_HELPER_MODEL` + provider key | `gpt-5.4-nano` on OpenAI, `gpt-oss-20b` on Groq | Plan groups, analyze query, **verify** matches |
-| Worker (mini) | `SEARCH_WORKER_MODEL` + provider key | `gpt-5.4-mini` on OpenAI, `gpt-oss-120b` on Groq | Batch **match** candidates |
+| Helper (nano) | `SEARCH_HELPER_MODEL` + `OPENAI_API_KEY` | `gpt-5.4-nano` | Plan groups, analyze query, **verify** matches |
+| Worker (nano) | `SEARCH_WORKER_MODEL` + `OPENAI_API_KEY` | `gpt-5.4-nano` | Batch **match** candidates |
 
 Deterministic validation (code, not LLM):
 
@@ -61,11 +61,9 @@ Target: high recall on tagged eval sets:
 Provider selection:
 
 1. `OPENAI_API_KEY` → helper/worker OpenAI models.
-2. `GROQ_API_KEY` → helper `gpt-oss-20b`, worker `gpt-oss-120b`.
-3. `AI_SEARCH_API_KEY` → NeuralDeep/OpenAI-compatible base URL.
 
-Responses include `llmProviders` so the UI and API callers can see which provider actually
-answered. If only `GROQ_API_KEY` is configured, OpenAI dashboard logs will stay empty.
+Responses include `llmProviders` so the UI and API callers can see which OpenAI role
+answered. Without `OPENAI_API_KEY`, discovery returns `503`.
 
 ## Code
 

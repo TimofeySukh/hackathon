@@ -9,7 +9,7 @@ import {
   type SearchIntent,
 } from './graphSearch.ts'
 import { ensurePersonSearchSummaries } from './searchSummary.ts'
-import { callNeuralDeepIntent } from './interpretSearch.ts'
+import { callOpenAiIntent } from './interpretSearch.ts'
 import { callHelperLlm } from './llmProvider.ts'
 import {
   expandSearchTerms,
@@ -168,7 +168,7 @@ export async function runAgentSearch(graph: GraphState, query: string, limit: nu
       detail: wantMultiple ? `${explanation} (group search)` : explanation,
     })
   } else {
-    const aiIntent = await callNeuralDeepIntent(trimmed, circleNames)
+    const aiIntent = await callOpenAiIntent(trimmed, circleNames)
     if (!aiIntent) {
       throw new Response('AI search could not interpret the query. Check graph-api LLM provider configuration and Edge Function logs.', { status: 502 })
     }

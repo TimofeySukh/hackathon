@@ -6,9 +6,8 @@ export type LlmProvider = {
   model: string
 }
 
-const DEFAULT_NEURALDEEP_BASE = 'https://api.neuraldeep.ru/v1'
-const DEFAULT_GROQ_BASE = 'https://api.groq.com/openai/v1'
 const DEFAULT_OPENAI_BASE = 'https://api.openai.com/v1'
+const DEFAULT_OPENAI_SEARCH_MODEL = 'gpt-5.4-nano'
 
 const GPT_OSS_STRICT = new Set(['openai/gpt-oss-20b', 'openai/gpt-oss-120b'])
 
@@ -35,7 +34,6 @@ function buildProvider(
 export function getHelperLlmProvider(): LlmProvider | null {
   const explicit = envTrim('SEARCH_HELPER_MODEL')
   const openaiKey = envTrim('OPENAI_API_KEY')
-  const groqKey = envTrim('GROQ_API_KEY')
 
   if (openaiKey) {
     return buildProvider(
@@ -43,40 +41,17 @@ export function getHelperLlmProvider(): LlmProvider | null {
       'helper',
       openaiKey,
       envTrim('OPENAI_API_BASE_URL') || DEFAULT_OPENAI_BASE,
-      explicit || envTrim('OPENAI_HELPER_MODEL') || 'gpt-5.4-nano',
-    )
-  }
-
-  if (groqKey) {
-    return buildProvider(
-      'groq-helper',
-      'helper',
-      groqKey,
-      DEFAULT_GROQ_BASE,
-      explicit || 'openai/gpt-oss-20b',
-    )
-  }
-
-  const aiKey = envTrim('AI_SEARCH_API_KEY')
-  if (aiKey) {
-    return buildProvider(
-      'ai-search-helper',
-      'helper',
-      aiKey,
-      envTrim('AI_SEARCH_API_BASE_URL') || DEFAULT_NEURALDEEP_BASE,
-      explicit || envTrim('AI_SEARCH_MODEL') || 'openai/gpt-oss-120b',
+      explicit || envTrim('OPENAI_HELPER_MODEL') || envTrim('OPENAI_MODEL') || DEFAULT_OPENAI_SEARCH_MODEL,
     )
   }
 
   return null
 }
 
-/** Worker (mini): batch matching — stronger model. */
+/** Worker: batch matching. Defaults to the same nano model to keep search on one OpenAI tier. */
 export function getWorkerLlmProvider(): LlmProvider | null {
   const explicit = envTrim('SEARCH_WORKER_MODEL')
-  const groqKey = envTrim('GROQ_API_KEY')
   const openaiKey = envTrim('OPENAI_API_KEY')
-  const aiKey = envTrim('AI_SEARCH_API_KEY')
 
   if (openaiKey) {
     return buildProvider(
@@ -84,27 +59,7 @@ export function getWorkerLlmProvider(): LlmProvider | null {
       'worker',
       openaiKey,
       envTrim('OPENAI_API_BASE_URL') || DEFAULT_OPENAI_BASE,
-      explicit || envTrim('OPENAI_WORKER_MODEL') || envTrim('OPENAI_MODEL') || 'gpt-5.4-mini',
-    )
-  }
-
-  if (groqKey) {
-    return buildProvider(
-      'groq-worker',
-      'worker',
-      groqKey,
-      DEFAULT_GROQ_BASE,
-      explicit || envTrim('GROQ_MODEL') || 'openai/gpt-oss-120b',
-    )
-  }
-
-  if (aiKey) {
-    return buildProvider(
-      'ai-search-worker',
-      'worker',
-      aiKey,
-      envTrim('AI_SEARCH_API_BASE_URL') || DEFAULT_NEURALDEEP_BASE,
-      explicit || envTrim('AI_SEARCH_MODEL') || 'openai/gpt-oss-120b',
+      explicit || envTrim('OPENAI_WORKER_MODEL') || envTrim('OPENAI_MODEL') || DEFAULT_OPENAI_SEARCH_MODEL,
     )
   }
 

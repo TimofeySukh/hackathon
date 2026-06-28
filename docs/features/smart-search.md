@@ -40,9 +40,9 @@ interpret intent and a local ranker to search the graph hierarchy.
   - [`../../supabase/functions/graph-api/graphSearch.ts`](../../supabase/functions/graph-api/graphSearch.ts)
   - [`../../supabase/functions/graph-api/interpretSearch.ts`](../../supabase/functions/graph-api/interpretSearch.ts)
   - [`../../supabase/functions/graph-api/index.ts`](../../supabase/functions/graph-api/index.ts)
-- Providers: OpenAI first when `OPENAI_API_KEY` is set, then Groq, then the
-  `AI_SEARCH_*` OpenAI-compatible provider. LLM interpretation failure is surfaced as
-  an API error so the UI can label local quick matches as fallback.
+- Provider: OpenAI only. `graph-api` requires `OPENAI_API_KEY` for signed-in AI search;
+  helper and worker calls default to `gpt-5.4-nano`. LLM interpretation failure is
+  surfaced as an API error so the UI can label local quick matches as fallback.
 
 ## Open questions / TODO
 

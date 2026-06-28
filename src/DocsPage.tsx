@@ -877,8 +877,8 @@ ${pinnedCmd}`}</code>
               clustered people with normalized map coordinates and profile notes/links for
               the selected matches. The planner must return valid JSON; otherwise the endpoint
               returns an error instead of silently falling back to a single generic group.
-              Requires <code>search:read</code> and an LLM provider secret (<code>OPENAI_API_KEY</code>,
-              <code>GROQ_API_KEY</code>, or <code>AI_SEARCH_API_KEY</code>).
+              Requires <code>search:read</code> and the OpenAI Edge Function secret
+              <code> OPENAI_API_KEY</code>. Graph search uses <code>gpt-5.4-nano</code> by default.
             </p>
 
             <h3>Request Body</h3>

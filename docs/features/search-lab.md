@@ -13,7 +13,7 @@ Visual sandbox for agent search / discovery on **synthetic data**. Use it to try
 
 | Engine | Requirements | Behavior |
 |--------|--------------|----------|
-| **LLM agent** (default when signed in) | Sign in + server `OPENAI_API_KEY`, `GROQ_API_KEY`, or `AI_SEARCH_API_KEY` | Calls `POST /v1/search/discover-lab` with synthetic graph — helper plans, worker matches, helper verifies. Response includes `llmCalls` and `llmProviders`. |
+| **LLM agent** (default when signed in) | Sign in + server `OPENAI_API_KEY` | Calls `POST /v1/search/discover-lab` with synthetic graph — OpenAI `gpt-5.4-nano` plans, matches, and verifies. Response includes `llmCalls` and `llmProviders`. |
 | **Local harness** | None | Deterministic rules in the browser, no network. |
 
 Deploy or serve the updated `graph-api` edge function so `/v1/search/discover-lab` is available locally.

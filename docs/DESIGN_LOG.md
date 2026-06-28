@@ -851,6 +851,15 @@ rediscover, write it here.
 - Why: Match exoskeleton nano/mini split; validate harness at real network scale with
   unlabeled data where ground truth is inferred from LinkedIn Position/Company fields.
 
+## 2026-06-28 — OpenAI nano-only graph search
+
+- Decision: Smart search and discovery now use OpenAI only. Both helper and worker roles
+  default to `gpt-5.4-nano`; `GROQ_API_KEY` and `AI_SEARCH_*` are no longer accepted by
+  `graph-api` for AI search.
+- Why: Service-unavailable states were ambiguous when production lacked a configured
+  provider or fell through older provider chains. One OpenAI model path makes deployment
+  and dashboard observability clear.
+
 ## 2026-06-27 — Large synthetic search bench (~3k)
 
 - Decision: `scripts/lib/synthetic-large-graph.mjs` + `npm run test:agent-search:bench`

@@ -389,30 +389,16 @@ supabase secrets set LINKEDIN_ENRICHMENT_API_KEY=your-linkedin-enrichment-provid
 ```
 
 Required secrets for signed-in natural-language smart search (`POST /v1/search/smart`) and
-people discovery (`POST /v1/search/discover`). The Edge Function chooses providers in order:
-**OpenAI → Groq → AI_SEARCH** for both helper and worker roles (first configured wins for
-each role; role fallbacks are attempted on error).
+people discovery (`POST /v1/search/discover`). The Edge Function uses OpenAI only for
+both helper and worker roles. Set `OPENAI_API_KEY`; without it the API returns `503`.
 
 ```bash
-# OpenAI helper/worker split
 supabase secrets set OPENAI_API_KEY=sk-...
 supabase secrets set OPENAI_HELPER_MODEL=gpt-5.4-nano
-supabase secrets set OPENAI_WORKER_MODEL=gpt-5.4-mini
-
-# Or Groq GPT-OSS 120B (fast, good group matching)
-supabase secrets set GROQ_API_KEY=gsk_...
-
-# Or NeuralDeep (OpenAI-compatible, hosts GPT-OSS 120B in RF)
-supabase secrets set AI_SEARCH_API_KEY=your-neuraldeep-sk-key
-supabase secrets set AI_SEARCH_API_BASE_URL=https://api.neuraldeep.ru/v1
-supabase secrets set AI_SEARCH_MODEL=openai/gpt-oss-120b
-
+supabase secrets set OPENAI_WORKER_MODEL=gpt-5.4-nano
 ```
 
-Provider docs: [NeuralDeep](https://neuraldeep.ru/docs), [Groq](https://console.groq.com/docs).
 For local `supabase functions serve`, export the same vars in your shell or `.env.local`.
-If only `GROQ_API_KEY` or `AI_SEARCH_API_KEY` is configured, OpenAI dashboard logs will not
-show these calls.
 
 Redeploy `graph-api` after setting secrets:
 

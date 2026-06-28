@@ -49,7 +49,7 @@ export function isAiSearchConfigured() {
   return isLlmConfigured()
 }
 
-export async function callNeuralDeepIntent(query: string, circleNames: string[]): Promise<SearchIntent | null> {
+export async function callOpenAiIntent(query: string, circleNames: string[]): Promise<SearchIntent | null> {
   const config = getAiSearchConfig()
   if (!config) return null
 
@@ -85,7 +85,7 @@ export async function interpretSearchQuery(graph: GraphState, query: string): Pr
   const trimmed = query.trim()
   const localIntent = buildSearchIntentFromQuery(trimmed)
   const circleNames = graph.circles.map((circle) => circle.name).filter(Boolean)
-  const aiIntent = await callNeuralDeepIntent(trimmed, circleNames)
+  const aiIntent = await callOpenAiIntent(trimmed, circleNames)
   if (aiIntent) {
     return { intent: aiIntent, source: 'ai' }
   }
