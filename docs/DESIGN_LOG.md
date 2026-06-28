@@ -17,12 +17,14 @@ rediscover, write it here.
 
 ## Entries
 
-### 2026-06-28 — Demo Lead Search Output Uses Report UI
+### 2026-06-28 — Demo Customer Network Lead Search Uses Report UI
 
-- Decision: the prepared agent demo now targets second-degree retail lead search and
-  renders as a structured report with metric tiles, a prioritized lead table, mutual
-  connections, LinkedIn/email fields, priority rationale, and fake email-generation
-  buttons for first-degree intros and second-degree outreach.
+- Decision: the prepared agent demo now targets expansion from a just-closed customer:
+  analyze the customer's LinkedIn/network circle and find likely retail apple buyers
+  there. It renders as a structured report with metric tiles, the closed customer, a
+  prioritized lead table, clickable LinkedIn/email fields, customer-circle relationship
+  evidence, priority rationale, and fake email-generation buttons for an intro request to
+  the closed customer and direct buyer outreach.
 - Why: the zero-to-demo flow is meant for a presentation video, so the first response
   needs to be visually scannable on camera.
 
@@ -37,9 +39,10 @@ rediscover, write it here.
 ### 2026-06-28 — Prepared Agent Referral Demo
 
 - Decision: agent chat now includes a local deterministic zero-to-demo lead-search
-  scenario for a farm apple-sales prompt. It returns prepared LinkedIn-style counts,
-  fabricated second-degree retail buyers, mutual connections, contact details, and email
-  draft actions without calling OpenRouter or any graph/API/MCP data source.
+  scenario for a farm apple-sales prompt after a closed customer deal. It returns prepared
+  LinkedIn-style counts, fabricated retail buyers inside that customer's circle,
+  relationship evidence, contact details, and email draft actions without calling
+  OpenRouter or any graph/API/MCP data source.
 - Why: the current product direction needs a fast video-demo pipeline while real graph
   reasoning and LinkedIn data integration remain out of scope for this change.
 

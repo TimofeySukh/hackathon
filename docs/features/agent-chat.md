@@ -20,15 +20,17 @@ providers, MCP tools, and board context.
   - message composer
   - starter prompt chips
   - live replies through OpenRouter `openrouter/free` when `VITE_OPENROUTER_API_KEY` is set
-- A deterministic zero-to-demo second-degree lead-search scenario is available without OpenRouter:
-  - when the user asks as a farm sales director selling apples and asks for second-degree
-    people who work at stores, the chat returns a prepared sales-intelligence answer
-  - the prepared answer fabricates the demo data: 14,892 second-degree profiles scanned,
-    1,086 store and retail operators, and 8 priority retail buyers
+- A deterministic zero-to-demo customer-network lead-search scenario is available without OpenRouter:
+  - when the user says they closed an apple deal with a customer and asks to analyze that
+    customer's LinkedIn/network circle for more likely store or grocery buyers, the chat
+    returns a prepared sales-intelligence answer
+  - the prepared answer fabricates the demo data: 1,273 connections in the closed
+    customer's circle, 276 retail/grocery profiles, and 8 priority retail buyers
   - the prepared answer renders as a structured report with metric tiles, a best-path
-    callout, a prioritized lead table with LinkedIn, email, mutual connection, company,
-    and priority rationale, plus fake email-generation buttons for first-degree intro and
-    second-degree direct outreach drafts
+    callout, the closed customer, a prioritized lead table with clickable LinkedIn/email
+    fields, connection evidence inside the customer's circle, company, and priority
+    rationale, plus fake email-generation buttons for an intro request to the closed
+    customer and direct outreach to the buyer
   - this path is for video/demo flow only and does not read the board graph, LinkedIn, API,
     CLI, MCP, or OpenRouter
 - Board graph state and chat history are not linked yet.
