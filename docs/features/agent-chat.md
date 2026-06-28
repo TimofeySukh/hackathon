@@ -32,6 +32,12 @@ providers, MCP tools, and board context.
     fields, connection evidence inside the customer's circle, company, and priority
     rationale, plus fake email-generation buttons for an intro request to the closed
     customer and direct outreach to the buyer
+  - before the report appears, the demo runs a ~10 second staged thinking sequence
+    rendered as separate agent chat messages with a spinner on the active step and a
+    checkmark on completed steps; the sequence auto-collapses into an expandable summary
+    when the report starts streaming
+  - the report itself streams in locally: intro text types out token-by-token, then
+    sections and table rows reveal progressively instead of appearing all at once
   - this path is for video/demo flow only and does not read the board graph, LinkedIn, API,
     CLI, MCP, or OpenRouter
 - Board graph state and chat history are not linked yet.

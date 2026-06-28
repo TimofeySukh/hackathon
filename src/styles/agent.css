@@ -304,6 +304,7 @@
 
 .agent-message--demo {
   width: 100%;
+  animation: agentDemoReportIn 0.52s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .agent-message--demo .agent-message__bubble {
@@ -355,6 +356,238 @@
 
 .agent-message--demo .agent-message__meta {
   margin: 14px 16px 0;
+}
+
+.agent-demo-thinking-block {
+  display: grid;
+  gap: 16px;
+}
+
+.agent-message--thinking-step {
+  animation: agentThinkingMessageIn 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.agent-message--thinking-step.is-done .agent-demo-thinking-check {
+  animation: agentDemoCheckPop 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.agent-demo-thinking-summary-enter {
+  animation: agentThinkingSummaryIn 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.agent-demo-thinking-summary-enter .agent-demo-thinking-toggle {
+  animation: agentDemoReveal 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.agent-demo-thinking-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  color: var(--md-on-surface);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.55;
+}
+
+.agent-demo-thinking-step__icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  color: var(--md-primary);
+}
+
+.agent-demo-thinking-spinner {
+  width: 18px;
+  height: 18px;
+  animation: agentDemoThinkingSpin 0.9s linear infinite;
+}
+
+.agent-demo-thinking-check {
+  width: 16px;
+  height: 16px;
+  color: var(--md-primary);
+}
+
+.agent-message--thinking-collapsed .agent-message__logo {
+  visibility: hidden;
+}
+
+.agent-demo-thinking-toggle {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  gap: 2px 10px;
+  width: 100%;
+  max-width: min(560px, 88%);
+  padding: 12px 14px;
+  border: none;
+  border-radius: var(--md-r-md);
+  background: var(--md-surface-container);
+  box-shadow: var(--md-elev-1);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--md-dur-short) var(--md-ease-standard),
+    box-shadow var(--md-dur-short) var(--md-ease-standard);
+}
+
+.agent-demo-thinking-toggle:hover {
+  background: color-mix(in srgb, var(--md-surface-container) 88%, var(--md-primary-container));
+}
+
+.agent-demo-thinking-toggle .agent-message__meta {
+  grid-column: 1 / -1;
+  margin-bottom: 4px;
+}
+
+.agent-demo-thinking-toggle__title {
+  color: var(--md-on-surface);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.agent-demo-thinking-toggle__meta {
+  color: var(--md-on-surface-variant);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.agent-demo-thinking-toggle__chevron {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  align-self: center;
+  width: 18px;
+  height: 18px;
+  color: var(--md-on-surface-variant);
+  transition: transform var(--md-dur-short) var(--md-ease-standard);
+}
+
+.agent-demo-thinking-toggle__chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.agent-demo-thinking-toggle.is-inline {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto;
+  align-items: center;
+}
+
+.agent-demo-thinking-toggle.is-inline .agent-demo-thinking-toggle__chevron {
+  grid-row: auto;
+}
+
+@keyframes agentDemoThinkingSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.agent-demo-stream {
+  margin: 0;
+  color: var(--md-on-surface);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.agent-demo-stream__cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--md-primary);
+  animation: agentDemoCursorBlink 0.9s step-end infinite;
+}
+
+.agent-demo-reveal {
+  animation: agentDemoReveal 0.46s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.agent-demo-result__status--pending {
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+@keyframes agentDemoCursorBlink {
+  0%, 100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes agentDemoReveal {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes agentThinkingMessageIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes agentThinkingSummaryIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes agentDemoCheckPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+
+  70% {
+    transform: scale(1.08);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes agentDemoReportIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .agent-demo-result {
@@ -657,6 +890,8 @@
 .agent-demo-table th:nth-child(1),
 .agent-demo-table td:nth-child(1) {
   width: 92px;
+  text-align: center;
+  vertical-align: middle;
 }
 
 .agent-demo-table th:nth-child(2),
@@ -689,7 +924,7 @@
 }
 
 .agent-demo-table td strong,
-.agent-demo-table td span {
+.agent-demo-table td span:not(.agent-demo-priority) {
   display: block;
 }
 
@@ -750,16 +985,19 @@
 }
 
 .agent-demo-priority {
-  display: grid;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 68px;
+  box-sizing: border-box;
+  width: 80px;
   max-width: calc(100% - 2px);
   min-height: 24px;
-  padding: 0 5px;
+  padding: 0 6px;
   border-radius: var(--md-r-full);
   font-size: 11px;
   font-weight: 800;
+  line-height: 1;
+  text-align: center;
   white-space: nowrap;
 }
 
@@ -869,14 +1107,16 @@
 }
 
 .agent-composer__shell {
+  --agent-composer-radius: 24px;
+
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 4px;
   width: 100%;
   min-height: 48px;
   max-height: 168px;
   padding: 4px 4px 4px 16px;
-  border-radius: var(--md-r-full);
+  border-radius: var(--agent-composer-radius);
   background: var(--md-surface-container);
   box-shadow: var(--md-elev-2);
   transition: box-shadow var(--md-dur-short) var(--md-ease-standard);
@@ -913,10 +1153,9 @@
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  align-self: flex-end;
   width: 40px;
   height: 40px;
-  margin-bottom: 0;
+  margin-bottom: 3px;
   border: none;
   border-radius: var(--md-r-full);
   background: var(--md-surface-container-highest);
