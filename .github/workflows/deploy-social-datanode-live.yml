@@ -1,0 +1,43 @@
+name: Deploy social.datanode.live
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: social-datanode-live-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger server deploy
+        env:
+          DEPLOY_HOST: ${{ secrets.SOCIAL_DATANODE_DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.SOCIAL_DATANODE_DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.SOCIAL_DATANODE_DEPLOY_USER }}
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.SOCIAL_DATANODE_DEPLOY_SSH_PRIVATE_KEY }}
+        run: |
+          set -Eeuo pipefail
+
+          : "${DEPLOY_HOST:?SOCIAL_DATANODE_DEPLOY_HOST secret is required}"
+          : "${DEPLOY_USER:?SOCIAL_DATANODE_DEPLOY_USER secret is required}"
+          : "${DEPLOY_SSH_PRIVATE_KEY:?SOCIAL_DATANODE_DEPLOY_SSH_PRIVATE_KEY secret is required}"
+
+          port="${DEPLOY_PORT:-22}"
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > "$HOME/.ssh/social-datanode-live"
+          chmod 600 "$HOME/.ssh/social-datanode-live"
+          ssh-keyscan -p "$port" -H "$DEPLOY_HOST" >> "$HOME/.ssh/known_hosts"
+
+          ssh \
+            -i "$HOME/.ssh/social-datanode-live" \
+            -p "$port" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            'BRANCH=main ~/.local/bin/social-datanode-live-autodeploy'
