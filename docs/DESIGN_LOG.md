@@ -17,6 +17,15 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-28 — Demo Lead Search Output Uses Report UI
+
+- Decision: the prepared agent demo now targets second-degree retail lead search and
+  renders as a structured report with metric tiles, a prioritized lead table, mutual
+  connections, LinkedIn/email fields, priority rationale, and fake email-generation
+  buttons for first-degree intros and second-degree outreach.
+- Why: the zero-to-demo flow is meant for a presentation video, so the first response
+  needs to be visually scannable on camera.
+
 ### 2026-06-28 — Hide Database Load Failure During Demo
 
 - Decision: when a signed-in board fails to load from Supabase, the app now falls back to
@@ -27,10 +36,10 @@ rediscover, write it here.
 
 ### 2026-06-28 — Prepared Agent Referral Demo
 
-- Decision: agent chat now includes a local deterministic zero-to-demo referral scenario
-  for a farm apple-sales prompt. It returns prepared LinkedIn-style counts, 9 fabricated
-  referral prospects, and a customer referral email draft without calling OpenRouter or
-  any graph/API/MCP data source.
+- Decision: agent chat now includes a local deterministic zero-to-demo lead-search
+  scenario for a farm apple-sales prompt. It returns prepared LinkedIn-style counts,
+  fabricated second-degree retail buyers, mutual connections, contact details, and email
+  draft actions without calling OpenRouter or any graph/API/MCP data source.
 - Why: the current product direction needs a fast video-demo pipeline while real graph
   reasoning and LinkedIn data integration remain out of scope for this change.
 
