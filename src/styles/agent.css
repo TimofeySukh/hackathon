@@ -63,20 +63,6 @@
   pointer-events: auto;
 }
 
-.agent-model-chip {
-  display: inline-flex;
-  align-items: center;
-  min-height: 48px;
-  padding: 0 16px;
-  border-radius: var(--md-r-full);
-  background: var(--md-surface-container);
-  box-shadow: var(--md-elev-2);
-  color: var(--md-on-surface-variant);
-  font-size: 13px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
 .agent-sidebar {
   position: absolute;
   z-index: 11;

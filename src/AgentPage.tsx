@@ -3,7 +3,6 @@ import sdnLogo from './assets/sdn-logo.svg'
 import WorkspaceModeToggle from './components/WorkspaceModeToggle'
 import {
   completeOpenRouterChat,
-  getOpenRouterModelLabel,
   isOpenRouterConfigured,
   type OpenRouterChatMessage,
 } from './lib/openRouterChat'
@@ -368,7 +367,6 @@ export default function AgentPage({ onSwitchToBoard }: AgentPageProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const requestAbortRef = useRef<AbortController | null>(null)
   const openRouterReady = isOpenRouterConfigured()
-  const modelLabel = getOpenRouterModelLabel()
   const isDemoDraft = isDemoReferralPrompt(draft)
 
   const activeThread = useMemo(
@@ -435,7 +433,7 @@ export default function AgentPage({ onSwitchToBoard }: AgentPageProps) {
 
     const isDemoPrompt = isDemoReferralPrompt(content)
     if (!isDemoPrompt && !openRouterReady) {
-      setChatError('Add VITE_OPENROUTER_API_KEY to .env.local, then restart the dev server.')
+      setChatError('This demo is prepared for the customer-network buyer search prompt.')
       return
     }
 
@@ -481,7 +479,7 @@ export default function AgentPage({ onSwitchToBoard }: AgentPageProps) {
       appendMessage(activeThread.id, {
         id: createId('msg'),
         role: 'assistant',
-        content: `Sorry, I could not reach OpenRouter.\n\n${message}`,
+        content: `Sorry, the live chat fallback is unavailable.\n\n${message}`,
         createdAt: Date.now(),
       })
     } finally {
@@ -511,9 +509,7 @@ export default function AgentPage({ onSwitchToBoard }: AgentPageProps) {
             onSwitchToAgent={() => undefined}
           />
         </div>
-        <div className="agent-toolbar__right">
-          <span className="agent-model-chip">{modelLabel}</span>
-        </div>
+        <div className="agent-toolbar__right" />
       </header>
 
       <aside className="agent-sidebar" aria-label="Chat history">
@@ -543,7 +539,7 @@ export default function AgentPage({ onSwitchToBoard }: AgentPageProps) {
           </nav>
 
           <p className="agent-sidebar__note">
-            Demo customer-network buyer search is prepared locally. Other chats use OpenRouter when configured.
+            Demo customer-network buyer search is prepared locally.
           </p>
       </aside>
 

@@ -20,6 +20,7 @@ providers, MCP tools, and board context.
   - message composer
   - starter prompt chips
   - live replies through OpenRouter `openrouter/free` when `VITE_OPENROUTER_API_KEY` is set
+  - the visible demo UI does not show provider/model badges
 - A deterministic zero-to-demo customer-network lead-search scenario is available without OpenRouter:
   - when the user says they closed an apple deal with a customer and asks to analyze that
     customer's LinkedIn/network circle for more likely store or grocery buyers, the chat
