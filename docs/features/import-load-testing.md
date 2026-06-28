@@ -83,8 +83,9 @@ npm run test:ui-import:persistence
 ```
 
 This uses a mock Supabase graph API on localhost plus `VITE_E2E_FAKE_AUTH=true`. It verifies
-that LinkedIn ZIP import and graph JSON import write through the signed-in persistence path
-and survive a page reload without touching production data.
+that LinkedIn ZIP import and graph JSON import write through the signed-in persistence path,
+survive a page reload, and can replace the graph even after an initial graph load failure,
+without touching production data.
 
 Useful overrides:
 

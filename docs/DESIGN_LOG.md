@@ -23,7 +23,9 @@ rediscover, write it here.
   with dev-only fake auth and a localhost mock Supabase graph API.
 - Why: import persistence bugs must be reproducible locally. The test covers LinkedIn ZIP
   import, graph JSON import, signed-in graph replacement writes, and reload persistence
-  without touching production Supabase.
+  without touching production Supabase. It also covers replacing the saved graph after an
+  initial graph load failure, matching the failure mode where a large or bad saved graph
+  blocks imports by leaving the browser without a loaded revision.
 - Decision: graph API catch-all errors now format structured error objects instead of
   returning a generic "Unexpected graph API error."
 

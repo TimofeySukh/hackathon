@@ -56,6 +56,8 @@ function startMockGraphApi({ port }) {
     revision: null,
     writes: 0,
     reads: 0,
+    metaReads: 0,
+    failGraphReads: 0,
   }
 
   const server = http.createServer(async (request, response) => {
@@ -67,13 +69,32 @@ function startMockGraphApi({ port }) {
 
       const url = new URL(request.url ?? '/', `http://127.0.0.1:${port}`)
       const isGraphRoute = url.pathname === '/functions/v1/graph-api/v1/graph'
-      if (!isGraphRoute) {
+      const isGraphMetaRoute = url.pathname === '/functions/v1/graph-api/v1/graph/meta'
+      if (!isGraphRoute && !isGraphMetaRoute) {
         jsonResponse(response, 404, { error: `Unhandled mock route: ${request.method} ${url.pathname}` })
+        return
+      }
+
+      if (request.method === 'GET' && isGraphMetaRoute) {
+        state.metaReads += 1
+        jsonResponse(response, 200, {
+          revision: state.revision,
+          counts: {
+            circles: state.graph?.circles?.length ?? 0,
+            people: state.graph?.people?.length ?? 0,
+            connections: state.graph?.connections?.length ?? 0,
+          },
+        })
         return
       }
 
       if (request.method === 'GET') {
         state.reads += 1
+        if (state.failGraphReads > 0) {
+          state.failGraphReads -= 1
+          jsonResponse(response, 500, { error: 'Simulated graph load failure.' })
+          return
+        }
         jsonResponse(response, 200, { graph: state.graph, revision: state.revision })
         return
       }
@@ -349,11 +370,45 @@ async function main() {
       throw new Error('Graph import did not survive reload in mock persistence.')
     }
 
+    mock.state.graph = buildGraphImportFixture()
+    mock.state.revision = 10
+    mock.state.failGraphReads = 1
+    const failedLoadPage = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
+    await failedLoadPage.addInitScript(() => {
+      window.localStorage.clear()
+      window.localStorage.setItem('social-onboarding-done-v1', '1')
+    })
+    await failedLoadPage.goto(`${vite.url}/#board`, { waitUntil: 'networkidle' })
+    await failedLoadPage.getByLabel('Settings', { exact: true }).waitFor({ timeout: 10000 })
+    await failedLoadPage.getByLabel('Settings', { exact: true }).click()
+    const replacementGraph = buildGraphImportFixture()
+    replacementGraph.people[0].id = 'replaced-after-load-failure'
+    replacementGraph.people[0].name = 'Replaced After Load Failure'
+    const replacementMessage = await uploadAndAcceptDialog(
+      failedLoadPage,
+      failedLoadPage.locator('input[type="file"][accept="application/json,.json"]'),
+      {
+        name: 'graph-replace-after-load-failure.json',
+        mimeType: 'application/json',
+        buffer: Buffer.from(`${JSON.stringify(replacementGraph)}\n`),
+      },
+    )
+
+    if (mock.state.graph?.people?.[0]?.id !== 'replaced-after-load-failure') {
+      throw new Error('Graph import after failed initial load did not replace the saved graph.')
+    }
+    if (mock.state.revision !== 11) {
+      throw new Error(`Expected retry write to advance revision to 11, got ${mock.state.revision}.`)
+    }
+    await failedLoadPage.close()
+
     console.log(JSON.stringify({
       zipMessage,
       graphMessage,
+      replacementMessage,
       revision: mock.state.revision,
       reads: mock.state.reads,
+      metaReads: mock.state.metaReads,
       writes: mock.state.writes,
       finalCounts: {
         circles: mock.state.graph.circles.length,

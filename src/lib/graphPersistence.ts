@@ -13,9 +13,12 @@ export type LoadedGraphRecord = {
 }
 
 export class GraphRevisionConflictError extends Error {
-  constructor() {
+  revision: number | null
+
+  constructor(revision: number | null = null) {
     super('Your board changed somewhere else. Reload before saving again.')
     this.name = 'GraphRevisionConflictError'
+    this.revision = revision
   }
 }
 
@@ -86,9 +89,34 @@ async function writeGraphThroughApi(graph: GraphState, expectedRevision: number 
   const payload = await parseJsonResponse(response)
   if (!response.ok) {
     if (response.status === 409) {
-      throw new GraphRevisionConflictError()
+      const revision = typeof (payload as { revision?: unknown } | null)?.revision === 'number'
+        ? (payload as { revision: number }).revision
+        : null
+      throw new GraphRevisionConflictError(revision)
     }
     throw new GraphPersistenceError('Failed to save your board', payload ?? { message: response.statusText, code: String(response.status) })
+  }
+
+  return payload as { revision?: unknown } | null
+}
+
+async function readGraphMetaThroughApi() {
+  const baseUrl = getSupabaseFunctionUrl('graph-api')
+  const accessToken = await getAccessToken()
+  if (!baseUrl || !accessToken) {
+    throw new GraphPersistenceError('Failed to load your board revision', 'Supabase session is not available.')
+  }
+
+  const response = await fetch(`${baseUrl}/v1/graph/meta`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: 'application/json',
+    },
+  })
+  const payload = await parseJsonResponse(response)
+
+  if (!response.ok) {
+    throw new GraphPersistenceError('Failed to load your board revision', payload ?? { message: response.statusText, code: String(response.status) })
   }
 
   return payload as { revision?: unknown } | null
@@ -142,8 +170,14 @@ export async function loadGraph(userId: string): Promise<GraphState | null> {
 }
 
 export async function loadGraphRecord(userId: string): Promise<LoadedGraphRecord> {
-  if (isE2EFakeAuth) return await readGraphThroughApi()
   if (!supabase) return { graph: null, revision: null, source: 'empty' }
+
+  try {
+    return await readGraphThroughApi()
+  } catch (apiError) {
+    if (isE2EFakeAuth) throw apiError
+    console.warn('Failed to load graph through graph API, falling back to direct Supabase read.', apiError)
+  }
 
   const { data, error } = await supabase
     .from('user_graphs')
@@ -168,8 +202,19 @@ export async function loadGraphRecord(userId: string): Promise<LoadedGraphRecord
 export async function saveGraph(userId: string, graph: GraphState, expectedRevision: number | null): Promise<number | null> {
   if (!supabase) return expectedRevision
   void userId
-  const data = await writeGraphThroughApi(graph, expectedRevision)
-  return typeof data?.revision === 'number' ? data.revision : expectedRevision === null ? 1 : expectedRevision + 1
+  let data: { revision?: unknown } | null
+  let savedFromRevision = expectedRevision
+  try {
+    data = await writeGraphThroughApi(graph, expectedRevision)
+  } catch (error) {
+    if (!(error instanceof GraphRevisionConflictError) || expectedRevision !== null) throw error
+    const meta = await readGraphMetaThroughApi()
+    const latestRevision = typeof meta?.revision === 'number' ? meta.revision : error.revision
+    if (latestRevision === null) throw error
+    savedFromRevision = latestRevision
+    data = await writeGraphThroughApi(graph, latestRevision)
+  }
+  return typeof data?.revision === 'number' ? data.revision : savedFromRevision === null ? 1 : savedFromRevision + 1
 }
 
 // ---- Local (signed-out) persistence ----------------------------------------
