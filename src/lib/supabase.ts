@@ -5,6 +5,10 @@ const supabaseKey =
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseKey)
+export const isE2EFakeAuth =
+  import.meta.env.DEV && import.meta.env.VITE_E2E_FAKE_AUTH === 'true'
+export const e2eFakeUserId = import.meta.env.VITE_E2E_FAKE_USER_ID || 'local-e2e-user'
+export const e2eFakeAccessToken = import.meta.env.VITE_E2E_FAKE_ACCESS_TOKEN || 'local-e2e-token'
 
 export function getSupabaseFunctionUrl(functionName: string) {
   if (!supabaseUrl) return null

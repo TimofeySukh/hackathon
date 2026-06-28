@@ -1,4 +1,4 @@
-import { getSupabaseFunctionUrl, supabase } from './supabase'
+import { e2eFakeAccessToken, getSupabaseFunctionUrl, isE2EFakeAuth, supabase } from './supabase'
 import type { GraphState } from './board/types'
 
 // The whole canvas graph lives in a single jsonb column keyed by user id.
@@ -49,6 +49,7 @@ function formatPersistenceError(error: unknown): string {
 }
 
 async function getAccessToken() {
+  if (isE2EFakeAuth) return e2eFakeAccessToken
   if (!supabase) return null
   const { data, error } = await supabase.auth.getSession()
   if (error) throw new GraphPersistenceError('Failed to read your auth session', error)
@@ -93,6 +94,34 @@ async function writeGraphThroughApi(graph: GraphState, expectedRevision: number 
   return payload as { revision?: unknown } | null
 }
 
+async function readGraphThroughApi(): Promise<LoadedGraphRecord> {
+  const baseUrl = getSupabaseFunctionUrl('graph-api')
+  const accessToken = await getAccessToken()
+  if (!baseUrl || !accessToken) {
+    throw new GraphPersistenceError('Failed to load your board', 'Supabase session is not available.')
+  }
+
+  const response = await fetch(`${baseUrl}/v1/graph`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: 'application/json',
+    },
+  })
+  const payload = await parseJsonResponse(response)
+
+  if (!response.ok) {
+    throw new GraphPersistenceError('Failed to load your board', payload ?? { message: response.statusText, code: String(response.status) })
+  }
+
+  const data = payload as { graph?: unknown; revision?: unknown } | null
+  const graph = isGraphState(data?.graph) ? data.graph : null
+  return {
+    graph,
+    revision: typeof data?.revision === 'number' ? data.revision : null,
+    source: graph ? 'saved' : 'empty',
+  }
+}
+
 function isGraphState(value: unknown): value is GraphState {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Record<string, unknown>
@@ -113,6 +142,7 @@ export async function loadGraph(userId: string): Promise<GraphState | null> {
 }
 
 export async function loadGraphRecord(userId: string): Promise<LoadedGraphRecord> {
+  if (isE2EFakeAuth) return await readGraphThroughApi()
   if (!supabase) return { graph: null, revision: null, source: 'empty' }
 
   const { data, error } = await supabase
