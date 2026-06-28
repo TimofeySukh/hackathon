@@ -399,6 +399,9 @@ supabase secrets set OPENAI_WORKER_MODEL=gpt-5.4-nano
 ```
 
 For local `supabase functions serve`, export the same vars in your shell or `.env.local`.
+This checkout's `.env.local` is the expected local place for `OPENAI_API_KEY` and may
+also contain `GROQ_API_KEY`; ad hoc shell commands do not automatically inherit those
+values unless the file is explicitly loaded.
 
 Redeploy `graph-api` after setting secrets:
 
