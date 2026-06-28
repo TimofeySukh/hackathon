@@ -10,6 +10,8 @@ providers, MCP tools, and board context.
 
 - On the board (`#board`), a top-left **Agent** pill switches to agent mode.
 - In agent mode, a top-left **Board** pill switches back to the board.
+- Agent mode is a full-screen overlay; the board stays mounted underneath so pan/zoom
+  listeners and canvas state survive the switch (do not early-return out of the board tree).
 - The last selected workspace mode persists in `localStorage`
   (`datanode.workspaceMode`).
 - Agent mode is standalone for now:
@@ -32,8 +34,9 @@ VITE_OPENROUTER_API_KEY=sk-or-v1-...
 VITE_OPENROUTER_MODEL=openrouter/free
 ```
 
-Restart `npm run dev` after changing env vars. The key is read in the browser for now;
-move it to a Supabase Edge Function secret before production.
+Production build env lives in `~/apps/social-datanode-live-autodeploy/deploy.env` on the
+deploy host (`VITE_OPENROUTER_API_KEY`, `VITE_OPENROUTER_MODEL`). Nginx CSP must allow
+`https://openrouter.ai` in `connect-src` (see `deploy/social-datanode-live/nginx.conf`).
 
 ## Design
 
@@ -55,7 +58,7 @@ Inspired by the board/docs Material 3 shell:
 
 ## Open questions / TODO
 
-- Move OpenRouter calls behind a Supabase Edge Function before production deploy.
+- Move OpenRouter calls behind a Supabase Edge Function so the API key is not in the JS bundle.
 - Switch from OpenRouter test key to Claude when ready.
 - Connect agent tools to the existing graph API / MCP server.
 - Pass board context (selected person, search results) into agent prompts.

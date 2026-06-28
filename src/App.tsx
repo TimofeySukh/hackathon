@@ -3957,16 +3957,8 @@ Content-Type: application/json
     return <DocsPage />
   }
 
-  if (workspaceMode === 'agent') {
-    return (
-      <div className="app-shell">
-        <AgentPage onSwitchToBoard={switchToBoardMode} />
-      </div>
-    )
-  }
-
   return (
-    <main className={`app-shell ${searchOpen ? 'is-search-open' : ''} ${showSettings ? 'is-settings-open' : ''} ${selectedItem ? 'is-inspector-open' : ''}`}>
+    <main className={`app-shell ${searchOpen ? 'is-search-open' : ''} ${showSettings ? 'is-settings-open' : ''} ${selectedItem ? 'is-inspector-open' : ''} ${workspaceMode === 'agent' ? 'is-agent-mode' : ''}`}>
       {graphLoadError && (
         <div style={{
           position: 'absolute',
@@ -5729,7 +5721,7 @@ Content-Type: application/json
         </div>
       )}
 
-      {graphLoaded && onboardingStep >= 0 && (
+      {graphLoaded && onboardingStep >= 0 && workspaceMode !== 'agent' && (
         <OnboardingCoach
           step={onboardingStep}
           celebrating={onboardingCelebrating}
@@ -5747,6 +5739,12 @@ Content-Type: application/json
           }}
           offset={onboardingOffset}
         />
+      )}
+
+      {workspaceMode === 'agent' && (
+        <div className="agent-workspace-overlay">
+          <AgentPage onSwitchToBoard={switchToBoardMode} />
+        </div>
       )}
     </main>
   )

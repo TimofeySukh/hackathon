@@ -1,5 +1,24 @@
 /* Agent chat — floating board chrome over the same dotted grid as the graph. */
 
+/* Keep the board mounted underneath; unmounting breaks native wheel listeners and
+   forces a full graph/canvas re-init when switching back. */
+.agent-workspace-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 200;
+  background: var(--md-surface);
+}
+
+.app-shell.is-agent-mode .toolbar,
+.app-shell.is-agent-mode .graph-surface,
+.app-shell.is-agent-mode .inspector,
+.app-shell.is-agent-mode .settings-panel,
+.app-shell.is-agent-mode .create-menu,
+.app-shell.is-agent-mode .linkedin-guide-panel {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .agent-shell {
   --agent-sidebar-width: min(280px, calc(100vw - 32px));
   --agent-sidebar-gap: 12px;
