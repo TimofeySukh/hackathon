@@ -15,9 +15,12 @@ import sdnLogo from './assets/sdn-logo.svg'
 zip.configure({ useWebWorkers: false })
 import { useAuth } from './lib/useAuth'
 import LandingPage from './LandingPage'
+import AgentPage from './AgentPage'
 import ContactPage from './ContactPage'
 import PrivacyPage from './PrivacyPage'
 import DocsPage from './DocsPage'
+import WorkspaceModeToggle from './components/WorkspaceModeToggle'
+import { readWorkspaceMode, writeWorkspaceMode, type WorkspaceMode } from './lib/workspaceMode'
 import { createAgentToken, getGraphApiBaseUrl, listAgentTokens, revokeAgentToken } from './lib/agentApi'
 import type { AgentScope, AgentTokenRecord } from './lib/agentApi'
 import { supabase } from './lib/supabase'
@@ -503,6 +506,17 @@ function App() {
     if (window.location.hash === '#privacy') return 'privacy';
     return 'landing';
   });
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>(() => readWorkspaceMode());
+
+  const switchToAgentMode = () => {
+    setWorkspaceMode('agent');
+    writeWorkspaceMode('agent');
+  };
+
+  const switchToBoardMode = () => {
+    setWorkspaceMode('board');
+    writeWorkspaceMode('board');
+  };
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -3943,6 +3957,14 @@ Content-Type: application/json
     return <DocsPage />
   }
 
+  if (workspaceMode === 'agent') {
+    return (
+      <div className="app-shell">
+        <AgentPage onSwitchToBoard={switchToBoardMode} />
+      </div>
+    )
+  }
+
   return (
     <main className={`app-shell ${searchOpen ? 'is-search-open' : ''} ${showSettings ? 'is-settings-open' : ''} ${selectedItem ? 'is-inspector-open' : ''}`}>
       {graphLoadError && (
@@ -3981,7 +4003,15 @@ Content-Type: application/json
           </button>
         </div>
       )}
-      <div className="toolbar" aria-label="Graph controls" style={{ justifyContent: 'flex-end' }}>
+      <div className="toolbar" aria-label="Graph controls">
+        <div className="toolbar__left">
+          <WorkspaceModeToggle
+            mode="board"
+            onSwitchToBoard={switchToBoardMode}
+            onSwitchToAgent={switchToAgentMode}
+          />
+        </div>
+        <div className="toolbar__right">
         <div
           ref={searchPanelRef}
           className={`search-box ${searchOpen ? 'is-open' : ''} ${isAiSearchActive ? 'is-ai-search' : ''}`}
@@ -4179,6 +4209,7 @@ Content-Type: application/json
               </span>
             )}
           </button>
+        </div>
         </div>
       </div>
 

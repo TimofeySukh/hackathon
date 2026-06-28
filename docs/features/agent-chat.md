@@ -1,0 +1,62 @@
+# Agent Chat Mode
+
+## Purpose
+
+Give users a dedicated agent workspace alongside the relationship board. The first
+version ships an Open WebUI-inspired chat shell that can later connect to LLM
+providers, MCP tools, and board context.
+
+## Behavior
+
+- On the board (`#board`), a top-left **Agent** pill switches to agent mode.
+- In agent mode, a top-left **Board** pill switches back to the board.
+- The last selected workspace mode persists in `localStorage`
+  (`datanode.workspaceMode`).
+- Agent mode is standalone for now:
+  - sidebar chat list
+  - new chat
+  - message composer
+  - starter prompt chips
+  - live replies through OpenRouter `openrouter/free` when `VITE_OPENROUTER_API_KEY` is set
+- Board graph state and chat history are not linked yet.
+
+## OpenRouter setup
+
+**OpenRouter** — это единый API-шлюз к разным LLM (языковым моделям). **OpenRouter Free**
+(`openrouter/free`) — бесплатный роутер: он сам выбирает доступную free-модель под запрос.
+
+Local test env (`.env.local`, gitignored):
+
+```bash
+VITE_OPENROUTER_API_KEY=sk-or-v1-...
+VITE_OPENROUTER_MODEL=openrouter/free
+```
+
+Restart `npm run dev` after changing env vars. The key is read in the browser for now;
+move it to a Supabase Edge Function secret before production.
+
+## Design
+
+Inspired by the board/docs Material 3 shell:
+
+- light `--md-surface*` sidebar and top bar, same as docs navigation
+- pill workspace toggle, tonal new-chat button, secondary-container active chat row
+- message cards on `--md-surface-container` / `--md-primary-container`
+- composer uses the same floating pill pattern as board search
+
+## Code
+
+- Main file: [`AgentPage.tsx`](../../src/AgentPage.tsx)
+- Mode toggle: [`WorkspaceModeToggle.tsx`](../../src/components/WorkspaceModeToggle.tsx)
+- Persistence helper: [`workspaceMode.ts`](../../src/lib/workspaceMode.ts)
+- OpenRouter client: [`openRouterChat.ts`](../../src/lib/openRouterChat.ts)
+- Styles: [`agent.css`](../../src/styles/agent.css)
+- App integration: [`App.tsx`](../../src/App.tsx)
+
+## Open questions / TODO
+
+- Move OpenRouter calls behind a Supabase Edge Function before production deploy.
+- Switch from OpenRouter test key to Claude when ready.
+- Connect agent tools to the existing graph API / MCP server.
+- Pass board context (selected person, search results) into agent prompts.
+- Decide whether agent mode should use its own hash route (`#agent`).
