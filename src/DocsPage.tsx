@@ -484,6 +484,67 @@ ${npxCmd}`}</code>
       }
     },
     {
+      id: 'local-linkedin-agent-search',
+      category: 'cli',
+      title: 'Local LinkedIn Agent Search',
+      keywords: ['linkedin', 'jsonl', 'agent search', 'grep', 'local', 'token budget'],
+      render: (copy) => {
+        const statsCmd = `npm run --silent linkedin:agent-search -- stats`
+        const searchCmd = `npm run --silent linkedin:agent-search -- search "founder agile" --budget-tokens 30000`
+        const pinnedCmd = `npm run --silent linkedin:agent-search -- search "role:coach circle:Novo" \\
+  --data /Users/velizard/Downloads/linkedin-graph-export-2026-06-14-basic/people-for-llm.jsonl`
+        return (
+          <div>
+            <h2>Local LinkedIn Agent Search</h2>
+            <p>
+              This read-only helper is separate from the authenticated DataNode CLI and MCP server. It searches compact LinkedIn export JSONL files on your machine and returns exact person ids, circle paths, notes, and links within a 30k/50k token budget for LLM context assembly.
+            </p>
+
+            <h3>Commands</h3>
+            <div className="docs-code-container">
+              <div className="docs-code-header">
+                <span>Terminal</span>
+                <button className="docs-code-copy-btn" onClick={() => copy(searchCmd, 'LinkedIn search command copied!')}>Copy</button>
+              </div>
+              <pre className="docs-code-pre">
+                <code className="docs-code">{`${statsCmd}
+${searchCmd}
+${pinnedCmd}`}</code>
+              </pre>
+            </div>
+
+            <h3>Query Syntax</h3>
+            <table className="docs-table">
+              <thead>
+                <tr>
+                  <th>Pattern</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="docs-param-name">founder agile</td>
+                  <td>Match all terms across name, role, circle path, notes, id, and links.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">role:coach circle:Novo</td>
+                  <td>Restrict terms to specific fields.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">--mode any</td>
+                  <td>Return broad groups where any term matches instead of requiring every term.</td>
+                </tr>
+                <tr>
+                  <td className="docs-param-name">--offset</td>
+                  <td>Page through large groups using the returned <code>next</code> command.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )
+      }
+    },
+    {
       id: 'get-meta',
       category: 'api',
       title: 'GET /graph/meta',

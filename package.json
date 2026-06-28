@@ -15,6 +15,7 @@
     "test:ui-import": "node ./scripts/test-ui-import-responsiveness.mjs",
     "test:load": "npm run test:db-load -- --people 3000 --connections 3000 && npm run test:ui-import -- --people 3000",
     "preview": "vite preview",
+    "linkedin:agent-search": "node ./scripts/linkedin-agent-search.mjs",
     "datanode:cli": "node ./scripts/datanode-cli.mjs",
     "datanode:mcp": "node ./scripts/datanode-mcp.mjs"
   },

@@ -786,3 +786,11 @@ rediscover, write it here.
 - Why: Users expect LLM search to read notes and try harder than substring match; one-shot
   JSON filters could not connect "my girlfriend" to "i love her".
 
+## 2026-06-28 — Local LinkedIn JSONL retrieval for agents
+
+- Decision: Add `scripts/linkedin-agent-search.mjs`, a read-only grep-like search over
+  compact LinkedIn `people-for-llm.jsonl` exports with exact ids, field filters, paging,
+  and 30k/50k token budgets. It is intentionally separate from Supabase, the graph API,
+  MCP, and `datanode-cli`.
+- Why: Full LinkedIn graph exports can exceed 1M tokens. Agents need deterministic local
+  retrieval that returns large groups in compact chunks before involving an LLM.

@@ -23,6 +23,7 @@ design without reverse-engineering `src/App.tsx`.
 - [Person connections](person-connections.md) — profile links, social handles, phone-app links, LinkedIn import links, and quick open/delete controls.
 - [Board search](board-search.md) — find a person by name, notes, connections, or circle; find circles from the toolbar and fly the camera to them.
 - [Smart search](smart-search.md) — signed-in natural-language search with AI query interpretation and hierarchy-aware ranking.
+- [Local LinkedIn agent search](local-linkedin-agent-search.md) — read-only grep-like shell retrieval over compact LinkedIn JSONL exports with 30k/50k token budgets.
 - [Authentication](auth.md) — local editing, Google sign-in, email/password registration, confirmation resend, and password reset.
 - [Import load testing](import-load-testing.md) — isolated database load checks and browser responsiveness verification for large LinkedIn imports.
 - [Landing page](landing-page.md) — clean, beautiful entry point introducing the product with animated orbits and view routing.

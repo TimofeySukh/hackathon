@@ -153,6 +153,26 @@ risk-aware tool list before choosing a detailed graph tool. For large, experimen
 or destructive graph changes, agents should create a backup with `export_graph` or ask the
 user for confirmation before calling replacement, reset, or broad cleanup tools.
 
+## Local LinkedIn Agent Search
+
+For private LinkedIn export analysis that should stay outside Supabase, MCP, and the
+authenticated graph API, use the local read-only JSONL search tool. It searches compact
+`people-for-llm.jsonl` exports and returns exact person ids plus compact notes under a
+token budget.
+
+```bash
+npm run --silent linkedin:agent-search -- stats
+npm run --silent linkedin:agent-search -- search "founder agile" --budget-tokens 30000
+npm run --silent linkedin:agent-search -- search "role:coach circle:Novo" --limit 100
+npm run --silent linkedin:agent-search -- search "founder" \
+  --data /Users/velizard/Downloads/linkedin-graph-export-2026-06-14-basic/people-for-llm.jsonl
+```
+
+The default data file is the newest
+`~/Downloads/linkedin-graph-export-*/people-for-llm.jsonl`. Results include a `next`
+command when a large group needs paging. Keep the default `30,000` token budget for normal
+LLM context assembly; use up to `50,000` only when the target model context can afford it.
+
 ## Import Load Testing
 
 Large import testing must stay out of production user accounts and production data.
