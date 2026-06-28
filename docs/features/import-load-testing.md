@@ -39,8 +39,9 @@ not thousands of per-contact database writes.
   storage backend (Supabase for signed-in users, `localStorage` for anonymous users)
   before the success alert is shown. The normal debounced autosave then skips the same
   unchanged snapshot.
-- Signed-in graph writes send a pre-serialized JSON body directly to Supabase REST so
-  large import payloads do not depend on client-side query-builder body serialization.
+- Signed-in graph writes go through the existing `graph-api` Edge Function replacement
+  route so import persistence uses the same revision-checked server path as API/CLI/MCP
+  graph replacement.
 - The import button is disabled while a ZIP import is running and shows `Importing...`.
 - Duplicate imported people are skipped by generated LinkedIn person id.
 

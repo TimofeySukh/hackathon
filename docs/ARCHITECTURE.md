@@ -32,9 +32,9 @@ circle) — there is no demo seed.
 - `src/lib/board/` is the framework-free board engine: `types.ts`, `constants.ts`,
   `colors.ts`, `geometry.ts`, `layout.ts` (containment/collision), and
   `render.ts` (spatial index, hit-testing, the Canvas 2D draw layer).
-- `src/lib/graphPersistence.ts` loads/saves the graph blob (Supabase for
-  signed-in users, `localStorage` for anonymous sessions) with optimistic graph
-  revision checks.
+- `src/lib/graphPersistence.ts` loads the graph blob from Supabase for signed-in
+  users, saves signed-in graph changes through the `graph-api` Edge Function so
+  writes stay revision-checked, and uses `localStorage` for anonymous sessions.
 - `src/lib/agentApi.ts` calls the `graph-api` Edge Function for agent token
   management from the Settings panel.
 - `src/lib/supabase.ts` creates the browser Supabase client from Vite environment variables.
