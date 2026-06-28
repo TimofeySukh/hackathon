@@ -19,6 +19,35 @@ export class GraphRevisionConflictError extends Error {
   }
 }
 
+export class GraphPersistenceError extends Error {
+  constructor(action: string, cause: unknown) {
+    super(`${action}: ${formatPersistenceError(cause)}`)
+    this.name = 'GraphPersistenceError'
+    this.cause = cause
+  }
+}
+
+function formatPersistenceError(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message
+  if (!error || typeof error !== 'object') return String(error)
+
+  const details = error as Record<string, unknown>
+  const parts = [
+    typeof details.message === 'string' ? details.message : null,
+    typeof details.details === 'string' ? details.details : null,
+    typeof details.hint === 'string' ? details.hint : null,
+    typeof details.code === 'string' ? `code ${details.code}` : null,
+  ].filter(Boolean)
+
+  if (parts.length > 0) return parts.join(' ')
+
+  try {
+    return JSON.stringify(error)
+  } catch {
+    return String(error)
+  }
+}
+
 function isGraphState(value: unknown): value is GraphState {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Record<string, unknown>
@@ -73,7 +102,7 @@ export async function saveGraph(userId: string, graph: GraphState, expectedRevis
 
     if (error) {
       if (error.code === '23505') throw new GraphRevisionConflictError()
-      throw error
+      throw new GraphPersistenceError('Failed to create your saved board', error)
     }
 
     return typeof data.revision === 'number' ? data.revision : 1
@@ -87,7 +116,7 @@ export async function saveGraph(userId: string, graph: GraphState, expectedRevis
     .select('revision')
     .maybeSingle()
 
-  if (error) throw error
+  if (error) throw new GraphPersistenceError('Failed to update your saved board', error)
   if (!data) throw new GraphRevisionConflictError()
 
   return typeof data.revision === 'number' ? data.revision : expectedRevision + 1

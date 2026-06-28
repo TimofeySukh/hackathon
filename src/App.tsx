@@ -144,6 +144,27 @@ function isGraphState(value: unknown): value is GraphState {
   )
 }
 
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message) return error.message
+  if (!error || typeof error !== 'object') return String(error)
+
+  const details = error as Record<string, unknown>
+  const parts = [
+    typeof details.message === 'string' ? details.message : null,
+    typeof details.details === 'string' ? details.details : null,
+    typeof details.hint === 'string' ? details.hint : null,
+    typeof details.code === 'string' ? `code ${details.code}` : null,
+  ].filter(Boolean)
+
+  if (parts.length > 0) return parts.join(' ')
+
+  try {
+    return JSON.stringify(error)
+  } catch {
+    return String(error)
+  }
+}
+
 type CreateMenu = {
   sourceCircleId: string
   x: number
@@ -1326,7 +1347,7 @@ function App() {
       closeSearch()
     } catch (err) {
       console.error(err)
-      const errorMessage = err instanceof Error ? err.message : String(err)
+      const errorMessage = getErrorMessage(err)
       alert(`Failed to import LinkedIn profile: ${errorMessage}`)
     } finally {
       setIsImportingLinkedInProfile(false)
@@ -1441,7 +1462,7 @@ function App() {
       alert(`LinkedIn data imported successfully: ${result.importedPeople} people across ${result.importedCompanies} companies.`)
     } catch (err) {
       console.error(err)
-      const errorMessage = err instanceof Error ? err.message : String(err)
+      const errorMessage = getErrorMessage(err)
       alert(`Failed to import LinkedIn ZIP: ${errorMessage}`)
     } finally {
       setIsImportingLinkedInZip(false)
@@ -1472,7 +1493,7 @@ function App() {
       alert('Graph imported successfully.')
     } catch (err) {
       console.error(err)
-      const errorMessage = err instanceof Error ? err.message : String(err)
+      const errorMessage = getErrorMessage(err)
       alert(`Failed to import graph: ${errorMessage}`)
     } finally {
       event.target.value = ''
