@@ -82,6 +82,24 @@ function jsonResponse(body: unknown, status = 200) {
   })
 }
 
+function formatError(error: unknown) {
+  if (error instanceof Error && error.message) return error.message
+  if (!error || typeof error !== 'object') return String(error)
+  const record = error as Record<string, unknown>
+  const parts = [
+    typeof record.message === 'string' ? record.message : null,
+    typeof record.details === 'string' ? record.details : null,
+    typeof record.hint === 'string' ? record.hint : null,
+    typeof record.code === 'string' ? `code ${record.code}` : null,
+  ].filter(Boolean)
+  if (parts.length > 0) return parts.join(' ')
+  try {
+    return JSON.stringify(error)
+  } catch {
+    return String(error)
+  }
+}
+
 function getRequiredEnv(name: string) {
   const value = Deno.env.get(name)
   if (!value) throw new Error(`Missing required environment variable: ${name}`)
@@ -1196,7 +1214,6 @@ Deno.serve(async (req) => {
       const message = await error.text()
       return jsonResponse({ error: message || error.statusText }, error.status)
     }
-    const message = error instanceof Error ? error.message : 'Unexpected graph API error.'
-    return jsonResponse({ error: message }, 500)
+    return jsonResponse({ error: formatError(error) }, 500)
   }
 })

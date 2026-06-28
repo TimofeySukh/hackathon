@@ -17,6 +17,16 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-28 — Local Import Persistence E2E
+
+- Decision: add `npm run test:ui-import:persistence`, a Playwright test that runs the app
+  with dev-only fake auth and a localhost mock Supabase graph API.
+- Why: import persistence bugs must be reproducible locally. The test covers LinkedIn ZIP
+  import, graph JSON import, signed-in graph replacement writes, and reload persistence
+  without touching production Supabase.
+- Decision: graph API catch-all errors now format structured error objects instead of
+  returning a generic "Unexpected graph API error."
+
 ### 2026-06-28 — Imported Graphs Flush Immediately
 
 - Decision: LinkedIn ZIP imports and graph JSON imports now write the resulting graph to

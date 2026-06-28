@@ -192,6 +192,7 @@ This runs:
 
 - `npm run test:db-load -- --people 3000 --connections 3000`
 - `npm run test:ui-import -- --people 3000`
+- `npm run test:ui-import:persistence`
 
 `test:db-load` is dry-run by default. It builds a synthetic graph with 3,000 people and
 3,000 connections, serializes it in the same shape stored in `user_graphs.graph`, and
@@ -224,6 +225,17 @@ HACKATHON_ALLOW_DATABASE_LOAD_TEST=true npm run test:db-load -- --people 5000 --
 uploads a generated LinkedIn ZIP through the real settings-panel file input, and measures
 event-loop lag while the import runs. The test fails when the browser is blocked longer
 than the configured threshold.
+
+`test:ui-import:persistence` is the local import persistence check:
+
+```bash
+npm run test:ui-import:persistence
+```
+
+This starts a local mock Supabase graph API and a Vite app with `VITE_E2E_FAKE_AUTH=true`.
+It does not touch production Supabase. The browser imports a generated LinkedIn ZIP, reloads
+the board, then imports a board graph JSON and reloads again. The test fails unless both
+imports are written to the mock graph API and survive reload.
 
 ## Auth Email E2E
 

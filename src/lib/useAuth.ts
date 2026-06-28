@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 
-import { supabase } from './supabase'
+import { e2eFakeAccessToken, e2eFakeUserId, isE2EFakeAuth, supabase } from './supabase'
 
 type AuthStatus = 'loading' | 'anonymous' | 'authenticated' | 'unconfigured'
 
@@ -14,15 +14,40 @@ type AuthState = {
 
 const getStatus = (session: Session | null): AuthStatus => (session ? 'authenticated' : 'anonymous')
 
+function createE2EFakeSession(): Session {
+  const nowIso = new Date().toISOString()
+  return {
+    access_token: e2eFakeAccessToken,
+    refresh_token: 'local-e2e-refresh-token',
+    token_type: 'bearer',
+    expires_in: 3600,
+    expires_at: Math.floor(Date.now() / 1000) + 3600,
+    user: {
+      id: e2eFakeUserId,
+      aud: 'authenticated',
+      role: 'authenticated',
+      email: 'local-e2e@example.invalid',
+      email_confirmed_at: nowIso,
+      phone: '',
+      app_metadata: {},
+      user_metadata: { full_name: 'Local E2E User' },
+      identities: [],
+      created_at: nowIso,
+      updated_at: nowIso,
+    },
+  } as Session
+}
+
 export function useAuth() {
   const [authState, setAuthState] = useState<AuthState>(() => ({
-    session: null,
-    status: supabase ? 'loading' : 'unconfigured',
+    session: isE2EFakeAuth ? createE2EFakeSession() : null,
+    status: isE2EFakeAuth ? 'authenticated' : supabase ? 'loading' : 'unconfigured',
     error: null,
     isPasswordRecovery: false,
   }))
 
   useEffect(() => {
+    if (isE2EFakeAuth) return undefined
     if (!supabase) return undefined
 
     let isMounted = true

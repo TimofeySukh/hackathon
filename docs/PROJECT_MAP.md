@@ -65,6 +65,7 @@ Completed tasks can remain listed here when they explain repository history. Liv
 - `README.md`: top-level overview and local development commands.
 - `scripts/test-database-load.mjs`: dry-run by default synthetic `user_graphs` payload generator, with guarded staging write/read/cleanup support.
 - `scripts/test-ui-import-responsiveness.mjs`: Playwright-driven large LinkedIn ZIP import check that measures browser event-loop lag.
+- `scripts/test-ui-import-persistence.mjs`: local Playwright import persistence check with a mock Supabase graph API; verifies ZIP import, graph JSON import, and reload without touching production.
 - `scripts/datanode-cli.mjs`: local CLI client for the agent graph API.
 - `scripts/datanode-mcp.mjs`: stdio MCP server for AI agents, backed by the graph API.
 - `src/main.tsx`: React entry point.

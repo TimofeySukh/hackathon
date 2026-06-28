@@ -137,9 +137,13 @@ async function main() {
       if (message.type() === 'error') console.error(message.text())
     })
 
-    await page.goto(server.url, { waitUntil: 'networkidle' })
-    await page.evaluate(() => {
+    await page.addInitScript(() => {
       window.localStorage.clear()
+      window.localStorage.setItem('social-onboarding-done-v1', '1')
+    })
+
+    await page.goto(`${server.url}/#board`, { waitUntil: 'networkidle' })
+    await page.evaluate(() => {
       const monitor = {
         samples: 0,
         maxLagMs: 0,
