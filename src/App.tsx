@@ -5792,7 +5792,7 @@ Content-Type: application/json
 
       {workspaceMode === 'agent' && (
         <div className="agent-workspace-overlay">
-          <AgentPage onSwitchToBoard={switchToBoardMode} />
+          <AgentPage graph={graphLoaded ? graph : null} onSwitchToBoard={switchToBoardMode} />
         </div>
       )}
     </main>

@@ -810,3 +810,13 @@ rediscover, write it here.
   MCP, and `datanode-cli`.
 - Why: Full LinkedIn graph exports can exceed 1M tokens. Agents need deterministic local
   retrieval that returns large groups in compact chunks before involving an LLM.
+
+## 2026-06-28 — Agent mode searches the current board with tools
+
+- Decision: Agent mode now exposes read-only board tools backed by the mounted `GraphState`:
+  `get_board_stats`, `search_board_people`, `get_board_people`, and `list_board_circles`.
+  The model must call tools to inspect the board; browser code executes calls and returns
+  exact ids, names, notes, links, nested circle paths, scores, offsets, and counts.
+- Why: The agent should search and analyze the user's live board itself, not receive an
+  automatically trimmed snapshot and not read local LinkedIn export files or MCP. The
+  harness keeps execution deterministic while the model decides what to search next.
