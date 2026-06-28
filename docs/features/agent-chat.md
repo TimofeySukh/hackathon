@@ -14,13 +14,19 @@ providers, MCP tools, and board context.
   listeners and canvas state survive the switch (do not early-return out of the board tree).
 - The last selected workspace mode persists in `localStorage`
   (`datanode.workspaceMode`).
-- Agent mode is standalone for now:
+- Agent mode includes:
   - sidebar chat list
   - new chat
   - message composer
   - starter prompt chips
   - live replies through OpenRouter `openrouter/free` when `VITE_OPENROUTER_API_KEY` is set
-- Board graph state and chat history are not linked yet.
+- model-driven read-only board tools. The model can call `get_board_stats`,
+  `search_board_people`, `get_board_people`, and `list_board_circles`; browser code executes
+  the call against the mounted `GraphState` and returns compact observations.
+- Tool results include exact person `id`, `name`, full `circlePath`, notes, links, scores,
+  matched circles, offsets, and next offsets for large groups.
+- The agent does not read local `Downloads`, Supabase service keys, MCP, or local LinkedIn
+  JSONL files. It searches the live board graph through the browser harness.
 
 ## OpenRouter setup
 
@@ -53,6 +59,7 @@ Inspired by the board/docs Material 3 shell:
 - Mode toggle: [`WorkspaceModeToggle.tsx`](../../src/components/WorkspaceModeToggle.tsx)
 - Persistence helper: [`workspaceMode.ts`](../../src/lib/workspaceMode.ts)
 - OpenRouter client: [`openRouterChat.ts`](../../src/lib/openRouterChat.ts)
+- Board context builder: [`agentBoardContext.ts`](../../src/lib/agentBoardContext.ts)
 - Styles: [`agent.css`](../../src/styles/agent.css)
 - App integration: [`App.tsx`](../../src/App.tsx)
 
@@ -60,6 +67,5 @@ Inspired by the board/docs Material 3 shell:
 
 - Move OpenRouter calls behind a Supabase Edge Function so the API key is not in the JS bundle.
 - Switch from OpenRouter test key to Claude when ready.
-- Connect agent tools to the existing graph API / MCP server.
-- Pass board context (selected person, search results) into agent prompts.
+- Pass selected person/search results as extra high-priority context.
 - Decide whether agent mode should use its own hash route (`#agent`).

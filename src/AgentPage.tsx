@@ -7,6 +7,12 @@ import {
   isOpenRouterConfigured,
   type OpenRouterChatMessage,
 } from './lib/openRouterChat'
+import {
+  buildAgentBoardToolInstructions,
+  parseAgentBoardToolCall,
+  runAgentBoardTool,
+} from './lib/agentBoardContext'
+import type { GraphState } from './lib/board/types'
 
 type ChatRole = 'user' | 'assistant'
 
@@ -26,6 +32,7 @@ type ChatThread = {
 
 type AgentPageProps = {
   onSwitchToBoard: () => void
+  graph: GraphState | null
 }
 
 function toApiMessages(messages: ChatMessage[]): OpenRouterChatMessage[] {
@@ -55,6 +62,38 @@ function deriveTitle(content: string): string {
   return trimmed.length > 42 ? `${trimmed.slice(0, 42)}…` : trimmed
 }
 
+const MAX_BOARD_TOOL_STEPS = 6
+
+async function runBoardToolLoop(
+  graph: GraphState,
+  historyForApi: OpenRouterChatMessage[],
+  signal: AbortSignal,
+) {
+  const loopMessages: OpenRouterChatMessage[] = [
+    { role: 'system', content: buildAgentBoardToolInstructions(graph) },
+    ...historyForApi,
+  ]
+
+  for (let step = 0; step < MAX_BOARD_TOOL_STEPS; step += 1) {
+    const assistantContent = await completeOpenRouterChat(loopMessages, signal)
+    const toolCall = parseAgentBoardToolCall(assistantContent)
+    if (!toolCall) return assistantContent
+
+    const toolResult = runAgentBoardTool(graph, toolCall)
+    loopMessages.push({ role: 'assistant', content: assistantContent })
+    loopMessages.push({
+      role: 'user',
+      content: [
+        `Tool result for ${toolCall.name}:`,
+        JSON.stringify(toolResult),
+        'Use this observation to decide whether to call another board tool or answer the user. Do not call the same tool with the same arguments unless you need the next offset.',
+      ].join('\n'),
+    })
+  }
+
+  return 'I searched the board but reached the tool-step limit before producing a final answer. Try asking a narrower question.'
+}
+
 function PlusIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -71,7 +110,7 @@ function SendIcon() {
   )
 }
 
-export default function AgentPage({ onSwitchToBoard }: AgentPageProps) {
+export default function AgentPage({ onSwitchToBoard, graph }: AgentPageProps) {
   const [threads, setThreads] = useState<ChatThread[]>(() => [createThread()])
   const [activeThreadId, setActiveThreadId] = useState<string>(() => threads[0]?.id ?? '')
   const [draft, setDraft] = useState('')
@@ -82,6 +121,9 @@ export default function AgentPage({ onSwitchToBoard }: AgentPageProps) {
   const requestAbortRef = useRef<AbortController | null>(null)
   const openRouterReady = isOpenRouterConfigured()
   const modelLabel = getOpenRouterModelLabel()
+  const boardCountsLabel = graph
+    ? `${graph.people.length} people · ${graph.circles.length} circles`
+    : 'Board is loading'
 
   const activeThread = useMemo(
     () => threads.find((thread) => thread.id === activeThreadId) ?? threads[0] ?? null,
@@ -162,7 +204,12 @@ export default function AgentPage({ onSwitchToBoard }: AgentPageProps) {
     requestAbortRef.current = controller
 
     try {
-      const reply = await completeOpenRouterChat(historyForApi, controller.signal)
+      const reply = graph
+        ? await runBoardToolLoop(graph, historyForApi, controller.signal)
+        : await completeOpenRouterChat([
+            { role: 'system', content: 'The board is still loading. Say that board search is unavailable until loading finishes.' },
+            ...historyForApi,
+          ], controller.signal)
       appendMessage(activeThread.id, {
         id: createId('msg'),
         role: 'assistant',
@@ -239,7 +286,7 @@ export default function AgentPage({ onSwitchToBoard }: AgentPageProps) {
 
           <p className="agent-sidebar__note">
             {openRouterReady
-              ? 'Board context is not connected yet.'
+              ? `Board tools connected: ${boardCountsLabel}.`
               : 'Add VITE_OPENROUTER_API_KEY to .env.local.'}
           </p>
       </aside>
