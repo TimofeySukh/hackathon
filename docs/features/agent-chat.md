@@ -20,6 +20,15 @@ providers, MCP tools, and board context.
   - message composer
   - starter prompt chips
   - live replies through OpenRouter `openrouter/free` when `VITE_OPENROUTER_API_KEY` is set
+- A deterministic zero-to-demo referral scenario is available without OpenRouter:
+  - when the user asks about selling apples from a farm, a just-closed deal, LinkedIn
+    first-degree connections, and possible referral prospects, the chat returns a prepared
+    sales-intelligence answer
+  - the prepared answer fabricates the demo data: 1,273 first-degree connections, 276
+    people with direct work-history overlap, 9 likely apple-buyer prospects, and a referral
+    email draft to the existing customer
+  - this path is for video/demo flow only and does not read the board graph, LinkedIn, API,
+    CLI, MCP, or OpenRouter
 - Board graph state and chat history are not linked yet.
 
 ## OpenRouter setup

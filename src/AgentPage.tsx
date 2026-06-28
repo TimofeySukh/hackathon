@@ -28,6 +28,36 @@ type AgentPageProps = {
   onSwitchToBoard: () => void
 }
 
+const demoReferralReply = `I found 1,273 first-degree LinkedIn connections for this customer.
+
+Based on LinkedIn work history, he appears to have personally worked with 276 of them.
+
+From that group, 9 people look like strong apple-buyer prospects:
+
+1. Sarah Mitchell, Fresh Category Lead at Harvest Market
+2. Daniel Brooks, Procurement Manager at Green Basket Foods
+3. Priya Nair, Owner at Corner Pantry
+4. Miguel Alvarez, Head Chef at Orchard Table
+5. Emma Carter, Operations Lead at Northside Grocers
+6. Jonas Weber, Buyer at Urban Produce Co.
+7. Aisha Khan, Food Service Director at Bright Schools
+8. Peter Novak, Supply Manager at Valley Canteen
+9. Lena Fischer, Founder at Daily Juice Bar
+
+Draft email:
+
+Subject: Quick intro to a few people who may need apples
+
+Hi,
+
+Great closing the apple order today. I really appreciate the trust.
+
+I noticed a few people in your network who may also buy apples for grocery, food service, or produce operations. Would you be comfortable introducing me to Sarah Mitchell, Daniel Brooks, Priya Nair, Miguel Alvarez, Emma Carter, Jonas Weber, Aisha Khan, Peter Novak, and Lena Fischer?
+
+A short intro is enough. I can follow up with availability, pricing, and delivery details.
+
+Thanks again.`
+
 function toApiMessages(messages: ChatMessage[]): OpenRouterChatMessage[] {
   return messages.map((message) => ({
     role: message.role,
@@ -53,6 +83,23 @@ function deriveTitle(content: string): string {
   const trimmed = content.trim()
   if (!trimmed) return 'New chat'
   return trimmed.length > 42 ? `${trimmed.slice(0, 42)}…` : trimmed
+}
+
+function isDemoReferralPrompt(content: string): boolean {
+  const normalized = content.toLowerCase()
+  return (
+    (normalized.includes('apple') || normalized.includes('яблок')) &&
+    (normalized.includes('farm') || normalized.includes('ферм')) &&
+    (normalized.includes('deal') || normalized.includes('сделк')) &&
+    (normalized.includes('linkedin') || normalized.includes('линкет') || normalized.includes('линкед')) &&
+    (normalized.includes('connection') || normalized.includes('конекш') || normalized.includes('первом круг'))
+  )
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms)
+  })
 }
 
 function PlusIcon() {
@@ -82,6 +129,7 @@ export default function AgentPage({ onSwitchToBoard }: AgentPageProps) {
   const requestAbortRef = useRef<AbortController | null>(null)
   const openRouterReady = isOpenRouterConfigured()
   const modelLabel = getOpenRouterModelLabel()
+  const isDemoDraft = isDemoReferralPrompt(draft)
 
   const activeThread = useMemo(
     () => threads.find((thread) => thread.id === activeThreadId) ?? threads[0] ?? null,
@@ -138,7 +186,8 @@ export default function AgentPage({ onSwitchToBoard }: AgentPageProps) {
     const content = rawContent.trim()
     if (!content || !activeThread || isThinking) return
 
-    if (!openRouterReady) {
+    const isDemoPrompt = isDemoReferralPrompt(content)
+    if (!isDemoPrompt && !openRouterReady) {
       setChatError('Add VITE_OPENROUTER_API_KEY to .env.local, then restart the dev server.')
       return
     }
@@ -150,8 +199,6 @@ export default function AgentPage({ onSwitchToBoard }: AgentPageProps) {
       createdAt: Date.now(),
     }
 
-    const historyForApi = toApiMessages([...activeThread.messages, userMessage])
-
     appendMessage(activeThread.id, userMessage)
     setDraft('')
     setChatError(null)
@@ -162,7 +209,9 @@ export default function AgentPage({ onSwitchToBoard }: AgentPageProps) {
     requestAbortRef.current = controller
 
     try {
-      const reply = await completeOpenRouterChat(historyForApi, controller.signal)
+      const reply = isDemoPrompt
+        ? await wait(650).then(() => demoReferralReply)
+        : await completeOpenRouterChat(toApiMessages([...activeThread.messages, userMessage]), controller.signal)
       appendMessage(activeThread.id, {
         id: createId('msg'),
         role: 'assistant',
@@ -238,9 +287,7 @@ export default function AgentPage({ onSwitchToBoard }: AgentPageProps) {
           </nav>
 
           <p className="agent-sidebar__note">
-            {openRouterReady
-              ? 'Board context is not connected yet.'
-              : 'Add VITE_OPENROUTER_API_KEY to .env.local.'}
+            Demo referral pipeline is prepared locally. Other chats use OpenRouter when configured.
           </p>
       </aside>
 
@@ -313,7 +360,7 @@ export default function AgentPage({ onSwitchToBoard }: AgentPageProps) {
                 type="submit"
                 className="agent-composer__send"
                 aria-label="Send message"
-                disabled={!draft.trim() || isThinking || !openRouterReady}
+                disabled={!draft.trim() || isThinking || (!openRouterReady && !isDemoDraft)}
               >
                 <SendIcon />
               </button>

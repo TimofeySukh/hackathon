@@ -17,6 +17,15 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-28 — Prepared Agent Referral Demo
+
+- Decision: agent chat now includes a local deterministic zero-to-demo referral scenario
+  for a farm apple-sales prompt. It returns prepared LinkedIn-style counts, 9 fabricated
+  referral prospects, and a customer referral email draft without calling OpenRouter or
+  any graph/API/MCP data source.
+- Why: the current product direction needs a fast video-demo pipeline while real graph
+  reasoning and LinkedIn data integration remain out of scope for this change.
+
 ### 2026-06-28 — Local Import Persistence E2E
 
 - Decision: add `npm run test:ui-import:persistence`, a Playwright test that runs the app
