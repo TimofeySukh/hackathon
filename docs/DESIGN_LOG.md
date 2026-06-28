@@ -889,3 +889,12 @@ rediscover, write it here.
 - Why: Agents working over 10k+ contacts need to collect many references and fetch 100+
   relevant profiles without accidentally receiving the whole graph, unrelated people, or
   large avatar payloads after every write.
+
+## 2026-06-28 — Local LinkedIn JSONL retrieval for agents
+
+- Decision: Add `scripts/linkedin-agent-search.mjs`, a read-only grep-like search over
+  compact LinkedIn `people-for-llm.jsonl` exports with exact ids, field filters, paging,
+  and 30k/50k token budgets. It is intentionally separate from Supabase, the graph API,
+  MCP, and `datanode-cli`.
+- Why: Full LinkedIn graph exports can exceed 1M tokens. Agents need deterministic local
+  retrieval that returns large groups in compact chunks before involving an LLM.
