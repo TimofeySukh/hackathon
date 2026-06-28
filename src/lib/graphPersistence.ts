@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { getSupabaseRestUrl, supabase, supabasePublishableKey } from './supabase'
 import type { GraphState } from './board/types'
 
 // The whole canvas graph lives in a single jsonb column keyed by user id.
@@ -48,6 +48,59 @@ function formatPersistenceError(error: unknown): string {
   }
 }
 
+async function getAccessToken() {
+  if (!supabase) return null
+  const { data, error } = await supabase.auth.getSession()
+  if (error) throw new GraphPersistenceError('Failed to read your auth session', error)
+  return data.session?.access_token ?? null
+}
+
+async function parseRestError(response: Response) {
+  const text = await response.text()
+  if (!text) return { message: response.statusText || `HTTP ${response.status}` }
+  try {
+    return JSON.parse(text) as unknown
+  } catch {
+    return { message: text, code: String(response.status) }
+  }
+}
+
+async function postgrestGraphWrite(path: string, method: 'POST' | 'PATCH', body: string) {
+  const url = getSupabaseRestUrl(path)
+  const accessToken = await getAccessToken()
+  if (!url || !supabasePublishableKey || !accessToken) {
+    throw new GraphPersistenceError('Failed to save your board', 'Supabase session is not available.')
+  }
+
+  const response = await fetch(url, {
+    method,
+    headers: {
+      apikey: supabasePublishableKey,
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Prefer: 'return=representation',
+    },
+    body,
+  })
+
+  if (!response.ok) {
+    const error = await parseRestError(response)
+    if (method === 'POST' && typeof error === 'object' && error && 'code' in error && error.code === '23505') {
+      throw new GraphRevisionConflictError()
+    }
+    throw new GraphPersistenceError('Failed to save your board', error)
+  }
+
+  const text = await response.text()
+  if (!text) return []
+  try {
+    return JSON.parse(text) as unknown[]
+  } catch (error) {
+    throw new GraphPersistenceError('Failed to read save response', error)
+  }
+}
+
 function isGraphState(value: unknown): value is GraphState {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Record<string, unknown>
@@ -92,31 +145,24 @@ export async function loadGraphRecord(userId: string): Promise<LoadedGraphRecord
  */
 export async function saveGraph(userId: string, graph: GraphState, expectedRevision: number | null): Promise<number | null> {
   if (!supabase) return expectedRevision
+  const graphJson = JSON.stringify(graph)
 
   if (expectedRevision === null) {
-    const { data, error } = await supabase
-      .from('user_graphs')
-      .insert({ user_id: userId, graph })
-      .select('revision')
-      .single()
-
-    if (error) {
-      if (error.code === '23505') throw new GraphRevisionConflictError()
-      throw new GraphPersistenceError('Failed to create your saved board', error)
-    }
-
-    return typeof data.revision === 'number' ? data.revision : 1
+    const rows = await postgrestGraphWrite(
+      'user_graphs?select=revision',
+      'POST',
+      `{"user_id":${JSON.stringify(userId)},"graph":${graphJson}}`,
+    )
+    const data = rows[0] as { revision?: unknown } | undefined
+    return typeof data?.revision === 'number' ? data.revision : 1
   }
 
-  const { data, error } = await supabase
-    .from('user_graphs')
-    .update({ graph })
-    .eq('user_id', userId)
-    .eq('revision', expectedRevision)
-    .select('revision')
-    .maybeSingle()
-
-  if (error) throw new GraphPersistenceError('Failed to update your saved board', error)
+  const rows = await postgrestGraphWrite(
+    `user_graphs?user_id=eq.${encodeURIComponent(userId)}&revision=eq.${encodeURIComponent(String(expectedRevision))}&select=revision`,
+    'PATCH',
+    `{"graph":${graphJson}}`,
+  )
+  const data = rows[0] as { revision?: unknown } | undefined
   if (!data) throw new GraphRevisionConflictError()
 
   return typeof data.revision === 'number' ? data.revision : expectedRevision + 1

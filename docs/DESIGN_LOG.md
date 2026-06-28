@@ -22,12 +22,16 @@ rediscover, write it here.
 - Decision: LinkedIn ZIP imports and graph JSON imports now write the resulting graph to
   the active storage backend immediately after replacing React state, instead of relying
   only on the debounced autosave effect.
+- Decision: signed-in graph persistence now sends pre-serialized JSON directly to
+  Supabase REST for `user_graphs` insert/update calls while keeping the same RLS and
+  revision filters.
 - Decision: the debounced signed-in autosave skips writes when the current graph matches
   the last saved snapshot, so an immediate import flush is not followed by a duplicate
   revision bump.
 - Why: manual edits were persisted reliably, but bulk/import paths could be lost after a
-  reload if the page closed before the debounce completed or if import code mutated the
-  current graph before React observed a distinct state change.
+  reload if the page closed before the debounce completed, if import code mutated the
+  current graph before React observed a distinct state change, or if a large imported graph
+  tripped client-side write serialization and reached PostgREST as invalid JSON.
 
 ### 2026-06-27 — Public Privacy Policy Page at `#privacy`
 
