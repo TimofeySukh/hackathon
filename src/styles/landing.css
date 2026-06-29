@@ -372,23 +372,55 @@
 
 .demo-inspector-star-btn {
   background: transparent;
-  border: none;
+  border: 1.5px solid #73777f;
+  border-radius: 50%;
   cursor: pointer;
-  padding: 4px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #73777f;
-  transition: transform 0.15s ease;
-}
-
-.demo-inspector-star-btn:hover {
-  transform: scale(1.1);
+  box-sizing: border-box;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease;
 }
 
 .demo-inspector-star-btn svg {
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
+}
+
+.demo-inspector-star-btn svg path {
+  fill: none;
+  stroke: #73777f;
+  stroke-width: 2;
+  transition: fill 0.15s ease, stroke 0.15s ease;
+}
+
+.demo-inspector-star-btn:hover {
+  background: rgba(26, 28, 30, 0.08);
+}
+
+.demo-inspector-star-btn:active {
+  transform: scale(0.9);
+}
+
+/* Active State (Selected) */
+.demo-inspector-star-btn.is-active {
+  background-color: #00629d;
+  border-color: #00629d;
+}
+
+.demo-inspector-star-btn.is-active svg path {
+  fill: #ffffff;
+  stroke: #ffffff;
+}
+
+.demo-inspector-star-btn.is-active:hover {
+  background-color: #005080;
+  border-color: #005080;
 }
 
 .demo-dropdown-avatar-row {

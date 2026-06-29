@@ -751,31 +751,57 @@ input[type="range"]::-webkit-slider-thumb:active {
   width: 32px;
   height: 32px;
   place-items: center;
-  padding: 4px;
-  border: none;
   border-radius: var(--md-r-full);
   background: transparent;
+  border: 1.5px solid var(--md-outline);
   cursor: pointer;
   outline: none;
+  box-sizing: border-box;
   transition:
     background-color var(--md-dur-short) var(--md-ease-standard),
+    border-color var(--md-dur-short) var(--md-ease-standard),
     transform var(--md-dur-short) var(--md-ease-spring);
 }
 
+.star-favorite-btn svg {
+  width: 18px;
+  height: 18px;
+  transition: transform var(--md-dur-medium) var(--md-ease-spring);
+}
+
+.star-favorite-btn svg path {
+  fill: none;
+  stroke: var(--md-on-surface-variant);
+  stroke-width: 2;
+  transition: fill var(--md-dur-short) var(--md-ease-standard), stroke var(--md-dur-short) var(--md-ease-standard);
+}
+
 .star-favorite-btn:hover {
-  background: color-mix(in srgb, var(--md-primary) 8%, transparent);
+  background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
 }
 
 .star-favorite-btn:active {
   transform: scale(0.9);
 }
 
-.star-favorite-btn svg {
-  transition: transform var(--md-dur-medium) var(--md-ease-spring);
-}
-
 .star-favorite-btn:active svg {
   transform: rotate(-8deg) scale(1.08);
+}
+
+/* Active State (Selected) */
+.star-favorite-btn.is-active {
+  background-color: var(--md-primary);
+  border-color: var(--md-primary);
+}
+
+.star-favorite-btn.is-active svg path {
+  fill: var(--md-on-primary);
+  stroke: var(--md-on-primary);
+}
+
+.star-favorite-btn.is-active:hover {
+  background-color: color-mix(in srgb, var(--md-on-primary) 8%, var(--md-primary));
+  border-color: color-mix(in srgb, var(--md-on-primary) 8%, var(--md-primary));
 }
 
 /* Secondary full-width buttons and actions */

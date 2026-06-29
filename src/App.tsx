@@ -4930,16 +4930,13 @@ Content-Type: application/json
                 {/* Favorite Star Button at top-right of inspector */}
                 <button
                   type="button"
-                  className="star-favorite-btn"
+                  className={`star-favorite-btn ${selectedPerson.isFavorite ? 'is-active' : ''}`}
                   onClick={() => togglePersonFavorite(selectedPerson.id)}
                   title={selectedPerson.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
                 >
-                  <svg viewBox="0 0 24 24" style={{ width: 20, height: 20 }}>
+                  <svg viewBox="0 0 24 24">
                     <path
                       d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
-                      fill={selectedPerson.isFavorite ? 'var(--md-favorite-fill)' : 'none'}
-                      stroke={selectedPerson.isFavorite ? 'var(--md-favorite-stroke)' : 'var(--md-outline-variant)'}
-                      strokeWidth={2}
                     />
                   </svg>
                 </button>

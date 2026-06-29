@@ -280,16 +280,13 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
                 />
                 <button
                   type="button"
-                  className="demo-inspector-star-btn"
+                  className={`demo-inspector-star-btn ${isFavorite ? 'is-active' : ''}`}
                   onClick={() => setIsFavorite(!isFavorite)}
                   title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
                 >
                   <svg viewBox="0 0 24 24">
                     <path
                       d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
-                      fill={isFavorite ? '#ffd600' : 'none'}
-                      stroke={isFavorite ? '#d97706' : '#73777f'}
-                      strokeWidth={2}
                     />
                   </svg>
                 </button>

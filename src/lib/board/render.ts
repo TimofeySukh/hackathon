@@ -269,10 +269,10 @@ function getPersonSprite(person: PersonNode, fillColor: string, size: number, st
   return canvas
 }
 
-function drawFavoritePersonOutline(ctx: CanvasRenderingContext2D, person: PersonNode, color: string, scale: number) {
-  const radius = PERSON_VISUAL_RADIUS + 7 / scale
+function drawFavoritePersonOutline(ctx: CanvasRenderingContext2D, person: PersonNode, color: string, drawRadius: number) {
+  const radius = drawRadius + 7
   const dotCount = 18
-  const haloRadius = Math.max(2.5 / scale, 1.6)
+  const haloRadius = 2.5
   ctx.save()
   for (let i = 0; i < dotCount; i += 1) {
     const angle = (Math.PI * 2 * i) / dotCount - Math.PI / 2
@@ -390,7 +390,7 @@ export function drawBoardLayer(
     drawCircleDetails(ctx, visibleCircles, camera.scale, circleFillMode, showCircleLabels, anim.scales)
     drawPeople(ctx, visiblePeople, index, selectedItem, hoveredPersonId, camera.scale, dpr, showPersonLabels, selectedPeopleIds, anim.scales)
     if (connector) drawConnector(ctx, connector, camera.scale)
-    drawSelectionHandles(ctx, selectedItem, index, camera.scale)
+    drawSelectionHandles(ctx, selectedItem, index, anim.scales)
   }
 
   ctx.restore()
@@ -824,7 +824,7 @@ function drawPeople(
       ctx.stroke()
       ctx.restore()
     }
-    if (person.isFavorite) drawFavoritePersonOutline(ctx, person, '#ffd600', scale)
+    if (person.isFavorite) drawFavoritePersonOutline(ctx, person, '#ffd600', drawRadius)
     if (showPersonLabels && (scale >= 0.70 || isSelected || isHovered)) drawPersonLabel(ctx, person, scale)
   }
 }
@@ -853,7 +853,12 @@ function drawPersonLabel(ctx: CanvasRenderingContext2D, person: PersonNode, scal
   ctx.restore()
 }
 
-function drawSelectionHandles(ctx: CanvasRenderingContext2D, selectedItem: SelectedItem, index: BoardIndex, scale: number) {
+function drawSelectionHandles(
+  ctx: CanvasRenderingContext2D,
+  selectedItem: SelectedItem,
+  index: BoardIndex,
+  scales: Map<string, number>,
+) {
   const selected = selectedItem?.type === 'person'
     ? index.peopleById.get(selectedItem.id)
     : selectedItem?.type === 'circle'
@@ -870,15 +875,15 @@ function drawSelectionHandles(ctx: CanvasRenderingContext2D, selectedItem: Selec
     color = circle ? getCircleColors(circle).centerBg : MATERIAL_TONES.blue.centerBg
   }
 
-  const screenRadius = 3.5 + 2.5 * Math.sqrt(scale)
-  const worldRadius = screenRadius / scale
+  const nodeScale = scales.get(selected.id) ?? 1
+  const worldRadius = 6
 
-  for (const handle of connectorHandlesFor(selected)) {
+  for (const handle of connectorHandlesFor(selected, nodeScale)) {
     ctx.beginPath()
     ctx.arc(handle.x, handle.y, worldRadius, 0, Math.PI * 2)
     ctx.fillStyle = color
     ctx.fill()
-    ctx.lineWidth = 2 / scale
+    ctx.lineWidth = 1.5
     ctx.strokeStyle = '#ffffff'
     ctx.stroke()
   }
@@ -895,14 +900,16 @@ function drawConnector(ctx: CanvasRenderingContext2D, connector: DragConnector, 
   ctx.restore()
 }
 
-function connectorHandlesFor(node: CircleNode | PersonNode) {
+function connectorHandlesFor(node: CircleNode | PersonNode, nodeScale = 1) {
   const isCircle = 'radius' in node
-  const radius = isCircle ? CIRCLE_CENTER_RADIUS : PERSON_VISUAL_RADIUS
+  const baseRadius = isCircle ? CIRCLE_CENTER_RADIUS : PERSON_VISUAL_RADIUS
+  const radius = baseRadius * nodeScale
+  const gap = 14 * nodeScale
   return [
-    { x: node.x, y: node.y - radius - 14 },
-    { x: node.x, y: node.y + radius + 14 },
-    { x: node.x - radius - 14, y: node.y },
-    { x: node.x + radius + 14, y: node.y },
+    { x: node.x, y: node.y - radius - gap },
+    { x: node.x, y: node.y + radius + gap },
+    { x: node.x - radius - gap, y: node.y },
+    { x: node.x + radius + gap, y: node.y },
   ]
 }
 
