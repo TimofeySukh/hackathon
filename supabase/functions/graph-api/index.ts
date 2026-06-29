@@ -93,6 +93,17 @@ function jsonResponse(body: unknown, status = 200) {
   })
 }
 
+function errorMessage(error: unknown, fallback = 'Unexpected graph API error.') {
+  if (error instanceof Error && error.message) return error.message
+  if (error && typeof error === 'object') {
+    const record = error as Record<string, unknown>
+    if (typeof record.message === 'string' && record.message) return record.message
+    if (typeof record.error === 'string' && record.error) return record.error
+    if (typeof record.details === 'string' && record.details) return record.details
+  }
+  return fallback
+}
+
 function getRequiredEnv(name: string) {
   const value = Deno.env.get(name)
   if (!value) throw new Error(`Missing required environment variable: ${name}`)
@@ -696,7 +707,13 @@ async function readJson(req: Request) {
   if (contentType.startsWith('image/') || contentType === 'application/octet-stream') {
     return {}
   }
-  return parseBody(await req.json().catch(() => ({})))
+  const rawBody = await req.text()
+  if (!rawBody.trim()) return {}
+  try {
+    return parseBody(JSON.parse(rawBody))
+  } catch {
+    throw new Response('Request body must be valid JSON.', { status: 400 })
+  }
 }
 
 function getExpectedRevision(req: Request, body: Record<string, unknown>) {
@@ -1395,7 +1412,6 @@ Deno.serve(async (req) => {
       const message = await error.text()
       return jsonResponse({ error: message || error.statusText }, error.status)
     }
-    const message = error instanceof Error ? error.message : 'Unexpected graph API error.'
-    return jsonResponse({ error: message }, 500)
+    return jsonResponse({ error: errorMessage(error) }, 500)
   }
 })

@@ -17,6 +17,16 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-29 — Realtime Ignores the Current Tab's In-Flight Save
+
+- Decision: signed-in board persistence tracks the graph currently being saved and treats
+  the matching Supabase Realtime `UPDATE` as an acknowledgement of that local save.
+- Decision: while a save is in flight, the debounced autosave waits for the next known
+  revision before writing newer local edits.
+- Why: Realtime can deliver the database update before the original `saveGraph()` promise
+  resolves. The web app was sometimes classifying its own save as an external change,
+  pausing autosave, and making later local edits look like a remote conflict.
+
 ### 2026-06-28 — Imported Graphs Flush Immediately
 
 - Decision: LinkedIn ZIP imports and graph JSON imports now write the resulting graph to

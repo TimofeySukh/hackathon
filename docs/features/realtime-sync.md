@@ -7,6 +7,7 @@ Ensures that the web application's board canvas stays synchronized in real-time 
 ## Behavior
 
 - When the database is updated externally, the web app automatically receives a database change event.
+- When the current browser tab receives the Realtime event for a save it already has in flight, the event is accepted as the save acknowledgement instead of being treated as an external edit.
 - **No Unsaved Local Changes**: The web app automatically updates the canvas to reflect the new state immediately and seamlessly.
 - **Unsaved Local Changes Exist**: To prevent overwriting the user's unsaved changes, the app displays a banner notifying the user that the board has changed elsewhere and pauses autosaving until the user reloads the page.
 
@@ -23,8 +24,9 @@ Ensures that the web application's board canvas stays synchronized in real-time 
 - **Frontend listener**: A `useEffect` in [App.tsx](file:///Users/velizard/Projects/hackathon/src/App.tsx) creates a Supabase Realtime subscription.
 - **State & Refs**:
   - `graphRef`: Holds the current `graph` state to prevent re-binding the listener when graph state changes.
-  - `loadedGraphRevisionRef`: Holds the currently loaded revision to filter out self-initiated writes.
+  - `loadedGraphRevisionRef`: Holds the currently loaded revision for optimistic concurrency and stale event filtering.
   - `loadedGraphSnapshotRef`: Stores the last loaded/saved graph state.
+  - `pendingSaveGraphRef` / `pendingSaveSnapshotRef`: Track a local save request while it is in flight, so the matching Realtime `UPDATE` can refresh the saved revision without showing a false external-conflict warning.
 - **Utilities**:
   - `isGraphStateEqual` and `deepEqual`: Semantic comparison functions in `src/App.tsx` used to determine whether the user has unsaved modifications.
 
