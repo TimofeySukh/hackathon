@@ -38,11 +38,10 @@ not thousands of per-contact database writes.
 - The import button is disabled while a ZIP import is running and shows `Importing...`.
 - Duplicate imported people are skipped by generated LinkedIn person id.
 - After a successful import, the browser immediately saves the resulting graph to the
-  active storage backend. Signed-in saves use the existing `graph-api` graph replacement
-  route with the current revision; anonymous saves use `localStorage`.
-- If a stale deployed `graph-api` function returns the generic "Unexpected graph API
-  error." failure, signed-in browser saves retry once through direct PostgREST
-  `user_graphs` writes with the same revision guard.
+  active storage backend. Signed-in saves use the `save_user_graph` RPC with the current
+  revision, then direct `user_graphs` table writes if the RPC is missing, and finally the
+  existing `graph-api` replacement route if direct Supabase writes fail. Anonymous saves
+  use `localStorage`.
 
 ## Verification
 
@@ -91,8 +90,8 @@ handling, structured error formatting, and the direct REST fallback request shap
 `test:ui-import:persistence` runs the app with dev-only fake auth plus a localhost mock
 Supabase REST/graph API and verifies that LinkedIn ZIP import and graph JSON import write
 through signed-in persistence and survive reload without touching production data.
-`test:ui-import:persistence:fallback` forces graph API save failures and verifies the same
-imports persist through REST fallback.
+`test:ui-import:persistence:fallback` forces direct Supabase save failures and verifies the
+same imports persist through the graph-api fallback.
 
 Useful overrides:
 

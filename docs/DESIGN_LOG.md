@@ -17,15 +17,18 @@ rediscover, write it here.
 
 ## Entries
 
-### 2026-06-29 — Graph API Generic Save Failure Fallback
+### 2026-06-29 — Browser Saves Prefer Supabase RPC
 
-- Decision: signed-in browser graph saves still try the `graph-api` replacement route
-  first, then fall back to direct PostgREST `user_graphs` writes only when the deployed
-  function returns the generic "Unexpected graph API error." failure.
-- Decision: `npm run test:ui-import:persistence:fallback` forces that failure and verifies
-  LinkedIn ZIP and graph JSON imports still persist and survive reload via REST fallback.
-- Why: hosted Edge Functions can lag local fixes during development; imports must not lose
-  user data while the function deployment is stale.
+- Decision: signed-in browser saves call `save_user_graph(p_graph, p_expected_revision)`
+  first, then fall back to direct `user_graphs` table writes, and finally `graph-api`.
+- Decision: normalize graphs with a JSON round-trip before persistence so imported
+  LinkedIn or graph JSON data cannot reach Supabase with unserializable values.
+- Decision: `npm run test:ui-import:persistence:fallback` forces direct Supabase save
+  failures and verifies LinkedIn ZIP and graph JSON imports still persist through the
+  `graph-api` fallback.
+- Why: large LinkedIn imports were reaching PostgREST with invalid PATCH bodies
+  (`PGRST102`) even after client-side JSON normalization; RPC keeps the graph payload
+  in a single POST body with server-side revision checks.
 
 ### 2026-06-29 — Import Persistence Regression Tests
 

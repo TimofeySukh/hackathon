@@ -1,5 +1,8 @@
 export function formatGraphApiError(error: unknown): string {
-  if (error instanceof Error && error.message) return error.message
+  if (error instanceof Error) {
+    if (error.message) return error.message
+    if (error.name) return error.name
+  }
   if (!error || typeof error !== 'object') return String(error)
 
   const details = error as Record<string, unknown>

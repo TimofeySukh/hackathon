@@ -750,6 +750,8 @@ function App() {
   // The board stays hidden until then so the demo seed never flashes or gets saved.
   const [graphLoaded, setGraphLoaded] = useState(false)
   const [graphLoadError, setGraphLoadError] = useState<string | null>(null)
+  const [isImportingLinkedInProfile, setIsImportingLinkedInProfile] = useState(false)
+  const [isImportingLinkedInZip, setIsImportingLinkedInZip] = useState(false)
   // Bumped when an avatar image finishes decoding, to force a board repaint.
   const [imageEpoch, setImageEpoch] = useState(0)
 
@@ -890,6 +892,7 @@ function App() {
   // Debounced autosave: a flood of drags or a bulk import collapses into one write.
   useEffect(() => {
     if (!graphLoaded || auth.status !== 'authenticated' || !userId) return
+    if (isImportingLinkedInZip || isImportingLinkedInProfile) return
     if (loadedGraphSourceRef.current === 'error') return
     if (loadedGraphSourceRef.current === 'local') return
     const graphJson = JSON.stringify(graph)
@@ -912,7 +915,7 @@ function App() {
         })
     }, 800)
     return () => window.clearTimeout(timer)
-  }, [graph, graphLoaded, auth.status, broadcastGraphRevision, userId])
+  }, [graph, graphLoaded, auth.status, broadcastGraphRevision, isImportingLinkedInProfile, isImportingLinkedInZip, userId])
 
   // Signed-out visitors aren't blocked: their board is restored from (and saved
   // to) localStorage so work survives a reload without an account. Signing in
@@ -952,7 +955,13 @@ function App() {
   async function persistGraphImmediately(nextGraph: GraphState) {
     if (auth.status === 'authenticated' && userId) {
       try {
+        if (supabase) {
+          await supabase.auth.getSession()
+        }
         const graphJson = JSON.stringify(nextGraph)
+        if (!graphJson) {
+          throw new Error('Graph payload could not be serialized.')
+        }
         const nextRevision = await saveGraph(userId, nextGraph, loadedGraphRevisionRef.current)
         loadedGraphRevisionRef.current = nextRevision
         loadedGraphSourceRef.current = 'saved'
@@ -1210,8 +1219,6 @@ function App() {
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([])
   const [isSmartSearching, setIsSmartSearching] = useState(false)
   const smartSearchRequestRef = useRef(0)
-  const [isImportingLinkedInProfile, setIsImportingLinkedInProfile] = useState(false)
-  const [isImportingLinkedInZip, setIsImportingLinkedInZip] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const searchPanelRef = useRef<HTMLDivElement>(null)
   const focusAnimRef = useRef<number | null>(null)

@@ -10,7 +10,7 @@ function parseArgs(argv) {
     companies: 12,
     appPort: 4188,
     mockPort: 54321,
-    forceRestFallback: false,
+    forceGraphApiFallback: false,
   }
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -28,8 +28,8 @@ function parseArgs(argv) {
     } else if (token === '--mock-port' && next) {
       args.mockPort = Number.parseInt(next, 10)
       index += 1
-    } else if (token === '--force-rest-fallback') {
-      args.forceRestFallback = true
+    } else if (token === '--force-graph-api-fallback' || token === '--force-rest-fallback') {
+      args.forceGraphApiFallback = true
     }
   }
 
@@ -53,7 +53,7 @@ async function readBody(request) {
   return text ? JSON.parse(text) : {}
 }
 
-function startMockGraphApi({ port, forceRestFallback }) {
+function startMockGraphApi({ port, forceGraphApiFallback }) {
   const state = {
     graph: null,
     revision: null,
@@ -61,6 +61,7 @@ function startMockGraphApi({ port, forceRestFallback }) {
     graphApiWrites: 0,
     graphApiFailures: 0,
     restWrites: 0,
+    restFailures: 0,
     reads: 0,
   }
 
@@ -74,6 +75,34 @@ function startMockGraphApi({ port, forceRestFallback }) {
       const url = new URL(request.url ?? '/', `http://127.0.0.1:${port}`)
       const isGraphRoute = url.pathname === '/functions/v1/graph-api/v1/graph'
       const isUserGraphsRestRoute = url.pathname === '/rest/v1/user_graphs'
+      const isSaveUserGraphRpcRoute = url.pathname === '/rest/v1/rpc/save_user_graph'
+
+      if (isSaveUserGraphRpcRoute && request.method === 'POST') {
+        if (forceGraphApiFallback) {
+          state.restFailures += 1
+          jsonResponse(response, 400, { code: 'PGRST102', message: 'Empty or invalid json' })
+          return
+        }
+
+        const body = await readBody(request)
+        if (!body || typeof body !== 'object' || !isGraphState(body.p_graph)) {
+          jsonResponse(response, 400, { code: 'PGRST102', message: 'Empty or invalid json' })
+          return
+        }
+
+        const expectedRevision = body.p_expected_revision ?? null
+        if (expectedRevision !== null && expectedRevision !== state.revision) {
+          jsonResponse(response, 409, { code: 'P0001', message: 'Revision conflict' })
+          return
+        }
+
+        state.graph = body.p_graph
+        state.revision = state.revision === null ? 1 : state.revision + 1
+        state.writes += 1
+        state.restWrites += 1
+        jsonResponse(response, 200, state.revision)
+        return
+      }
 
       if (isUserGraphsRestRoute && request.method === 'GET') {
         state.reads += 1
@@ -82,6 +111,12 @@ function startMockGraphApi({ port, forceRestFallback }) {
       }
 
       if (isUserGraphsRestRoute && request.method === 'POST') {
+        if (forceGraphApiFallback) {
+          state.restFailures += 1
+          jsonResponse(response, 400, { code: 'PGRST102', message: 'Empty or invalid json' })
+          return
+        }
+
         const body = await readBody(request)
         if (!body || typeof body !== 'object' || body.user_id !== 'local-e2e-user' || !isGraphState(body.graph)) {
           jsonResponse(response, 400, { error: 'Invalid REST insert graph.' })
@@ -101,6 +136,12 @@ function startMockGraphApi({ port, forceRestFallback }) {
       }
 
       if (isUserGraphsRestRoute && request.method === 'PATCH') {
+        if (forceGraphApiFallback) {
+          state.restFailures += 1
+          jsonResponse(response, 400, { code: 'PGRST102', message: 'Empty or invalid json' })
+          return
+        }
+
         const expectedUserId = url.searchParams.get('user_id')
         const expectedRevision = url.searchParams.get('revision')
         const body = await readBody(request)
@@ -134,12 +175,6 @@ function startMockGraphApi({ port, forceRestFallback }) {
       }
 
       if (request.method === 'PUT') {
-        if (forceRestFallback) {
-          state.graphApiFailures += 1
-          jsonResponse(response, 500, { error: 'Unexpected graph API error.' })
-          return
-        }
-
         const body = await readBody(request)
         if (!body || typeof body !== 'object' || !isGraphState(body.graph)) {
           jsonResponse(response, 400, { error: 'Invalid graph.' })
@@ -360,7 +395,7 @@ async function main() {
   if (!Number.isInteger(args.companies) || args.companies <= 0) throw new Error('--companies must be a positive integer.')
 
   const playwright = await import('playwright')
-  const mock = await startMockGraphApi({ port: args.mockPort, forceRestFallback: args.forceRestFallback })
+  const mock = await startMockGraphApi({ port: args.mockPort, forceGraphApiFallback: args.forceGraphApiFallback })
   const vite = await startVite({ appPort: args.appPort, mockUrl: mock.url })
   const browser = await playwright.chromium.launch({ headless: true })
 
@@ -422,16 +457,20 @@ async function main() {
       throw new Error('Graph import did not survive reload in mock persistence.')
     }
 
-    if (args.forceRestFallback) {
-      if (mock.state.graphApiFailures < 2) {
-        throw new Error(`Expected graph-api save failures, got ${mock.state.graphApiFailures}.`)
+    if (args.forceGraphApiFallback) {
+      if (mock.state.restFailures < 2) {
+        throw new Error(`Expected direct REST save failures, got ${mock.state.restFailures}.`)
       }
-      if (mock.state.restWrites < 2) {
-        throw new Error(`Expected REST fallback writes, got ${mock.state.restWrites}.`)
+      if (mock.state.graphApiWrites < 2) {
+        throw new Error(`Expected graph-api fallback writes, got ${mock.state.graphApiWrites}.`)
       }
-      if (mock.state.graphApiWrites !== 0) {
-        throw new Error(`Expected no successful graph-api writes, got ${mock.state.graphApiWrites}.`)
+      if (mock.state.restWrites !== 0) {
+        throw new Error(`Expected no successful direct REST writes, got ${mock.state.restWrites}.`)
       }
+    } else if (mock.state.restWrites < 2) {
+      throw new Error(`Expected direct REST writes, got ${mock.state.restWrites}.`)
+    } else if (mock.state.graphApiWrites !== 0) {
+      throw new Error(`Expected no graph-api writes in the default path, got ${mock.state.graphApiWrites}.`)
     }
 
     console.log(JSON.stringify({
@@ -443,7 +482,8 @@ async function main() {
       graphApiWrites: mock.state.graphApiWrites,
       graphApiFailures: mock.state.graphApiFailures,
       restWrites: mock.state.restWrites,
-      forceRestFallback: args.forceRestFallback,
+      restFailures: mock.state.restFailures,
+      forceGraphApiFallback: args.forceGraphApiFallback,
       finalCounts: {
         circles: mock.state.graph.circles.length,
         people: mock.state.graph.people.length,

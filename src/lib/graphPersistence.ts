@@ -27,8 +27,34 @@ export class GraphPersistenceError extends Error {
   }
 }
 
-function isGenericGraphApiFailure(error: unknown) {
-  return error instanceof GraphPersistenceError && error.message.includes('Unexpected graph API error.')
+function serializeGraphPayload(payload: Record<string, unknown>) {
+  try {
+    return JSON.stringify(payload, (_, value) => (typeof value === 'bigint' ? value.toString() : value))
+  } catch (error) {
+    throw new GraphPersistenceError('Failed to save your board', error)
+  }
+}
+
+function toPersistableGraph(graph: GraphState): GraphState {
+  if (!isGraphState(graph)) {
+    throw new GraphPersistenceError('Failed to save your board', 'Graph payload is invalid.')
+  }
+
+  const serialized = serializeGraphPayload({ graph })
+  if (!serialized) {
+    throw new GraphPersistenceError('Failed to save your board', 'Graph payload could not be serialized.')
+  }
+
+  try {
+    const parsed = JSON.parse(serialized) as { graph?: unknown }
+    if (!isGraphState(parsed.graph)) {
+      throw new GraphPersistenceError('Failed to save your board', 'Graph payload is invalid after serialization.')
+    }
+    return parsed.graph
+  } catch (error) {
+    if (error instanceof GraphPersistenceError) throw error
+    throw new GraphPersistenceError('Failed to save your board', error)
+  }
 }
 
 function formatPersistenceError(error: unknown): string {
@@ -108,8 +134,15 @@ export async function saveGraphThroughRest(
   expectedRevision: number | null,
   fetchImpl: typeof fetch = fetch,
 ) {
-  const graphJson = JSON.stringify(graph)
+  const persistableGraph = toPersistableGraph(graph)
   const encodedUserId = encodeURIComponent(userId)
+  const requestBody = expectedRevision === null
+    ? serializeGraphPayload({ user_id: userId, graph: persistableGraph })
+    : serializeGraphPayload({ graph: persistableGraph })
+
+  if (!requestBody) {
+    throw new GraphPersistenceError('Failed to save your board', 'Graph payload could not be serialized.')
+  }
 
   if (expectedRevision === null) {
     const response = await fetchImpl(`${restBasePath.replace(/\/$/, '')}/user_graphs?select=revision`, {
@@ -121,7 +154,7 @@ export async function saveGraphThroughRest(
         Accept: 'application/json',
         Prefer: 'return=representation',
       },
-      body: `{"user_id":${JSON.stringify(userId)},"graph":${graphJson}}`,
+      body: requestBody,
     })
 
     const payload = await parseJsonResponse(response)
@@ -129,7 +162,7 @@ export async function saveGraphThroughRest(
       if (typeof payload === 'object' && payload && 'code' in payload && payload.code === '23505') {
         throw new GraphRevisionConflictError()
       }
-      throw new GraphPersistenceError('Failed to save your board through REST fallback', payload ?? { message: response.statusText, code: String(response.status) })
+      throw new GraphPersistenceError('Failed to save your board', payload ?? { message: response.statusText, code: String(response.status) })
     }
 
     return Array.isArray(payload) ? payload[0] as { revision?: unknown } | undefined : undefined
@@ -146,13 +179,13 @@ export async function saveGraphThroughRest(
         Accept: 'application/json',
         Prefer: 'return=representation',
       },
-      body: `{"graph":${graphJson}}`,
+      body: requestBody,
     },
   )
 
   const payload = await parseJsonResponse(response)
   if (!response.ok) {
-    throw new GraphPersistenceError('Failed to save your board through REST fallback', payload ?? { message: response.statusText, code: String(response.status) })
+    throw new GraphPersistenceError('Failed to save your board', payload ?? { message: response.statusText, code: String(response.status) })
   }
 
   const row = Array.isArray(payload) ? payload[0] as { revision?: unknown } | undefined : undefined
@@ -214,24 +247,121 @@ export async function loadGraphRecord(userId: string): Promise<LoadedGraphRecord
  */
 export async function saveGraph(userId: string, graph: GraphState, expectedRevision: number | null): Promise<number | null> {
   if (!supabase) return expectedRevision
+
+  const persistableGraph = toPersistableGraph(graph)
+
   try {
-    const data = await writeGraphThroughApi(graph, expectedRevision)
-    return typeof data?.revision === 'number' ? data.revision : expectedRevision === null ? 1 : expectedRevision + 1
-  } catch (error) {
-    if (!isGenericGraphApiFailure(error)) throw error
-    return saveGraphDirectly(userId, graph, expectedRevision)
+    return await saveGraphDirectly(userId, persistableGraph, expectedRevision)
+  } catch (directError) {
+    if (directError instanceof GraphRevisionConflictError) throw directError
+
+    try {
+      const data = await writeGraphThroughApi(persistableGraph, expectedRevision)
+      return typeof data?.revision === 'number' ? data.revision : expectedRevision === null ? 1 : expectedRevision + 1
+    } catch (apiError) {
+      if (
+        directError instanceof GraphPersistenceError &&
+        directError.message.includes('PGRST102') &&
+        apiError instanceof GraphPersistenceError
+      ) {
+        throw apiError
+      }
+      throw directError
+    }
   }
 }
 
-async function saveGraphDirectly(userId: string, graph: GraphState, expectedRevision: number | null): Promise<number | null> {
-  const restUrl = getSupabaseRestUrl('')
-  const accessToken = await getAccessToken()
-  if (!restUrl || !supabasePublishableKey || !accessToken) {
-    throw new GraphPersistenceError('Failed to save your board through REST fallback', 'Supabase session is not available.')
+function isRevisionConflictError(error: { code?: string | null; message?: string | null }) {
+  return error.code === 'P0001' || /revision conflict/i.test(error.message ?? '')
+}
+
+function isMissingSaveUserGraphRpc(error: { code?: string | null; message?: string | null }) {
+  return error.code === 'PGRST202' || /save_user_graph/i.test(error.message ?? '')
+}
+
+async function saveGraphDirectlyViaRpc(graph: GraphState, expectedRevision: number | null): Promise<number | null> {
+  if (!supabase) {
+    throw new GraphPersistenceError('Failed to save your board', 'Supabase session is not available.')
   }
 
-  const data = await saveGraphThroughRest(restUrl, supabasePublishableKey, accessToken, userId, graph, expectedRevision)
-  return typeof data?.revision === 'number' ? data.revision : expectedRevision === null ? 1 : expectedRevision + 1
+  const { data, error } = await supabase.rpc('save_user_graph', {
+    p_graph: graph,
+    p_expected_revision: expectedRevision,
+  })
+
+  if (error) {
+    if (isRevisionConflictError(error)) throw new GraphRevisionConflictError()
+    if (isMissingSaveUserGraphRpc(error)) return null
+    throw new GraphPersistenceError('Failed to save your board', error)
+  }
+
+  return typeof data === 'number' ? data : expectedRevision === null ? 1 : expectedRevision + 1
+}
+
+async function saveGraphDirectlyViaTable(userId: string, graph: GraphState, expectedRevision: number | null): Promise<number | null> {
+  if (!supabase) {
+    throw new GraphPersistenceError('Failed to save your board', 'Supabase session is not available.')
+  }
+
+  const restUrl = getSupabaseRestUrl('')
+  const accessToken = await getAccessToken()
+  if (restUrl && supabasePublishableKey && accessToken) {
+    try {
+      const row = await saveGraphThroughRest(restUrl, supabasePublishableKey, accessToken, userId, graph, expectedRevision)
+      return typeof row?.revision === 'number' ? row.revision : expectedRevision === null ? 1 : expectedRevision + 1
+    } catch (error) {
+      if (!(error instanceof GraphPersistenceError) || !String(error.message).includes('PGRST102')) {
+        throw error
+      }
+    }
+  }
+
+  if (expectedRevision === null) {
+    const { data, error } = await supabase
+      .from('user_graphs')
+      .insert({ user_id: userId, graph })
+      .select('revision')
+      .single()
+
+    if (error) {
+      if (error.code === '23505') {
+        const { data: existing, error: existingError } = await supabase
+          .from('user_graphs')
+          .select('revision')
+          .eq('user_id', userId)
+          .maybeSingle()
+        if (existingError) throw new GraphPersistenceError('Failed to save your board', existingError)
+        if (typeof existing?.revision !== 'number') throw new GraphRevisionConflictError()
+        return saveGraphDirectlyViaTable(userId, graph, existing.revision)
+      }
+      throw new GraphPersistenceError('Failed to save your board', error)
+    }
+
+    return typeof data?.revision === 'number' ? data.revision : 1
+  }
+
+  const { data, error } = await supabase
+    .from('user_graphs')
+    .update({ graph })
+    .eq('user_id', userId)
+    .eq('revision', expectedRevision)
+    .select('revision')
+    .maybeSingle()
+
+  if (error) {
+    throw new GraphPersistenceError('Failed to save your board', error)
+  }
+  if (!data) {
+    throw new GraphRevisionConflictError()
+  }
+
+  return typeof data.revision === 'number' ? data.revision : expectedRevision + 1
+}
+
+async function saveGraphDirectly(userId: string, graph: GraphState, expectedRevision: number | null): Promise<number | null> {
+  const rpcRevision = await saveGraphDirectlyViaRpc(graph, expectedRevision)
+  if (rpcRevision !== null) return rpcRevision
+  return saveGraphDirectlyViaTable(userId, graph, expectedRevision)
 }
 
 // ---- Local (signed-out) persistence ----------------------------------------

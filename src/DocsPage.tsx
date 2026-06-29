@@ -191,7 +191,7 @@ export default function DocsPage() {
       "command": "npx",
       "args": ["-y", "github:TimofeySukh/hackathon"],
       "env": {
-        "DATANODE_API_URL": "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1",
+        "DATANODE_API_URL": "https://lycfoukfoesobeuumuad.supabase.co/functions/v1/graph-api/v1",
         "DATANODE_API_TOKEN": "dn_live_your_token_here"
       }
     }
@@ -551,7 +551,7 @@ ${pinnedCmd}`}</code>
       badge: 'get',
       keywords: ['get', '/graph/meta', 'meta', 'revision', 'counts'],
       render: (copy) => {
-        const curl = `curl -X GET "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/graph/meta" \\
+        const curl = `curl -X GET "https://lycfoukfoesobeuumuad.supabase.co/functions/v1/graph-api/v1/graph/meta" \\
   -H "Authorization: Bearer dn_live_your_token"`
         const response = `{
   "revision": 12,
@@ -603,7 +603,7 @@ ${pinnedCmd}`}</code>
       badge: 'get',
       keywords: ['get', '/search', 'query', 'people', 'circles', 'find'],
       render: (copy) => {
-        const curl = `curl -X GET "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/search?q=alice&limit=5" \\
+        const curl = `curl -X GET "https://lycfoukfoesobeuumuad.supabase.co/functions/v1/graph-api/v1/search?q=alice&limit=5" \\
   -H "Authorization: Bearer dn_live_your_token"`
         return (
           <div>
@@ -660,7 +660,7 @@ ${pinnedCmd}`}</code>
       badge: 'post',
       keywords: ['post', '/search/smart', 'natural language', 'ai', 'semantic', 'query'],
       render: (copy) => {
-        const curl = `curl -X POST "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/search/smart" \\
+        const curl = `curl -X POST "https://lycfoukfoesobeuumuad.supabase.co/functions/v1/graph-api/v1/search/smart" \\
   -H "Authorization: Bearer dn_live_your_token" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -758,7 +758,7 @@ ${pinnedCmd}`}</code>
       badge: 'get',
       keywords: ['get', '/circles', 'list circles', 'hierarchy'],
       render: (copy) => {
-        const curl = `curl -X GET "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/circles" \\
+        const curl = `curl -X GET "https://lycfoukfoesobeuumuad.supabase.co/functions/v1/graph-api/v1/circles" \\
   -H "Authorization: Bearer dn_live_your_token"`
         return (
           <div>
@@ -789,7 +789,7 @@ ${pinnedCmd}`}</code>
       badge: 'post',
       keywords: ['post', '/people', 'create person', 'add person'],
       render: (copy) => {
-        const curl = `curl -X POST "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/people" \\
+        const curl = `curl -X POST "https://lycfoukfoesobeuumuad.supabase.co/functions/v1/graph-api/v1/people" \\
   -H "Authorization: Bearer dn_live_your_token" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -871,7 +871,7 @@ ${pinnedCmd}`}</code>
       badge: 'post',
       keywords: ['post', '/people/import-linkedin', 'import linkedin', 'add linkedin'],
       render: (copy) => {
-        const curl = `curl -X POST "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/people/import-linkedin" \\
+        const curl = `curl -X POST "https://lycfoukfoesobeuumuad.supabase.co/functions/v1/graph-api/v1/people/import-linkedin" \\
   -H "Authorization: Bearer dn_live_your_token" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -933,7 +933,7 @@ ${pinnedCmd}`}</code>
       badge: 'post',
       keywords: ['post', 'note', '/people/notes', 'add note'],
       render: (copy) => {
-        const curl = `curl -X POST "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/people/person-123/notes" \\
+        const curl = `curl -X POST "https://lycfoukfoesobeuumuad.supabase.co/functions/v1/graph-api/v1/people/person-123/notes" \\
   -H "Authorization: Bearer dn_live_your_token" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -1001,7 +1001,7 @@ ${pinnedCmd}`}</code>
       badge: 'post',
       keywords: ['post', 'link', '/people/links', 'add link', 'linkedin', 'telegram'],
       render: (copy) => {
-        const curl = `curl -X POST "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/people/person-123/links" \\
+        const curl = `curl -X POST "https://lycfoukfoesobeuumuad.supabase.co/functions/v1/graph-api/v1/people/person-123/links" \\
   -H "Authorization: Bearer dn_live_your_token" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -1077,7 +1077,7 @@ ${pinnedCmd}`}</code>
       badge: 'post',
       keywords: ['post', '/connections', 'create connection', 'add relationship', 'line'],
       render: (copy) => {
-        const curl = `curl -X POST "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/connections" \\
+        const curl = `curl -X POST "https://lycfoukfoesobeuumuad.supabase.co/functions/v1/graph-api/v1/connections" \\
   -H "Authorization: Bearer dn_live_your_token" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -1165,7 +1165,7 @@ ${pinnedCmd}`}</code>
     }
   ]
 }`
-        const curl = `curl -X POST "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/operations" \\
+        const curl = `curl -X POST "https://lycfoukfoesobeuumuad.supabase.co/functions/v1/graph-api/v1/operations" \\
   -H "Authorization: Bearer dn_live_your_token" \\
   -H "Content-Type: application/json" \\
   -d '${payload}'`
@@ -1208,7 +1208,7 @@ ${pinnedCmd}`}</code>
       badge: 'delete',
       keywords: ['delete', '/people', 'remove person', 'delete person'],
       render: (copy) => {
-        const curl = `curl -X DELETE "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/people/person-123" \\
+        const curl = `curl -X DELETE "https://lycfoukfoesobeuumuad.supabase.co/functions/v1/graph-api/v1/people/person-123" \\
   -H "Authorization: Bearer dn_live_your_token" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -1263,7 +1263,7 @@ ${pinnedCmd}`}</code>
       badge: 'delete',
       keywords: ['delete', 'note', '/people/notes', 'remove note'],
       render: (copy) => {
-        const curl = `curl -X DELETE "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/people/person-123/notes/note-456" \\
+        const curl = `curl -X DELETE "https://lycfoukfoesobeuumuad.supabase.co/functions/v1/graph-api/v1/people/person-123/notes/note-456" \\
   -H "Authorization: Bearer dn_live_your_token" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -1318,7 +1318,7 @@ ${pinnedCmd}`}</code>
       badge: 'delete',
       keywords: ['delete', 'link', '/people/links', 'remove link'],
       render: (copy) => {
-        const curl = `curl -X DELETE "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/people/person-123/links/link-456" \\
+        const curl = `curl -X DELETE "https://lycfoukfoesobeuumuad.supabase.co/functions/v1/graph-api/v1/people/person-123/links/link-456" \\
   -H "Authorization: Bearer dn_live_your_token" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -1373,7 +1373,7 @@ ${pinnedCmd}`}</code>
       badge: 'delete',
       keywords: ['delete', '/connections', 'remove connection', 'delete connection'],
       render: (copy) => {
-        const curl = `curl -X DELETE "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/connections/connection-123" \\
+        const curl = `curl -X DELETE "https://lycfoukfoesobeuumuad.supabase.co/functions/v1/graph-api/v1/connections/connection-123" \\
   -H "Authorization: Bearer dn_live_your_token" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -1428,7 +1428,7 @@ ${pinnedCmd}`}</code>
       badge: 'get',
       keywords: ['get', '/graph', 'export graph', 'backup'],
       render: (copy) => {
-        const curl = `curl -X GET "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/graph" \\
+        const curl = `curl -X GET "https://lycfoukfoesobeuumuad.supabase.co/functions/v1/graph-api/v1/graph" \\
   -H "Authorization: Bearer dn_live_your_token"`
         return (
           <div>
@@ -1456,7 +1456,7 @@ ${pinnedCmd}`}</code>
       badge: 'post',
       keywords: ['put', '/graph', 'import graph', 'replace'],
       render: (copy) => {
-        const curl = `curl -X PUT "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/graph" \\
+        const curl = `curl -X PUT "https://lycfoukfoesobeuumuad.supabase.co/functions/v1/graph-api/v1/graph" \\
   -H "Authorization: Bearer dn_live_your_token" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -1493,7 +1493,7 @@ ${pinnedCmd}`}</code>
       badge: 'post',
       keywords: ['post', '/graph/clear', 'reset graph', 'clear'],
       render: (copy) => {
-        const curl = `curl -X POST "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/graph/clear" \\
+        const curl = `curl -X POST "https://lycfoukfoesobeuumuad.supabase.co/functions/v1/graph-api/v1/graph/clear" \\
   -H "Authorization: Bearer dn_live_your_token" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -1525,7 +1525,7 @@ ${pinnedCmd}`}</code>
       badge: 'post',
       keywords: ['post', '/circles', 'create circle'],
       render: (copy) => {
-        const curl = `curl -X POST "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/circles" \\
+        const curl = `curl -X POST "https://lycfoukfoesobeuumuad.supabase.co/functions/v1/graph-api/v1/circles" \\
   -H "Authorization: Bearer dn_live_your_token" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -1560,7 +1560,7 @@ ${pinnedCmd}`}</code>
       badge: 'post',
       keywords: ['patch', '/circles', 'update circle', 'edit circle'],
       render: (copy) => {
-        const curl = `curl -X PATCH "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/circles/circle-123" \\
+        const curl = `curl -X PATCH "https://lycfoukfoesobeuumuad.supabase.co/functions/v1/graph-api/v1/circles/circle-123" \\
   -H "Authorization: Bearer dn_live_your_token" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -1594,7 +1594,7 @@ ${pinnedCmd}`}</code>
       badge: 'delete',
       keywords: ['delete', '/circles', 'remove circle'],
       render: (copy) => {
-        const curl = `curl -X DELETE "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/circles/circle-123" \\
+        const curl = `curl -X DELETE "https://lycfoukfoesobeuumuad.supabase.co/functions/v1/graph-api/v1/circles/circle-123" \\
   -H "Authorization: Bearer dn_live_your_token" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -1626,7 +1626,7 @@ ${pinnedCmd}`}</code>
       badge: 'post',
       keywords: ['post', '/people/avatar', 'upload photo', 'avatar'],
       render: (copy) => {
-        const curl = `curl -X POST "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/people/person-123/avatar" \\
+        const curl = `curl -X POST "https://lycfoukfoesobeuumuad.supabase.co/functions/v1/graph-api/v1/people/person-123/avatar" \\
   -H "Authorization: Bearer dn_live_your_token" \\
   -H "Content-Type: image/png" \\
   --data-binary "@avatar.png"`
@@ -1656,7 +1656,7 @@ ${pinnedCmd}`}</code>
       badge: 'post',
       keywords: ['post', '/circles/avatar', 'upload photo', 'avatar'],
       render: (copy) => {
-        const curl = `curl -X POST "https://lxnrpdeahoglgiocowsh.supabase.co/functions/v1/graph-api/v1/circles/circle-123/avatar" \\
+        const curl = `curl -X POST "https://lycfoukfoesobeuumuad.supabase.co/functions/v1/graph-api/v1/circles/circle-123/avatar" \\
   -H "Authorization: Bearer dn_live_your_token" \\
   -H "Content-Type: image/png" \\
   --data-binary "@circle.png"`
