@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { getSupabaseFunctionUrl, supabase } from './supabase'
 import type { GraphState } from './board/types'
 
 // The whole canvas graph lives in a single jsonb column keyed by user id.
@@ -17,6 +17,80 @@ export class GraphRevisionConflictError extends Error {
     super('Your board changed somewhere else. Reload before saving again.')
     this.name = 'GraphRevisionConflictError'
   }
+}
+
+export class GraphPersistenceError extends Error {
+  constructor(action: string, cause: unknown) {
+    super(`${action}: ${formatPersistenceError(cause)}`)
+    this.name = 'GraphPersistenceError'
+    this.cause = cause
+  }
+}
+
+function formatPersistenceError(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message
+  if (!error || typeof error !== 'object') return String(error)
+
+  const details = error as Record<string, unknown>
+  const parts = [
+    typeof details.message === 'string' ? details.message : null,
+    typeof details.details === 'string' ? details.details : null,
+    typeof details.hint === 'string' ? details.hint : null,
+    typeof details.code === 'string' ? `code ${details.code}` : null,
+  ].filter(Boolean)
+
+  if (parts.length > 0) return parts.join(' ')
+
+  try {
+    return JSON.stringify(error)
+  } catch {
+    return String(error)
+  }
+}
+
+async function getAccessToken() {
+  if (!supabase) return null
+  const { data, error } = await supabase.auth.getSession()
+  if (error) throw new GraphPersistenceError('Failed to read your auth session', error)
+  return data.session?.access_token ?? null
+}
+
+async function parseJsonResponse(response: Response) {
+  const text = await response.text()
+  if (!text) return null
+  try {
+    return JSON.parse(text) as unknown
+  } catch {
+    return { message: text, code: String(response.status) }
+  }
+}
+
+async function writeGraphThroughApi(graph: GraphState, expectedRevision: number | null) {
+  const baseUrl = getSupabaseFunctionUrl('graph-api')
+  const accessToken = await getAccessToken()
+  if (!baseUrl || !accessToken) {
+    throw new GraphPersistenceError('Failed to save your board', 'Supabase session is not available.')
+  }
+
+  const response = await fetch(`${baseUrl}/v1/graph`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ graph, expectedRevision }),
+  })
+
+  const payload = await parseJsonResponse(response)
+  if (!response.ok) {
+    if (response.status === 409) {
+      throw new GraphRevisionConflictError()
+    }
+    throw new GraphPersistenceError('Failed to save your board', payload ?? { message: response.statusText, code: String(response.status) })
+  }
+
+  return payload as { revision?: unknown } | null
 }
 
 function isGraphState(value: unknown): value is GraphState {
@@ -63,34 +137,9 @@ export async function loadGraphRecord(userId: string): Promise<LoadedGraphRecord
  */
 export async function saveGraph(userId: string, graph: GraphState, expectedRevision: number | null): Promise<number | null> {
   if (!supabase) return expectedRevision
-
-  if (expectedRevision === null) {
-    const { data, error } = await supabase
-      .from('user_graphs')
-      .insert({ user_id: userId, graph })
-      .select('revision')
-      .single()
-
-    if (error) {
-      if (error.code === '23505') throw new GraphRevisionConflictError()
-      throw error
-    }
-
-    return typeof data.revision === 'number' ? data.revision : 1
-  }
-
-  const { data, error } = await supabase
-    .from('user_graphs')
-    .update({ graph })
-    .eq('user_id', userId)
-    .eq('revision', expectedRevision)
-    .select('revision')
-    .maybeSingle()
-
-  if (error) throw error
-  if (!data) throw new GraphRevisionConflictError()
-
-  return typeof data.revision === 'number' ? data.revision : expectedRevision + 1
+  void userId
+  const data = await writeGraphThroughApi(graph, expectedRevision)
+  return typeof data?.revision === 'number' ? data.revision : expectedRevision === null ? 1 : expectedRevision + 1
 }
 
 // ---- Local (signed-out) persistence ----------------------------------------

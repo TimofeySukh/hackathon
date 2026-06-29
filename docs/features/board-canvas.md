@@ -74,8 +74,9 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
 - **Graph file actions**: the bottom of Settings includes graph import, export, and
   clear actions. Export downloads the current board as a JSON file. Import accepts a
   board graph JSON with `circles`, `people`, and `connections` arrays, then replaces the
-  current board and keeps the action undoable. Clear resets the board to a fresh single
-  `You` circle after confirmation and is also undoable.
+  current board, immediately flushes it to the active storage backend, and keeps the
+  action undoable. Clear resets the board to a fresh single `You` circle after
+  confirmation and is also undoable.
 - **Persistence safety**: signed-in boards load only from the `user_graphs` blob.
   A brand-new empty graph is not immediately autosaved on load, so a temporary
   backend/schema mismatch cannot overwrite an existing board with a single `You` circle.
@@ -94,6 +95,10 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   outline on the canvas.
 - **Avatar fallback**: remote person avatar URLs render initials until the image loads,
   and keep initials if the image fails, so imported profiles never draw as empty chips.
+- **Import persistence**: LinkedIn ZIP imports, single-profile LinkedIn imports, and graph
+  JSON imports save the resulting graph immediately. Signed-in imports write through the
+  `graph-api` replacement route with the current revision; anonymous imports write to
+  `localStorage`.
 - **Collision rules**: people repel other people in their owning circle and the center
   handle of that circle. Nested subset circles repel people that belong directly to the
   parent circle, so a parent-level person cannot visually sit inside a subset they do not

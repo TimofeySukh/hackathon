@@ -137,7 +137,7 @@ async function main() {
       if (message.type() === 'error') console.error(message.text())
     })
 
-    await page.goto(server.url, { waitUntil: 'networkidle' })
+    await page.goto(`${server.url}#board`, { waitUntil: 'networkidle' })
     await page.evaluate(() => {
       window.localStorage.clear()
       const monitor = {

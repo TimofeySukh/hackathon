@@ -37,6 +37,9 @@ not thousands of per-contact database writes.
   so the settings panel can repaint and the event loop is not blocked for the whole import.
 - The import button is disabled while a ZIP import is running and shows `Importing...`.
 - Duplicate imported people are skipped by generated LinkedIn person id.
+- After a successful import, the browser immediately saves the resulting graph to the
+  active storage backend. Signed-in saves use the existing `graph-api` graph replacement
+  route with the current revision; anonymous saves use `localStorage`.
 
 ## Verification
 

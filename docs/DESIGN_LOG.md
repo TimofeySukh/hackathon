@@ -17,6 +17,15 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-29 — Import paths flush graph persistence immediately
+
+- Decision: LinkedIn ZIP imports, single-profile LinkedIn imports, and graph JSON imports
+  now write the resulting graph to the active storage backend immediately after replacing
+  the board state. Signed-in browser saves go through the existing `graph-api` graph
+  replacement route instead of writing directly to the `user_graphs` table endpoint.
+- Why: manual edits saved through debounce, but imported/replaced graphs could be lost
+  after reload or fail with PostgREST invalid-JSON errors on large payloads.
+
 ### 2026-06-29 — Restore automatic circle tone assignment
 
 - Decision: new top-level circles, LinkedIn ZIP company circles, and manually enriched
