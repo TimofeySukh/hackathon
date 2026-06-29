@@ -17,6 +17,14 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-29 — Restore automatic circle tone assignment
+
+- Decision: new top-level circles, LinkedIn ZIP company circles, and manually enriched
+  LinkedIn company circles cycle through the Material tone sequence again instead of
+  defaulting every new circle to blue.
+- Why: transparent clean circle shapes still keep the board quiet, but repeated blue
+  outlines made dense company maps visually indistinguishable.
+
 ### 2026-06-27 — Public Privacy Policy Page at `#privacy`
 
 - Decision: ship a dedicated Privacy Policy screen at `#privacy` (`PrivacyPage.tsx`) instead

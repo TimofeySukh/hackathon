@@ -3512,7 +3512,7 @@ function App() {
             minRadius: isNested ? 82 : 190,
             parentId: isNested ? source.id : null,
             connectedTo: source.id,
-            tone: isNested ? 'violet' : 'blue',
+            tone: isNested ? 'violet' : nextTone(current.circles.length),
             fillMode: circleCreationDefaults.fillMode,
             shapeType: circleCreationDefaults.shapeType,
             shapeCustom: false,
@@ -5892,7 +5892,7 @@ async function buildLinkedInConnectionsGraph(
         minRadius: company.radius,
         parentId: null,
         connectedTo: null,
-        tone: 'blue',
+        tone: nextTone(nextCircles.length),
         fillMode: 'transparent',
         shapeType: 'circle',
         shapeCustom: false,
@@ -6112,7 +6112,7 @@ function ensureLinkedInCompanyCircle(current: GraphState, profile: LinkedInProfi
       minRadius: 90,
       parentId: null,
       connectedTo: null,
-      tone: 'blue',
+      tone: nextTone(nextCircles.length),
       fillMode: 'transparent',
       shapeType: 'circle',
       shapeCustom: false,
@@ -6374,6 +6374,10 @@ function menuPosition(menu: CreateMenu) {
 function makeAvatar(index: number) {
   const names = ['AL', 'BD', 'CE', 'DK', 'EV', 'FX', 'GN', 'HM', 'IR']
   return names[index % names.length]
+}
+
+function nextTone(index: number): CircleTone {
+  return (['blue', 'red', 'green', 'amber', 'violet'] as CircleTone[])[index % 5]
 }
 
 

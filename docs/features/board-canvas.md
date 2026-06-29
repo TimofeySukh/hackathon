@@ -88,7 +88,8 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   circles. Selecting a circle shows quick color swatches, the fill toggle, avatar upload,
   and the Wavyness/Edges sliders directly in the compact quick card. The palette popover
   is only for detailed color/brightness controls. Fill and shape changes apply only to
-  the selected circle; new circles keep the clean transparent default.
+  the selected circle; new circles keep the clean transparent default while their color
+  tone is assigned automatically from the Material tone sequence.
 - **Favorite**: a person can be starred; favorited people get a thicker neon-yellow
   outline on the canvas.
 - **Avatar fallback**: remote person avatar URLs render initials until the image loads,
@@ -107,7 +108,8 @@ This is the most Material-3-aligned part of the app today; keep it that way.
 
 - **Color**: circles and people use the categorical accent palette
   (`MATERIAL_TONES` in `src/App.tsx`) — see the accent table in
-  [`../DESIGN_SYSTEM.md`](../DESIGN_SYSTEM.md#1-color-tonal-roles). Text on a fill uses
+  [`../DESIGN_SYSTEM.md`](../DESIGN_SYSTEM.md#1-color-tonal-roles). New top-level circles
+  and imported company circles cycle through the Material tones automatically. Text on a fill uses
   that tone's on-container value.
 - **Shapes**: nodes render as `wavy` (flower), soft `polygon`, or `circle` via
   `getNodePath`. Circle Wavyness maps to amplitude; Edges maps to side count, with 25
