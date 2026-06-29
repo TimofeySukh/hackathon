@@ -17,6 +17,15 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-29 — Graph Persistence Sanitizes JSONB Text
+
+- Decision: browser and `graph-api` board writes sanitize text before storing the graph
+  in `user_graphs.graph`, removing NUL characters and replacing invalid lone UTF-16
+  surrogate code units.
+- Why: LinkedIn exports and other imported data can contain malformed text that is valid
+  enough to sit in browser state but reaches Supabase/PostgREST as `PGRST102` "Empty or
+  invalid json" when the whole board graph is written as one JSONB blob.
+
 ### 2026-06-29 — Pull-based production promotion
 
 - Decision: Production deploys through a manual GitHub workflow that promotes a reviewed

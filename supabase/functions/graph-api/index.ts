@@ -329,13 +329,104 @@ async function readGraph(userId: string): Promise<GraphRecord> {
   return { graph: data.graph, revision: typeof data.revision === 'number' ? data.revision : 1 }
 }
 
+function sanitizeJsonbText(value: string) {
+  let sanitized = ''
+  let changed = false
+
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index)
+    if (code === 0) {
+      changed = true
+      continue
+    }
+
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const next = value.charCodeAt(index + 1)
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        sanitized += value[index] + value[index + 1]
+        index += 1
+      } else {
+        sanitized += '\uFFFD'
+        changed = true
+      }
+      continue
+    }
+
+    if (code >= 0xdc00 && code <= 0xdfff) {
+      sanitized += '\uFFFD'
+      changed = true
+      continue
+    }
+
+    sanitized += value[index]
+  }
+
+  return changed ? sanitized : value
+}
+
+function finiteNumber(value: number, fallback = 0) {
+  return Number.isFinite(value) ? value : fallback
+}
+
+function sanitizeGraphForJsonb(graph: GraphState): GraphState {
+  return {
+    circles: graph.circles.map((circle) => ({
+      ...circle,
+      id: sanitizeJsonbText(circle.id),
+      name: sanitizeJsonbText(circle.name),
+      icon: sanitizeJsonbText(circle.icon),
+      x: finiteNumber(circle.x),
+      y: finiteNumber(circle.y),
+      radius: finiteNumber(circle.radius, 104),
+      minRadius: finiteNumber(circle.minRadius, 104),
+      parentId: circle.parentId === null ? null : sanitizeJsonbText(circle.parentId),
+      connectedTo: circle.connectedTo === null ? null : sanitizeJsonbText(circle.connectedTo),
+      imageUrl: typeof circle.imageUrl === 'string' ? sanitizeJsonbText(circle.imageUrl) : circle.imageUrl,
+      customColor: typeof circle.customColor === 'string' ? sanitizeJsonbText(circle.customColor) : circle.customColor,
+      sides: typeof circle.sides === 'number' ? finiteNumber(circle.sides, 25) : circle.sides,
+      amplitude: typeof circle.amplitude === 'number' ? finiteNumber(circle.amplitude, 0) : circle.amplitude,
+    })),
+    people: graph.people.map((person) => ({
+      ...person,
+      id: sanitizeJsonbText(person.id),
+      name: sanitizeJsonbText(person.name),
+      x: finiteNumber(person.x),
+      y: finiteNumber(person.y),
+      circleId: sanitizeJsonbText(person.circleId),
+      avatar: sanitizeJsonbText(person.avatar),
+      imageUrl: typeof person.imageUrl === 'string' ? sanitizeJsonbText(person.imageUrl) : person.imageUrl,
+      sides: typeof person.sides === 'number' ? finiteNumber(person.sides, 10) : person.sides,
+      amplitude: typeof person.amplitude === 'number' ? finiteNumber(person.amplitude, 0) : person.amplitude,
+      notes: person.notes?.map((note) => ({
+        ...note,
+        id: sanitizeJsonbText(note.id),
+        title: sanitizeJsonbText(note.title),
+        body: sanitizeJsonbText(note.body),
+      })),
+      links: person.links?.map((link) => ({
+        ...link,
+        id: sanitizeJsonbText(link.id),
+        label: sanitizeJsonbText(link.label),
+        url: sanitizeJsonbText(link.url),
+      })),
+    })),
+    connections: graph.connections.map((connection) => ({
+      ...connection,
+      id: sanitizeJsonbText(connection.id),
+      fromId: sanitizeJsonbText(connection.fromId),
+      toId: sanitizeJsonbText(connection.toId),
+    })),
+  }
+}
+
 async function writeGraph(userId: string, graph: GraphState, expectedRevision: number | null) {
   const service = getServiceClient()
+  const safeGraph = sanitizeGraphForJsonb(graph)
 
   if (expectedRevision === null) {
     const { data, error } = await service
       .from('user_graphs')
-      .insert({ user_id: userId, graph })
+      .insert({ user_id: userId, graph: safeGraph })
       .select('revision')
       .single()
     if (error) {
@@ -345,12 +436,12 @@ async function writeGraph(userId: string, graph: GraphState, expectedRevision: n
       }
       throw error
     }
-    return jsonResponse({ graph, revision: data.revision ?? 1 })
+    return jsonResponse({ graph: safeGraph, revision: data.revision ?? 1 })
   }
 
   const { data, error } = await service
     .from('user_graphs')
-    .update({ graph })
+    .update({ graph: safeGraph })
     .eq('user_id', userId)
     .eq('revision', expectedRevision)
     .select('revision')
@@ -361,7 +452,7 @@ async function writeGraph(userId: string, graph: GraphState, expectedRevision: n
     const current = await readGraph(userId)
     return jsonResponse({ error: 'Revision conflict.', revision: current.revision }, 409)
   }
-  return jsonResponse({ graph, revision: data.revision ?? expectedRevision + 1 })
+  return jsonResponse({ graph: safeGraph, revision: data.revision ?? expectedRevision + 1 })
 }
 
 function getCirclePath(graph: GraphState, circleId: string | null) {

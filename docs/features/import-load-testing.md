@@ -39,6 +39,10 @@ not thousands of per-contact database writes.
   storage backend (Supabase for signed-in users, `localStorage` for anonymous users)
   before the success alert is shown. The normal debounced autosave then skips the same
   unchanged snapshot.
+- Graph persistence strips Postgres-unsafe NUL characters and replaces invalid lone
+  UTF-16 surrogate code units before writing the board to `jsonb`. This protects imports
+  from malformed characters that can appear in exported contact data and otherwise cause
+  PostgREST `PGRST102` "Empty or invalid json" write failures.
 - Signed-in graph writes use the existing `graph-api` Edge Function replacement route as
   the primary path so import persistence shares the same revision-checked contract as
   API/CLI/MCP graph replacement.
@@ -92,7 +96,9 @@ This uses a mock Supabase graph API and minimal mock PostgREST endpoint on local
 through the signed-in persistence path, survive a page reload, recover the latest revision
 when `409 Conflict` omits it, fall back to direct Supabase persistence after a graph API
 failure, and can replace the graph even after an initial graph load failure, without
-touching production data.
+touching production data. The generated LinkedIn CSV also includes Postgres-unsafe text
+characters so the test fails if graph persistence sends raw `\u0000` or invalid surrogate
+escapes to PostgREST.
 
 Useful overrides:
 

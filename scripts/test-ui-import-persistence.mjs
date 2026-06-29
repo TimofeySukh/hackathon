@@ -47,7 +47,17 @@ async function readBody(request) {
   const chunks = []
   for await (const chunk of request) chunks.push(chunk)
   const text = Buffer.concat(chunks).toString('utf8')
+  assertPostgresJsonbSafeBody(text)
   return text ? JSON.parse(text) : {}
+}
+
+function assertPostgresJsonbSafeBody(text) {
+  const lower = text.toLowerCase()
+  if (lower.includes('\\u0000') || lower.includes('\\ud800')) {
+    const error = new Error('Empty or invalid json')
+    error.code = 'PGRST102'
+    throw error
+  }
 }
 
 function startMockGraphApi({ port }) {
@@ -183,6 +193,10 @@ function startMockGraphApi({ port }) {
 
       jsonResponse(response, 405, { error: `Unsupported method: ${request.method}` })
     } catch (error) {
+      if (error?.code === 'PGRST102') {
+        jsonResponse(response, 400, { message: 'Empty or invalid json', code: 'PGRST102' })
+        return
+      }
       jsonResponse(response, 500, { error: error instanceof Error ? error.message : String(error) })
     }
   })
@@ -226,8 +240,8 @@ function buildConnectionsCsv({ people, companies }) {
       `Person${index + 1}`,
       `https://www.linkedin.com/in/persist-person-${index + 1}`,
       `persist.person.${index + 1}@example.invalid`,
-      `Persist Company ${companyNumber}`,
-      `Synthetic Position ${index + 1}`,
+      index === 0 ? `Persist Company ${companyNumber}\u0000` : `Persist Company ${companyNumber}`,
+      index === 0 ? `Synthetic Position ${index + 1}\uD800` : `Synthetic Position ${index + 1}`,
       '2026-06-14',
     ])
   }
