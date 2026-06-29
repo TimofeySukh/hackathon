@@ -69,8 +69,13 @@ import {
   CIRCLE_COLOR_PRESETS,
   LINK_SERVICE_OPTIONS,
   EMPTY_ANIM_FRAME,
+  EDGE_HOVER_ANIM_MS,
+  COLOR_ANIM_MS,
+  MORPH_ANIM_MS,
+  RING_ANIM_MS,
+  randomCircleTone,
 } from './lib/board/constants'
-import { getCircleColors, hexToHsv, hsvToHex } from './lib/board/colors'
+import { getCircleColors, hexToHsv, hsvToHex, lerpCircleColors, circleColorsEqual } from './lib/board/colors'
 import { clamp } from './lib/board/geometry'
 import {
   ensureContainment,
@@ -84,7 +89,7 @@ import {
   movePersonInPlace,
   resizeCircleFromPointInPlace,
 } from './lib/board/layout'
-import { createBoardIndex, hitTestBoard, readAnimFrame, drawBoardLayer, setBoardRepaintCallback } from './lib/board/render'
+import { createBoardIndex, hitTestBoard, readAnimFrame, drawBoardLayer, setBoardRepaintCallback, resolveCircleEdgeHover } from './lib/board/render'
 import { makeInitials } from './lib/board/text'
 
 export type { CircleNode, PersonNode, Connection, GraphState, CircleTone } from './lib/board/types'
@@ -1074,6 +1079,10 @@ function App() {
   const boardAnimRafRef = useRef<number | null>(null)
   const animNowRef = useRef(0)
   const paintBoardRef = useRef<(now?: number) => void>(() => {})
+  const handleExitNodesRef = useRef<Map<string, CircleNode | PersonNode>>(new Map())
+  const prevSelectionRef = useRef<SelectedItem>(null)
+  const ringCircleIdRef = useRef<string | null>(null)
+  const edgeHoverCircleIdRef = useRef<string | null>(null)
 
 
 
@@ -1081,11 +1090,49 @@ function App() {
   const [marquee, setMarquee] = useState<MarqueeState | null>(null)
   const [createMenu, setCreateMenu] = useState<CreateMenu | null>(null)
   const [selectedItem, setSelectedItem] = useState<SelectedItem>(null)
+  const [renderedInspectorItem, setRenderedInspectorItem] = useState<SelectedItem>(null)
+  const [isInspectorOpen, setIsInspectorOpen] = useState(false)
+  const inspectorCloseTimeoutRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (selectedItem) {
+      if (inspectorCloseTimeoutRef.current !== null) {
+        window.clearTimeout(inspectorCloseTimeoutRef.current)
+        inspectorCloseTimeoutRef.current = null
+      }
+      setRenderedInspectorItem(selectedItem)
+      setIsInspectorOpen(false)
+      const openFrame = window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => setIsInspectorOpen(true))
+      })
+      return () => window.cancelAnimationFrame(openFrame)
+    }
+    setIsInspectorOpen(false)
+    // Match the 220ms CSS transition duration
+    inspectorCloseTimeoutRef.current = window.setTimeout(() => {
+      setRenderedInspectorItem(null)
+      inspectorCloseTimeoutRef.current = null
+    }, 220)
+    return () => {
+      if (inspectorCloseTimeoutRef.current !== null) {
+        window.clearTimeout(inspectorCloseTimeoutRef.current)
+      }
+    }
+  }, [selectedItem])
+
+  function selectionShowsHandles(item: SelectedItem | null) {
+    if (!item) return false
+    if (item.type === 'person') return true
+    if (item.type === 'circle') return item.showHandles === true
+    return false
+  }
+
   const [showCircleDropdown, setShowCircleDropdown] = useState(false)
   const [showCircleStylePanel, setShowCircleStylePanel] = useState(false)
   // Which color picker is being actively dragged (vs tapped). A tap glides the
   // thumb to the point; an active drag tracks the pointer with no latency.
   const [pickerDragging, setPickerDragging] = useState<'wheel' | 'brightness' | null>(null)
+  const [colorAnimTick, setColorAnimTick] = useState(0)
   // Pointer-down position for each picker — used to enforce a min-distance
   // threshold before switching from "tap glide" mode to "instant drag" mode.
   // Without this, pointermove fires immediately for any mouse movement,
@@ -1095,6 +1142,7 @@ function App() {
   const [selectedCircleIds, setSelectedCircleIds] = useState<string[]>([])
   const [hoveredPersonId, setHoveredPersonId] = useState<string | null>(null)
   const [hoveredCircleEdgeId, setHoveredCircleEdgeId] = useState<string | null>(null)
+  const hoveredCircleEdgeIdRef = useRef<string | null>(null)
  
   // Onboarding tour. -1 = inactive. A ref mirrors the step so board event
   // handlers (wired once in effects) always read the live value.
@@ -1601,6 +1649,8 @@ function App() {
   }
 
   function togglePersonFavorite(personId: string) {
+    const person = graph.people.find((p) => p.id === personId)
+    const becomingFavorite = !person?.isFavorite
     pushHistory()
     setGraph((current) => ({
       ...current,
@@ -1608,6 +1658,11 @@ function App() {
         p.id === personId ? { ...p, isFavorite: !p.isFavorite } : p
       ),
     }))
+    if (becomingFavorite) {
+      startBoardAnim(`favorite-in:${personId}`, 540)
+    } else {
+      startBoardAnim(`favorite-out:${personId}`, 360)
+    }
   }
 
   function addPersonNote(personId: string, title: string, body: string) {
@@ -1718,8 +1773,62 @@ function App() {
     setNewLinkService('website')
   }
 
-  function setCircleColorFromHsv(circleId: string, hsv: HsvColor) {
-    updateCircleStyle(circleId, { customColor: hsvToHex(hsv) })
+  function setCircleColorFromHsv(circleId: string, hsv: HsvColor, instant = false) {
+    const hex = hsvToHex(hsv)
+    if (instant) {
+      boardAnimsRef.current.delete(`color:${circleId}`)
+      updateCircleStyle(circleId, { customColor: hex })
+      return
+    }
+    animateCircleColor(circleId, { customColor: hex })
+  }
+
+  function displayCircleColors(circle: CircleNode) {
+    const blend = readAnimFrame(boardAnimsRef.current, animNowRef.current).colorReveal.get(circle.id)
+    if (blend) return lerpCircleColors(blend.from, blend.to, blend.t)
+    return getCircleColors(circle)
+  }
+
+  function animateCircleColor(circleId: string, updates: Partial<CircleNode>) {
+    const live = graphRef.current.circles.find((c) => c.id === circleId)
+    if (!live) return
+    const target = { ...live, ...updates }
+    const to = getCircleColors(target)
+    const blend = readAnimFrame(boardAnimsRef.current, animNowRef.current).colorReveal.get(circleId)
+    const from = blend ? lerpCircleColors(blend.from, blend.to, blend.t) : getCircleColors(live)
+    updateCircleStyle(circleId, updates)
+    if (circleColorsEqual(from, to)) return
+    if (prefersReducedMotion()) return
+    boardAnimsRef.current.set(`color:${circleId}`, {
+      start: -1,
+      duration: COLOR_ANIM_MS,
+      colorMorph: { from, to },
+    })
+    if (boardAnimRafRef.current == null) {
+      boardAnimRafRef.current = window.requestAnimationFrame(tickBoardAnims)
+    }
+  }
+
+  function scheduleCircleMorph(circleId: string, next: CircleMorph) {
+    if (prefersReducedMotion()) return
+    const key = `morph:${circleId}`
+    const existing = boardAnimsRef.current.get(key)
+    if (existing?.morph) {
+      boardAnimsRef.current.set(key, {
+        ...existing,
+        morph: {
+          ...existing.morph,
+          toSides: next.toSides,
+          toAmp: next.toAmp,
+          toShapeType: next.toShapeType,
+        },
+      })
+      if (boardAnimRafRef.current == null) {
+        boardAnimRafRef.current = window.requestAnimationFrame(tickBoardAnims)
+      }
+      return
+    }
+    startBoardAnim(key, MORPH_ANIM_MS, next)
   }
 
   function updateCircleStyleAndCreationDefaults(id: string, updates: Partial<CircleNode>) {
@@ -1744,7 +1853,7 @@ function App() {
     const dy = event.clientY - centerY
     const radius = Math.max(1, Math.min(rect.width, rect.height) / 2)
     const distance = Math.min(radius, Math.hypot(dx, dy))
-    const current = hexToHsv(getCircleColors(circle).centerBg)
+    const current = hexToHsv(displayCircleColors(circle).centerBg)
     const angle = Math.atan2(dy, dx)
     const hue = (angle * 180) / Math.PI + 180
     setCircleColorFromHsv(circle.id, { h: hue, s: distance / radius, v: current.v })
@@ -1759,6 +1868,7 @@ function App() {
       if (dist < PICKER_DRAG_THRESHOLD) return // still within tap zone — let the glide play
       down.moved = true
       setPickerDragging('wheel') // drop transition; track instantly from here
+      boardAnimsRef.current.delete(`color:${circle.id}`)
     }
     const rect = event.currentTarget.getBoundingClientRect()
     const centerX = rect.left + rect.width / 2
@@ -1767,10 +1877,10 @@ function App() {
     const dy = event.clientY - centerY
     const radius = Math.max(1, Math.min(rect.width, rect.height) / 2)
     const distance = Math.min(radius, Math.hypot(dx, dy))
-    const current = hexToHsv(getCircleColors(circle).centerBg)
+    const current = hexToHsv(displayCircleColors(circle).centerBg)
     const angle = Math.atan2(dy, dx)
     const hue = (angle * 180) / Math.PI + 180
-    setCircleColorFromHsv(circle.id, { h: hue, s: distance / radius, v: current.v })
+    setCircleColorFromHsv(circle.id, { h: hue, s: distance / radius, v: current.v }, true)
   }
 
   function handleBrightnessPointerDown(event: ReactPointerEvent<HTMLButtonElement>, circle: CircleNode) {
@@ -1780,7 +1890,7 @@ function App() {
     setPickerDragging(null)
     const rect = event.currentTarget.getBoundingClientRect()
     const x = clamp((event.clientX - rect.left) / rect.width, 0, 1)
-    const current = hexToHsv(getCircleColors(circle).centerBg)
+    const current = hexToHsv(displayCircleColors(circle).centerBg)
     setCircleColorFromHsv(circle.id, { ...current, v: x })
   }
 
@@ -1792,11 +1902,12 @@ function App() {
       if (dist < PICKER_DRAG_THRESHOLD) return
       down.moved = true
       setPickerDragging('brightness')
+      boardAnimsRef.current.delete(`color:${circle.id}`)
     }
     const rect = event.currentTarget.getBoundingClientRect()
     const x = clamp((event.clientX - rect.left) / rect.width, 0, 1)
-    const current = hexToHsv(getCircleColors(circle).centerBg)
-    setCircleColorFromHsv(circle.id, { ...current, v: x })
+    const current = hexToHsv(displayCircleColors(circle).centerBg)
+    setCircleColorFromHsv(circle.id, { ...current, v: x }, true)
   }
 
   function handlePickerPointerUp() {
@@ -1842,9 +1953,10 @@ function App() {
   }
 
   function updateCircleCorners(circle: CircleNode, sides: number) {
-    const fromSides = circle.sides ?? 25
-    const amplitude = circle.amplitude ?? 0
-    const fromShapeType = circle.shapeType ?? (amplitude > 0 ? 'wavy' : fromSides >= 25 ? 'circle' : 'polygon')
+    const live = graphRef.current.circles.find((c) => c.id === circle.id) ?? circle
+    const amplitude = live.amplitude ?? 0
+    const committedSides = live.sides ?? 25
+    const fromShapeType = live.shapeType ?? (amplitude > 0 ? 'wavy' : committedSides >= 25 ? 'circle' : 'polygon')
     const toShapeType = amplitude > 0 ? 'wavy' : sides >= 25 ? 'circle' : 'polygon'
     const updates: Partial<CircleNode> = {
       shapeType: toShapeType,
@@ -1852,24 +1964,25 @@ function App() {
       sides,
       amplitude,
     }
-    updateCircleStyleAndCreationDefaults(circle.id, updates)
-    // Morph the shape smoothly over a snappy 250ms interval.
-    if (fromSides !== sides) {
-      startBoardAnim('morph:' + circle.id, 250, {
-        fromSides,
-        fromAmp: amplitude,
-        toSides: sides,
-        toAmp: amplitude,
-        fromShapeType,
-        toShapeType,
-      })
-    }
+    updateCircleStyleAndCreationDefaults(live.id, updates)
+    if (committedSides === sides) return
+
+    const existing = boardAnimsRef.current.get(`morph:${live.id}`)?.morph
+    scheduleCircleMorph(live.id, {
+      fromSides: existing?.fromSides ?? committedSides,
+      fromAmp: existing?.fromAmp ?? amplitude,
+      toSides: sides,
+      toAmp: amplitude,
+      fromShapeType: existing?.fromShapeType ?? fromShapeType,
+      toShapeType,
+    })
   }
 
   function updateCircleAmplitude(circle: CircleNode, amplitude: number) {
-    const sides = circle.sides ?? 25
-    const fromAmplitude = circle.amplitude ?? 0
-    const fromShapeType = circle.shapeType ?? (fromAmplitude > 0 ? 'wavy' : sides >= 25 ? 'circle' : 'polygon')
+    const live = graphRef.current.circles.find((c) => c.id === circle.id) ?? circle
+    const sides = live.sides ?? 25
+    const committedAmp = live.amplitude ?? 0
+    const fromShapeType = live.shapeType ?? (committedAmp > 0 ? 'wavy' : sides >= 25 ? 'circle' : 'polygon')
     const toShapeType = amplitude > 0 ? 'wavy' : sides >= 25 ? 'circle' : 'polygon'
     const updates: Partial<CircleNode> = {
       shapeType: toShapeType,
@@ -1877,19 +1990,18 @@ function App() {
       sides,
       amplitude,
     }
-    updateCircleStyleAndCreationDefaults(circle.id, updates)
-    // Only schedule a morph animation for significant jumps (e.g. tapping the track).
-    // Continuous drag steps update statically in real-time.
-    if (Math.abs(amplitude - fromAmplitude) > 1.5) {
-      startBoardAnim('morph:' + circle.id, 250, {
-        fromSides: sides,
-        fromAmp: fromAmplitude,
-        toSides: sides,
-        toAmp: amplitude,
-        fromShapeType,
-        toShapeType,
-      })
-    }
+    updateCircleStyleAndCreationDefaults(live.id, updates)
+    if (Math.abs(amplitude - committedAmp) < 0.05) return
+
+    const existing = boardAnimsRef.current.get(`morph:${live.id}`)?.morph
+    scheduleCircleMorph(live.id, {
+      fromSides: existing?.fromSides ?? sides,
+      fromAmp: existing?.fromAmp ?? committedAmp,
+      toSides: sides,
+      toAmp: amplitude,
+      fromShapeType: existing?.fromShapeType ?? fromShapeType,
+      toShapeType,
+    })
   }
 
   function deleteCircle(circleId: string) {
@@ -2272,32 +2384,96 @@ function App() {
 
 
 
-  const selectedCircle = selectedItem?.type === 'circle' ? circlesById.get(selectedItem.id) ?? null : null
-  const selectedPerson = selectedItem?.type === 'person' ? graph.people.find((person) => person.id === selectedItem.id) ?? null : null
+  const selectedCircle = renderedInspectorItem?.type === 'circle' ? circlesById.get(renderedInspectorItem.id) ?? null : null
+  const selectedPerson = renderedInspectorItem?.type === 'person'
+    ? graph.people.find((person) => person.id === renderedInspectorItem.id) ?? null
+    : null
   const selectedConnection = useMemo<Connection | null>(() => {
-    if (selectedItem?.type !== 'connection') return null
+    if (renderedInspectorItem?.type !== 'connection') return null
 
-    const stored = (graph.connections || []).find((conn) => conn.id === selectedItem.id)
+    const stored = (graph.connections || []).find((conn) => conn.id === renderedInspectorItem.id)
     if (stored) return stored
 
-    if (selectedItem.id.startsWith(MEMBERSHIP_CONNECTION_PREFIX)) {
-      const personId = selectedItem.id.slice(MEMBERSHIP_CONNECTION_PREFIX.length)
+    if (renderedInspectorItem.id.startsWith(MEMBERSHIP_CONNECTION_PREFIX)) {
+      const personId = renderedInspectorItem.id.slice(MEMBERSHIP_CONNECTION_PREFIX.length)
       const person = peopleById.get(personId)
       if (person?.circleId && circlesById.has(person.circleId)) {
-        return { id: selectedItem.id, fromId: person.circleId, toId: person.id }
+        return { id: renderedInspectorItem.id, fromId: person.circleId, toId: person.id }
       }
     }
 
-    if (selectedItem.id.startsWith(CIRCLE_LINK_CONNECTION_PREFIX)) {
-      const circleId = selectedItem.id.slice(CIRCLE_LINK_CONNECTION_PREFIX.length)
+    if (renderedInspectorItem.id.startsWith(CIRCLE_LINK_CONNECTION_PREFIX)) {
+      const circleId = renderedInspectorItem.id.slice(CIRCLE_LINK_CONNECTION_PREFIX.length)
       const circle = circlesById.get(circleId)
       if (circle?.connectedTo && circlesById.has(circle.connectedTo)) {
-        return { id: selectedItem.id, fromId: circle.connectedTo, toId: circle.id }
+        return { id: renderedInspectorItem.id, fromId: circle.connectedTo, toId: circle.id }
       }
     }
 
     return null
-  }, [circlesById, graph.connections, peopleById, selectedItem])
+  }, [circlesById, graph.connections, peopleById, renderedInspectorItem])
+
+  useEffect(() => {
+    const prev = prevSelectionRef.current
+    prevSelectionRef.current = selectedItem
+
+    const prevShows = selectionShowsHandles(prev)
+    const nextShows = selectionShowsHandles(selectedItem)
+    const prevId = prevShows && prev ? prev.id : null
+    const nextId = nextShows && selectedItem ? selectedItem.id : null
+
+    const handlesTurnedOffSameCircle =
+      prev?.type === 'circle' &&
+      selectedItem?.type === 'circle' &&
+      prev.id === selectedItem.id &&
+      prev.showHandles &&
+      !selectedItem.showHandles
+
+    const handlesTurnedOnSameCircle =
+      prev?.type === 'circle' &&
+      selectedItem?.type === 'circle' &&
+      prev.id === selectedItem.id &&
+      !prev.showHandles &&
+      selectedItem.showHandles
+
+    if (prevId && (prevId !== nextId || handlesTurnedOffSameCircle)) {
+      const node =
+        prev?.type === 'person'
+          ? graph.people.find((person) => person.id === prevId)
+          : circlesById.get(prevId)
+      if (node) {
+        handleExitNodesRef.current.set(prevId, node)
+        startBoardAnim(`handles-out:${prevId}`, 220)
+      }
+    }
+
+    if (nextId && (nextId !== prevId || handlesTurnedOnSameCircle)) {
+      startBoardAnim(`handles:${nextId}`, 300)
+    }
+  }, [selectedItem, graph.circles, graph.people, circlesById])
+
+  useEffect(() => {
+    const circleId = selectedItem?.type === 'circle' ? selectedItem.id : null
+    const prevRingId = ringCircleIdRef.current
+
+    if (circleId && circleId !== prevRingId) {
+      if (prevRingId) startBoardAnim(`ring-out:${prevRingId}`, RING_ANIM_MS)
+      startBoardAnim(`ring:${circleId}`, RING_ANIM_MS)
+      ringCircleIdRef.current = circleId
+    } else if (!circleId && prevRingId) {
+      startBoardAnim(`ring-out:${prevRingId}`, RING_ANIM_MS)
+      ringCircleIdRef.current = null
+    }
+  }, [selectedItem])
+
+  useEffect(() => {
+    const prev = edgeHoverCircleIdRef.current
+    if (hoveredCircleEdgeId === prev) return
+
+    if (prev) animateEdgeHoverTo(prev, 0)
+    if (hoveredCircleEdgeId) animateEdgeHoverTo(hoveredCircleEdgeId, 1)
+    edgeHoverCircleIdRef.current = hoveredCircleEdgeId
+  }, [hoveredCircleEdgeId])
 
 
 
@@ -2337,7 +2513,6 @@ function App() {
         selectedPeopleIds,
         marqueeRef.current,
         selectedCircleIds,
-        hoveredCircleEdgeId,
         EMPTY_ANIM_FRAME,
       )
     }
@@ -2431,8 +2606,9 @@ function App() {
       selectedPeopleIds,
       marquee,
       selectedCircleIds,
-      hoveredCircleEdgeId,
       frame,
+      handleExitNodesRef.current,
+      hoveredCircleEdgeId,
     )
   }
 
@@ -2448,9 +2624,14 @@ function App() {
   function tickBoardAnims(now: number) {
     animNowRef.current = now
     let active = false
+    let colorAnimActive = false
     for (const [key, a] of boardAnimsRef.current) {
+      if (key.startsWith('color:')) colorAnimActive = true
       const start = a.start < 0 ? now : a.start // anchor on first frame
       if (now - start >= a.duration) {
+        if (key.startsWith('handles-out:')) {
+          handleExitNodesRef.current.delete(key.slice(12))
+        }
         boardAnimsRef.current.delete(key)
       } else {
         if (a.start < 0) boardAnimsRef.current.set(key, { ...a, start })
@@ -2461,6 +2642,7 @@ function App() {
 
 
     paintBoardRef.current(now)
+    if (colorAnimActive) setColorAnimTick((t) => t + 1)
     if (active) {
       boardAnimRafRef.current = window.requestAnimationFrame(tickBoardAnims)
     } else {
@@ -2477,6 +2659,29 @@ function App() {
     if (boardAnimRafRef.current == null) {
       boardAnimRafRef.current = window.requestAnimationFrame(tickBoardAnims)
     }
+  }
+
+  function startScalarBoardAnim(key: string, duration: number, fromValue: number, toValue: number) {
+    if (prefersReducedMotion()) return
+    boardAnimsRef.current.set(key, { start: -1, duration, fromValue, toValue })
+    if (boardAnimRafRef.current == null) {
+      boardAnimRafRef.current = window.requestAnimationFrame(tickBoardAnims)
+    }
+  }
+
+  function currentEdgeHoverLevel(circleId: string) {
+    const level = readAnimFrame(boardAnimsRef.current, animNowRef.current).edgeHoverReveal.get(circleId)
+    if (level !== undefined) return level
+    return edgeHoverCircleIdRef.current === circleId ? 1 : 0
+  }
+
+  function animateEdgeHoverTo(circleId: string, target: number) {
+    const from = currentEdgeHoverLevel(circleId)
+    if (Math.abs(from - target) < 0.02) {
+      boardAnimsRef.current.delete(`edge-hover:${circleId}`)
+      return
+    }
+    startScalarBoardAnim(`edge-hover:${circleId}`, EDGE_HOVER_ANIM_MS, from, target)
   }
 
   // Repaint the people canvas whenever the settled camera, people, viewport or
@@ -2640,7 +2845,7 @@ function App() {
     const hit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
       x: event.clientX,
       y: event.clientY,
-    })
+    }, hoveredCircleEdgeIdRef.current)
 
     if (hit?.type === 'connector-handle') {
       if (isRightClick) return
@@ -2701,7 +2906,7 @@ function App() {
         }))
         setSelectedPeopleIds([])
         setSelectedCircleIds([])
-        selectItem({ type: 'circle', id: hit.circle.id })
+        selectItem({ type: 'circle', id: hit.circle.id, showHandles: true })
         startCircleMove(event, hit.circle)
       } else {
         if (event.shiftKey) {
@@ -2722,8 +2927,8 @@ function App() {
           if (!selectedCircleIds.includes(hit.circle.id)) {
             setSelectedPeopleIds([])
             setSelectedCircleIds([])
-            selectItem({ type: 'circle', id: hit.circle.id })
           }
+          selectItem({ type: 'circle', id: hit.circle.id, showHandles: true })
           // When this zone is part of a multi/mixed selection, grabbing its center
           // drags the whole group instead of starting a connector.
           const isGroupDrag =
@@ -2781,7 +2986,7 @@ function App() {
         if (!selectedCircleIds.includes(hit.circle.id)) {
           setSelectedPeopleIds([])
           setSelectedCircleIds([])
-          selectItem({ type: 'circle', id: hit.circle.id })
+          selectItem({ type: 'circle', id: hit.circle.id, showHandles: false })
         }
         startCircleMove(event, hit.circle)
       }
@@ -2981,7 +3186,7 @@ function App() {
       const hit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
         x: event.clientX,
         y: event.clientY,
-      })
+      }, hoveredCircleEdgeIdRef.current)
       if (hit?.type === 'circle-edge') {
         const world = screenToWorld({ x: event.clientX, y: event.clientY })
         setSurfaceCursor(getResizeCursor(world, hit.circle))
@@ -2994,20 +3199,27 @@ function App() {
 
     // Idle hover is canvas hit-testing now; React only stores the hovered ids.
     if (!pan && !moving && !movingPerson && !resizing) {
+      const world = screenToWorld({ x: event.clientX, y: event.clientY })
       const hit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
         x: event.clientX,
         y: event.clientY,
-      })
+      }, hoveredCircleEdgeIdRef.current)
       const id = hit?.type === 'person' ? hit.person.id : null
       if (id !== hoveredPersonId) setHoveredPersonId(id)
       const connId = hit?.type === 'connection' ? hit.connection.id : null
       if (connId !== hoveredConnId) setHoveredConnId(connId)
-      const edgeId = hit?.type === 'circle-edge' ? hit.circle.id : null
-      if (edgeId !== hoveredCircleEdgeId) setHoveredCircleEdgeId(edgeId)
+      const edgeId = resolveCircleEdgeHover(boardIndex, world, cameraRef.current.scale, hoveredCircleEdgeIdRef.current)
+      if (edgeId !== hoveredCircleEdgeIdRef.current) {
+        hoveredCircleEdgeIdRef.current = edgeId
+        setHoveredCircleEdgeId(edgeId)
+      }
     } else {
       if (hoveredPersonId) setHoveredPersonId(null)
       if (hoveredConnId) setHoveredConnId(null)
-      if (hoveredCircleEdgeId) setHoveredCircleEdgeId(null)
+      if (hoveredCircleEdgeIdRef.current) {
+        hoveredCircleEdgeIdRef.current = null
+        setHoveredCircleEdgeId(null)
+      }
     }
   }
 
@@ -3022,7 +3234,7 @@ function App() {
     const upHit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
       x: event.clientX,
       y: event.clientY,
-    })
+    }, hoveredCircleEdgeIdRef.current)
     setSurfaceCursor(upHit ? 'pointer' : 'default')
 
     if (marqueeRef.current) {
@@ -3246,7 +3458,7 @@ function App() {
     const hit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
       x: event.clientX,
       y: event.clientY,
-    })
+    }, hoveredCircleEdgeIdRef.current)
     if (hit?.type !== 'circle-body' && hit?.type !== 'circle-edge' && hit?.type !== 'circle-center') return
 
     selectItem({ type: 'circle', id: hit.circle.id })
@@ -3414,7 +3626,7 @@ function App() {
     const hit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
       x: event.clientX,
       y: event.clientY,
-    })
+    }, hoveredCircleEdgeIdRef.current)
 
     // An empty-space tap yields no owning circle (''), so the person stays put.
     let circleId = ''
@@ -3520,7 +3732,7 @@ function App() {
         minRadius: 82,
         parentId: parentCircleId,
         connectedTo: parentCircleId,
-        tone: 'violet' as const,
+        tone: randomCircleTone(),
         fillMode: circleCreationDefaults.fillMode,
         shapeType: circleCreationDefaults.shapeType,
         shapeCustom: false,
@@ -3637,7 +3849,7 @@ function App() {
             minRadius: isNested ? 82 : 190,
             parentId: isNested ? source.id : null,
             connectedTo: source.id,
-            tone: isNested ? 'violet' : 'blue',
+            tone: randomCircleTone(),
             fillMode: circleCreationDefaults.fillMode,
             shapeType: circleCreationDefaults.shapeType,
             shapeCustom: false,
@@ -4568,7 +4780,10 @@ Content-Type: application/json
         onPointerLeave={() => {
           if (hoveredPersonId) setHoveredPersonId(null)
           if (hoveredConnId) setHoveredConnId(null)
-          if (hoveredCircleEdgeId) setHoveredCircleEdgeId(null)
+          if (hoveredCircleEdgeIdRef.current) {
+            hoveredCircleEdgeIdRef.current = null
+            setHoveredCircleEdgeId(null)
+          }
           setSurfaceCursor('default')
         }}
       >
@@ -4620,10 +4835,15 @@ Content-Type: application/json
         </div>
       )}
 
-      {selectedItem && (
-      <aside key={`${selectedItem.type}:${selectedItem.id}`} className="inspector" aria-label="Selection details" style={{ overflow: 'visible', maxHeight: 'calc(100vh - 120px)' }}>
+      {renderedInspectorItem && (
+      <aside
+        key={`${renderedInspectorItem.type}:${renderedInspectorItem.id}`}
+        className={`inspector ${isInspectorOpen ? 'is-open' : ''}`}
+        aria-label="Selection details"
+        style={{ overflow: 'visible', maxHeight: 'calc(100vh - 120px)' }}
+      >
 
-            {selectedItem.type !== 'connection' ? (
+            {renderedInspectorItem.type !== 'connection' ? (
               <input
                 className="inspector__name-input"
                 value={selectedCircle?.name ?? selectedPerson?.name ?? ''}
@@ -4639,7 +4859,8 @@ Content-Type: application/json
             {selectedCircle && (
               <>
                 {(() => {
-                  const selectedCircleColors = getCircleColors(selectedCircle)
+                  void colorAnimTick
+                  const selectedCircleColors = displayCircleColors(selectedCircle)
                   const selectedCircleHsv = hexToHsv(selectedCircleColors.centerBg)
                   const selectedCircleSides = selectedCircle.sides ?? 25
                   const selectedCircleAmplitude = selectedCircle.amplitude ?? 0
@@ -4657,7 +4878,7 @@ Content-Type: application/json
                                 data-ind-key={id}
                                 className={`quick-circle-color ${selectedCircle.tone === tone && !selectedCircle.customColor ? 'is-selected' : ''} ${pressingSwatchId === id ? 'is-pressing' : ''} ${returningSwatchId === id ? 'is-returning' : ''}`}
                                 style={{ backgroundColor: MATERIAL_TONES[tone].centerBg }}
-                                onPointerDown={() => handleSwatchPointerDown(id, () => updateCircleStyle(selectedCircle.id, { tone, customColor: undefined }))}
+                                onPointerDown={() => handleSwatchPointerDown(id, () => animateCircleColor(selectedCircle.id, { tone, customColor: undefined }))}
                                 onPointerUp={() => handleSwatchPointerUp(id)}
                                 onPointerLeave={() => handleSwatchPointerUp(id)}
                                 onPointerCancel={() => handleSwatchPointerUp(id)}
@@ -4766,7 +4987,7 @@ Content-Type: application/json
                                   data-ind-key={id}
                                   className={`circle-style-preset ${selectedCircleColors.centerBg.toLowerCase() === color.toLowerCase() ? 'is-selected' : ''} ${pressingSwatchId === id ? 'is-pressing' : ''} ${returningSwatchId === id ? 'is-returning' : ''}`}
                                   style={{ backgroundColor: color }}
-                                  onPointerDown={() => handleSwatchPointerDown(id, () => updateCircleStyle(selectedCircle.id, { customColor: color }))}
+                                  onPointerDown={() => handleSwatchPointerDown(id, () => animateCircleColor(selectedCircle.id, { customColor: color }))}
                                   onPointerUp={() => handleSwatchPointerUp(id)}
                                   onPointerLeave={() => handleSwatchPointerUp(id)}
                                   onPointerCancel={() => handleSwatchPointerUp(id)}

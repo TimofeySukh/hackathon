@@ -102,7 +102,7 @@ export type MarqueeState = {
 }
 
 export type SelectedItem =
-  | { type: 'circle'; id: string }
+  | { type: 'circle'; id: string; showHandles?: boolean }
   | { type: 'person'; id: string }
   | { type: 'connection'; id: string }
   | null
@@ -152,11 +152,28 @@ export type CircleMorph = {
   toShapeType?: ShapeType
 }
 
+export type CircleToneColors = {
+  fill: string
+  border: string
+  text: string
+  centerBg: string
+}
+
+export type ColorMorph = {
+  from: CircleToneColors
+  to: CircleToneColors
+}
+
 export type BoardAnim = {
   start: number
   duration: number
   // For 'morph:<id>' anims.
   morph?: CircleMorph
+  // For 'color:<id>' anims.
+  colorMorph?: ColorMorph
+  // Scalar lerp endpoints (edge-hover and similar).
+  fromValue?: number
+  toValue?: number
 }
 
 export type AnimFrame = {
@@ -166,6 +183,18 @@ export type AnimFrame = {
   // circleId -> in-flight shape morph (with eased progress `t`) that overrides
   // the circle's stored shape while the animation runs.
   morphs: Map<string, CircleMorph & { t: number }>
+  // nodeId -> connector-handle reveal (0 = collapsed at center, 1 = fully out).
+  handleReveal: Map<string, number>
+  // personId -> favorite halo reveal (0 = hidden, 1 = all dots visible).
+  favoriteReveal: Map<string, number>
+  // personId -> favorite ring tilt in radians (wobble while appearing).
+  favoriteTilt: Map<string, number>
+  // circleId -> selection ring fill progress (0 = dashed/rest, 1 = solid highlight).
+  ringReveal: Map<string, number>
+  // circleId -> resize-edge hover highlight (0 = hidden, 1 = fully visible).
+  edgeHoverReveal: Map<string, number>
+  // circleId -> in-flight fill/border color blend while the tone or custom color changes.
+  colorReveal: Map<string, ColorMorph & { t: number }>
 }
 
 export type LayoutContext = {

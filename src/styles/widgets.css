@@ -559,6 +559,7 @@
   transition:
     --wheel-x var(--md-dur-medium) var(--md-ease-spring),
     --wheel-y var(--md-dur-medium) var(--md-ease-spring),
+    background-color var(--md-dur-medium) var(--md-ease-spring),
     transform var(--md-dur-short) var(--md-ease-spring),
     box-shadow 0.1s;
   animation: pickerThumbPop 0.16s cubic-bezier(.2, 0, 0, 1);

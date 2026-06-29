@@ -1,7 +1,7 @@
 // Pure geometry + canvas-path helpers shared by the renderer, hit-testing and the
 // layout/collision passes.
 
-import type { ShapeType } from './types'
+import type { CircleMorph, ShapeType } from './types'
 
 export function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value))
@@ -194,6 +194,26 @@ export function sampleCircleOutline(
   for (let i = 0; i < n; i++) {
     const theta = (i / n) * 2 * Math.PI
     const rad = circleRadiusAtAngle(R, sides, amplitude, theta, shapeType)
+    pts[i] = { x: cx + rad * Math.cos(theta), y: cy + rad * Math.sin(theta) }
+  }
+  return pts
+}
+
+// Morph between two circle outlines by lerping radius at matching angles.
+export function sampleCircleOutlineMorph(
+  cx: number,
+  cy: number,
+  R: number,
+  morph: CircleMorph & { t: number },
+  n: number,
+): OutlinePoint[] {
+  const t = morph.t
+  const pts: OutlinePoint[] = new Array(n)
+  for (let i = 0; i < n; i++) {
+    const theta = (i / n) * 2 * Math.PI
+    const rFrom = circleRadiusAtAngle(R, morph.fromSides, morph.fromAmp, theta, morph.fromShapeType)
+    const rTo = circleRadiusAtAngle(R, morph.toSides, morph.toAmp, theta, morph.toShapeType)
+    const rad = rFrom + (rTo - rFrom) * t
     pts[i] = { x: cx + rad * Math.cos(theta), y: cy + rad * Math.sin(theta) }
   }
   return pts

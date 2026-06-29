@@ -11,10 +11,20 @@ export const ZONE_ONLY_SCALE = 0.35
 
 export const CONNECT_THRESHOLD = 40
 export const MIN_CIRCLE_RADIUS = 72
-export const EDGE_RESIZE_HIT_SIZE = 18
+export const EDGE_RESIZE_HIT_SIZE = 16
+// Wider band kept while the pointer stays near a resize edge to avoid hover flicker.
+export const EDGE_RESIZE_HIT_LEAVE_SIZE = 48
+export const EDGE_HOVER_ANIM_MS = 320
+export const MORPH_ANIM_MS = 380
+export const COLOR_ANIM_MS = 220
+export const RING_ANIM_MS = 420
+export const RING_VERTEX_SPREAD_END = 0.88
 export const PERSON_VISUAL_RADIUS = 20
 export const CIRCLE_CENTER_RADIUS = 20
 export const HANDLE_HIT_RADIUS = 16
+export const FAVORITE_HALO_INSET = 5
+export const CONNECTOR_HANDLE_GAP = 22
+export const CONNECTOR_HANDLE_GAP_FAVORITE = 28
 export const CIRCLE_LINK_CONNECTION_PREFIX = 'circle-link:'
 export const MEMBERSHIP_CONNECTION_PREFIX = 'membership:'
 export const PERSON_CONTAINMENT_RADIUS = 28
@@ -51,7 +61,16 @@ export const IMPORT_LAYOUT_LIMIT = 1500
 // Side of one spatial-hash cell (world units) used by the board index.
 export const BOARD_GRID_SIZE = 360
 
-export const EMPTY_ANIM_FRAME: AnimFrame = { scales: new Map(), morphs: new Map() }
+export const EMPTY_ANIM_FRAME: AnimFrame = {
+  scales: new Map(),
+  morphs: new Map(),
+  handleReveal: new Map(),
+  favoriteReveal: new Map(),
+  favoriteTilt: new Map(),
+  ringReveal: new Map(),
+  edgeHoverReveal: new Map(),
+  colorReveal: new Map(),
+}
 
 export const MATERIAL_TONES: Record<CircleTone, { fill: string; border: string; text: string; centerBg: string }> = {
   blue: { fill: '#D2E4FF', border: '#004A77', text: '#001D35', centerBg: '#00629D' },
@@ -59,6 +78,12 @@ export const MATERIAL_TONES: Record<CircleTone, { fill: string; border: string; 
   green: { fill: '#D1E8D2', border: '#0F6D38', text: '#00210B', centerBg: '#1E824A' },
   amber: { fill: '#FFE082', border: '#B06000', text: '#2A1400', centerBg: '#D87A00' },
   violet: { fill: '#EADDFF', border: '#6750A4', text: '#21005D', centerBg: '#7F67BE' },
+}
+
+export const CIRCLE_TONES: CircleTone[] = ['blue', 'red', 'green', 'amber', 'violet']
+
+export function randomCircleTone(): CircleTone {
+  return CIRCLE_TONES[Math.floor(Math.random() * CIRCLE_TONES.length)]
 }
 
 // The picker shows the first 8 of these as presets. They are deliberately

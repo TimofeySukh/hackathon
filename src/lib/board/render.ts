@@ -8,6 +8,7 @@ import type {
   BoardAnim,
   BoardHit,
   CircleMorph,
+  ColorMorph,
   BoardIndex,
   Camera,
   CircleFillMode,
@@ -25,15 +26,20 @@ import {
   BOARD_GRID_SIZE,
   CIRCLE_LINK_CONNECTION_PREFIX,
   CIRCLE_CENTER_RADIUS,
+  CONNECTOR_HANDLE_GAP,
+  CONNECTOR_HANDLE_GAP_FAVORITE,
   EDGE_RESIZE_HIT_SIZE,
+  EDGE_RESIZE_HIT_LEAVE_SIZE,
   EMPTY_ANIM_FRAME,
+  FAVORITE_HALO_INSET,
   HANDLE_HIT_RADIUS,
   MEMBERSHIP_CONNECTION_PREFIX,
   MATERIAL_TONES,
   PERSON_VISUAL_RADIUS,
+  RING_VERTEX_SPREAD_END,
   ZONE_ONLY_SCALE,
 } from './constants'
-import { colorMix, getCircleColors } from './colors'
+import { colorMix, getCircleColors, lerpCircleColors } from './colors'
 import {
   distanceToCurvePath,
   drawCurvePath,
@@ -42,6 +48,7 @@ import {
   outlinePath,
   roundedRect,
   sampleCircleOutline,
+  sampleCircleOutlineMorph,
 } from './geometry'
 import { makeInitials } from './text'
 
@@ -269,17 +276,35 @@ function getPersonSprite(person: PersonNode, fillColor: string, size: number, st
   return canvas
 }
 
-function drawFavoritePersonOutline(ctx: CanvasRenderingContext2D, person: PersonNode, color: string, drawRadius: number) {
-  const radius = drawRadius + 7
+// Slight overshoot so a freshly created node grows past full size then settles.
+const easeOutBack = (t: number) => {
+  const c1 = 1.70158
+  const c3 = c1 + 1
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2)
+}
+
+function drawFavoritePersonOutline(
+  ctx: CanvasRenderingContext2D,
+  person: PersonNode,
+  color: string,
+  drawRadius: number,
+  reveal = 1,
+) {
+  const radius = drawRadius + FAVORITE_HALO_INSET
   const dotCount = 18
   const haloRadius = 2.5
   ctx.save()
   for (let i = 0; i < dotCount; i += 1) {
-    const angle = (Math.PI * 2 * i) / dotCount - Math.PI / 2
+    const dotStart = i / dotCount
+    const dotSpan = 1 / dotCount
+    if (reveal <= dotStart) continue
+    const dotT = Math.min(1, (reveal - dotStart) / dotSpan)
+    const scale = Math.max(0, easeOutBack(dotT))
+    const angle = (Math.PI * 2 * i) / dotCount - Math.PI / 2 + Math.PI / dotCount
     const x = person.x + Math.cos(angle) * radius
     const y = person.y + Math.sin(angle) * radius
     ctx.beginPath()
-    ctx.arc(x, y, haloRadius, 0, Math.PI * 2)
+    ctx.arc(x, y, haloRadius * scale, 0, Math.PI * 2)
     ctx.fillStyle = color
     ctx.fill()
   }
@@ -309,32 +334,61 @@ function resizeCanvas(canvas: HTMLCanvasElement, surface: HTMLElement) {
 // repaints, so the gesture/drag paths can keep calling drawBoardLayer with nothing.
 // BoardAnim / AnimFrame / EMPTY_ANIM_FRAME live in lib/board/{types,constants}.
 
-// Slight overshoot so a freshly created node grows past full size then settles.
-const easeOutBack = (t: number) => {
-  const c1 = 1.70158
-  const c3 = c1 + 1
-  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2)
-}
-
 // Decelerating ease for shape morphs: fast start, soft settle.
 const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3)
+const easeInCubic = (t: number) => t * t * t
+const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
+
+function selectionShowsHandles(selectedItem: SelectedItem | null) {
+  if (!selectedItem) return false
+  if (selectedItem.type === 'person') return true
+  if (selectedItem.type === 'circle') return selectedItem.showHandles === true
+  return false
+}
 
 export function readAnimFrame(anims: Map<string, BoardAnim>, now: number): AnimFrame {
   if (anims.size === 0) return EMPTY_ANIM_FRAME
   const scales = new Map<string, number>()
   const morphs = new Map<string, CircleMorph & { t: number }>()
+  const handleReveal = new Map<string, number>()
+  const favoriteReveal = new Map<string, number>()
+  const favoriteTilt = new Map<string, number>()
+  const ringReveal = new Map<string, number>()
+  const edgeHoverReveal = new Map<string, number>()
+  const colorReveal = new Map<string, ColorMorph & { t: number }>()
+
   for (const [key, a] of anims) {
-    // start < 0 means "not yet anchored to the rAF clock" → treat as just begun.
     const t = a.start < 0 ? 0 : Math.min(1, Math.max(0, (now - a.start) / a.duration))
     if (key.startsWith('pop:')) {
-      // Grow-in for freshly created nodes: 0 -> slight overshoot -> 1.
       scales.set(key.slice(4), Math.max(0, easeOutBack(t)))
     } else if (key.startsWith('morph:') && a.morph) {
-      // Smoothly morph a circle's shape (sides and/or amplitude).
-      morphs.set(key.slice(6), { ...a.morph, t: easeOutCubic(t) })
+      morphs.set(key.slice(6), { ...a.morph, t: easeInOutCubic(t) })
+    } else if (key.startsWith('handles-out:')) {
+      handleReveal.set(key.slice(12), Math.max(0, 1 - easeInCubic(t)))
+    } else if (key.startsWith('handles:')) {
+      handleReveal.set(key.slice(8), Math.max(0, easeOutBack(t)))
+    } else if (key.startsWith('favorite-out:')) {
+      favoriteReveal.set(key.slice(13), Math.max(0, 1 - easeInCubic(t)))
+    } else if (key.startsWith('favorite-in:')) {
+      favoriteReveal.set(key.slice(12), easeOutCubic(t))
+    } else if (key.startsWith('ring-out:')) {
+      ringReveal.set(key.slice(9), Math.max(0, 1 - easeInCubic(t)))
+    } else if (key.startsWith('ring:')) {
+      ringReveal.set(key.slice(5), easeOutCubic(t))
+    } else if (key.startsWith('edge-hover:')) {
+      const id = key.slice(11)
+      if (a.fromValue !== undefined && a.toValue !== undefined) {
+        const eased = easeInOutCubic(t)
+        edgeHoverReveal.set(id, a.fromValue + (a.toValue - a.fromValue) * eased)
+      } else {
+        edgeHoverReveal.set(id, easeOutCubic(t))
+      }
+    } else if (key.startsWith('color:') && a.colorMorph) {
+      colorReveal.set(key.slice(6), { ...a.colorMorph, t: easeInOutCubic(t) })
     }
   }
-  return { scales, morphs }
+
+  return { scales, morphs, handleReveal, favoriteReveal, favoriteTilt, ringReveal, edgeHoverReveal, colorReveal }
 }
 
 export function drawBoardLayer(
@@ -353,8 +407,9 @@ export function drawBoardLayer(
   selectedPeopleIds: string[] = [],
   marquee: MarqueeState | null = null,
   selectedCircleIds: string[] = [],
-  hoveredCircleEdgeId: string | null = null,
   anim: AnimFrame = EMPTY_ANIM_FRAME,
+  handleExitNodes: Map<string, CircleNode | PersonNode> = new Map(),
+  activeEdgeHoverId: string | null = null,
 ) {
   const { dpr, width, height } = resizeCanvas(canvas, surface)
   const ctx = canvas.getContext('2d')
@@ -373,7 +428,7 @@ export function drawBoardLayer(
   ctx.translate(camera.x, camera.y)
   ctx.scale(camera.scale, camera.scale)
 
-  drawCircleFills(ctx, visibleCircles, selectedItem, camera.scale, circleShapeMode, circleFillMode, selectedCircleIds, hoveredCircleEdgeId, anim.morphs)
+  drawCircleFills(ctx, visibleCircles, selectedItem, camera.scale, circleShapeMode, circleFillMode, selectedCircleIds, anim, activeEdgeHoverId)
 
   if (camera.scale < ZONE_ONLY_SCALE) {
     // Far-zoom simplified view: only the colored zones and the labels of the
@@ -387,10 +442,10 @@ export function drawBoardLayer(
     drawCircleEdges(ctx, visibleCircles, index, camera.scale, selectedItem, hoveredConnId)
     drawPersonEdges(ctx, visiblePeople, index, camera.scale, selectedItem, hoveredConnId)
     drawCustomConnections(ctx, visiblePeopleIds, visibleCircleIds, index, selectedItem, hoveredConnId, camera.scale)
-    drawCircleDetails(ctx, visibleCircles, camera.scale, circleFillMode, showCircleLabels, anim.scales)
-    drawPeople(ctx, visiblePeople, index, selectedItem, hoveredPersonId, camera.scale, dpr, showPersonLabels, selectedPeopleIds, anim.scales)
+    drawCircleDetails(ctx, visibleCircles, camera.scale, circleFillMode, showCircleLabels, anim)
+    drawPeople(ctx, visiblePeople, index, selectedItem, hoveredPersonId, camera.scale, dpr, showPersonLabels, selectedPeopleIds, anim)
     if (connector) drawConnector(ctx, connector, camera.scale)
-    drawSelectionHandles(ctx, selectedItem, index, anim.scales)
+    drawSelectionHandles(ctx, selectedItem, index, anim, handleExitNodes, visiblePeople)
   }
 
   ctx.restore()
@@ -597,6 +652,12 @@ function drawCustomConnections(
   }
 }
 
+function resolveCircleColors(circle: CircleNode, anim: AnimFrame) {
+  const blend = anim.colorReveal.get(circle.id)
+  if (blend) return lerpCircleColors(blend.from, blend.to, blend.t)
+  return getCircleColors(circle)
+}
+
 function drawCircleFills(
   ctx: CanvasRenderingContext2D,
   circles: CircleNode[],
@@ -605,13 +666,13 @@ function drawCircleFills(
   circleShapeMode: CircleShapeMode,
   circleFillMode: CircleFillMode,
   selectedCircleIds: string[] = [],
-  hoveredCircleEdgeId: string | null = null,
-  morphs: Map<string, CircleMorph & { t: number }> = EMPTY_ANIM_FRAME.morphs,
+  anim: AnimFrame = EMPTY_ANIM_FRAME,
+  activeEdgeHoverId: string | null = null,
 ) {
   for (const circle of circles) {
-    const tone = getCircleColors(circle)
+    const tone = resolveCircleColors(circle, anim)
     const isTransparent = (circle.fillMode ?? circleFillMode) === 'transparent'
-    const path = getCirclePath(circle, circleShapeMode, morphs.get(circle.id))
+    const path = getCirclePath(circle, circleShapeMode, anim.morphs.get(circle.id))
     ctx.save()
     ctx.globalAlpha = isTransparent ? 0.34 : 1
     ctx.fillStyle = tone.fill
@@ -619,32 +680,149 @@ function drawCircleFills(
     ctx.restore()
 
     const isSelected = (selectedItem?.type === 'circle' && selectedItem.id === circle.id) || selectedCircleIds.includes(circle.id)
-    const isEdgeHovered = hoveredCircleEdgeId === circle.id
+    const animHoverT = anim.edgeHoverReveal.get(circle.id)
+    const edgeHoverT = animHoverT !== undefined ? animHoverT : (activeEdgeHoverId === circle.id ? 1 : 0)
+    const ringAnim = anim.ringReveal.get(circle.id)
+    const ringT = ringAnim !== undefined ? ringAnim : (isSelected ? 1 : 0)
+    const showSelectionRing = ringT > 0.001 && (isSelected || ringAnim !== undefined)
+    const isRound = isSimpleCircleShape(circle, circleShapeMode)
 
-    if (isEdgeHovered) {
+    // Idle transparent outline (resting dashed border) — keep visible during edge hover too.
+    if (isTransparent && !showSelectionRing) {
       ctx.save()
-      ctx.strokeStyle = isSelected ? tone.border : '#64748b'
-      ctx.globalAlpha = isSelected ? 0.24 : 0.18
-      ctx.lineWidth = isSelected ? Math.max(9 / scale, 6) : Math.max(8 / scale, 5)
-      if (isTransparent && !isSelected) ctx.setLineDash([8 / scale, 7 / scale])
+      ctx.strokeStyle = tone.border
+      ctx.lineWidth = Math.max(2.2 / scale, 1.4)
+      ctx.setLineDash([8 / scale, 7 / scale])
       ctx.stroke(path)
       ctx.restore()
     }
 
-    if (isTransparent || isSelected || isEdgeHovered) {
+    // Resize-edge hover — logical circle only; does not thicken the shape outline.
+    if (edgeHoverT > 0.001) {
       ctx.save()
-      ctx.strokeStyle = isSelected ? tone.border : isEdgeHovered ? '#64748b' : tone.border
-      ctx.lineWidth =
-        isSelected
-          ? (isEdgeHovered ? Math.max(4.5 / scale, 3) : Math.max(3.5 / scale, 2))
-          : isEdgeHovered
-            ? Math.max(2.8 / scale, 1.8)
-            : Math.max((isTransparent ? 2.2 : 1.4) / scale, isTransparent ? 1.4 : 0.9)
-      if (isTransparent && !isSelected) ctx.setLineDash([8 / scale, 7 / scale])
-      ctx.stroke(path)
+      ctx.beginPath()
+      ctx.arc(circle.x, circle.y, circle.radius, 0, Math.PI * 2)
+      ctx.strokeStyle = showSelectionRing ? tone.border : '#64748b'
+      ctx.globalAlpha = 0.18 + 0.42 * edgeHoverT
+      ctx.lineWidth = Math.max(2 / scale, 1.2) + edgeHoverT * Math.max(1 / scale, 0.5)
+      if (isTransparent && !showSelectionRing) ctx.setLineDash([6 / scale, 5 / scale])
+      ctx.stroke()
       ctx.restore()
+    }
+
+    // Selection ring — animates in and out (independent of resize hover).
+    if (showSelectionRing) {
+      const lineWidth = Math.max(3.5 / scale, 2)
+
+      if (isTransparent) {
+        const dashUnit = 8 / scale
+        const gapUnit = dashUnit * 0.875
+        const gapLen = gapUnit * (1 - ringT)
+        ctx.save()
+        ctx.strokeStyle = tone.border
+        ctx.lineWidth = lineWidth * (0.88 + 0.12 * ringT)
+        if (gapLen > 0.4 / scale) {
+          ctx.setLineDash([dashUnit, gapLen])
+          ctx.lineDashOffset = (1 - ringT) * dashUnit * 2
+        }
+        ctx.globalAlpha = 0.55 + 0.45 * ringT
+        ctx.stroke(path)
+        ctx.restore()
+      } else if (isRound) {
+        ctx.save()
+        ctx.strokeStyle = tone.border
+        ctx.lineWidth = lineWidth
+        ctx.globalAlpha = ringT
+        ctx.stroke(path)
+        ctx.restore()
+      } else if (ringAnim !== undefined && ringT < RING_VERTEX_SPREAD_END) {
+        strokeOutlineWithVertexSpread(ctx, circle, ringT / RING_VERTEX_SPREAD_END, tone.border, lineWidth)
+      } else {
+        ctx.save()
+        ctx.strokeStyle = tone.border
+        ctx.lineWidth = lineWidth
+        ctx.globalAlpha = ringAnim !== undefined ? 0.55 + 0.45 * ringT : 1
+        ctx.stroke(path)
+        ctx.restore()
+      }
     }
   }
+}
+
+function isSimpleCircleShape(circle: CircleNode, circleShapeMode: CircleShapeMode) {
+  const amplitude = circle.amplitude ?? 0
+  const sides = circle.sides ?? 25
+  const shapeType: ShapeType = circle.shapeType ?? (amplitude > 0 ? 'wavy' : sides >= 25 ? 'circle' : 'polygon')
+  const isCustomShape = circle.shapeCustom === true && (shapeType !== 'circle' || amplitude > 0 || sides < 25)
+  if (circleShapeMode === 'circles' && !isCustomShape) return true
+  return shapeType === 'circle' && amplitude === 0 && sides >= 25
+}
+
+function strokeOutlineWithVertexSpread(
+  ctx: CanvasRenderingContext2D,
+  circle: CircleNode,
+  t: number,
+  strokeStyle: string,
+  lineWidth: number,
+) {
+  if (t <= 0.001) return
+
+  const n = Math.max(120, Math.round(circle.radius * 2))
+  const amplitude = circle.amplitude ?? 0
+  const sides = circle.sides ?? 8
+  const shapeType: ShapeType = circle.shapeType ?? (amplitude > 0 ? 'wavy' : sides >= 25 ? 'circle' : 'polygon')
+  const points = sampleCircleOutline(circle.x, circle.y, circle.radius, sides, amplitude, n, shapeType)
+  const vertexCount = Math.max(3, Math.min(sides, 60))
+
+  const arcLens: number[] = []
+  let total = 0
+  for (let i = 0; i < points.length; i++) {
+    arcLens.push(total)
+    const next = points[(i + 1) % points.length]
+    total += Math.hypot(next.x - points[i].x, next.y - points[i].y)
+  }
+
+  const vertexArcs: number[] = []
+  for (let v = 0; v < vertexCount; v++) {
+    const idx = Math.round((v / vertexCount) * points.length) % points.length
+    vertexArcs.push(arcLens[idx] ?? 0)
+  }
+
+  const spread = t * total / (2 * vertexCount)
+  const covered = (dist: number) => {
+    for (const v of vertexArcs) {
+      const diff = Math.abs(dist - v)
+      if (Math.min(diff, total - diff) <= spread + 0.001) return true
+    }
+    return false
+  }
+
+  ctx.save()
+  ctx.beginPath()
+  let drawing = false
+  for (let i = 0; i < points.length; i++) {
+    const segStart = arcLens[i] ?? 0
+    const segEnd = i + 1 < points.length ? (arcLens[i + 1] ?? total) : total
+    const mid = (segStart + segEnd) / 2
+    const p = points[i]
+    const next = points[(i + 1) % points.length]
+    if (covered(mid)) {
+      if (!drawing) {
+        ctx.moveTo(p.x, p.y)
+        drawing = true
+      }
+      ctx.lineTo(next.x, next.y)
+    } else {
+      drawing = false
+    }
+  }
+  ctx.strokeStyle = strokeStyle
+  ctx.lineWidth = lineWidth
+  ctx.lineJoin = 'round'
+  ctx.lineCap = 'round'
+  ctx.globalAlpha = 0.55 + 0.45 * t
+  ctx.stroke()
+  ctx.restore()
 }
 
 function getCirclePath(
@@ -679,11 +857,11 @@ function drawCircleDetails(
   scale: number,
   circleFillMode: CircleFillMode,
   showCircleLabels: boolean,
-  scales: Map<string, number> = EMPTY_ANIM_FRAME.scales,
+  anim: AnimFrame = EMPTY_ANIM_FRAME,
 ) {
   for (const circle of circles) {
     if (showCircleLabels) drawCircleLabel(ctx, circle, scale)
-    drawCircleCenter(ctx, circle, scale, circleFillMode, scales.get(circle.id) ?? 1)
+    drawCircleCenter(ctx, circle, scale, circleFillMode, anim.scales.get(circle.id) ?? 1, anim)
   }
 }
 
@@ -695,16 +873,9 @@ function getCircleRenderPath(
   // Smooth-enough point count; from/to use the same count so points correspond.
   const n = Math.max(120, Math.round(circle.radius * 2))
 
-  // Mid-morph: lerp between the from-shape and to-shape sampled at matching
-  // points (works across different side counts without a seam).
+  // Mid-morph: anchor-aligned spin lerp between from/to outlines.
   if (morph) {
-    const from = sampleCircleOutline(circle.x, circle.y, circle.radius, morph.fromSides, morph.fromAmp, n, morph.fromShapeType)
-    const to = sampleCircleOutline(circle.x, circle.y, circle.radius, morph.toSides, morph.toAmp, n, morph.toShapeType)
-    for (let i = 0; i < n; i++) {
-      from[i].x += (to[i].x - from[i].x) * morph.t
-      from[i].y += (to[i].y - from[i].y) * morph.t
-    }
-    return new Path2D(outlinePath(from))
+    return new Path2D(outlinePath(sampleCircleOutlineMorph(circle.x, circle.y, circle.radius, morph, n)))
   }
 
   const amplitude = circle.amplitude ?? 0
@@ -721,8 +892,15 @@ function getCircleRenderPath(
   return new Path2D(outlinePath(sampleCircleOutline(circle.x, circle.y, circle.radius, sides, amplitude, n, shapeType)))
 }
 
-function drawCircleCenter(ctx: CanvasRenderingContext2D, circle: CircleNode, _scale: number, circleFillMode: CircleFillMode, nodeScale = 1) {
-  const tone = getCircleColors(circle)
+function drawCircleCenter(
+  ctx: CanvasRenderingContext2D,
+  circle: CircleNode,
+  _scale: number,
+  circleFillMode: CircleFillMode,
+  nodeScale = 1,
+  anim: AnimFrame = EMPTY_ANIM_FRAME,
+) {
+  const tone = resolveCircleColors(circle, anim)
   const radius = CIRCLE_CENTER_RADIUS * nodeScale
   ctx.save()
   ctx.beginPath()
@@ -786,7 +964,7 @@ function drawPeople(
   dpr: number,
   showPersonLabels: boolean,
   selectedPeopleIds: string[] = [],
-  scales: Map<string, number> = EMPTY_ANIM_FRAME.scales,
+  anim: AnimFrame = EMPTY_ANIM_FRAME,
 ) {
   const spriteRes = pickSpriteTier(PERSON_VISUAL_RADIUS * 2 * scale * dpr)
   ctx.imageSmoothingEnabled = true
@@ -801,7 +979,7 @@ function drawPeople(
     const stroke = isSingleSelected ? '#00629d' : isHovered ? '#64748b' : circleColor
     const strokeWidth = isSelected || isHovered ? 2.5 : 1.5
     // Press bounce on selection + grow-in pop for new people (1 = at rest).
-    const drawRadius = PERSON_VISUAL_RADIUS * (scales.get(person.id) ?? 1)
+    const drawRadius = PERSON_VISUAL_RADIUS * (anim.scales.get(person.id) ?? 1)
     ctx.drawImage(
       getPersonSprite(person, circleColor, spriteRes, stroke, strokeWidth),
       person.x - drawRadius,
@@ -824,7 +1002,14 @@ function drawPeople(
       ctx.stroke()
       ctx.restore()
     }
-    if (person.isFavorite) drawFavoritePersonOutline(ctx, person, '#ffd600', drawRadius)
+    const favoriteAnimReveal = anim.favoriteReveal.get(person.id)
+    if (favoriteAnimReveal !== undefined) {
+      if (favoriteAnimReveal > 0) {
+        drawFavoritePersonOutline(ctx, person, '#ffd600', drawRadius, favoriteAnimReveal)
+      }
+    } else if (person.isFavorite) {
+      drawFavoritePersonOutline(ctx, person, '#ffd600', drawRadius, 1)
+    }
     if (showPersonLabels && (scale >= 0.70 || isSelected || isHovered)) drawPersonLabel(ctx, person, scale)
   }
 }
@@ -857,35 +1042,58 @@ function drawSelectionHandles(
   ctx: CanvasRenderingContext2D,
   selectedItem: SelectedItem,
   index: BoardIndex,
-  scales: Map<string, number>,
+  anim: AnimFrame,
+  handleExitNodes: Map<string, CircleNode | PersonNode>,
+  visiblePeople: PersonNode[],
 ) {
-  const selected = selectedItem?.type === 'person'
-    ? index.peopleById.get(selectedItem.id)
-    : selectedItem?.type === 'circle'
-      ? index.circlesById.get(selectedItem.id)
-      : null
-  if (!selected) return
+  const peopleById = new Map(visiblePeople.map((person) => [person.id, person]))
 
-  let color = MATERIAL_TONES.blue.centerBg
-  if (selectedItem?.type === 'circle') {
-    color = getCircleColors(selected as CircleNode).centerBg
-  } else if (selectedItem?.type === 'person') {
-    const person = selected as PersonNode
-    const circle = person.circleId ? index.circlesById.get(person.circleId) : null
-    color = circle ? getCircleColors(circle).centerBg : MATERIAL_TONES.blue.centerBg
+  const drawForNode = (
+    node: CircleNode | PersonNode,
+    itemType: 'circle' | 'person',
+    reveal: number,
+  ) => {
+    if (reveal <= 0) return
+
+    let color = MATERIAL_TONES.blue.centerBg
+    if (itemType === 'circle') {
+      color = getCircleColors(node as CircleNode).centerBg
+    } else {
+      const person = node as PersonNode
+      const circle = person.circleId ? index.circlesById.get(person.circleId) : null
+      color = circle ? getCircleColors(circle).centerBg : MATERIAL_TONES.blue.centerBg
+    }
+
+    const nodeScale = anim.scales.get(node.id) ?? 1
+    const worldRadius = 6 * reveal
+    const hasFavorite = itemType === 'person' && (node as PersonNode).isFavorite === true
+
+    for (const handle of connectorHandlesFor(node, nodeScale, hasFavorite)) {
+      const x = node.x + (handle.x - node.x) * reveal
+      const y = node.y + (handle.y - node.y) * reveal
+      ctx.beginPath()
+      ctx.arc(x, y, worldRadius, 0, Math.PI * 2)
+      ctx.fillStyle = color
+      ctx.fill()
+    }
   }
 
-  const nodeScale = scales.get(selected.id) ?? 1
-  const worldRadius = 6
+  if (selectionShowsHandles(selectedItem)) {
+    const node = selectedItem!.type === 'person'
+      ? index.peopleById.get(selectedItem!.id) ?? peopleById.get(selectedItem!.id)
+      : index.circlesById.get(selectedItem!.id)
+    if (node) {
+      const reveal = anim.handleReveal.get(node.id) ?? 1
+      drawForNode(node, selectedItem!.type as 'circle' | 'person', reveal)
+    }
+  }
 
-  for (const handle of connectorHandlesFor(selected, nodeScale)) {
-    ctx.beginPath()
-    ctx.arc(handle.x, handle.y, worldRadius, 0, Math.PI * 2)
-    ctx.fillStyle = color
-    ctx.fill()
-    ctx.lineWidth = 1.5
-    ctx.strokeStyle = '#ffffff'
-    ctx.stroke()
+  for (const [nodeId, node] of handleExitNodes) {
+    if (selectedItem?.id === nodeId && selectionShowsHandles(selectedItem)) continue
+    const reveal = anim.handleReveal.get(nodeId)
+    if (reveal !== undefined) {
+      drawForNode(node, 'radius' in node ? 'circle' : 'person', reveal)
+    }
   }
 }
 
@@ -900,11 +1108,11 @@ function drawConnector(ctx: CanvasRenderingContext2D, connector: DragConnector, 
   ctx.restore()
 }
 
-function connectorHandlesFor(node: CircleNode | PersonNode, nodeScale = 1) {
+function connectorHandlesFor(node: CircleNode | PersonNode, nodeScale = 1, hasFavorite = false) {
   const isCircle = 'radius' in node
   const baseRadius = isCircle ? CIRCLE_CENTER_RADIUS : PERSON_VISUAL_RADIUS
   const radius = baseRadius * nodeScale
-  const gap = 14 * nodeScale
+  const gap = (hasFavorite ? CONNECTOR_HANDLE_GAP_FAVORITE : CONNECTOR_HANDLE_GAP) * nodeScale
   return [
     { x: node.x, y: node.y - radius - gap },
     { x: node.x, y: node.y + radius + gap },
@@ -913,7 +1121,59 @@ function connectorHandlesFor(node: CircleNode | PersonNode, nodeScale = 1) {
   ]
 }
 
-export function hitTestBoard(index: BoardIndex, camera: Camera, selectedItem: SelectedItem, screen: { x: number; y: number }): BoardHit {
+function findBestCircleEdge(
+  circles: CircleNode[],
+  point: { x: number; y: number },
+  scale: number,
+  hitSize = EDGE_RESIZE_HIT_SIZE / scale,
+) {
+  let best: CircleNode | null = null
+  let bestDist = Infinity
+  for (const circle of circles) {
+    const d = Math.hypot(point.x - circle.x, point.y - circle.y)
+    const edgeDist = Math.abs(d - circle.radius)
+    if (edgeDist <= hitSize && edgeDist < bestDist) {
+      bestDist = edgeDist
+      best = circle
+    }
+  }
+  return best
+}
+
+export function resolveCircleEdgeHover(
+  index: BoardIndex,
+  point: { x: number; y: number },
+  scale: number,
+  stickyEdgeId: string | null,
+): string | null {
+  if (scale < ZONE_ONLY_SCALE) return null
+
+  const leaveSize = EDGE_RESIZE_HIT_LEAVE_SIZE / scale
+  if (stickyEdgeId) {
+    const sticky = index.circlesById.get(stickyEdgeId)
+    if (sticky) {
+      const d = Math.hypot(point.x - sticky.x, point.y - sticky.y)
+      if (Math.abs(d - sticky.radius) <= leaveSize) return stickyEdgeId
+    }
+  }
+
+  const hitRect = {
+    left: point.x - 32 / scale,
+    right: point.x + 32 / scale,
+    top: point.y - 32 / scale,
+    bottom: point.y + 32 / scale,
+  }
+  const edge = findBestCircleEdge(queryCircles(index, hitRect), point, scale)
+  return edge?.id ?? null
+}
+
+export function hitTestBoard(
+  index: BoardIndex,
+  camera: Camera,
+  selectedItem: SelectedItem,
+  screen: { x: number; y: number },
+  stickyEdgeId: string | null = null,
+): BoardHit {
   const point = {
     x: (screen.x - camera.x) / camera.scale,
     y: (screen.y - camera.y) / camera.scale,
@@ -921,17 +1181,18 @@ export function hitTestBoard(index: BoardIndex, camera: Camera, selectedItem: Se
   const scale = camera.scale
   const handleHit = HANDLE_HIT_RADIUS / scale
 
-  if (scale >= ZONE_ONLY_SCALE) {
+  if (scale >= ZONE_ONLY_SCALE && selectionShowsHandles(selectedItem)) {
     if (selectedItem?.type === 'person') {
       const person = index.peopleById.get(selectedItem.id)
       if (person) {
-        for (const handle of connectorHandlesFor(person)) {
+        const hasFavorite = person.isFavorite === true
+        for (const handle of connectorHandlesFor(person, 1, hasFavorite)) {
           if (Math.hypot(point.x - handle.x, point.y - handle.y) <= handleHit) {
             return { type: 'connector-handle', sourceId: person.id, sourceType: 'person', x: person.x, y: person.y }
           }
         }
       }
-    } else if (selectedItem?.type === 'circle') {
+    } else if (selectedItem?.type === 'circle' && selectedItem.showHandles) {
       const circle = index.circlesById.get(selectedItem.id)
       if (circle) {
         for (const handle of connectorHandlesFor(circle)) {
@@ -971,12 +1232,15 @@ export function hitTestBoard(index: BoardIndex, camera: Camera, selectedItem: Se
   }
 
   const circles = queryCircles(index, hitRect).reverse()
+  const edgeId = resolveCircleEdgeHover(index, point, scale, stickyEdgeId)
+  if (scale >= ZONE_ONLY_SCALE && edgeId) {
+    const edgeCircle = index.circlesById.get(edgeId)
+    if (edgeCircle) return { type: 'circle-edge', circle: edgeCircle }
+  }
+
   for (const circle of circles) {
     const d = Math.hypot(point.x - circle.x, point.y - circle.y)
     if (scale >= ZONE_ONLY_SCALE && d <= CIRCLE_CENTER_RADIUS + 6 / scale) return { type: 'circle-center', circle }
-    if (scale >= ZONE_ONLY_SCALE && Math.abs(d - circle.radius) <= EDGE_RESIZE_HIT_SIZE / scale) {
-      return { type: 'circle-edge', circle }
-    }
     if (d <= circle.radius) return { type: 'circle-body', circle }
   }
 

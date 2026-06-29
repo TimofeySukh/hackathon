@@ -1,10 +1,12 @@
 // Pure color helpers for the board: tone resolution, hex<->rgb<->hsv conversion,
 // mixing and readable-contrast selection.
 
-import type { CircleNode, HsvColor } from './types'
+import type { CircleNode, CircleToneColors, HsvColor } from './types'
 import { MATERIAL_TONES } from './constants'
 
-export function getCircleColors(circle: CircleNode) {
+export type { CircleToneColors }
+
+export function getCircleColors(circle: CircleNode): CircleToneColors {
   if (!circle.customColor) return MATERIAL_TONES[circle.tone]
   return {
     fill: colorMix(circle.customColor, '#ffffff', 0.78),
@@ -12,6 +14,31 @@ export function getCircleColors(circle: CircleNode) {
     text: '#1a1c1e',
     centerBg: circle.customColor,
   }
+}
+
+export function lerpHex(a: string, b: string, t: number) {
+  const from = hexToRgb(a)
+  const to = hexToRgb(b)
+  if (!from || !to) return t < 0.5 ? a : b
+  const mix = (x: number, y: number) => Math.round(x + (y - x) * t)
+  return rgbToHex(mix(from.r, to.r), mix(from.g, to.g), mix(from.b, to.b))
+}
+
+export function lerpCircleColors(from: CircleToneColors, to: CircleToneColors, t: number): CircleToneColors {
+  return {
+    fill: lerpHex(from.fill, to.fill, t),
+    border: lerpHex(from.border, to.border, t),
+    text: lerpHex(from.text, to.text, t),
+    centerBg: lerpHex(from.centerBg, to.centerBg, t),
+  }
+}
+
+export function circleColorsEqual(a: CircleToneColors, b: CircleToneColors) {
+  return (
+    a.fill.toLowerCase() === b.fill.toLowerCase() &&
+    a.border.toLowerCase() === b.border.toLowerCase() &&
+    a.centerBg.toLowerCase() === b.centerBg.toLowerCase()
+  )
 }
 
 export function colorMix(hex: string, target: string, amount: number) {
