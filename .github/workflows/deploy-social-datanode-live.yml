@@ -1,43 +1,59 @@
-name: Deploy social.datanode.live
+name: Promote social.datanode.live
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
+    inputs:
+      ref:
+        description: Git branch, tag, or commit SHA to promote to production
+        required: true
+        default: main
+
+permissions:
+  contents: write
 
 concurrency:
-  group: social-datanode-live-deploy
+  group: social-datanode-live-promotion
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Deploy
+  promote:
+    name: Promote production ref
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger server deploy
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Update production branch
         env:
-          DEPLOY_HOST: ${{ secrets.SOCIAL_DATANODE_DEPLOY_HOST }}
-          DEPLOY_PORT: ${{ secrets.SOCIAL_DATANODE_DEPLOY_PORT }}
-          DEPLOY_USER: ${{ secrets.SOCIAL_DATANODE_DEPLOY_USER }}
-          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.SOCIAL_DATANODE_DEPLOY_SSH_PRIVATE_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          DEPLOY_REF: ${{ inputs.ref }}
         run: |
           set -Eeuo pipefail
 
-          : "${DEPLOY_HOST:?SOCIAL_DATANODE_DEPLOY_HOST secret is required}"
-          : "${DEPLOY_USER:?SOCIAL_DATANODE_DEPLOY_USER secret is required}"
-          : "${DEPLOY_SSH_PRIVATE_KEY:?SOCIAL_DATANODE_DEPLOY_SSH_PRIVATE_KEY secret is required}"
+          git fetch --tags origin
 
-          port="${DEPLOY_PORT:-22}"
-          install -m 700 -d "$HOME/.ssh"
-          printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > "$HOME/.ssh/social-datanode-live"
-          chmod 600 "$HOME/.ssh/social-datanode-live"
-          ssh-keyscan -p "$port" -H "$DEPLOY_HOST" >> "$HOME/.ssh/known_hosts"
+          if target_sha="$(git rev-parse --verify --quiet "${DEPLOY_REF}^{commit}")"; then
+            :
+          elif target_sha="$(git rev-parse --verify --quiet "origin/${DEPLOY_REF}^{commit}")"; then
+            :
+          else
+            git fetch --depth 1 origin "$DEPLOY_REF"
+            target_sha="$(git rev-parse --verify "FETCH_HEAD^{commit}")"
+          fi
 
-          ssh \
-            -i "$HOME/.ssh/social-datanode-live" \
-            -p "$port" \
-            -o BatchMode=yes \
-            -o StrictHostKeyChecking=yes \
-            "$DEPLOY_USER@$DEPLOY_HOST" \
-            'BRANCH=main ~/.local/bin/social-datanode-live-autodeploy'
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/production" >/dev/null 2>&1; then
+            gh api \
+              --method PATCH \
+              "repos/${GITHUB_REPOSITORY}/git/refs/heads/production" \
+              -f "sha=${target_sha}" \
+              -F force=true
+          else
+            gh api \
+              --method POST \
+              "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f ref=refs/heads/production \
+              -f "sha=${target_sha}"
+          fi
+
+          echo "Promoted ${target_sha} to production"

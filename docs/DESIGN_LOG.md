@@ -17,6 +17,14 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-29 — Pull-based production promotion
+
+- Decision: Production deploys through a manual GitHub workflow that promotes a reviewed
+  branch, tag, or commit SHA to the `production` branch. The home server polls
+  `production` from cron and deploys changed commits from inside the network.
+- Why: The production server can sit behind a home NAT without public inbound SSH, while
+  releases are still explicit and no longer happen automatically on every `main` push.
+
 ### 2026-06-29 — Import Persistence Recovers From Graph API Failures
 
 - Decision: browser graph saves still use `graph-api` first, but fall back to direct

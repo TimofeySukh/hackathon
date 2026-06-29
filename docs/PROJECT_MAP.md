@@ -91,4 +91,4 @@ Task ownership is tracked in Linear. Code ownership is not split by directory ye
 - Update `docs/project-structure.md` and `docs/ARCHITECTURE.md` when source structure or boundaries change.
 - Follow `docs/DESIGN_SYSTEM.md` for UI work, keep a feature doc under `docs/features/` for each feature, and log durable design decisions in `docs/DESIGN_LOG.md`.
 - Keep Supabase Auth redirect URLs and Google OAuth origins aligned with every deployed frontend origin.
-- Remember that commits on `main` deploy to the primary production site within about 3 minutes after they reach GitHub.
+- Remember that production deploys only after a manual promotion to the `production` branch; the home server polls that branch from cron.
