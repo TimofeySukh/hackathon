@@ -148,7 +148,7 @@ export function useAuth() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin,
+        redirectTo: window.location.origin + window.location.pathname + '#board',
       },
     })
 
@@ -179,7 +179,7 @@ export function useAuth() {
       email,
       password,
       options: {
-        emailRedirectTo: window.location.origin,
+        emailRedirectTo: window.location.origin + window.location.pathname + '#board',
       },
     })
 
@@ -206,7 +206,7 @@ export function useAuth() {
       type: 'signup',
       email,
       options: {
-        emailRedirectTo: window.location.origin,
+        emailRedirectTo: window.location.origin + window.location.pathname + '#board',
       },
     })
 
@@ -221,7 +221,7 @@ export function useAuth() {
     if (!supabase) return { error: 'Auth is not configured.' as string | null }
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin,
+      redirectTo: window.location.origin + window.location.pathname + '#board',
     })
 
     if (error) {

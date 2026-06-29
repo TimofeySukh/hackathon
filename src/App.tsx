@@ -603,6 +603,14 @@ function App() {
   const swatchPressTxRef = useRef<number>(0)
   const auth = useAuth()
   const userId = auth.session?.user?.id ?? null
+
+  // Redirect authenticated users from landing page to the board.
+  useEffect(() => {
+    if (auth.status === 'authenticated' && viewMode === 'landing') {
+      window.location.hash = '#board'
+    }
+  }, [auth.status, viewMode])
+
   // Sign-in dialog: a single "Sign in" button opens this; it holds every
   // sign-in option so the Settings panel itself stays compact.
   const [showSignInModal, setShowSignInModal] = useState(false)
