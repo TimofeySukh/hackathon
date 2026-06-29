@@ -40,6 +40,9 @@ not thousands of per-contact database writes.
 - After a successful import, the browser immediately saves the resulting graph to the
   active storage backend. Signed-in saves use the existing `graph-api` graph replacement
   route with the current revision; anonymous saves use `localStorage`.
+- If a stale deployed `graph-api` function returns the generic "Unexpected graph API
+  error." failure, signed-in browser saves retry once through direct PostgREST
+  `user_graphs` writes with the same revision guard.
 
 ## Verification
 
@@ -55,6 +58,7 @@ This runs:
 - `npm run test:db-load -- --people 3000 --connections 3000`
 - `npm run test:ui-import -- --people 3000`
 - `npm run test:ui-import:persistence`
+- `npm run test:ui-import:persistence:fallback`
 
 The database load test is dry-run by default. It generates the same graph payload shape
 that Supabase receives and reports the serialized size without writing anything.
@@ -78,14 +82,17 @@ Run the local signed-in persistence checks before changing import persistence:
 ```bash
 npm run test:import-persistence
 npm run test:ui-import:persistence
+npm run test:ui-import:persistence:fallback
 ```
 
 `test:import-persistence` uses a fake graph API server and directly verifies the browser
 save contract: `PUT /v1/graph`, bearer auth, graph payload, expected revision, conflict
-handling, and structured error formatting. `test:ui-import:persistence` runs the app with
-dev-only fake auth plus a localhost mock Supabase REST/graph API and verifies that
-LinkedIn ZIP import and graph JSON import write through signed-in persistence and survive
-reload without touching production data.
+handling, structured error formatting, and the direct REST fallback request shape.
+`test:ui-import:persistence` runs the app with dev-only fake auth plus a localhost mock
+Supabase REST/graph API and verifies that LinkedIn ZIP import and graph JSON import write
+through signed-in persistence and survive reload without touching production data.
+`test:ui-import:persistence:fallback` forces graph API save failures and verifies the same
+imports persist through REST fallback.
 
 Useful overrides:
 
@@ -94,6 +101,7 @@ npm run test:db-load -- --people 5000 --connections 5000
 npm run test:ui-import -- --people 5000 --max-lag-ms 1500
 npm run test:ui-import -- --url http://127.0.0.1:5173
 npm run test:ui-import:persistence -- --people 500 --companies 25
+npm run test:ui-import:persistence:fallback -- --people 500 --companies 25
 ```
 
 If Chromium is not installed for Playwright:

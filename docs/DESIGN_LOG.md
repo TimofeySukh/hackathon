@@ -17,6 +17,16 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-29 — Graph API Generic Save Failure Fallback
+
+- Decision: signed-in browser graph saves still try the `graph-api` replacement route
+  first, then fall back to direct PostgREST `user_graphs` writes only when the deployed
+  function returns the generic "Unexpected graph API error." failure.
+- Decision: `npm run test:ui-import:persistence:fallback` forces that failure and verifies
+  LinkedIn ZIP and graph JSON imports still persist and survive reload via REST fallback.
+- Why: hosted Edge Functions can lag local fixes during development; imports must not lose
+  user data while the function deployment is stale.
+
 ### 2026-06-29 — Import Persistence Regression Tests
 
 - Decision: add `npm run test:import-persistence` for the browser graph-save contract

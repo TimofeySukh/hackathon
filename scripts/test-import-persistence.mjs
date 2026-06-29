@@ -126,6 +126,35 @@ async function main() {
       )
     })
 
+    await withMockGraphApi((req, res, bodyText) => {
+      assert.equal(req.method, 'PATCH')
+      assert.equal(req.url, '/rest/v1/user_graphs?user_id=eq.test-user&revision=eq.7&select=revision')
+      assert.equal(req.headers.apikey, 'test-publishable-key')
+      assert.equal(req.headers.authorization, 'Bearer test-access-token')
+      assert.match(req.headers.prefer ?? '', /return=representation/)
+
+      const body = JSON.parse(bodyText)
+      assert.deepEqual(body, { graph })
+      json(res, 200, [{ revision: 8 }])
+    }, async (baseUrl) => {
+      const restUrl = baseUrl.replace('/functions/v1/graph-api', '/rest/v1')
+      const response = await persistence.saveGraphThroughRest(restUrl, 'test-publishable-key', 'test-access-token', 'test-user', graph, 7)
+      assert.deepEqual(response, { revision: 8 })
+    })
+
+    await withMockGraphApi((req, res, bodyText) => {
+      assert.equal(req.method, 'POST')
+      assert.equal(req.url, '/rest/v1/user_graphs?select=revision')
+
+      const body = JSON.parse(bodyText)
+      assert.deepEqual(body, { user_id: 'test-user', graph })
+      json(res, 200, [{ revision: 1 }])
+    }, async (baseUrl) => {
+      const restUrl = baseUrl.replace('/functions/v1/graph-api', '/rest/v1')
+      const response = await persistence.saveGraphThroughRest(restUrl, 'test-publishable-key', 'test-access-token', 'test-user', graph, null)
+      assert.deepEqual(response, { revision: 1 })
+    })
+
     assert.equal(
       graphApiErrors.formatGraphApiError({
         message: 'column user_graphs.revision does not exist',
@@ -141,7 +170,7 @@ async function main() {
       'Unexpected graph API error.',
     )
 
-    console.log(JSON.stringify({ status: 'ok', checked: ['graph-api-save-body', 'revision-conflict', 'error-formatting'] }, null, 2))
+    console.log(JSON.stringify({ status: 'ok', checked: ['graph-api-save-body', 'revision-conflict', 'rest-fallback-body', 'error-formatting'] }, null, 2))
   } finally {
     await vite.close()
   }

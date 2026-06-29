@@ -1,4 +1,4 @@
-import { e2eFakeAccessToken, getSupabaseFunctionUrl, isE2EFakeAuth, supabase } from './supabase'
+import { e2eFakeAccessToken, getSupabaseFunctionUrl, getSupabaseRestUrl, isE2EFakeAuth, supabase, supabasePublishableKey } from './supabase'
 import type { GraphState } from './board/types'
 
 // The whole canvas graph lives in a single jsonb column keyed by user id.
@@ -25,6 +25,10 @@ export class GraphPersistenceError extends Error {
     this.name = 'GraphPersistenceError'
     this.cause = cause
   }
+}
+
+function isGenericGraphApiFailure(error: unknown) {
+  return error instanceof GraphPersistenceError && error.message.includes('Unexpected graph API error.')
 }
 
 function formatPersistenceError(error: unknown): string {
@@ -95,6 +99,67 @@ export async function saveGraphThroughApi(
   return payload as { revision?: unknown } | null
 }
 
+export async function saveGraphThroughRest(
+  restBasePath: string,
+  publishableKey: string,
+  accessToken: string,
+  userId: string,
+  graph: GraphState,
+  expectedRevision: number | null,
+  fetchImpl: typeof fetch = fetch,
+) {
+  const graphJson = JSON.stringify(graph)
+  const encodedUserId = encodeURIComponent(userId)
+
+  if (expectedRevision === null) {
+    const response = await fetchImpl(`${restBasePath.replace(/\/$/, '')}/user_graphs?select=revision`, {
+      method: 'POST',
+      headers: {
+        apikey: publishableKey,
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Prefer: 'return=representation',
+      },
+      body: `{"user_id":${JSON.stringify(userId)},"graph":${graphJson}}`,
+    })
+
+    const payload = await parseJsonResponse(response)
+    if (!response.ok) {
+      if (typeof payload === 'object' && payload && 'code' in payload && payload.code === '23505') {
+        throw new GraphRevisionConflictError()
+      }
+      throw new GraphPersistenceError('Failed to save your board through REST fallback', payload ?? { message: response.statusText, code: String(response.status) })
+    }
+
+    return Array.isArray(payload) ? payload[0] as { revision?: unknown } | undefined : undefined
+  }
+
+  const response = await fetchImpl(
+    `${restBasePath.replace(/\/$/, '')}/user_graphs?user_id=eq.${encodedUserId}&revision=eq.${encodeURIComponent(String(expectedRevision))}&select=revision`,
+    {
+      method: 'PATCH',
+      headers: {
+        apikey: publishableKey,
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Prefer: 'return=representation',
+      },
+      body: `{"graph":${graphJson}}`,
+    },
+  )
+
+  const payload = await parseJsonResponse(response)
+  if (!response.ok) {
+    throw new GraphPersistenceError('Failed to save your board through REST fallback', payload ?? { message: response.statusText, code: String(response.status) })
+  }
+
+  const row = Array.isArray(payload) ? payload[0] as { revision?: unknown } | undefined : undefined
+  if (!row) throw new GraphRevisionConflictError()
+  return row
+}
+
 async function writeGraphThroughApi(graph: GraphState, expectedRevision: number | null) {
   const baseUrl = getSupabaseFunctionUrl('graph-api')
   const accessToken = await getAccessToken()
@@ -149,8 +214,23 @@ export async function loadGraphRecord(userId: string): Promise<LoadedGraphRecord
  */
 export async function saveGraph(userId: string, graph: GraphState, expectedRevision: number | null): Promise<number | null> {
   if (!supabase) return expectedRevision
-  void userId
-  const data = await writeGraphThroughApi(graph, expectedRevision)
+  try {
+    const data = await writeGraphThroughApi(graph, expectedRevision)
+    return typeof data?.revision === 'number' ? data.revision : expectedRevision === null ? 1 : expectedRevision + 1
+  } catch (error) {
+    if (!isGenericGraphApiFailure(error)) throw error
+    return saveGraphDirectly(userId, graph, expectedRevision)
+  }
+}
+
+async function saveGraphDirectly(userId: string, graph: GraphState, expectedRevision: number | null): Promise<number | null> {
+  const restUrl = getSupabaseRestUrl('')
+  const accessToken = await getAccessToken()
+  if (!restUrl || !supabasePublishableKey || !accessToken) {
+    throw new GraphPersistenceError('Failed to save your board through REST fallback', 'Supabase session is not available.')
+  }
+
+  const data = await saveGraphThroughRest(restUrl, supabasePublishableKey, accessToken, userId, graph, expectedRevision)
   return typeof data?.revision === 'number' ? data.revision : expectedRevision === null ? 1 : expectedRevision + 1
 }
 
