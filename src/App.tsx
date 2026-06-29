@@ -20,7 +20,7 @@ import PrivacyPage from './PrivacyPage'
 import DocsPage from './DocsPage'
 import { createAgentToken, getGraphApiBaseUrl, listAgentTokens, revokeAgentToken } from './lib/agentApi'
 import type { AgentScope, AgentTokenRecord } from './lib/agentApi'
-import { supabase } from './lib/supabase'
+import { isE2EFakeAuth, supabase } from './lib/supabase'
 import { GraphRevisionConflictError, loadGraphRecord, saveGraph, loadLocalGraph, saveLocalGraph } from './lib/graphPersistence'
 import { enrichLinkedInProfile } from './lib/linkedinEnrichment'
 import { searchGraphByQuery } from './lib/search/graphSearch'
@@ -791,6 +791,7 @@ function App() {
 
   // Listen to remote changes on the user's graph row via Supabase Realtime
   useEffect(() => {
+    if (isE2EFakeAuth) return
     if (auth.status !== 'authenticated' || !userId || !supabase || !auth.session) return
 
     const channel = supabase

@@ -51,8 +51,10 @@ npm run test:load
 
 This runs:
 
+- `npm run test:import-persistence`
 - `npm run test:db-load -- --people 3000 --connections 3000`
 - `npm run test:ui-import -- --people 3000`
+- `npm run test:ui-import:persistence`
 
 The database load test is dry-run by default. It generates the same graph payload shape
 that Supabase receives and reports the serialized size without writing anything.
@@ -71,12 +73,27 @@ The UI responsiveness test starts Vite, opens the app in Chromium, uploads a gen
 LinkedIn ZIP through the real file input, and fails if event-loop lag exceeds the configured
 threshold.
 
+Run the local signed-in persistence checks before changing import persistence:
+
+```bash
+npm run test:import-persistence
+npm run test:ui-import:persistence
+```
+
+`test:import-persistence` uses a fake graph API server and directly verifies the browser
+save contract: `PUT /v1/graph`, bearer auth, graph payload, expected revision, conflict
+handling, and structured error formatting. `test:ui-import:persistence` runs the app with
+dev-only fake auth plus a localhost mock Supabase REST/graph API and verifies that
+LinkedIn ZIP import and graph JSON import write through signed-in persistence and survive
+reload without touching production data.
+
 Useful overrides:
 
 ```bash
 npm run test:db-load -- --people 5000 --connections 5000
 npm run test:ui-import -- --people 5000 --max-lag-ms 1500
 npm run test:ui-import -- --url http://127.0.0.1:5173
+npm run test:ui-import:persistence -- --people 500 --companies 25
 ```
 
 If Chromium is not installed for Playwright:

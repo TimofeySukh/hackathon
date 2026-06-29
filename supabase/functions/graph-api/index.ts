@@ -5,6 +5,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 import { isAiSearchConfigured } from './interpretSearch.ts'
 import { runAgentSearch } from './agentSearch.ts'
 import { searchGraphByQuery, toApiSearchResults } from './graphSearch.ts'
+import { formatGraphApiError } from './errors.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -1196,7 +1197,6 @@ Deno.serve(async (req) => {
       const message = await error.text()
       return jsonResponse({ error: message || error.statusText }, error.status)
     }
-    const message = error instanceof Error ? error.message : 'Unexpected graph API error.'
-    return jsonResponse({ error: message }, 500)
+    return jsonResponse({ error: formatGraphApiError(error) || 'Unexpected graph API error.' }, 500)
   }
 })

@@ -17,6 +17,16 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-29 — Import Persistence Regression Tests
+
+- Decision: add `npm run test:import-persistence` for the browser graph-save contract
+  and `npm run test:ui-import:persistence` for a signed-in Playwright import/reload flow
+  against a localhost mock Supabase REST/graph API.
+- Decision: graph API catch-all errors now format structured error objects instead of
+  masking PostgREST failures as generic "Unexpected graph API error."
+- Why: import persistence must fail in automation before a user has to manually discover
+  that imported LinkedIn or graph JSON data did not save.
+
 ### 2026-06-29 — Import paths flush graph persistence immediately
 
 - Decision: LinkedIn ZIP imports, single-profile LinkedIn imports, and graph JSON imports

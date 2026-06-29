@@ -190,8 +190,10 @@ npm run test:load
 
 This runs:
 
+- `npm run test:import-persistence`
 - `npm run test:db-load -- --people 3000 --connections 3000`
 - `npm run test:ui-import -- --people 3000`
+- `npm run test:ui-import:persistence`
 
 `test:db-load` is dry-run by default. It builds a synthetic graph with 3,000 people and
 3,000 connections, serializes it in the same shape stored in `user_graphs.graph`, and
@@ -218,12 +220,22 @@ Useful database load overrides:
 ```bash
 npm run test:db-load -- --people 5000 --connections 5000
 HACKATHON_ALLOW_DATABASE_LOAD_TEST=true npm run test:db-load -- --people 5000 --connections 5000 --write --cleanup
+npm run test:import-persistence
+npm run test:ui-import:persistence -- --people 500 --companies 25
 ```
 
 `test:ui-import` starts Vite on an isolated local port, opens Chromium through Playwright,
 uploads a generated LinkedIn ZIP through the real settings-panel file input, and measures
 event-loop lag while the import runs. The test fails when the browser is blocked longer
 than the configured threshold.
+
+`test:import-persistence` starts a fake graph API server and verifies the browser save
+contract for imported graphs: `PUT /v1/graph`, bearer auth, graph payload, expected
+revision, conflict handling, and structured error formatting.
+
+`test:ui-import:persistence` starts the app with dev-only fake auth and a localhost mock
+Supabase REST/graph API. It verifies that LinkedIn ZIP import and graph JSON import write
+through signed-in persistence and survive reload without touching production data.
 
 ## Auth Email E2E
 
@@ -250,6 +262,7 @@ Useful UI responsiveness overrides:
 ```bash
 npm run test:ui-import -- --people 5000 --max-lag-ms 1500
 npm run test:ui-import -- --url http://127.0.0.1:5173
+npm run test:ui-import:persistence -- --people 500 --companies 25
 ```
 
 If Playwright's Chromium is not installed on the machine:
@@ -595,6 +608,7 @@ Supabase verification:
 
 - `npm run build`
 - `npm run lint`
+- `npm run test:import-persistence`
 - `npm run test:load`
 - Manual browser check of drag navigation, wheel and trackpad navigation, theme persistence, persisted graph editing, local search, and LinkedIn import
 - Manual Supabase auth check when credentials and Google OAuth are configured

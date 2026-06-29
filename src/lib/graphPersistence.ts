@@ -1,4 +1,4 @@
-import { getSupabaseFunctionUrl, supabase } from './supabase'
+import { e2eFakeAccessToken, getSupabaseFunctionUrl, isE2EFakeAuth, supabase } from './supabase'
 import type { GraphState } from './board/types'
 
 // The whole canvas graph lives in a single jsonb column keyed by user id.
@@ -33,6 +33,7 @@ function formatPersistenceError(error: unknown): string {
 
   const details = error as Record<string, unknown>
   const parts = [
+    typeof details.error === 'string' ? details.error : null,
     typeof details.message === 'string' ? details.message : null,
     typeof details.details === 'string' ? details.details : null,
     typeof details.hint === 'string' ? details.hint : null,
@@ -49,6 +50,7 @@ function formatPersistenceError(error: unknown): string {
 }
 
 async function getAccessToken() {
+  if (isE2EFakeAuth) return e2eFakeAccessToken
   if (!supabase) return null
   const { data, error } = await supabase.auth.getSession()
   if (error) throw new GraphPersistenceError('Failed to read your auth session', error)
@@ -65,14 +67,14 @@ async function parseJsonResponse(response: Response) {
   }
 }
 
-async function writeGraphThroughApi(graph: GraphState, expectedRevision: number | null) {
-  const baseUrl = getSupabaseFunctionUrl('graph-api')
-  const accessToken = await getAccessToken()
-  if (!baseUrl || !accessToken) {
-    throw new GraphPersistenceError('Failed to save your board', 'Supabase session is not available.')
-  }
-
-  const response = await fetch(`${baseUrl}/v1/graph`, {
+export async function saveGraphThroughApi(
+  graphApiBaseUrl: string,
+  accessToken: string,
+  graph: GraphState,
+  expectedRevision: number | null,
+  fetchImpl: typeof fetch = fetch,
+) {
+  const response = await fetchImpl(`${graphApiBaseUrl.replace(/\/$/, '')}/v1/graph`, {
     method: 'PUT',
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -91,6 +93,16 @@ async function writeGraphThroughApi(graph: GraphState, expectedRevision: number 
   }
 
   return payload as { revision?: unknown } | null
+}
+
+async function writeGraphThroughApi(graph: GraphState, expectedRevision: number | null) {
+  const baseUrl = getSupabaseFunctionUrl('graph-api')
+  const accessToken = await getAccessToken()
+  if (!baseUrl || !accessToken) {
+    throw new GraphPersistenceError('Failed to save your board', 'Supabase session is not available.')
+  }
+
+  return saveGraphThroughApi(baseUrl, accessToken, graph, expectedRevision)
 }
 
 function isGraphState(value: unknown): value is GraphState {
