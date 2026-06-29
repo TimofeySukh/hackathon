@@ -22,4 +22,5 @@ This repo follows the harness guidance in `docs/`.
 - Document each new feature under `docs/features/` (copy `_TEMPLATE.md`), and record durable design decisions in `docs/DESIGN_LOG.md`.
 - Always create a commit after making changes.
 - Always restart the local server after making changes.
+- Install missing local verification tools when needed instead of skipping checks.
 - Keep this file short. Add project detail to `docs/`, not here.

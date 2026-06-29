@@ -562,6 +562,9 @@ function App() {
   const loadedGraphSourceRef = useRef<'saved' | 'empty' | 'local' | 'error'>('empty')
   const loadedGraphSnapshotRef = useRef<string | null>(null)
   const loadedGraphRevisionRef = useRef<number | null>(null)
+  const pendingSaveGraphRef = useRef<GraphState | null>(null)
+  const pendingSaveSnapshotRef = useRef<string | null>(null)
+  const [saveEpoch, bumpSaveEpoch] = useState(0)
   const graphChannelId = useId()
   const pendingConnectorRef = useRef<DragConnector | null>(null)
   // Start from a blank board (just the "you" circle), never the old demo seed.
@@ -784,6 +787,14 @@ function App() {
     channel.close()
   }, [graphChannelId])
 
+  const clearPendingSave = useCallback((graphJson: string | null = null) => {
+    if (graphJson === null || pendingSaveSnapshotRef.current === graphJson) {
+      pendingSaveGraphRef.current = null
+      pendingSaveSnapshotRef.current = null
+      bumpSaveEpoch((epoch) => epoch + 1)
+    }
+  }, [])
+
   const graphRef = useRef(graph)
   useEffect(() => {
     graphRef.current = graph
@@ -815,6 +826,19 @@ function App() {
             return
           }
 
+          const base = sanitizeDefaultCircleStyles(newGraphData)
+          const stamped = stampYouIdentity(base, auth.session!.user)
+          const incomingSnapshot = JSON.stringify(stamped)
+          const pendingSaveGraph = pendingSaveGraphRef.current
+
+          if (pendingSaveGraph && isGraphStateEqual(stamped, pendingSaveGraph)) {
+            loadedGraphSourceRef.current = 'saved'
+            loadedGraphSnapshotRef.current = incomingSnapshot
+            loadedGraphRevisionRef.current = newRevision
+            clearPendingSave(pendingSaveSnapshotRef.current)
+            return
+          }
+
           // Check if there are local unsaved modifications
           const isUnsaved = (() => {
             if (!loadedGraphSnapshotRef.current) return false
@@ -828,10 +852,8 @@ function App() {
 
           if (!isUnsaved) {
             // No unsaved modifications: automatically apply the update in real-time
-            const base = sanitizeDefaultCircleStyles(newGraphData)
-            const stamped = stampYouIdentity(base, auth.session!.user)
             loadedGraphSourceRef.current = 'saved'
-            loadedGraphSnapshotRef.current = JSON.stringify(stamped)
+            loadedGraphSnapshotRef.current = incomingSnapshot
             loadedGraphRevisionRef.current = newRevision
             setGraph(stamped)
           } else {
@@ -848,7 +870,7 @@ function App() {
     return () => {
       void channel.unsubscribe()
     }
-  }, [auth.status, userId, auth.session])
+  }, [auth.status, userId, auth.session, clearPendingSave])
 
   // Load the signed-in user's graph; a brand-new account starts from a blank
   // canvas with only their "you" circle — the local demo data is never persisted.
@@ -866,6 +888,7 @@ function App() {
         loadedGraphSourceRef.current = loaded.source
         loadedGraphSnapshotRef.current = JSON.stringify(stamped)
         loadedGraphRevisionRef.current = loaded.revision
+        clearPendingSave()
         setGraph(stamped)
         setGraphLoaded(true)
       })
@@ -876,6 +899,7 @@ function App() {
           loadedGraphSourceRef.current = 'error'
           loadedGraphSnapshotRef.current = JSON.stringify(stamped)
           loadedGraphRevisionRef.current = null
+          clearPendingSave()
           setGraphLoadError('Failed to load your board from the database. To protect your data, changes will not be saved. Please reload the page.')
           setGraph(stamped)
           setGraphLoaded(true)
@@ -894,15 +918,31 @@ function App() {
     if (loadedGraphSourceRef.current === 'local') return
     const graphJson = JSON.stringify(graph)
     if (loadedGraphSnapshotRef.current === graphJson) return
+    if (loadedGraphSnapshotRef.current) {
+      try {
+        const snap = JSON.parse(loadedGraphSnapshotRef.current) as GraphState
+        if (isGraphStateEqual(graph, snap)) {
+          loadedGraphSnapshotRef.current = graphJson
+          return
+        }
+      } catch {
+        // Fall through and attempt to save the current valid graph.
+      }
+    }
+    if (pendingSaveSnapshotRef.current !== null) return
     const timer = window.setTimeout(() => {
+      pendingSaveGraphRef.current = graph
+      pendingSaveSnapshotRef.current = graphJson
       void saveGraph(userId, graph, loadedGraphRevisionRef.current)
         .then((nextRevision) => {
           loadedGraphRevisionRef.current = nextRevision
           loadedGraphSourceRef.current = 'saved'
           loadedGraphSnapshotRef.current = graphJson
+          clearPendingSave(graphJson)
           broadcastGraphRevision(userId, nextRevision)
         })
         .catch((error) => {
+          clearPendingSave(graphJson)
           if (error instanceof GraphRevisionConflictError) {
             loadedGraphSourceRef.current = 'error'
             setGraphLoadError('This board changed in another tab or through an agent. To protect your data, reload before making more changes.')
@@ -912,7 +952,7 @@ function App() {
         })
     }, 800)
     return () => window.clearTimeout(timer)
-  }, [graph, graphLoaded, auth.status, broadcastGraphRevision, userId])
+  }, [graph, graphLoaded, auth.status, broadcastGraphRevision, clearPendingSave, saveEpoch, userId])
 
   // Signed-out visitors aren't blocked: their board is restored from (and saved
   // to) localStorage so work survives a reload without an account. Signing in
@@ -953,13 +993,17 @@ function App() {
     if (auth.status === 'authenticated' && userId) {
       try {
         const graphJson = JSON.stringify(nextGraph)
+        pendingSaveGraphRef.current = nextGraph
+        pendingSaveSnapshotRef.current = graphJson
         const nextRevision = await saveGraph(userId, nextGraph, loadedGraphRevisionRef.current)
         loadedGraphRevisionRef.current = nextRevision
         loadedGraphSourceRef.current = 'saved'
         loadedGraphSnapshotRef.current = graphJson
+        clearPendingSave(graphJson)
         setGraph(nextGraph)
         broadcastGraphRevision(userId, nextRevision)
       } catch (error) {
+        clearPendingSave(JSON.stringify(nextGraph))
         if (error instanceof GraphRevisionConflictError) {
           loadedGraphSourceRef.current = 'error'
           setGraphLoadError('This board changed in another tab or through an agent. To protect your data, reload before making more changes.')
@@ -973,6 +1017,7 @@ function App() {
       saveLocalGraph(nextGraph)
       loadedGraphSourceRef.current = 'local'
       loadedGraphSnapshotRef.current = JSON.stringify(nextGraph)
+      clearPendingSave()
     }
     setGraph(nextGraph)
   }

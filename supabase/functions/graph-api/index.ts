@@ -621,7 +621,13 @@ async function readJson(req: Request) {
   if (contentType.startsWith('image/') || contentType === 'application/octet-stream') {
     return {}
   }
-  return parseBody(await req.json().catch(() => ({})))
+  const rawBody = await req.text()
+  if (!rawBody.trim()) return {}
+  try {
+    return parseBody(JSON.parse(rawBody))
+  } catch {
+    throw new Response('Request body must be valid JSON.', { status: 400 })
+  }
 }
 
 function getExpectedRevision(req: Request, body: Record<string, unknown>) {

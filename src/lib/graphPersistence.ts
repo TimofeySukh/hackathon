@@ -331,6 +331,10 @@ export async function loadGraphRecord(userId: string): Promise<LoadedGraphRecord
  */
 export async function saveGraph(userId: string, graph: GraphState, expectedRevision: number | null): Promise<number | null> {
   if (!supabase) return expectedRevision
+  if (!isGraphState(graph)) {
+    throw new Error('Cannot save board: graph data is missing or invalid.')
+  }
+
   let data: { revision?: unknown } | null
   let savedFromRevision = expectedRevision
   try {
