@@ -43,9 +43,10 @@ not thousands of per-contact database writes.
   the primary path so import persistence shares the same revision-checked contract as
   API/CLI/MCP graph replacement.
 - If the browser receives a non-conflict failure from `graph-api`, it retries the same
-  revision-checked save directly through Supabase RLS. This keeps imports recoverable
-  when the deployed function is stale or temporarily failing, without silently ignoring
-  revision conflicts.
+  revision-checked save directly through Supabase RLS using explicit PostgREST `fetch`
+  calls and pre-serialized JSON. This keeps imports recoverable when the deployed
+  function is stale or temporarily failing, without silently ignoring revision conflicts
+  or depending on client-library serialization for large graph blobs.
 - The import button is disabled while a ZIP import is running and shows `Importing...`.
 - Duplicate imported people are skipped by generated LinkedIn person id.
 

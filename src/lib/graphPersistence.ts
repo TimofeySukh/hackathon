@@ -1,4 +1,11 @@
-import { e2eFakeAccessToken, getSupabaseFunctionUrl, isE2EFakeAuth, supabase } from './supabase'
+import {
+  e2eFakeAccessToken,
+  getSupabaseFunctionUrl,
+  getSupabaseRestUrl,
+  isE2EFakeAuth,
+  supabase,
+  supabasePublishableKey,
+} from './supabase'
 import type { GraphState } from './board/types'
 
 // The whole canvas graph lives in a single jsonb column keyed by user id.
@@ -125,38 +132,62 @@ async function readGraphRevisionDirect(userId: string): Promise<number | null> {
 }
 
 async function writeGraphDirect(userId: string, graph: GraphState, expectedRevision: number | null) {
-  if (!supabase) {
+  const accessToken = await getAccessToken()
+  if (!supabase || !supabasePublishableKey || !accessToken) {
     throw new GraphPersistenceError('Failed to save your board', 'Supabase session is not available.')
   }
 
-  if (expectedRevision === null) {
-    const { data, error } = await supabase
-      .from('user_graphs')
-      .insert({ user_id: userId, graph })
-      .select('revision')
+  const graphJson = JSON.stringify(graph)
+  const headers = {
+    apikey: supabasePublishableKey,
+    Authorization: `Bearer ${accessToken}`,
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+    Prefer: 'return=representation',
+  }
 
-    if (error) {
-      if (error.code === '23505') {
-        throw new GraphRevisionConflictError(await readGraphRevisionDirect(userId))
-      }
-      throw new GraphPersistenceError('Failed to save your board', error)
+  if (expectedRevision === null) {
+    const url = getSupabaseRestUrl('user_graphs?select=revision')
+    if (!url) {
+      throw new GraphPersistenceError('Failed to save your board', 'Supabase REST URL is not available.')
     }
 
-    return { revision: readRevisionFromRows(data) ?? 1 }
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: `{"user_id":${JSON.stringify(userId)},"graph":${graphJson}}`,
+    })
+    const payload = await parseJsonResponse(response)
+
+    if (!response.ok) {
+      if (response.status === 409 || (payload && typeof payload === 'object' && (payload as { code?: unknown }).code === '23505')) {
+        throw new GraphRevisionConflictError(await readGraphRevisionDirect(userId))
+      }
+      throw new GraphPersistenceError('Failed to save your board', payload ?? { message: response.statusText, code: String(response.status) })
+    }
+
+    return { revision: readRevisionFromRows(payload) ?? 1 }
   }
 
-  const { data, error } = await supabase
-    .from('user_graphs')
-    .update({ graph })
-    .eq('user_id', userId)
-    .eq('revision', expectedRevision)
-    .select('revision')
-
-  if (error) {
-    throw new GraphPersistenceError('Failed to save your board', error)
+  const url = getSupabaseRestUrl(
+    `user_graphs?user_id=eq.${encodeURIComponent(userId)}&revision=eq.${encodeURIComponent(String(expectedRevision))}&select=revision`,
+  )
+  if (!url) {
+    throw new GraphPersistenceError('Failed to save your board', 'Supabase REST URL is not available.')
   }
 
-  const revision = readRevisionFromRows(data)
+  const response = await fetch(url, {
+    method: 'PATCH',
+    headers,
+    body: `{"graph":${graphJson}}`,
+  })
+  const payload = await parseJsonResponse(response)
+
+  if (!response.ok) {
+    throw new GraphPersistenceError('Failed to save your board', payload ?? { message: response.statusText, code: String(response.status) })
+  }
+
+  const revision = readRevisionFromRows(payload)
   if (revision === null) {
     throw new GraphRevisionConflictError(await readGraphRevisionDirect(userId))
   }
