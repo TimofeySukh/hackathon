@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/TimofeySukh/hackathon.git}"
-BRANCH="${BRANCH:-main}"
+BRANCH="${BRANCH:-production}"
 BASE_DIR="${BASE_DIR:-$HOME/apps/social-datanode-live-autodeploy}"
 REPO_DIR="${REPO_DIR:-$BASE_DIR/repo}"
 LIVE_DIR="${LIVE_DIR:-$HOME/apps/social-datanode-live}"

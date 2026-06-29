@@ -266,20 +266,29 @@ If Playwright's Chromium is not installed on the machine:
 npx playwright install chromium
 ```
 
-## Production Auto-Deploy
+## Production Deploy
 
-The `social.datanode.live` deployment can run a lightweight user-level auto-deploy loop on the server.
+The `social.datanode.live` deployment uses a pull-based production promotion flow.
+The home server polls GitHub from cron, so it does not need a public IP address,
+port forwarding, inbound SSH, or GitHub repository deploy secrets.
+
+Production does not deploy every push to `main`. A GitHub Actions manual workflow
+promotes a reviewed branch, tag, or commit SHA to the `production` branch. The server
+then notices that `production` changed and deploys it from inside the home network.
 
 Files:
 
+- `.github/workflows/deploy-social-datanode-live.yml`
 - `deploy/social-datanode-live/auto-deploy/social-datanode-live-autodeploy.sh`
 - `deploy/social-datanode-live/auto-deploy/social-datanode-live-autodeploy.cron`
 
 What it does:
 
-- checks `main` on GitHub every 3 minutes from cron
+- keeps deploy control in GitHub without requiring GitHub to SSH into the server
+- promotes a selected ref to `production` through a manual workflow dispatch
+- checks `production` on GitHub every 3 minutes from cron
 - exits immediately when the remote commit did not change
-- only runs `npm ci`, `npm run build`, and `docker compose up -d --build` when `main` changed
+- only runs `npm ci`, `npm run build`, and `docker compose up -d --build` when `production` changed
 - stores the last deployed commit SHA on the server to avoid unnecessary rebuilds
 - loads optional build-time Vite variables from `$HOME/apps/social-datanode-live-autodeploy/deploy.env` before `npm run build`
 
@@ -291,6 +300,13 @@ VITE_SUPABASE_URL=https://lxnrpdeahoglgiocowsh.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=<publishable-key-from-supabase>
 VITE_SUPABASE_ANON_KEY=
 EOF
+```
+
+Before the first server run, create or update the `production` branch with the promotion
+workflow after this workflow file exists on `main`:
+
+```bash
+gh workflow run deploy-social-datanode-live.yml --ref main -f ref=main
 ```
 
 Suggested server install for user `egg`:
@@ -306,11 +322,24 @@ rm -f /tmp/current-crontab /tmp/next-crontab
 ~/.local/bin/social-datanode-live-autodeploy
 ```
 
+Promote later releases after they are ready:
+
+```bash
+gh workflow run deploy-social-datanode-live.yml --ref main -f ref=main
+```
+
+Promote a specific commit SHA:
+
+```bash
+gh workflow run deploy-social-datanode-live.yml --ref main -f ref=<commit-sha>
+```
+
 Check status:
 
 ```bash
 crontab -l
 tail -n 100 ~/.local/share/social-datanode-live-autodeploy/cron.log
+gh run list --workflow deploy-social-datanode-live.yml --limit 5
 ```
 
 Vite listens on all network interfaces in this repository, so it prints both a local URL and a network URL in the terminal. Open either URL in a browser.
@@ -600,7 +629,7 @@ Supabase verification:
 - Before starting new repo work, run `git fetch` and then `git pull --ff-only` when the working tree is clean, so local work starts from the latest GitHub state without creating automatic merge commits.
 - Create a commit after repository changes.
 - Do not push automatically after every change; push only when the user asks for it or the release workflow requires it.
-- Commits on `main` are deployed to the primary production site within about 3 minutes after they reach GitHub.
+- Commits on `main` do not deploy automatically; promote a reviewed ref with the production workflow when a release is ready.
 
 ## Current Priorities
 

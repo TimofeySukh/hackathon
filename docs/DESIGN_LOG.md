@@ -807,6 +807,14 @@ rediscover, write it here.
 - Why: Full LinkedIn graph exports can exceed 1M tokens. Agents need deterministic local
   retrieval that returns large groups in compact chunks before involving an LLM.
 
+## 2026-06-29 — Pull-based production promotion
+
+- Decision: Production deploys through a manual GitHub workflow that promotes a reviewed
+  branch, tag, or commit SHA to the `production` branch. The home server polls
+  `production` from cron and deploys changed commits from inside the network.
+- Why: The production server can sit behind a home NAT without public inbound SSH, while
+  releases are still explicit and no longer happen automatically on every `main` push.
+
 ## 2026-06-28 — Agent mode searches the current board with tools
 
 - Decision: Agent mode now exposes read-only board tools backed by the mounted `GraphState`:

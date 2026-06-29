@@ -1,0 +1,59 @@
+name: Promote social.datanode.live
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git branch, tag, or commit SHA to promote to production
+        required: true
+        default: main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: social-datanode-live-promotion
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: Promote production ref
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Update production branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOY_REF: ${{ inputs.ref }}
+        run: |
+          set -Eeuo pipefail
+
+          git fetch --tags origin
+
+          if target_sha="$(git rev-parse --verify --quiet "${DEPLOY_REF}^{commit}")"; then
+            :
+          elif target_sha="$(git rev-parse --verify --quiet "origin/${DEPLOY_REF}^{commit}")"; then
+            :
+          else
+            git fetch --depth 1 origin "$DEPLOY_REF"
+            target_sha="$(git rev-parse --verify "FETCH_HEAD^{commit}")"
+          fi
+
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/production" >/dev/null 2>&1; then
+            gh api \
+              --method PATCH \
+              "repos/${GITHUB_REPOSITORY}/git/refs/heads/production" \
+              -f "sha=${target_sha}" \
+              -F force=true
+          else
+            gh api \
+              --method POST \
+              "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f ref=refs/heads/production \
+              -f "sha=${target_sha}"
+          fi
+
+          echo "Promoted ${target_sha} to production"
