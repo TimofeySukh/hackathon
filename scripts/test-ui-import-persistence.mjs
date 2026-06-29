@@ -416,6 +416,15 @@ async function main() {
       throw new Error(`ZIP import saved ${mock.state.graph?.people?.length ?? 0} people, expected ${args.people}.`)
     }
 
+    const importedCompanyTones = new Set(
+      (mock.state.graph?.circles ?? [])
+        .filter((circle) => circle.id.startsWith('linkedin-company-'))
+        .map((circle) => circle.tone),
+    )
+    if (importedCompanyTones.size <= 1) {
+      throw new Error(`ZIP import used only one LinkedIn company tone: ${JSON.stringify([...importedCompanyTones])}.`)
+    }
+
     const readsBeforeReload = mock.state.reads
     await page.reload({ waitUntil: 'networkidle' })
     await waitForGraphRead(mock, readsBeforeReload + 1)

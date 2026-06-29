@@ -15,6 +15,10 @@ not thousands of per-contact database writes.
 - LinkedIn ZIP import reads `Connections.csv` from the uploaded archive.
 - The import groups people by company, creates missing company circles, and adds new
   people under those circles.
+- New LinkedIn company circles use a stable deterministic tone from the Material 3 circle
+  palette instead of defaulting every imported company to blue. Existing company circles
+  keep their current tone on re-import, except legacy default-blue LinkedIn company circles
+  without a custom color are migrated to the deterministic tone.
 - Imported nodes are placed **non-overlapping up front** so the O(n²) collision relaxer
   never has to untangle a pile-up: people are sunflower-packed inside their company
   (`personPackOffset`), each company circle is sized to its member count

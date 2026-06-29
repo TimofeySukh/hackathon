@@ -172,6 +172,28 @@ function titleCaseSlug(slug: string) {
     .join(' ')
 }
 
+const LINKEDIN_COMPANY_TONES: CircleNode['tone'][] = ['red', 'green', 'amber', 'violet', 'blue']
+
+function hashString(value: string) {
+  let hash = 0
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0
+  }
+  return hash
+}
+
+function toneForLinkedInCompany(companyId: string): CircleNode['tone'] {
+  if (companyId === 'linkedin-company-socialdatanode') return 'blue'
+  return LINKEDIN_COMPANY_TONES[hashString(companyId) % LINKEDIN_COMPANY_TONES.length]
+}
+
+function shouldRecolorLegacyLinkedInCompany(circle: CircleNode) {
+  return circle.id.startsWith('linkedin-company-') &&
+    circle.id !== 'linkedin-company-socialdatanode' &&
+    circle.tone === 'blue' &&
+    !circle.customColor
+}
+
 function extractLinkedInProfileUrlCandidate(rawValue: string) {
   const value = rawValue.trim()
   if (!value) return ''
@@ -221,7 +243,7 @@ function ensureLinkedInCompanyCircle(graph: GraphState, companyName: string, com
       minRadius: 90,
       parentId: null,
       connectedTo: null,
-      tone: 'blue',
+      tone: toneForLinkedInCompany(companyId),
       fillMode: 'transparent',
       shapeType: 'circle',
       shapeCustom: false,
@@ -231,6 +253,9 @@ function ensureLinkedInCompanyCircle(graph: GraphState, companyName: string, com
     graph.circles.push(companyCircle)
   } else if (companyLogoUrl && !companyCircle.imageUrl) {
     companyCircle.imageUrl = companyLogoUrl
+  }
+  if (shouldRecolorLegacyLinkedInCompany(companyCircle)) {
+    companyCircle.tone = toneForLinkedInCompany(companyCircle.id)
   }
 
   return companyCircle

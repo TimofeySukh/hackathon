@@ -20,6 +20,10 @@ selects the node and flies the camera to it at a comfortable zoom.
 - LinkedIn profile import normalizes the URL, tries to read public Open Graph metadata
   for name, headline/company, and avatar only when server-side enrichment misses core
   fields, then falls back to the URL slug when no backend enrichment is available.
+- New company circles created by manual LinkedIn profile import use the same stable
+  deterministic tone assignment as ZIP imports. Legacy default-blue LinkedIn companies
+  without a custom color are corrected on update, while the built-in SocialDataNode
+  onboarding company remains blue.
 - Signed-in users get server-side LinkedIn profile enrichment for manual one-profile
   imports only. The result provides name, current company, headline, avatar, and profile
   description when those fields are available. The headline and description are saved as

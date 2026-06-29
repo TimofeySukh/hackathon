@@ -367,6 +367,28 @@ function titleCaseSlug(slug: string) {
     .join(' ')
 }
 
+const LINKEDIN_COMPANY_TONES: CircleTone[] = ['red', 'green', 'amber', 'violet', 'blue']
+
+function hashString(value: string) {
+  let hash = 0
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0
+  }
+  return hash
+}
+
+function toneForLinkedInCompany(companyId: string): CircleTone {
+  if (companyId === 'linkedin-company-socialdatanode') return 'blue'
+  return LINKEDIN_COMPANY_TONES[hashString(companyId) % LINKEDIN_COMPANY_TONES.length]
+}
+
+function shouldRecolorLegacyLinkedInCompany(circle: CircleNode) {
+  return circle.id.startsWith('linkedin-company-') &&
+    circle.id !== 'linkedin-company-socialdatanode' &&
+    circle.tone === 'blue' &&
+    !circle.customColor
+}
+
 function parseLinkedInTitle(title: string) {
   const cleanTitle = title.replace(/\s*\|\s*LinkedIn\s*$/i, '').trim()
   const parts = cleanTitle.split(/\s+-\s+/).map((part) => part.trim()).filter(Boolean)
@@ -5924,6 +5946,11 @@ async function buildLinkedInConnectionsGraph(
   }
 
   const nextCircles = current.circles.map((circle) => ({ ...circle }))
+  for (const circle of nextCircles) {
+    if (shouldRecolorLegacyLinkedInCompany(circle)) {
+      circle.tone = toneForLinkedInCompany(circle.id)
+    }
+  }
   const nextPeople = current.people.map((person) => ({
     ...person,
     notes: person.notes ? person.notes.map((note) => ({ ...note })) : person.notes,
@@ -5994,7 +6021,7 @@ async function buildLinkedInConnectionsGraph(
         minRadius: company.radius,
         parentId: null,
         connectedTo: null,
-        tone: 'blue',
+        tone: toneForLinkedInCompany(company.id),
         fillMode: 'transparent',
         shapeType: 'circle',
         shapeCustom: false,
@@ -6214,7 +6241,7 @@ function ensureLinkedInCompanyCircle(current: GraphState, profile: LinkedInProfi
       minRadius: 90,
       parentId: null,
       connectedTo: null,
-      tone: 'blue',
+      tone: toneForLinkedInCompany(companyId),
       fillMode: 'transparent',
       shapeType: 'circle',
       shapeCustom: false,
@@ -6226,6 +6253,14 @@ function ensureLinkedInCompanyCircle(current: GraphState, profile: LinkedInProfi
     companyCircle = {
       ...companyCircle,
       imageUrl: profile.companyLogoUrl,
+    }
+    const idx = nextCircles.findIndex((c) => c.id === companyCircle!.id)
+    if (idx !== -1) nextCircles[idx] = companyCircle
+  }
+  if (companyCircle && shouldRecolorLegacyLinkedInCompany(companyCircle)) {
+    companyCircle = {
+      ...companyCircle,
+      tone: toneForLinkedInCompany(companyCircle.id),
     }
     const idx = nextCircles.findIndex((c) => c.id === companyCircle!.id)
     if (idx !== -1) nextCircles[idx] = companyCircle

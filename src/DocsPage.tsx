@@ -884,7 +884,7 @@ ${pinnedCmd}`}</code>
               <span className="docs-method-badge post">POST</span>
               <span className="docs-endpoint-path">/people/import-linkedin</span>
             </div>
-            <p>Imports or updates a person node inside a target circle by scraping their LinkedIn profile URL. The circle is automatically resolved or created based on the person\'s current company.</p>
+            <p>Imports or updates a person node inside a target circle by scraping their LinkedIn profile URL. The circle is automatically resolved or created based on the person\'s current company, with a stable palette tone assigned to newly created LinkedIn company circles.</p>
 
             <h3>Request Parameters</h3>
             <table className="docs-table">

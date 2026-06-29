@@ -17,6 +17,16 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-29 — LinkedIn Company Imports Use Stable Mixed Tones
+
+- Decision: new LinkedIn company circles get a deterministic tone from the circle palette
+  based on their company id instead of always using blue. Existing company circles keep
+  their saved tone during re-imports, except legacy default-blue LinkedIn companies
+  without custom colors are corrected to the deterministic tone.
+- Decision: the built-in `SocialDataNode` onboarding/import company remains blue.
+- Why: one onboarding/profile special case should not make large LinkedIn ZIP imports
+  visually collapse into a single-color board.
+
 ### 2026-06-29 — Graph Persistence Sanitizes JSONB Text
 
 - Decision: browser and `graph-api` board writes sanitize text before storing the graph
