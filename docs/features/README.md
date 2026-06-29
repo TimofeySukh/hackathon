@@ -30,5 +30,4 @@ design without reverse-engineering `src/App.tsx`.
 - [Privacy policy](privacy-policy.md) — public privacy page at `#privacy` for OAuth and user data transparency.
 - [Agent API](agent-api.md) — revocable agent tokens, graph API access, CLI, and MCP server setup.
 - [Real-time sync](realtime-sync.md) — automatic real-time sync with database edits via Supabase Realtime.
-- [Agent chat mode](agent-chat.md) — Open WebUI-style chat workspace toggled from the board toolbar.
 - [Product presentation](presentation.md) — standalone browser slide deck for demos and pitching.
