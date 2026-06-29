@@ -100,6 +100,90 @@ async function writeGraphThroughApi(graph: GraphState, expectedRevision: number 
   return payload as { revision?: unknown } | null
 }
 
+function readRevisionFromRows(rows: unknown): number | null {
+  if (!Array.isArray(rows)) return null
+  const revision = (rows[0] as { revision?: unknown } | undefined)?.revision
+  return typeof revision === 'number' ? revision : null
+}
+
+async function readGraphRevisionDirect(userId: string): Promise<number | null> {
+  if (!supabase) {
+    throw new GraphPersistenceError('Failed to load your board revision', 'Supabase session is not available.')
+  }
+
+  const { data, error } = await supabase
+    .from('user_graphs')
+    .select('revision')
+    .eq('user_id', userId)
+    .limit(1)
+
+  if (error) {
+    throw new GraphPersistenceError('Failed to load your board revision', error)
+  }
+
+  return readRevisionFromRows(data)
+}
+
+async function writeGraphDirect(userId: string, graph: GraphState, expectedRevision: number | null) {
+  if (!supabase) {
+    throw new GraphPersistenceError('Failed to save your board', 'Supabase session is not available.')
+  }
+
+  if (expectedRevision === null) {
+    const { data, error } = await supabase
+      .from('user_graphs')
+      .insert({ user_id: userId, graph })
+      .select('revision')
+
+    if (error) {
+      if (error.code === '23505') {
+        throw new GraphRevisionConflictError(await readGraphRevisionDirect(userId))
+      }
+      throw new GraphPersistenceError('Failed to save your board', error)
+    }
+
+    return { revision: readRevisionFromRows(data) ?? 1 }
+  }
+
+  const { data, error } = await supabase
+    .from('user_graphs')
+    .update({ graph })
+    .eq('user_id', userId)
+    .eq('revision', expectedRevision)
+    .select('revision')
+
+  if (error) {
+    throw new GraphPersistenceError('Failed to save your board', error)
+  }
+
+  const revision = readRevisionFromRows(data)
+  if (revision === null) {
+    throw new GraphRevisionConflictError(await readGraphRevisionDirect(userId))
+  }
+
+  return { revision }
+}
+
+async function writeGraphWithFallback(userId: string, graph: GraphState, expectedRevision: number | null) {
+  try {
+    return await writeGraphThroughApi(graph, expectedRevision)
+  } catch (apiError) {
+    if (apiError instanceof GraphRevisionConflictError) throw apiError
+    if (!supabase) throw apiError
+
+    console.warn('Failed to save graph through graph API, falling back to direct Supabase write.', apiError)
+    try {
+      return await writeGraphDirect(userId, graph, expectedRevision)
+    } catch (directError) {
+      if (directError instanceof GraphRevisionConflictError) throw directError
+      throw new GraphPersistenceError('Failed to save your board', {
+        graphApi: formatPersistenceError(apiError),
+        directSupabase: formatPersistenceError(directError),
+      })
+    }
+  }
+}
+
 async function readGraphMetaThroughApi() {
   const baseUrl = getSupabaseFunctionUrl('graph-api')
   const accessToken = await getAccessToken()
@@ -120,6 +204,21 @@ async function readGraphMetaThroughApi() {
   }
 
   return payload as { revision?: unknown } | null
+}
+
+async function readLatestGraphRevision(userId: string, knownRevision: number | null): Promise<number | null> {
+  if (knownRevision !== null) return knownRevision
+
+  try {
+    const meta = await readGraphMetaThroughApi()
+    const revision = typeof meta?.revision === 'number' ? meta.revision : null
+    if (revision !== null) return revision
+  } catch (apiError) {
+    if (!supabase) throw apiError
+    console.warn('Failed to load graph revision through graph API, falling back to direct Supabase read.', apiError)
+  }
+
+  return await readGraphRevisionDirect(userId)
 }
 
 async function readGraphThroughApi(): Promise<LoadedGraphRecord> {
@@ -201,18 +300,16 @@ export async function loadGraphRecord(userId: string): Promise<LoadedGraphRecord
  */
 export async function saveGraph(userId: string, graph: GraphState, expectedRevision: number | null): Promise<number | null> {
   if (!supabase) return expectedRevision
-  void userId
   let data: { revision?: unknown } | null
   let savedFromRevision = expectedRevision
   try {
-    data = await writeGraphThroughApi(graph, expectedRevision)
+    data = await writeGraphWithFallback(userId, graph, expectedRevision)
   } catch (error) {
     if (!(error instanceof GraphRevisionConflictError) || expectedRevision !== null) throw error
-    const meta = await readGraphMetaThroughApi()
-    const latestRevision = typeof meta?.revision === 'number' ? meta.revision : error.revision
+    const latestRevision = await readLatestGraphRevision(userId, error.revision)
     if (latestRevision === null) throw error
     savedFromRevision = latestRevision
-    data = await writeGraphThroughApi(graph, latestRevision)
+    data = await writeGraphWithFallback(userId, graph, latestRevision)
   }
   return typeof data?.revision === 'number' ? data.revision : savedFromRevision === null ? 1 : savedFromRevision + 1
 }

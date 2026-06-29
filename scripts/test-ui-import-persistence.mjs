@@ -36,7 +36,7 @@ function parseArgs(argv) {
 function jsonResponse(response, status, payload) {
   response.writeHead(status, {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-client-info',
+    'Access-Control-Allow-Headers': 'accept-profile, authorization, content-profile, content-type, apikey, prefer, x-client-info',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
     'Content-Type': 'application/json',
   })
@@ -57,7 +57,11 @@ function startMockGraphApi({ port }) {
     writes: 0,
     reads: 0,
     metaReads: 0,
+    restReads: 0,
+    restWrites: 0,
     failGraphReads: 0,
+    failGraphWrites: 0,
+    graphConflictIncludesRevision: true,
   }
 
   const server = http.createServer(async (request, response) => {
@@ -70,9 +74,57 @@ function startMockGraphApi({ port }) {
       const url = new URL(request.url ?? '/', `http://127.0.0.1:${port}`)
       const isGraphRoute = url.pathname === '/functions/v1/graph-api/v1/graph'
       const isGraphMetaRoute = url.pathname === '/functions/v1/graph-api/v1/graph/meta'
-      if (!isGraphRoute && !isGraphMetaRoute) {
+      const isRestGraphRoute = url.pathname === '/rest/v1/user_graphs'
+      if (!isGraphRoute && !isGraphMetaRoute && !isRestGraphRoute) {
         jsonResponse(response, 404, { error: `Unhandled mock route: ${request.method} ${url.pathname}` })
         return
+      }
+
+      if (isRestGraphRoute) {
+        if (request.method === 'GET') {
+          state.restReads += 1
+          jsonResponse(response, 200, state.revision === null ? [] : [{ revision: state.revision }])
+          return
+        }
+
+        if (request.method === 'POST') {
+          const body = await readBody(request)
+          if (state.revision !== null) {
+            jsonResponse(response, 409, {
+              code: '23505',
+              message: 'duplicate key value violates unique constraint "user_graphs_pkey"',
+            })
+            return
+          }
+          if (!body || typeof body !== 'object' || !isGraphState(body.graph)) {
+            jsonResponse(response, 400, { error: 'Invalid graph.' })
+            return
+          }
+          state.graph = body.graph
+          state.revision = 1
+          state.restWrites += 1
+          jsonResponse(response, 201, [{ revision: state.revision }])
+          return
+        }
+
+        if (request.method === 'PATCH') {
+          const body = await readBody(request)
+          const expectedRevision = Number(String(url.searchParams.get('revision') ?? '').replace(/^eq\./, ''))
+          if (!body || typeof body !== 'object' || !isGraphState(body.graph)) {
+            jsonResponse(response, 400, { error: 'Invalid graph.' })
+            return
+          }
+          if (!Number.isFinite(expectedRevision) || expectedRevision !== state.revision) {
+            jsonResponse(response, 200, [])
+            return
+          }
+
+          state.graph = body.graph
+          state.revision += 1
+          state.restWrites += 1
+          jsonResponse(response, 200, [{ revision: state.revision }])
+          return
+        }
       }
 
       if (request.method === 'GET' && isGraphMetaRoute) {
@@ -100,13 +152,25 @@ function startMockGraphApi({ port }) {
       }
 
       if (request.method === 'PUT') {
+        if (state.failGraphWrites > 0) {
+          state.failGraphWrites -= 1
+          jsonResponse(response, 500, { error: 'Unexpected graph API error.' })
+          return
+        }
+
         const body = await readBody(request)
         if (!body || typeof body !== 'object' || !isGraphState(body.graph)) {
           jsonResponse(response, 400, { error: 'Invalid graph.' })
           return
         }
         if (body.expectedRevision !== state.revision) {
-          jsonResponse(response, 409, { error: 'Revision conflict.', revision: state.revision })
+          jsonResponse(
+            response,
+            409,
+            state.graphConflictIncludesRevision
+              ? { error: 'Revision conflict.', revision: state.revision }
+              : { error: 'Revision conflict.' },
+          )
           return
         }
 
@@ -372,7 +436,9 @@ async function main() {
 
     mock.state.graph = buildGraphImportFixture()
     mock.state.revision = 10
-    mock.state.failGraphReads = 1
+    mock.state.failGraphReads = 2
+    mock.state.graphConflictIncludesRevision = false
+    const metaReadsBeforeConflictRecovery = mock.state.metaReads
     const failedLoadPage = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
     await failedLoadPage.addInitScript(() => {
       window.localStorage.clear()
@@ -400,15 +466,47 @@ async function main() {
     if (mock.state.revision !== 11) {
       throw new Error(`Expected retry write to advance revision to 11, got ${mock.state.revision}.`)
     }
+    if (mock.state.metaReads <= metaReadsBeforeConflictRecovery) {
+      throw new Error('Graph import after failed load did not recover the latest revision through /graph/meta.')
+    }
+
+    mock.state.graphConflictIncludesRevision = true
+    mock.state.failGraphWrites = 1
+    const restWritesBeforeFallback = mock.state.restWrites
+    const fallbackGraph = buildGraphImportFixture()
+    fallbackGraph.people[0].id = 'replaced-after-api-failure'
+    fallbackGraph.people[0].name = 'Replaced After API Failure'
+    const fallbackMessage = await uploadAndAcceptDialog(
+      failedLoadPage,
+      failedLoadPage.locator('input[type="file"][accept="application/json,.json"]'),
+      {
+        name: 'graph-replace-after-api-failure.json',
+        mimeType: 'application/json',
+        buffer: Buffer.from(`${JSON.stringify(fallbackGraph)}\n`),
+      },
+    )
+
+    if (mock.state.graph?.people?.[0]?.id !== 'replaced-after-api-failure') {
+      throw new Error('Graph import did not fall back to direct Supabase persistence after graph API failure.')
+    }
+    if (mock.state.restWrites !== restWritesBeforeFallback + 1) {
+      throw new Error('Expected graph API failure recovery to use exactly one direct Supabase write.')
+    }
+    if (mock.state.revision !== 12) {
+      throw new Error(`Expected direct fallback write to advance revision to 12, got ${mock.state.revision}.`)
+    }
     await failedLoadPage.close()
 
     console.log(JSON.stringify({
       zipMessage,
       graphMessage,
       replacementMessage,
+      fallbackMessage,
       revision: mock.state.revision,
       reads: mock.state.reads,
       metaReads: mock.state.metaReads,
+      restReads: mock.state.restReads,
+      restWrites: mock.state.restWrites,
       writes: mock.state.writes,
       finalCounts: {
         circles: mock.state.graph.circles.length,

@@ -17,6 +17,18 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-29 — Import Persistence Recovers From Graph API Failures
+
+- Decision: browser graph saves still use `graph-api` first, but fall back to direct
+  Supabase RLS writes when the function returns a non-conflict failure.
+- Decision: graph API replacement conflicts include the latest `revision` in `409`
+  responses, and the browser can recover via `/graph/meta` or direct revision reads when
+  an older function omits it.
+- Why: imports previously depended on a single Edge Function save path. A stale or failing
+  deployed function could return a generic "Unexpected graph API error" and block a ZIP
+  import even though the authenticated browser session still had permission to save its
+  own `user_graphs` row.
+
 ### 2026-06-28 — Local Import Persistence E2E
 
 - Decision: add `npm run test:ui-import:persistence`, a Playwright test that runs the app

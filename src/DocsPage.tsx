@@ -173,8 +173,8 @@ export default function DocsPage() {
           <ul style={{ lineHeight: '1.6', fontSize: '14px', color: 'var(--md-on-surface-variant)' }}>
             <li>Every mutation request requires an <code>expectedRevision</code> parameter.</li>
             <li>You can fetch the current revision of your graph from the <code>GET /graph/meta</code> endpoint.</li>
-            <li>If the current revision on the server does not match your <code>expectedRevision</code>, the server rejects the request with a <code>409 Conflict</code>.</li>
-            <li>When receiving a <code>409</code>, read the latest metadata, resolve the payload differences, and retry the mutation.</li>
+            <li>If the current revision on the server does not match your <code>expectedRevision</code>, the server rejects the request with a <code>409 Conflict</code> and includes the current <code>revision</code>.</li>
+            <li>When receiving a <code>409</code>, use the returned revision or read the latest metadata, resolve the payload differences, and retry the mutation.</li>
           </ul>
         </div>
       )
@@ -1473,7 +1473,7 @@ ${pinnedCmd}`}</code>
               <span className="docs-method-badge post">PUT</span>
               <span className="docs-endpoint-path">/graph</span>
             </div>
-            <p>Replaces the entire graph state with a new graph payload. Requires <code>graph:replace</code> scope.</p>
+            <p>Replaces the entire graph state with a new graph payload. Requires <code>graph:replace</code> scope. Revision conflicts return <code>409 Conflict</code> with the latest <code>revision</code>.</p>
             <h3>Request Example</h3>
             <div className="docs-code-container">
               <div className="docs-code-header">

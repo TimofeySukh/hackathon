@@ -33,8 +33,9 @@ circle) — there is no demo seed.
   `colors.ts`, `geometry.ts`, `layout.ts` (containment/collision), and
   `render.ts` (spatial index, hit-testing, the Canvas 2D draw layer).
 - `src/lib/graphPersistence.ts` loads and saves signed-in graph changes through the
-  `graph-api` Edge Function so reads and writes use the same revision-checked server
-  path, and uses `localStorage` for anonymous sessions.
+  `graph-api` Edge Function as the primary revision-checked server path. Browser
+  session saves can fall back to direct Supabase RLS writes when the function layer
+  returns a non-conflict failure. Anonymous sessions use `localStorage`.
 - `src/lib/agentApi.ts` calls the `graph-api` Edge Function for agent token
   management from the Settings panel.
 - `src/lib/supabase.ts` creates the browser Supabase client from Vite environment variables.

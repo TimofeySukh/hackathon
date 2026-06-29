@@ -39,9 +39,13 @@ not thousands of per-contact database writes.
   storage backend (Supabase for signed-in users, `localStorage` for anonymous users)
   before the success alert is shown. The normal debounced autosave then skips the same
   unchanged snapshot.
-- Signed-in graph writes go through the existing `graph-api` Edge Function replacement
-  route so import persistence uses the same revision-checked server path as API/CLI/MCP
-  graph replacement.
+- Signed-in graph writes use the existing `graph-api` Edge Function replacement route as
+  the primary path so import persistence shares the same revision-checked contract as
+  API/CLI/MCP graph replacement.
+- If the browser receives a non-conflict failure from `graph-api`, it retries the same
+  revision-checked save directly through Supabase RLS. This keeps imports recoverable
+  when the deployed function is stale or temporarily failing, without silently ignoring
+  revision conflicts.
 - The import button is disabled while a ZIP import is running and shows `Importing...`.
 - Duplicate imported people are skipped by generated LinkedIn person id.
 
@@ -82,10 +86,12 @@ Run the local signed-in persistence check before changing import persistence:
 npm run test:ui-import:persistence
 ```
 
-This uses a mock Supabase graph API on localhost plus `VITE_E2E_FAKE_AUTH=true`. It verifies
-that LinkedIn ZIP import and graph JSON import write through the signed-in persistence path,
-survive a page reload, and can replace the graph even after an initial graph load failure,
-without touching production data.
+This uses a mock Supabase graph API and minimal mock PostgREST endpoint on localhost plus
+`VITE_E2E_FAKE_AUTH=true`. It verifies that LinkedIn ZIP import and graph JSON import write
+through the signed-in persistence path, survive a page reload, recover the latest revision
+when `409 Conflict` omits it, fall back to direct Supabase persistence after a graph API
+failure, and can replace the graph even after an initial graph load failure, without
+touching production data.
 
 Useful overrides:
 

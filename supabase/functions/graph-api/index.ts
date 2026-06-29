@@ -339,7 +339,10 @@ async function writeGraph(userId: string, graph: GraphState, expectedRevision: n
       .select('revision')
       .single()
     if (error) {
-      if (error.code === '23505') return jsonResponse({ error: 'Revision conflict.' }, 409)
+      if (error.code === '23505') {
+        const current = await readGraph(userId)
+        return jsonResponse({ error: 'Revision conflict.', revision: current.revision }, 409)
+      }
       throw error
     }
     return jsonResponse({ graph, revision: data.revision ?? 1 })
@@ -354,7 +357,10 @@ async function writeGraph(userId: string, graph: GraphState, expectedRevision: n
     .maybeSingle()
 
   if (error) throw error
-  if (!data) return jsonResponse({ error: 'Revision conflict.' }, 409)
+  if (!data) {
+    const current = await readGraph(userId)
+    return jsonResponse({ error: 'Revision conflict.', revision: current.revision }, 409)
+  }
   return jsonResponse({ graph, revision: data.revision ?? expectedRevision + 1 })
 }
 
@@ -720,7 +726,12 @@ async function handleGraphRoutes(req: Request, path: string, auth: AuthContext, 
     if (!auth.scopes.has('graph:replace')) return jsonResponse({ error: 'Missing scope: graph:replace' }, 403)
     const graph = body.graph
     if (!isGraphState(graph)) return jsonResponse({ error: 'Invalid graph.' }, 400)
-    return await writeGraph(auth.userId, graph, getExpectedRevision(req, body))
+    const expectedRevision = getExpectedRevision(req, body)
+    const current = await readGraph(auth.userId)
+    if (current.revision !== expectedRevision) {
+      return jsonResponse({ error: 'Revision conflict.', revision: current.revision }, 409)
+    }
+    return await writeGraph(auth.userId, graph, expectedRevision)
   }
 
   if (req.method === 'GET' && path === '/v1/search') {
