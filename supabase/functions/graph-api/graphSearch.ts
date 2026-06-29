@@ -10,7 +10,7 @@ type PersonNode = {
   notes?: PersonNote[]
   links?: PersonLink[]
 }
-type GraphState = { circles: CircleNode[]; people: PersonNode[]; connections: unknown[] }
+export type GraphState = { circles: CircleNode[]; people: PersonNode[]; connections: unknown[] }
 
 export type CirclePathItem = { id: string; name: string }
 

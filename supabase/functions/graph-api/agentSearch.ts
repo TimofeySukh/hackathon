@@ -262,7 +262,7 @@ export async function runAgentSearch(graph: GraphState, query: string, limit: nu
 
   steps.push({ id: 'scan', label: 'Scanning contacts and notes' })
 
-  let strictResults = rankGraphSearch(graph, intent, limit)
+  const strictResults = rankGraphSearch(graph, intent, limit)
   if (strictResults.length > 0) {
     steps.push({
       id: 'keyword',
