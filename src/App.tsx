@@ -25,11 +25,8 @@ import { GraphRevisionConflictError, loadGraphRecord, saveGraph, loadLocalGraph,
 import { enrichLinkedInProfile } from './lib/linkedinEnrichment'
 import { searchGraphByQuery } from './lib/search/graphSearch'
 import { mapSmartSearchResults, shouldUseSmartSearch, smartSearchGraph, type AgentSearchStep } from './lib/smartSearch'
-import { OnboardingCoach } from './Onboarding'
 import { SelectionIndicator } from './components/SelectionIndicator'
 import { M3Slider } from './components/M3Slider'
-import { ONBOARDING_STEPS, ONBOARDING_DONE_STEP } from './onboardingSteps'
-import type { OnboardingAction } from './onboardingSteps'
 // STRESS TEST — dev-only performance harness. See src/lib/stressTest.ts.
 
 import type {
@@ -489,9 +486,8 @@ const authCardStyle: CSSProperties = {
   maxWidth: '320px',
 }
 
-// First-run flag for the onboarding tour. Kept in localStorage so a returning
-// visitor isn't shown the card on every load.
-const ONBOARDING_STORAGE_KEY = 'social-onboarding-done-v1'
+const LINKEDIN_GUIDE_HINT_KEY = 'social-linkedin-guide-hint-seen-v1'
+const SEARCH_LINKEDIN_HINT_KEY = 'social-search-linkedin-hint-seen-v1'
 const CIRCLE_CREATION_DEFAULTS_KEY = 'hackathon-board:circle-creation-defaults:v1'
 
 type CircleCreationDefaults = {
@@ -517,17 +513,17 @@ function loadCircleCreationDefaults(): CircleCreationDefaults {
   return DEFAULT_CIRCLE_CREATION_DEFAULTS
 }
 
-function hasSeenOnboarding(): boolean {
+function hasLocalFlag(key: string): boolean {
   try {
-    return window.localStorage.getItem(ONBOARDING_STORAGE_KEY) === '1'
+    return window.localStorage.getItem(key) === '1'
   } catch {
     return false
   }
 }
 
-function markOnboardingSeen() {
+function markLocalFlag(key: string) {
   try {
-    window.localStorage.setItem(ONBOARDING_STORAGE_KEY, '1')
+    window.localStorage.setItem(key, '1')
   } catch {
     // ignore
   }
@@ -1155,152 +1151,14 @@ function App() {
   const [hoveredPersonId, setHoveredPersonId] = useState<string | null>(null)
   const [hoveredCircleEdgeId, setHoveredCircleEdgeId] = useState<string | null>(null)
   const hoveredCircleEdgeIdRef = useRef<string | null>(null)
- 
-  // Onboarding tour. -1 = inactive. A ref mirrors the step so board event
-  // handlers (wired once in effects) always read the live value.
-  const [onboardingStep, setOnboardingStep] = useState(-1)
-  const onboardingStepRef = useRef(onboardingStep)
-  useEffect(() => {
-    onboardingStepRef.current = onboardingStep
-  }, [onboardingStep])
-
-  const [onboardingOffset, setOnboardingOffset] = useState(0)
-
-  useEffect(() => {
-    const updateOffset = () => {
-      if (window.innerWidth > 720) {
-        setOnboardingOffset(0)
-        return
-      }
-
-      const inspectorEl = document.querySelector('.inspector')
-      const popoverEl = document.querySelector('.circle-style-popover.is-open')
-
-      let maxBottom = 0
-
-      if (inspectorEl) {
-        const rect = inspectorEl.getBoundingClientRect()
-        maxBottom = Math.max(maxBottom, rect.height + 16)
-      }
-
-      if (popoverEl) {
-        const rect = popoverEl.getBoundingClientRect()
-        maxBottom = Math.max(maxBottom, rect.height + 96)
-      }
-
-      setOnboardingOffset(maxBottom)
-    }
-
-    updateOffset()
-    const timer1 = setTimeout(updateOffset, 50)
-    const timer2 = setTimeout(updateOffset, 150)
-    const timer3 = setTimeout(updateOffset, 300)
-
-    window.addEventListener('resize', updateOffset)
-
-    const observer = new MutationObserver(updateOffset)
-    observer.observe(document.body, { childList: true, subtree: true, attributes: true })
-
-    return () => {
-      clearTimeout(timer1)
-      clearTimeout(timer2)
-      clearTimeout(timer3)
-      window.removeEventListener('resize', updateOffset)
-      observer.disconnect()
-    }
-  }, [selectedItem, showCircleStylePanel, onboardingStep])
-
-  // True during the brief "Great!" beat that plays after a gesture, before the
-  // card advances to the next step.
-  const [onboardingCelebrating, setOnboardingCelebrating] = useState(false)
-  const onboardingCelebrateRef = useRef(false)
-  const onboardingTimerRef = useRef<number | null>(null)
-  const onboardingDecidedRef = useRef(false)
-
-  // Decide once per load whether to open the tour. On the dev server it always
-  // opens for signed-out visitors (acts as the landing); in production it shows
-  // only once ever, tracked in localStorage — so it isn't a popup on every visit.
-  useEffect(() => {
-    if (onboardingDecidedRef.current) return
-    if (!graphLoaded || auth.status === 'loading') return
-    onboardingDecidedRef.current = true
-    const isSignedOut = auth.status === 'anonymous' || auth.status === 'unconfigured'
-    const devAlwaysShow = import.meta.env.DEV && isSignedOut
-    if (devAlwaysShow || !hasSeenOnboarding()) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setOnboardingStep(0)
-      if (!devAlwaysShow) markOnboardingSeen()
-    }
-  }, [graphLoaded, auth.status])
-
-  function clearOnboardingTimer() {
-    if (onboardingTimerRef.current != null) {
-      window.clearTimeout(onboardingTimerRef.current)
-      onboardingTimerRef.current = null
-    }
-    onboardingCelebrateRef.current = false
-    setOnboardingCelebrating(false)
-  }
-
-  function finishOnboarding() {
-    clearOnboardingTimer()
-    setOnboardingStep(-1)
-    markOnboardingSeen()
-  }
-
-  function onboardingNext() {
-    clearOnboardingTimer()
-    setOnboardingStep((step) => {
-      if (step < 0) return step
-      if (step >= ONBOARDING_DONE_STEP) {
-        markOnboardingSeen()
-        return -1
-      }
-      const next = step + 1
-      if (next === ONBOARDING_DONE_STEP) markOnboardingSeen()
-      return next
-    })
-  }
-
-  function onboardingBack() {
-    clearOnboardingTimer()
-    setOnboardingStep((step) => (step > 0 ? step - 1 : step))
-  }
-
-  // Called from board interaction handlers. When the action matches the step the
-  // tour is waiting for, play a one-second "Great!" beat, then advance.
-  function notifyOnboarding(action: OnboardingAction) {
-    const step = onboardingStepRef.current
-    if (step < 0 || step >= ONBOARDING_DONE_STEP) return
-    if (ONBOARDING_STEPS[step].trigger !== action) return
-    if (onboardingCelebrateRef.current) return
-    onboardingCelebrateRef.current = true
-    setOnboardingCelebrating(true)
-    onboardingTimerRef.current = window.setTimeout(() => {
-      onboardingTimerRef.current = null
-      onboardingCelebrateRef.current = false
-      setOnboardingCelebrating(false)
-      setOnboardingStep((s) => {
-        if (s < 0 || s >= ONBOARDING_DONE_STEP) return s
-        const next = s + 1
-        if (next === ONBOARDING_DONE_STEP) markOnboardingSeen()
-        return next
-      })
-    }, 1100)
-  }
-
-  // The closing "you're ready" card dismisses itself after a beat so it never
-  // lingers in the way; the Done button still closes it instantly.
-  useEffect(() => {
-    if (onboardingStep !== ONBOARDING_DONE_STEP) return
-    const timer = window.setTimeout(() => setOnboardingStep(-1), 3600)
-    return () => window.clearTimeout(timer)
-  }, [onboardingStep])
 
   // Viewport size in CSS px, used to cull off-screen nodes. Updated on resize.
   const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight })
 
   const [showSettings, setShowSettings] = useState(false)
+  const [highlightLinkedInGuideHelp, setHighlightLinkedInGuideHelp] = useState(
+    () => !hasLocalFlag(LINKEDIN_GUIDE_HINT_KEY),
+  )
 
 
   const [showAgentSettings, setShowAgentSettings] = useState(false)
@@ -1344,6 +1202,7 @@ function App() {
   const [aiSearchSteps, setAiSearchSteps] = useState<AgentSearchStep[]>([])
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([])
   const [isSmartSearching, setIsSmartSearching] = useState(false)
+  const [showSearchLinkedInHint, setShowSearchLinkedInHint] = useState(false)
   const smartSearchRequestRef = useRef(0)
   const [isImportingLinkedInProfile, setIsImportingLinkedInProfile] = useState(false)
   const [isImportingLinkedInZip, setIsImportingLinkedInZip] = useState(false)
@@ -1403,6 +1262,7 @@ function App() {
   function closeSearch() {
     setSearchOpen(false)
     setSearchQuery('')
+    setShowSearchLinkedInHint(false)
     setActiveSearchIndex(0)
     setAiSearchResults(null)
     setAiSearchExplanation(null)
@@ -1463,7 +1323,6 @@ function App() {
         : addLinkedInProfileToGraph(graph, profile)
       pushHistory()
       setGraph(next.graph)
-      notifyOnboarding('import')
       selectItem({ type: 'person', id: next.person.id })
       focusCameraOnWorld(next.person.x, next.person.y, 1.5)
       closeSearch()
@@ -1579,7 +1438,6 @@ function App() {
       const result = await buildLinkedInConnectionsGraph(graph, csvText)
       pushHistory()
       await persistGraphImmediately(result.graph)
-      notifyOnboarding('import')
 
       alert(`LinkedIn data imported successfully: ${result.importedPeople} people across ${result.importedCompanies} companies.`)
     } catch (err) {
@@ -2819,7 +2677,6 @@ function App() {
           y: currentCamera.y - event.deltaY,
         })
       }
-      notifyOnboarding('pan')
     }
 
     surface.addEventListener('wheel', handleWheel, { passive: false })
@@ -3388,13 +3245,8 @@ function App() {
 
     const activePan = panRef.current?.pointerId === event.pointerId ? panRef.current : null
     if (activePan) {
-      const dx = event.clientX - activePan.startX
-      const dy = event.clientY - activePan.startY
       panRef.current = null
       settleGesture()
-      if (Math.hypot(dx, dy) > 5) {
-        notifyOnboarding('pan')
-      }
     }
 
     const activeMoveCircle = moveCircleRef.current?.pointerId === event.pointerId ? moveCircleRef.current : null
@@ -3414,11 +3266,6 @@ function App() {
     const resizeMoveDist = activeResizeCircle
       ? Math.hypot(event.clientX - (activeResizeCircle.startX ?? event.clientX), event.clientY - (activeResizeCircle.startY ?? event.clientY))
       : 0
-    const nodeMoveDist = activeMoveCircle
-      ? Math.hypot(event.clientX - activeMoveCircle.startX, event.clientY - activeMoveCircle.startY)
-      : activeMovePerson
-        ? Math.hypot(event.clientX - activeMovePerson.startX, event.clientY - activeMovePerson.startY)
-        : 0
     const wasResize = activeResizeCircle !== null
     const completedResize = wasResize && resizeMoveDist > DRAG_START_THRESHOLD
     const completedNodeMove = (activeMoveCircle?.moved ?? false) || (activeMovePerson?.moved ?? false)
@@ -3436,12 +3283,6 @@ function App() {
     stopLiftFeedback(endingLiftIds)
 
     if (endingMove) {
-      if (completedResize) {
-        notifyOnboarding('resize')
-      } else if (completedNodeMove && nodeMoveDist > DRAG_START_THRESHOLD) {
-        notifyOnboarding('move')
-      }
-
       const nextResolved = {
         ...graph,
         circles: graph.circles.map((c) => {
@@ -3806,7 +3647,6 @@ function App() {
     selectItem({ type: 'person', id })
     // Grow the new person in so it feels placed, not blinked into existence.
     startBoardAnim('pop:' + id, 360)
-    notifyOnboarding('create')
   }
 
   function handleMergeSelected() {
@@ -3953,7 +3793,6 @@ function App() {
     // Grow the new person in so it feels placed, not blinked into existence.
     startBoardAnim('pop:' + id, 360)
     setCreateMenu(null)
-    notifyOnboarding('create')
   }
 
   // "Add circle" in the create menu auto-detects containment the same way the
@@ -4008,7 +3847,6 @@ function App() {
 
     selectItem({ type: 'circle', id })
     setCreateMenu(null)
-    notifyOnboarding('create')
   }
 
 
@@ -4478,6 +4316,10 @@ Content-Type: application/json
               } else {
                 setShowSettings(false)
                 setSearchOpen(true)
+                if (!hasLocalFlag(SEARCH_LINKEDIN_HINT_KEY)) {
+                  setShowSearchLinkedInHint(true)
+                  markLocalFlag(SEARCH_LINKEDIN_HINT_KEY)
+                }
                 window.requestAnimationFrame(() => searchInputRef.current?.focus())
               }
             }}
@@ -4496,7 +4338,9 @@ Content-Type: application/json
                 aria-controls="board-search-results"
                 aria-activedescendant={searchResults.length > 0 ? `search-result-${searchResults[currentSearchIndex]?.kind}-${searchResults[currentSearchIndex]?.id}` : undefined}
                 onChange={(event) => {
-                  setSearchQuery(event.target.value)
+                  const nextQuery = event.target.value
+                  setSearchQuery(nextQuery)
+                  if (nextQuery.trim() !== '') setShowSearchLinkedInHint(false)
                   setActiveSearchIndex(0)
                   setAiSearchResults(null)
                   setAiSearchExplanation(null)
@@ -4531,6 +4375,11 @@ Content-Type: application/json
                 </button>
               )}
             </>
+          )}
+          {searchOpen && searchQuery.trim() === '' && showSearchLinkedInHint && (
+            <div className="search-linkedin-hint" role="note">
+              Paste a LinkedIn profile link here to add that person to your board.
+            </div>
           )}
           {searchOpen && searchQuery.trim() !== '' && (
             <div id="board-search-results" className={`search-results ${isAiSearchActive ? 'search-results--ai' : ''}`} role="listbox">
@@ -4679,10 +4528,12 @@ Content-Type: application/json
                 </label>
                 <button
                   type="button"
-                  className="linkedin-guide-help"
+                  className={`linkedin-guide-help ${highlightLinkedInGuideHelp ? 'is-attention' : ''}`}
                   aria-label="How to sync your LinkedIn"
                   title="How to sync your LinkedIn"
                   onClick={() => {
+                    markLocalFlag(LINKEDIN_GUIDE_HINT_KEY)
+                    setHighlightLinkedInGuideHelp(false)
                     setShowSettings(false)
                     setShowLinkedInGuide(true)
                   }}
@@ -6186,25 +6037,6 @@ Content-Type: application/json
         </div>
       )}
 
-      {graphLoaded && onboardingStep >= 0 && (
-        <OnboardingCoach
-          step={onboardingStep}
-          celebrating={onboardingCelebrating}
-          onNext={onboardingNext}
-          onBack={onboardingBack}
-          onSkip={finishOnboarding}
-          onOpenSearch={(query) => {
-            setShowSettings(false)
-            setSearchOpen(true)
-            if (query) {
-              setSearchQuery(query)
-              setActiveSearchIndex(0)
-            }
-            window.requestAnimationFrame(() => searchInputRef.current?.focus())
-          }}
-          offset={onboardingOffset}
-        />
-      )}
     </main>
   )
 }

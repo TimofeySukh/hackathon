@@ -10,6 +10,9 @@ selects the node and flies the camera to it at a comfortable zoom.
 
 - A magnifier pill sits in the top toolbar, immediately left of the settings gear.
   Collapsed it is an icon button; tapping it expands an inline text field and focuses it.
+- The first time a user opens search, a small hint explains that a LinkedIn profile URL can
+  be pasted there to add that person to the board. The hint is tracked locally and only
+  appears once per browser.
 - Typing filters live: people match on name, owning circle path, notes (including Position/Headline), and saved
   connections; circles match on name and path. People are listed first, then circles
   (labelled "Circle"); results are capped at 8. Subtitles show `Circle › … · role` when available.
@@ -44,7 +47,8 @@ selects the node and flies the camera to it at a comfortable zoom.
   for a circle.
 - Closing: the × clears the field; clicking outside, pressing Escape, or opening the
   settings panel closes search. Search and settings are mutually exclusive.
-- Empty query shows nothing; a query with no matches shows "No matches".
+- Empty query usually shows nothing, except for the one-time LinkedIn URL hint. A query
+  with no matches shows "No matches".
 
 ## Design
 
@@ -60,9 +64,8 @@ Reuses the Material 3 chrome language (see [`../DESIGN_SYSTEM.md`](../DESIGN_SYS
   dropdown fades/slides/scales in, and result rows stagger in by index. Active rows use
   a Material state layer instead of a hard selected outline. On mobile the open field
   grows with `flex: 1` to fill the row left of the gear and the dropdown spans that
-  width. The "sign in to save" banner is capped to `calc(100vw - 132px)` and hidden
-  while search/settings is open, via `.is-search-open` / `.is-settings-open` on
-  `.app-shell`.
+  width. The first-run LinkedIn URL hint uses `primary-container` and the same dropdown
+  elevation/motion as search results.
 - Known gaps vs. the Material 3 target: no result highlighting of the matched substring.
 
 ## Code
@@ -76,8 +79,9 @@ Reuses the Material 3 chrome language (see [`../DESIGN_SYSTEM.md`](../DESIGN_SYS
 - Backend: `supabase/functions/enrich-linkedin-profile/index.ts` calls the server-side
   LinkedIn profile provider with `LINKEDIN_ENRICHMENT_API_KEY` after validating the
   user's Supabase session.
-- Related state / hooks: `searchOpen`, `searchQuery`, `activeSearchIndex`, `searchInputRef`,
-  `searchPanelRef`, `focusAnimRef`; the shared outside-click effect handles dismissal.
+- Related state / hooks: `searchOpen`, `searchQuery`, `showSearchLinkedInHint`,
+  `activeSearchIndex`, `searchInputRef`, `searchPanelRef`, `focusAnimRef`; the shared
+  outside-click effect handles dismissal.
 
 ## Open questions / TODO
 

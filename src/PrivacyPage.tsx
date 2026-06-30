@@ -128,8 +128,8 @@ export default function PrivacyPage({ onLogin, onSignUp, isAuthenticated }: Priv
               </li>
               <li>
                 <strong>Technical and preference data.</strong> We store a signed-in session token in your browser
-                through Supabase. We also store small local preferences such as whether you completed the onboarding
-                tour. We do not run advertising analytics or third-party marketing trackers on the site today.
+                through Supabase. We also store small local preferences such as whether you have seen first-run
+                in-app hints. We do not run advertising analytics or third-party marketing trackers on the site today.
               </li>
             </ul>
           </section>

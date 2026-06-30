@@ -858,6 +858,22 @@ rediscover, write it here.
 - Decision: Integrated throttled (150ms) style-change ripples in `updateCircleStyle` when shape, rounding, sides, opacity, tone, custom color, or image properties are updated.
 - Why: Gives real-time tactile wave feedback to the canvas when modifying any visual settings of a circle.
 
+### 2026-06-30 — Remove Onboarding Tour, Keep Contextual First-Run Hints
+
+- Decision: Removed the gesture-driven onboarding tour entirely, including the React
+  component, step data, first-run card state, and onboarding CSS.
+- Why: The tour competed with the board and felt like a dismissible popup rather than a
+  useful path into the product. The important discovery points are already in Settings and
+  Search.
+- Decision: Added a one-time attention pulse to the LinkedIn Data Import help `?` until the
+  user opens the LinkedIn sync guide.
+- Why: The full LinkedIn archive guide is important, but it should be discovered in the
+  existing Settings import section instead of through a separate onboarding surface.
+- Decision: Added a one-time Search hint explaining that users can paste a LinkedIn profile
+  URL to add that person to the board.
+- Why: Manual profile-link import belongs directly in Search, and the hint appears exactly
+  when the user first opens that control.
+
 ## 2026-06-27 — Hybrid natural-language smart search
 
 - Decision: Smart search uses NeuralDeep (`https://api.neuraldeep.ru/v1`) with model

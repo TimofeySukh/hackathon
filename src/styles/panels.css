@@ -98,6 +98,25 @@
   transform: translateY(-3px) scale(0.9);
 }
 
+.linkedin-guide-help.is-attention {
+  border-color: var(--md-primary);
+  color: var(--md-primary);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--md-primary) 30%, transparent);
+  animation: linkedinGuideHelpPulse 1.7s var(--md-ease-standard, ease-in-out) infinite;
+}
+
+@keyframes linkedinGuideHelpPulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--md-primary) 34%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 9px color-mix(in srgb, var(--md-primary) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--md-primary) 0%, transparent);
+  }
+}
+
 /* LinkedIn sync guide: scrollable panel that replaces Settings, same theme. */
 .linkedin-guide-panel {
   position: absolute;
@@ -367,6 +386,22 @@
   background: var(--md-surface-container);
   box-shadow: var(--md-elev-2);
   transform-origin: top center;
+  animation: searchResultsIn var(--md-dur-medium, 0.22s) var(--md-ease-decelerate, ease-out);
+}
+
+.search-linkedin-hint {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding: 12px 14px;
+  border-radius: var(--md-r-md);
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+  box-shadow: var(--md-elev-2);
+  font-size: 13px;
+  line-height: 1.4;
   animation: searchResultsIn var(--md-dur-medium, 0.22s) var(--md-ease-decelerate, ease-out);
 }
 
