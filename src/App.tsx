@@ -1088,6 +1088,7 @@ function App() {
   const boardAnimRafRef = useRef<number | null>(null)
   const animNowRef = useRef(0)
   const paintBoardRef = useRef<(now?: number) => void>(() => {})
+  const pressedNodeIdsRef = useRef<Set<string>>(new Set())
   const liftedNodeIdsRef = useRef<Set<string>>(new Set())
   const suppressDoubleClickUntilRef = useRef(0)
   const handleExitNodesRef = useRef<Map<string, CircleNode | PersonNode>>(new Map())
@@ -2597,8 +2598,13 @@ function App() {
   // state-driven repaint composes cleanly with any in-flight pulse/pop, and the
   // rAF loop below reuses the exact same draw through paintBoardRef.
   function withActiveLiftScales(frame: AnimFrame): AnimFrame {
-    if (liftedNodeIdsRef.current.size === 0) return frame
+    if (pressedNodeIdsRef.current.size === 0 && liftedNodeIdsRef.current.size === 0) return frame
     const liftScales = new Map(frame.liftScales)
+    for (const id of pressedNodeIdsRef.current) {
+      if (!boardAnimsRef.current.has(`press-in:${id}`)) {
+        liftScales.set(id, Math.max(liftScales.get(id) ?? 1, 1.06))
+      }
+    }
     for (const id of liftedNodeIdsRef.current) {
       if (!boardAnimsRef.current.has(`lift-in:${id}`)) {
         liftScales.set(id, Math.max(liftScales.get(id) ?? 1, 1.1))
@@ -2702,6 +2708,30 @@ function App() {
     }
   }
 
+  function startPressFeedback(ids: string[]) {
+    if (prefersReducedMotion()) return
+    const uniqueIds = [...new Set(ids)]
+    if (uniqueIds.length === 0) return
+    for (const id of uniqueIds) {
+      pressedNodeIdsRef.current.add(id)
+      boardAnimsRef.current.delete(`press-out:${id}`)
+      startBoardAnim(`press-in:${id}`, 110)
+    }
+  }
+
+  function stopPressFeedback(ids: string[]) {
+    if (prefersReducedMotion()) return
+    const uniqueIds = [...new Set(ids)]
+    if (uniqueIds.length === 0) return
+    for (const id of uniqueIds) {
+      const wasPressed = pressedNodeIdsRef.current.has(id) || boardAnimsRef.current.has(`press-in:${id}`)
+      if (!wasPressed) continue
+      pressedNodeIdsRef.current.delete(id)
+      boardAnimsRef.current.delete(`press-in:${id}`)
+      startBoardAnim(`press-out:${id}`, 210)
+    }
+  }
+
   function stopLiftFeedback(ids: string[]) {
     if (prefersReducedMotion()) return
     const uniqueIds = [...new Set(ids)]
@@ -2712,15 +2742,6 @@ function App() {
       liftedNodeIdsRef.current.delete(id)
       boardAnimsRef.current.delete(`lift-in:${id}`)
       startBoardAnim(`lift-out:${id}`, 180)
-    }
-  }
-
-  function startTapFeedback(ids: string[]) {
-    if (prefersReducedMotion()) return
-    const uniqueIds = [...new Set(ids)]
-    for (const id of uniqueIds) {
-      boardAnimsRef.current.delete(`tap:${id}`)
-      startBoardAnim(`tap:${id}`, 190)
     }
   }
 
@@ -2857,6 +2878,11 @@ function App() {
     ]
 
     if (activePointersRef.current.length >= 2) {
+      stopPressFeedback([
+        ...(moveCircleRef.current?.liftIds ?? []),
+        ...(movePersonRef.current?.liftIds ?? []),
+        ...(connector ? [connector.sourceId] : []),
+      ])
       stopLiftFeedback([
         ...(moveCircleRef.current?.liftIds ?? []),
         ...(movePersonRef.current?.liftIds ?? []),
@@ -3390,19 +3416,19 @@ function App() {
         ? Math.hypot(event.clientX - activeMovePerson.startX, event.clientY - activeMovePerson.startY)
         : 0
     const wasResize = activeResizeCircle !== null
-    const wasNodeMove = activeMoveCircle !== null || activeMovePerson !== null
     const completedResize = wasResize && resizeMoveDist > DRAG_START_THRESHOLD
     const completedNodeMove = (activeMoveCircle?.moved ?? false) || (activeMovePerson?.moved ?? false)
     const endingMove = completedNodeMove || completedResize
-    const tapFeedbackIds = !endingMove && wasNodeMove
-      ? activeMoveCircle?.liftIds ?? activeMovePerson?.liftIds ?? []
-      : []
+    const endingPressIds = [
+      ...(activeMoveCircle?.liftIds ?? []),
+      ...(activeMovePerson?.liftIds ?? []),
+    ]
 
     if (moveCircleRef.current?.pointerId === event.pointerId) moveCircleRef.current = null
     if (movePersonRef.current?.pointerId === event.pointerId) movePersonRef.current = null
     if (resizeCircleRef.current?.pointerId === event.pointerId) resizeCircleRef.current = null
+    stopPressFeedback(endingPressIds)
     stopLiftFeedback(endingLiftIds)
-    startTapFeedback(tapFeedbackIds)
 
     if (endingMove) {
       if (completedResize) {
@@ -3479,6 +3505,7 @@ function App() {
       dragRafRef.current = null
     }
     if (!conn) return
+    stopPressFeedback([conn.sourceId])
 
     if (cameraRef.current.scale < ZONE_ONLY_SCALE) {
       setConnector(null)
@@ -3541,8 +3568,6 @@ function App() {
           })
         }
       }
-    } else if (distance * cameraRef.current.scale <= DRAG_START_THRESHOLD) {
-      startTapFeedback([conn.sourceId])
     }
     setConnector(null)
   }
@@ -3579,6 +3604,7 @@ function App() {
       endX: startX,
       endY: startY,
     })
+    startPressFeedback([sourceId])
   }
 
   function startCircleMove(event: ReactPointerEvent<Element>, circle: CircleNode) {
@@ -3634,6 +3660,7 @@ function App() {
       lastX: event.clientX,
       lastY: event.clientY,
     }
+    startPressFeedback(targets)
   }
 
   function startPersonMove(event: ReactPointerEvent<HTMLElement>, person: PersonNode) {
@@ -3696,6 +3723,7 @@ function App() {
       lastX: event.clientX,
       lastY: event.clientY,
     }
+    startPressFeedback(liftIds)
   }
 
   function startCircleResize(event: ReactPointerEvent<Element>, circle: CircleNode) {

@@ -368,13 +368,10 @@ export function readAnimFrame(anims: Map<string, BoardAnim>, now: number): AnimF
     const t = a.start < 0 ? 0 : Math.min(1, Math.max(0, (now - a.start) / a.duration))
     if (key.startsWith('pop:')) {
       scales.set(key.slice(4), Math.max(0, easeOutBack(t)))
-    } else if (key.startsWith('tap:')) {
-      const pressT = Math.min(1, t / 0.34)
-      const releaseT = Math.min(1, Math.max(0, (t - 0.34) / 0.66))
-      const next = t < 0.34
-        ? 1 - 0.045 * easeOutCubic(pressT)
-        : 0.955 + 0.045 * easeOutBack(releaseT)
-      setLiftScale(key.slice(4), next)
+    } else if (key.startsWith('press-in:')) {
+      setLiftScale(key.slice(9), 1 + 0.06 * easeOutCubic(t))
+    } else if (key.startsWith('press-out:')) {
+      setLiftScale(key.slice(10), 1.06 - 0.06 * easeOutBack(t))
     } else if (key.startsWith('lift-in:')) {
       setLiftScale(key.slice(8), 1 + 0.1 * easeOutCubic(t))
     } else if (key.startsWith('lift-out:')) {

@@ -17,12 +17,12 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   nested circle crosses the current parent boundary and when it moves back inward. On small
   boards, the final drop still runs containment/collision cleanup; on large boards, final
   cleanup is skipped so one interaction cannot reflow or freeze a dense import. While a
-  person or circle is being moved past the 5px drag threshold, the grabbed root renders
-  with a 10% lift scale and eases back after drop. A plain click that stays under the
-  threshold plays a separate short press pulse instead of starting the drag lift or running
-  geometry cleanup. For circles, the renderer applies one canvas transform to the circle
-  root and its descendants so the zone reads like one scaled picture rather than separately
-  animated parts.
+  person or circle is pressed, the grabbed root immediately scales up into a held press
+  state. If the pointer moves past the 5px drag threshold, that press continues into the
+  10% drag lift and eases back after drop. A plain click that stays under the threshold
+  plays the same press-in plus release spring without starting drag geometry cleanup. For
+  circles, the renderer applies one canvas transform to the circle root and its descendants
+  so the zone reads like one scaled picture rather than separately animated parts.
 - **Resize**: drag a circle's edge; parent circles auto-fit (expand and shrink back to a
   minimum) as their contents move. Shrinking a circle pulls its contained people and subset
   circles toward the center, and nested subset circles shrink with the parent when position
