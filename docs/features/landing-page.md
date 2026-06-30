@@ -42,6 +42,8 @@ Header requirements:
 - It should not become a huge black banner.
 - It should not dominate the first screen.
 - `Contact` opens a separate contact screen at `#contact`.
+- On phone widths, the header uses two compact rows: logo plus auth action on the first
+  row, Docs/Contact centered below. Header contents must never overflow horizontally.
 
 Auth behavior:
 
@@ -133,6 +135,10 @@ Deck cards across these sections share the white rounded-card, slight rotation,
 and hover straightening behavior from the hero slogan stack.
 
 Do not add a generic multi-column feature grid to the main landing page.
+
+On phone widths, cards lose their scattered/translated geometry and stack in one clean
+column. The mobile page must not rely on desktop rotations, negative margins, or hover
+expansion that can push content outside the viewport.
 
 ## Docs
 

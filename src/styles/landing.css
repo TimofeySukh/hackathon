@@ -1446,3 +1446,321 @@
 .scatter-card--3 { transform: rotate(-1deg) translate(-6px, 10px); z-index: 1; margin-top: -8px; }
 .scatter-card--4 { transform: rotate(2.5deg) translate(4px, 8px); z-index: 3; margin-left: -16px; }
 .scatter-card--5 { transform: rotate(-1.8deg) translate(10px, -4px); z-index: 2; }
+
+/* Phone layout: keep desktop/tablet composition intact, but stop the landing page
+   from inheriting wide-header and scattered-card desktop geometry. */
+@media (max-width: 640px) {
+  .landing-container {
+    background-image: radial-gradient(circle at 50% 0%, rgba(0, 98, 157, 0.05), transparent 36%);
+  }
+
+  .landing-header {
+    position: sticky;
+  }
+
+  .landing-nav {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px 12px;
+    padding: 12px 16px 10px;
+  }
+
+  .landing-logo {
+    min-width: 0;
+    gap: 8px;
+  }
+
+  .landing-logo-mark {
+    width: 26px;
+    height: 26px;
+  }
+
+  .landing-logo-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 16px;
+    letter-spacing: 0;
+  }
+
+  .landing-nav-right {
+    display: contents;
+  }
+
+  .landing-nav-actions {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+    gap: 8px;
+  }
+
+  .landing-nav-links {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: center;
+    gap: 22px;
+  }
+
+  .landing-nav-link {
+    font-size: 13px;
+  }
+
+  .lp-btn {
+    height: 36px;
+    padding: 0 14px;
+    font-size: 13px;
+  }
+
+  .landing-section {
+    padding: 44px 20px;
+  }
+
+  .landing-hero-section {
+    padding-top: 34px;
+    padding-bottom: 46px;
+  }
+
+  .board-preview-layout,
+  .linkedin-layout {
+    gap: 30px;
+  }
+
+  .demo-eyebrow {
+    margin-bottom: 10px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+  }
+
+  .demo-title,
+  .section-title,
+  .board-preview-copy .demo-title {
+    font-size: 30px;
+    line-height: 1.12;
+    letter-spacing: 0;
+  }
+
+  .section-lead {
+    max-width: 33ch;
+    margin-bottom: 18px;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  .lp-deck,
+  .demo-notes-deck {
+    gap: 10px;
+  }
+
+  .lp-deck-card,
+  .demo-deck-card {
+    padding: 14px 16px;
+    font-size: 14px;
+    line-height: 1.45;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.045);
+  }
+
+  .landing-hero-cta {
+    width: auto;
+    min-width: 132px;
+    margin-top: 4px;
+  }
+
+  .board-preview-frame {
+    border-radius: var(--r-lg);
+    padding: 5px;
+    box-shadow: 0 10px 30px rgba(0, 98, 157, 0.08);
+  }
+
+  .board-preview-image {
+    border-radius: calc(var(--r-lg) - 5px);
+  }
+
+  .problem-solution-section,
+  .how-it-works-section,
+  .interactive-demo-section,
+  .linkedin-section {
+    padding-top: 50px;
+    padding-bottom: 50px;
+  }
+
+  .section-header,
+  .problem-solution-header {
+    max-width: 32ch;
+    margin: 0 auto 28px;
+  }
+
+  .problem-solution-grid,
+  .how-it-works-grid {
+    max-width: 100%;
+    gap: 14px;
+  }
+
+  .problem-solution-card,
+  .how-step {
+    min-height: 0;
+    text-align: left;
+    align-items: flex-start;
+  }
+
+  .problem-solution-card__title {
+    font-size: 18px;
+    line-height: 1.3;
+  }
+
+  .problem-solution-card__body,
+  .how-step-body {
+    font-size: 13.5px;
+    line-height: 1.55;
+  }
+
+  .trust-strip-section {
+    padding: 0 20px 46px;
+  }
+
+  .trust-strip {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .trust-strip-card {
+    max-width: none;
+    padding: 12px 16px;
+    text-align: left;
+  }
+
+  .demo-container {
+    gap: 28px;
+    text-align: left;
+  }
+
+  .demo-info-col {
+    align-items: flex-start;
+  }
+
+  .demo-info-col .demo-title {
+    max-width: 12ch;
+  }
+
+  .demo-notes-deck {
+    width: 100%;
+    margin-top: 8px;
+  }
+
+  .demo-inspector-card {
+    width: 100%;
+    max-width: none;
+    padding: 18px;
+    border-radius: var(--r-lg);
+    gap: 14px;
+  }
+
+  .demo-inspector-name-input {
+    min-width: 0;
+    font-size: 22px;
+  }
+
+  .demo-dropdown-avatar-row {
+    gap: 10px;
+  }
+
+  .demo-dropdown-trigger {
+    height: 42px;
+    padding: 0 12px;
+  }
+
+  .demo-box {
+    padding: 14px;
+  }
+
+  .demo-connection-input-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .demo-connection-save-btn {
+    padding: 0 14px;
+  }
+
+  .features-section {
+    padding-top: 50px;
+    padding-bottom: 50px;
+  }
+
+  .capabilities-scatter-board {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    width: 100%;
+    max-width: 100%;
+    margin: 28px auto 0;
+    padding: 0;
+  }
+
+  .capabilities-scatter-card,
+  .capabilities-scatter-card:hover,
+  .scatter-card--1,
+  .scatter-card--2,
+  .scatter-card--3,
+  .scatter-card--4,
+  .scatter-card--5 {
+    width: 100%;
+    max-width: none;
+    min-height: 0;
+    margin: 0 !important;
+    transform: none !important;
+  }
+
+  .capabilities-scatter-card {
+    padding: 16px;
+    border-radius: var(--r-md);
+  }
+
+  .capabilities-scatter-card:hover {
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+  }
+
+  .capabilities-scatter-card .demo-field-label {
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .linkedin-layout .lp-deck {
+    max-width: 100%;
+  }
+
+  .contact-page-main {
+    padding: 32px 20px 48px;
+  }
+
+  .landing-footer {
+    padding: 28px 20px;
+  }
+
+  .footer-content {
+    gap: 14px;
+  }
+}
+
+@media (max-width: 380px) {
+  .landing-nav {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .landing-logo-text {
+    max-width: 132px;
+    font-size: 15px;
+  }
+
+  .lp-btn {
+    padding: 0 12px;
+  }
+
+  .landing-section {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}

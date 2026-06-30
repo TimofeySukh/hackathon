@@ -17,6 +17,14 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-30 — Phone landing uses compact stacked geometry
+
+- Decision: the landing page keeps the desktop screenshot/deck composition on wide
+  screens, but phone widths switch to a compact two-row header, reduced section spacing,
+  and one-column cards without scattered transforms or negative margins.
+- Why: the desktop landing composition looked good on large screens but caused header
+  overflow and visually drifting cards on phones.
+
 ### 2026-06-30 — Keep auth callbacks on the board route while sessions restore
 
 - Decision: login flows now include a `sdn_auth_return=board` callback URL parameter and
