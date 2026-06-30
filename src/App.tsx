@@ -503,7 +503,7 @@ const authCardStyle: CSSProperties = {
 const LINKEDIN_GUIDE_HINT_KEY = 'social-linkedin-guide-hint-seen-v1'
 const SEARCH_LINKEDIN_HINT_KEY = 'social-search-linkedin-hint-seen-v1'
 const CIRCLE_CREATION_DEFAULTS_KEY = 'hackathon-board:circle-creation-defaults:v1'
-type BoardToolMode = 'edit' | 'pan'
+type BoardToolMode = 'edit' | 'pan' | 'select'
 
 type CircleCreationDefaults = {
   fillMode: CircleFillMode
@@ -2979,6 +2979,10 @@ function App() {
         window.cancelAnimationFrame(dragRafRef.current)
         dragRafRef.current = null
       }
+      if (marqueeRef.current) {
+        marqueeRef.current = null
+        setMarquee(null)
+      }
 
       const p1 = activePointersRef.current[0]
       const p2 = activePointersRef.current[1]
@@ -3021,6 +3025,7 @@ function App() {
 
     if (hit?.type === 'connector-handle') {
       if (isRightClick) return
+      if (boardToolMode === 'select') return
       startConnector(event, hit.sourceId, hit.sourceType, hit.x, hit.y)
       return
     }
@@ -3039,7 +3044,7 @@ function App() {
         selectItem({ type: 'person', id: hit.person.id })
         startPersonMove(event, hit.person)
       } else {
-        if (event.shiftKey) {
+        if (event.shiftKey || boardToolMode === 'select') {
           setSelectedPeopleIds((prev) => {
             let next = [...prev]
             if (selectedItem?.type === 'person' && !next.includes(selectedItem.id)) {
@@ -3081,7 +3086,7 @@ function App() {
         selectItem({ type: 'circle', id: hit.circle.id, showHandles: true })
         startCircleMove(event, hit.circle)
       } else {
-        if (event.shiftKey) {
+        if (event.shiftKey || boardToolMode === 'select') {
           setSelectedCircleIds((prev) => {
             let next = [...prev]
             if (selectedItem?.type === 'circle' && !next.includes(selectedItem.id)) {
@@ -3116,10 +3121,12 @@ function App() {
       return
     }
 
-    if (isRightClick) {
-      setSelectedPeopleIds([])
-      setSelectedCircleIds([])
-      selectItem(null)
+    if (isRightClick || (boardToolMode === 'select' && (!hit || hit.type === 'circle-body' || hit.type === 'circle-edge' || hit.type === 'connection'))) {
+      if (!event.shiftKey) {
+        setSelectedPeopleIds([])
+        setSelectedCircleIds([])
+        selectItem(null)
+      }
       setOpenNotesPersonId(null)
       const marqueeState = {
         startX: event.clientX,
@@ -3463,20 +3470,64 @@ function App() {
       const currentX = event.clientX
       const currentY = event.clientY
 
-      const pStart = screenToWorld({ x: Math.min(startX, currentX), y: Math.min(startY, currentY) })
-      const pEnd = screenToWorld({ x: Math.max(startX, currentX), y: Math.max(startY, currentY) })
+      const distance = Math.hypot(currentX - startX, currentY - startY)
+      if (distance > DRAG_START_THRESHOLD) {
+        const pStart = screenToWorld({ x: Math.min(startX, currentX), y: Math.min(startY, currentY) })
+        const pEnd = screenToWorld({ x: Math.max(startX, currentX), y: Math.max(startY, currentY) })
 
-      const selectedPIds = graph.people
-        .filter((p) => p.x >= pStart.x && p.x <= pEnd.x && p.y >= pStart.y && p.y <= pEnd.y)
-        .map((p) => p.id)
+        const selectedPIds = graph.people
+          .filter((p) => p.x >= pStart.x && p.x <= pEnd.x && p.y >= pStart.y && p.y <= pEnd.y)
+          .map((p) => p.id)
 
-      const selectedCIds = graph.circles
-        .filter((c) => c.id !== 'you' && c.x >= pStart.x && c.x <= pEnd.x && c.y >= pStart.y && c.y <= pEnd.y)
-        .map((c) => c.id)
+        const selectedCIds = graph.circles
+          .filter((c) => c.id !== 'you' && c.x >= pStart.x && c.x <= pEnd.x && c.y >= pStart.y && c.y <= pEnd.y)
+          .map((c) => c.id)
 
-      setSelectedPeopleIds(selectedPIds)
-      setSelectedCircleIds(selectedCIds)
-      selectItem(null)
+        if (event.shiftKey) {
+          setSelectedPeopleIds((prev) => Array.from(new Set([...prev, ...selectedPIds])))
+          setSelectedCircleIds((prev) => Array.from(new Set([...prev, ...selectedCIds])))
+        } else {
+          setSelectedPeopleIds(selectedPIds)
+          setSelectedCircleIds(selectedCIds)
+        }
+        selectItem(null)
+      } else {
+        const hit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
+          x: startX,
+          y: startY,
+        }, hoveredCircleEdgeIdRef.current)
+
+        if (hit?.type === 'circle-body' || hit?.type === 'circle-edge') {
+          setSelectedCircleIds((prev) => {
+            let next = [...prev]
+            if (selectedItem?.type === 'circle' && !next.includes(selectedItem.id)) {
+              next.push(selectedItem.id)
+            }
+            if (next.includes(hit.circle.id)) {
+              next = next.filter((id) => id !== hit.circle.id)
+            } else {
+              next.push(hit.circle.id)
+            }
+            return next
+          })
+          if (!event.shiftKey) {
+            setSelectedPeopleIds([])
+          }
+          selectItem(null)
+        } else if (hit?.type === 'connection') {
+          if (!event.shiftKey) {
+            setSelectedPeopleIds([])
+            setSelectedCircleIds([])
+          }
+          selectItem({ type: 'connection', id: hit.connection.id })
+        } else {
+          if (!event.shiftKey) {
+            setSelectedPeopleIds([])
+            setSelectedCircleIds([])
+            selectItem(null)
+          }
+        }
+      }
 
       marqueeRef.current = null
       setMarquee(null)
@@ -4572,6 +4623,20 @@ Content-Type: application/json
           }}
         >
           <PointerIcon />
+        </button>
+        <button
+          type="button"
+          className={boardToolMode === 'select' ? 'is-active' : ''}
+          aria-label="Select mode"
+          title="Select mode"
+          aria-pressed={boardToolMode === 'select'}
+          onClick={() => {
+            cancelPanInertia()
+            setBoardToolMode('select')
+            setCreateMenu(null)
+          }}
+        >
+          <SelectIcon />
         </button>
         <button
           type="button"
@@ -7057,6 +7122,15 @@ function PanIcon() {
       <path d="M3 12h18" />
       <path d="m7 8-4 4 4 4" />
       <path d="m17 8 4 4-4 4" />
+    </svg>
+  )
+}
+
+function SelectIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="3 3" />
+      <path d="M12 8v8M8 12h8" />
     </svg>
   )
 }

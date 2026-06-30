@@ -66,6 +66,42 @@ const selectedBatch: { source: { x: number; y: number }; target: { x: number; y:
 const drawnCircleEdges = new Set<string>()
 const drawnPersonEdges = new Set<string>()
 
+const personLabelCache = new Map<string, { ellipsized: string; width1x: number }>()
+const circleLabelCache = new Map<string, { ellipsized: string; width1x: number }>()
+
+function getPersonLabelLayout(ctx: CanvasRenderingContext2D, name: string): { ellipsized: string; width1x: number } {
+  const cached = personLabelCache.get(name)
+  if (cached) return cached
+
+  ctx.save()
+  ctx.font = '500 11px Inter, system-ui, sans-serif'
+  const ellipsized = ellipsize(ctx, name, 90)
+  const metrics = ctx.measureText(ellipsized)
+  const width1x = Math.min(90, metrics.width) + 14
+  ctx.restore()
+
+  const result = { ellipsized, width1x }
+  personLabelCache.set(name, result)
+  return result
+}
+
+function getCircleLabelLayout(ctx: CanvasRenderingContext2D, name: string): { ellipsized: string; width1x: number } {
+  const cached = circleLabelCache.get(name)
+  if (cached) return cached
+
+  ctx.save()
+  ctx.font = '500 13px Inter, system-ui, sans-serif'
+  const ellipsized = ellipsize(ctx, name, 170)
+  const metrics = ctx.measureText(ellipsized)
+  const width1x = Math.min(170, metrics.width) + 18
+  ctx.restore()
+
+  const result = { ellipsized, width1x }
+  circleLabelCache.set(name, result)
+  return result
+}
+
+
 const PERSON_DETAIL_SCALE = 0.72
 const PERSON_DOT_VISIBLE_LIMIT = 260
 const PEOPLE_EDGE_VISIBLE_LIMIT = 420
@@ -465,7 +501,7 @@ export function drawBoardLayer(
   const performanceMode = options.performanceMode === true
   const dotPeople =
     camera.scale < PERSON_DETAIL_SCALE &&
-    (performanceMode || visiblePeople.length > PERSON_DOT_VISIBLE_LIMIT)
+    visiblePeople.length > PERSON_DOT_VISIBLE_LIMIT
   const skipMembershipEdges =
     performanceMode ||
     dotPeople ||
@@ -494,11 +530,11 @@ export function drawBoardLayer(
     if (!performanceMode || selectedItem?.type === 'connection' || hoveredConnId) {
       drawCustomConnections(ctx, visiblePeopleIds, visibleCircleIds, index, selectedItem, hoveredConnId, camera.scale)
     }
-    drawCircleDetails(ctx, visibleCircles, index, camera.scale, circleFillMode, showCircleLabels && !performanceMode, anim)
+    drawCircleDetails(ctx, visibleCircles, index, camera.scale, circleFillMode, showCircleLabels, anim)
     if (dotPeople) {
       drawPeopleDots(ctx, visiblePeople, index, camera.scale, selectedItem, hoveredPersonId, selectedPeopleIds)
     } else {
-      drawPeople(ctx, visiblePeople, index, selectedItem, hoveredPersonId, camera.scale, dpr, showPersonLabels && !performanceMode, selectedPeopleIds, anim)
+      drawPeople(ctx, visiblePeople, index, selectedItem, hoveredPersonId, camera.scale, dpr, showPersonLabels, selectedPeopleIds, anim)
     }
     if (connector) drawConnector(ctx, connector, camera.scale)
     drawSelectionHandles(ctx, selectedItem, index, anim, handleExitNodes, visiblePeople)
@@ -1136,27 +1172,26 @@ function drawCircleLabel(
   anim: AnimFrame = EMPTY_ANIM_FRAME,
 ) {
   if (!force && scale < 0.50) return
-  const fontSize = 13 / scale
-  ctx.save()
-  if (index) applyLiftTransformForCircle(ctx, circle, index, anim)
-  ctx.font = `500 ${fontSize}px Inter, system-ui, sans-serif`
-  const maxWidth = 170 / scale
-  const text = ellipsize(ctx, circle.name, maxWidth)
-  const metrics = ctx.measureText(text)
-  const width = Math.min(maxWidth, metrics.width) + 18 / scale
+  const layout = getCircleLabelLayout(ctx, circle.name)
+  const width = layout.width1x / scale
   const height = 24 / scale
   const x = circle.x - width / 2
   const y = circle.y + circle.radius - 41 / scale
+
+  ctx.save()
+  if (index) applyLiftTransformForCircle(ctx, circle, index, anim)
   roundedRect(ctx, x, y, width, height, 7 / scale)
   ctx.fillStyle = 'rgba(255, 255, 255, 0.86)'
   ctx.fill()
   ctx.strokeStyle = '#d7dcde'
   ctx.lineWidth = 1 / scale
   ctx.stroke()
+
+  ctx.font = `500 ${13 / scale}px Inter, system-ui, sans-serif`
   ctx.fillStyle = '#1c2528'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  ctx.fillText(text, circle.x, y + height / 2 + 0.5 / scale)
+  ctx.fillText(layout.ellipsized, circle.x, y + height / 2 + 0.5 / scale)
   ctx.restore()
 }
 
@@ -1224,26 +1259,24 @@ function drawPeople(
 }
 
 function drawPersonLabel(ctx: CanvasRenderingContext2D, person: PersonNode, scale: number) {
-  const fontSize = 11 / scale
-  ctx.save()
-  ctx.font = `500 ${fontSize}px Inter, system-ui, sans-serif`
-  const maxWidth = 90 / scale
-  const text = ellipsize(ctx, person.name, maxWidth)
-  const metrics = ctx.measureText(text)
-  const width = Math.min(maxWidth, metrics.width) + 14 / scale
+  const layout = getPersonLabelLayout(ctx, person.name)
+  const width = layout.width1x / scale
   const height = 20 / scale
   const x = person.x - width / 2
   const y = person.y + 26 / scale
+  ctx.save()
   roundedRect(ctx, x, y, width, height, 6 / scale)
   ctx.fillStyle = 'rgba(255, 255, 255, 0.88)'
   ctx.fill()
   ctx.strokeStyle = '#d7dcde'
   ctx.lineWidth = 1 / scale
   ctx.stroke()
+
+  ctx.font = `500 ${11 / scale}px Inter, system-ui, sans-serif`
   ctx.fillStyle = '#1c2528'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  ctx.fillText(text, person.x, y + height / 2 + 0.5 / scale)
+  ctx.fillText(layout.ellipsized, person.x, y + height / 2 + 0.5 / scale)
   ctx.restore()
 }
 
