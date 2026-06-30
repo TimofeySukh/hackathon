@@ -13,6 +13,59 @@
   pointer-events: none;
 }
 
+.board-mode-menu {
+  position: absolute;
+  z-index: 11;
+  top: 16px;
+  left: 16px;
+  display: inline-grid;
+  gap: 4px;
+  padding: 4px;
+  border: none;
+  border-radius: var(--md-r-full);
+  background: var(--md-surface-container);
+  box-shadow: var(--md-elev-2);
+  pointer-events: auto;
+}
+
+.board-mode-menu button {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: var(--md-r-full);
+  background: transparent;
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  transition:
+    background-color var(--md-dur-short) var(--md-ease-standard),
+    color var(--md-dur-short) var(--md-ease-standard),
+    transform var(--md-dur-short) var(--md-ease-standard);
+}
+
+.board-mode-menu button:hover {
+  background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+}
+
+.board-mode-menu button:active {
+  transform: scale(0.9);
+}
+
+.board-mode-menu button.is-active {
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+.board-mode-menu svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .brand,
 .toolbar__group,
 .help-panel,

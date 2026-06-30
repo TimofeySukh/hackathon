@@ -66,6 +66,18 @@ const selectedBatch: { source: { x: number; y: number }; target: { x: number; y:
 const drawnCircleEdges = new Set<string>()
 const drawnPersonEdges = new Set<string>()
 
+const PERSON_DETAIL_SCALE = 0.72
+const PERSON_DOT_VISIBLE_LIMIT = 260
+const PEOPLE_EDGE_VISIBLE_LIMIT = 420
+const CIRCLE_TINY_SCREEN_RADIUS = 10
+
+export type BoardRenderOptions = {
+  viewportWidth?: number
+  viewportHeight?: number
+  dprCap?: number
+  performanceMode?: boolean
+}
+
 function pickSpriteTier(screenPx: number): number {
   for (const tier of SPRITE_TIERS) {
     if (tier >= screenPx) return tier
@@ -170,9 +182,7 @@ function queryCircles(index: BoardIndex, rect: WorldRect) {
   )
 }
 
-function cameraWorldRect(surface: HTMLElement, camera: Camera, padPx = 120): WorldRect {
-  const width = Math.max(1, surface.clientWidth)
-  const height = Math.max(1, surface.clientHeight)
+function cameraWorldRectForSize(width: number, height: number, camera: Camera, padPx = 120): WorldRect {
   const pad = padPx / camera.scale
   return {
     left: -camera.x / camera.scale - pad,
@@ -180,6 +190,10 @@ function cameraWorldRect(surface: HTMLElement, camera: Camera, padPx = 120): Wor
     top: -camera.y / camera.scale - pad,
     bottom: (height - camera.y) / camera.scale + pad,
   }
+}
+
+function cameraWorldRect(surface: HTMLElement, camera: Camera, padPx = 120): WorldRect {
+  return cameraWorldRectForSize(Math.max(1, surface.clientWidth), Math.max(1, surface.clientHeight), camera, padPx)
 }
 
 // Set by App via setBoardRepaintCallback so freshly-decoded images can trigger a
@@ -312,17 +326,23 @@ function drawFavoritePersonOutline(
   ctx.restore()
 }
 
-function resizeCanvas(canvas: HTMLCanvasElement, surface: HTMLElement) {
-  const dpr = Math.min(window.devicePixelRatio || 1, 1.75)
-  const width = Math.max(1, surface.clientWidth)
-  const height = Math.max(1, surface.clientHeight)
+function resizeCanvas(
+  canvas: HTMLCanvasElement,
+  surface: HTMLElement,
+  options: BoardRenderOptions = {},
+) {
+  const dpr = Math.min(window.devicePixelRatio || 1, options.dprCap ?? 1.75)
+  const width = Math.max(1, options.viewportWidth ?? surface.clientWidth)
+  const height = Math.max(1, options.viewportHeight ?? surface.clientHeight)
   const nextWidth = Math.round(width * dpr)
   const nextHeight = Math.round(height * dpr)
   if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
     canvas.width = nextWidth
     canvas.height = nextHeight
-    canvas.style.width = `${width}px`
-    canvas.style.height = `${height}px`
+    if (!options.viewportWidth && !options.viewportHeight) {
+      canvas.style.width = `${width}px`
+      canvas.style.height = `${height}px`
+    }
   }
   return { dpr, width, height }
 }
@@ -426,19 +446,31 @@ export function drawBoardLayer(
   anim: AnimFrame = EMPTY_ANIM_FRAME,
   handleExitNodes: Map<string, CircleNode | PersonNode> = new Map(),
   activeEdgeHoverId: string | null = null,
+  options: BoardRenderOptions = {},
 ) {
-  const { dpr, width, height } = resizeCanvas(canvas, surface)
+  const { dpr, width, height } = resizeCanvas(canvas, surface, options)
   const ctx = canvas.getContext('2d')
   if (!ctx) return
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.clearRect(0, 0, width, height)
 
-  const worldRect = cameraWorldRect(surface, camera)
+  const worldRect = options.viewportWidth || options.viewportHeight
+    ? cameraWorldRectForSize(width, height, camera)
+    : cameraWorldRect(surface, camera)
   const visibleCircles = queryCircles(index, worldRect)
   const visiblePeople = queryPeople(index, worldRect)
   const visibleCircleIds = new Set(visibleCircles.map((circle) => circle.id))
   const visiblePeopleIds = new Set(visiblePeople.map((person) => person.id))
+  const performanceMode = options.performanceMode === true
+  const dotPeople =
+    camera.scale < PERSON_DETAIL_SCALE &&
+    (performanceMode || visiblePeople.length > PERSON_DOT_VISIBLE_LIMIT)
+  const skipMembershipEdges =
+    performanceMode ||
+    dotPeople ||
+    visiblePeople.length > PEOPLE_EDGE_VISIBLE_LIMIT ||
+    camera.scale < 0.5
 
   ctx.save()
   ctx.translate(camera.x, camera.y)
@@ -456,10 +488,18 @@ export function drawBoardLayer(
     }
   } else {
     drawCircleEdges(ctx, visibleCircles, index, camera.scale, selectedItem, hoveredConnId)
-    drawPersonEdges(ctx, visiblePeople, index, camera.scale, selectedItem, hoveredConnId)
-    drawCustomConnections(ctx, visiblePeopleIds, visibleCircleIds, index, selectedItem, hoveredConnId, camera.scale)
-    drawCircleDetails(ctx, visibleCircles, index, camera.scale, circleFillMode, showCircleLabels, anim)
-    drawPeople(ctx, visiblePeople, index, selectedItem, hoveredPersonId, camera.scale, dpr, showPersonLabels, selectedPeopleIds, anim)
+    if (!skipMembershipEdges) {
+      drawPersonEdges(ctx, visiblePeople, index, camera.scale, selectedItem, hoveredConnId)
+    }
+    if (!performanceMode || selectedItem?.type === 'connection' || hoveredConnId) {
+      drawCustomConnections(ctx, visiblePeopleIds, visibleCircleIds, index, selectedItem, hoveredConnId, camera.scale)
+    }
+    drawCircleDetails(ctx, visibleCircles, index, camera.scale, circleFillMode, showCircleLabels && !performanceMode, anim)
+    if (dotPeople) {
+      drawPeopleDots(ctx, visiblePeople, index, camera.scale, selectedItem, hoveredPersonId, selectedPeopleIds)
+    } else {
+      drawPeople(ctx, visiblePeople, index, selectedItem, hoveredPersonId, camera.scale, dpr, showPersonLabels && !performanceMode, selectedPeopleIds, anim)
+    }
     if (connector) drawConnector(ctx, connector, camera.scale)
     drawSelectionHandles(ctx, selectedItem, index, anim, handleExitNodes, visiblePeople)
   }
@@ -743,12 +783,19 @@ function drawCircleFills(
   for (const circle of circles) {
     const tone = resolveCircleColors(circle, anim)
     const isTransparent = (circle.fillMode ?? circleFillMode) === 'transparent'
-    const path = getCirclePath(circle, circleShapeMode, anim.morphs.get(circle.id))
+    const isTiny = circle.radius * scale < CIRCLE_TINY_SCREEN_RADIUS && !anim.morphs.has(circle.id)
+    const path = isTiny ? null : getCirclePath(circle, circleShapeMode, anim.morphs.get(circle.id))
     ctx.save()
     applyLiftTransformForCircle(ctx, circle, index, anim)
     ctx.globalAlpha = isTransparent ? 0.34 : 1
     ctx.fillStyle = tone.fill
-    ctx.fill(path)
+    if (path) {
+      ctx.fill(path)
+    } else {
+      ctx.beginPath()
+      ctx.arc(circle.x, circle.y, circle.radius, 0, Math.PI * 2)
+      ctx.fill()
+    }
     ctx.restore()
 
     const isSelected = (selectedItem?.type === 'circle' && selectedItem.id === circle.id) || selectedCircleIds.includes(circle.id)
@@ -760,7 +807,17 @@ function drawCircleFills(
     const isRound = isSimpleCircleShape(circle, circleShapeMode)
 
     // Idle transparent outline (resting dashed border) — keep visible during edge hover too.
-    if (isTransparent && !showSelectionRing) {
+    if (isTiny && isTransparent && !showSelectionRing) {
+      ctx.save()
+      applyLiftTransformForCircle(ctx, circle, index, anim)
+      ctx.strokeStyle = lerpHex(tone.border, '#64748b', edgeHoverT)
+      ctx.globalAlpha = 0.78
+      ctx.lineWidth = Math.max(1.4 / scale, 1)
+      ctx.beginPath()
+      ctx.arc(circle.x, circle.y, circle.radius, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.restore()
+    } else if (path && isTransparent && !showSelectionRing) {
       ctx.save()
       applyLiftTransformForCircle(ctx, circle, index, anim)
       ctx.strokeStyle = lerpHex(tone.border, '#64748b', edgeHoverT)
@@ -782,7 +839,7 @@ function drawCircleFills(
         ctx.strokeStyle = showSelectionRing ? tone.border : '#64748b'
         ctx.globalAlpha = 0.18 + 0.42 * edgeHoverT
         ctx.lineWidth = Math.max(2 / scale, 1.2) + edgeHoverT * Math.max(1 / scale, 0.5)
-        ctx.stroke(path)
+        strokePathOrCircle(ctx, path, circle)
         ctx.restore()
       }
     }
@@ -804,7 +861,7 @@ function drawCircleFills(
           ctx.lineDashOffset = (1 - ringT) * dashUnit * 2
         }
         ctx.globalAlpha = 0.55 + 0.45 * ringT
-        ctx.stroke(path)
+        strokePathOrCircle(ctx, path, circle)
         ctx.restore()
       } else if (isRound) {
         ctx.save()
@@ -812,7 +869,7 @@ function drawCircleFills(
         ctx.strokeStyle = tone.border
         ctx.lineWidth = lineWidth
         ctx.globalAlpha = ringT
-        ctx.stroke(path)
+        strokePathOrCircle(ctx, path, circle)
         ctx.restore()
       } else if (ringAnim !== undefined && ringT < RING_VERTEX_SPREAD_END) {
         ctx.save()
@@ -825,11 +882,66 @@ function drawCircleFills(
         ctx.strokeStyle = tone.border
         ctx.lineWidth = lineWidth
         ctx.globalAlpha = ringAnim !== undefined ? 0.55 + 0.45 * ringT : 1
-        ctx.stroke(path)
+        strokePathOrCircle(ctx, path, circle)
         ctx.restore()
       }
     }
   }
+}
+
+function strokePathOrCircle(ctx: CanvasRenderingContext2D, path: Path2D | null, circle: CircleNode) {
+  if (path) {
+    ctx.stroke(path)
+    return
+  }
+  ctx.beginPath()
+  ctx.arc(circle.x, circle.y, circle.radius, 0, Math.PI * 2)
+  ctx.stroke()
+}
+
+function drawPeopleDots(
+  ctx: CanvasRenderingContext2D,
+  people: PersonNode[],
+  index: BoardIndex,
+  scale: number,
+  selectedItem: SelectedItem,
+  hoveredPersonId: string | null,
+  selectedPeopleIds: string[] = [],
+) {
+  const selectedIds = new Set(selectedPeopleIds)
+  const batches = new Map<string, PersonNode[]>()
+  for (const person of people) {
+    const circle = index.circlesById.get(person.circleId)
+    const color = circle ? getCircleColors(circle).centerBg : MATERIAL_TONES.blue.centerBg
+    const batch = batches.get(color)
+    if (batch) batch.push(person)
+    else batches.set(color, [person])
+  }
+
+  const radius = Math.max(2.2 / scale, Math.min(PERSON_VISUAL_RADIUS, 3.6 / scale))
+  ctx.save()
+  for (const [color, batch] of batches) {
+    ctx.beginPath()
+    for (const person of batch) {
+      ctx.moveTo(person.x + radius, person.y)
+      ctx.arc(person.x, person.y, radius, 0, Math.PI * 2)
+    }
+    ctx.fillStyle = color
+    ctx.globalAlpha = 0.92
+    ctx.fill()
+  }
+  ctx.globalAlpha = 1
+  for (const person of people) {
+    const isSelected = selectedItem?.type === 'person' && selectedItem.id === person.id
+    const isHovered = hoveredPersonId === person.id
+    if (!isSelected && !isHovered && !selectedIds.has(person.id)) continue
+    ctx.beginPath()
+    ctx.arc(person.x, person.y, radius + 2.5 / scale, 0, Math.PI * 2)
+    ctx.strokeStyle = isSelected ? '#00629d' : '#64748b'
+    ctx.lineWidth = Math.max(2 / scale, 1.2)
+    ctx.stroke()
+  }
+  ctx.restore()
 }
 
 function isSimpleCircleShape(circle: CircleNode, circleShapeMode: CircleShapeMode) {
@@ -1396,6 +1508,59 @@ function findConnectionNearPoint(index: BoardIndex, point: { x: number; y: numbe
       bestDist = dist
       best = connection
     }
+  }
+
+  const denseBoard = index.people.length + index.circles.length > 900
+
+  if (denseBoard) {
+    const rect = {
+      left: point.x - tolerance * 10,
+      right: point.x + tolerance * 10,
+      top: point.y - tolerance * 10,
+      bottom: point.y + tolerance * 10,
+    }
+    const nearbyPeople = queryPeople(index, rect)
+    const nearbyCircles = queryCircles(index, rect)
+    const candidateConnections = new Map<string, Connection>()
+    for (const person of nearbyPeople) {
+      const bucket = index.connectionsByEndpoint.get(person.id)
+      if (bucket) for (const conn of bucket) candidateConnections.set(conn.id, conn)
+    }
+    for (const circle of nearbyCircles) {
+      const bucket = index.connectionsByEndpoint.get(circle.id)
+      if (bucket) for (const conn of bucket) candidateConnections.set(conn.id, conn)
+    }
+
+    for (const conn of candidateConnections.values()) {
+      if (conn.id.startsWith('stress-link-')) continue
+      const source = index.peopleById.get(conn.fromId) || index.circlesById.get(conn.fromId)
+      const target = index.peopleById.get(conn.toId) || index.circlesById.get(conn.toId)
+      if (!source || !target) continue
+      consider(conn, source, target)
+    }
+
+    for (const person of nearbyPeople) {
+      const circle = index.circlesById.get(person.circleId)
+      if (!circle) continue
+      consider(
+        { id: `${MEMBERSHIP_CONNECTION_PREFIX}${person.id}`, fromId: circle.id, toId: person.id },
+        circle,
+        person,
+      )
+    }
+
+    for (const circle of nearbyCircles) {
+      if (!circle.connectedTo) continue
+      const source = index.circlesById.get(circle.connectedTo)
+      if (!source || source.id === 'you') continue
+      consider(
+        { id: `${CIRCLE_LINK_CONNECTION_PREFIX}${circle.id}`, fromId: source.id, toId: circle.id },
+        source,
+        circle,
+      )
+    }
+
+    return best
   }
 
   for (const conn of index.connections) {

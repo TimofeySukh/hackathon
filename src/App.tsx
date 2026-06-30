@@ -102,6 +102,14 @@ const prefersReducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
 const DRAG_START_THRESHOLD = 5
+const MAX_PAN_INERTIA_VELOCITY = 1.45
+
+function limitPanVelocity(x: number, y: number) {
+  const speed = Math.hypot(x, y)
+  if (speed <= MAX_PAN_INERTIA_VELOCITY) return { x, y }
+  const ratio = MAX_PAN_INERTIA_VELOCITY / speed
+  return { x: x * ratio, y: y * ratio }
+}
 
 function shouldRunGlobalInteractionLayout(state: GraphState) {
   return state.circles.length + state.people.length <= BOARD_INTERACTION_LAYOUT_LIMIT
@@ -222,6 +230,12 @@ type PanState = {
   startY: number
   originX: number
   originY: number
+  lastX: number
+  lastY: number
+  lastT: number
+  velocityX: number
+  velocityY: number
+  moved: boolean
 }
 
 type PinchState = {
@@ -489,6 +503,7 @@ const authCardStyle: CSSProperties = {
 const LINKEDIN_GUIDE_HINT_KEY = 'social-linkedin-guide-hint-seen-v1'
 const SEARCH_LINKEDIN_HINT_KEY = 'social-search-linkedin-hint-seen-v1'
 const CIRCLE_CREATION_DEFAULTS_KEY = 'hackathon-board:circle-creation-defaults:v1'
+type BoardToolMode = 'edit' | 'pan'
 
 type CircleCreationDefaults = {
   fillMode: CircleFillMode
@@ -584,6 +599,16 @@ function App() {
   // pan/zoom gesture) so a move event flood doesn't trigger a re-render storm.
   const dragRafRef = useRef<number | null>(null)
   const pendingGraphRef = useRef<((current: GraphState) => GraphState) | null>(null)
+  const panInertiaRafRef = useRef<number | null>(null)
+  const panInertiaLastTRef = useRef(0)
+  const cameraBitmapCacheRef = useRef<{
+    canvas: HTMLCanvasElement
+    startCamera: Camera
+    pad: number
+    cssWidth: number
+    cssHeight: number
+    dpr: number
+  } | null>(null)
   const loadedGraphSourceRef = useRef<'saved' | 'empty' | 'local' | 'error'>('empty')
   const loadedGraphSnapshotRef = useRef<string | null>(null)
   const loadedGraphRevisionRef = useRef<number | null>(null)
@@ -1157,6 +1182,7 @@ function App() {
   const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight })
 
   const [showSettings, setShowSettings] = useState(false)
+  const [boardToolMode, setBoardToolMode] = useState<BoardToolMode>('edit')
   const [highlightLinkedInGuideHelp, setHighlightLinkedInGuideHelp] = useState(
     () => !hasLocalFlag(LINKEDIN_GUIDE_HINT_KEY),
   )
@@ -2360,11 +2386,135 @@ function App() {
     }
   }
 
+  function clearCameraBitmapCache() {
+    cameraBitmapCacheRef.current = null
+    const canvas = peopleCanvasRef.current
+    if (canvas) {
+      canvas.style.transform = ''
+      canvas.style.transformOrigin = ''
+    }
+  }
+
+  function ensureCameraBitmapCache() {
+    const canvas = peopleCanvasRef.current
+    const surface = surfaceRef.current
+    if (!canvas || !surface) return null
+    const width = Math.max(1, surface.clientWidth)
+    const height = Math.max(1, surface.clientHeight)
+    const existing = cameraBitmapCacheRef.current
+    if (
+      existing &&
+      existing.cssWidth >= width &&
+      existing.cssHeight >= height &&
+      Math.abs(existing.startCamera.scale - cameraRef.current.scale) / Math.max(cameraRef.current.scale, 0.001) < 0.2
+    ) {
+      return existing
+    }
+
+    const pad = Math.min(900, Math.max(360, Math.round(Math.max(width, height) * 0.75)))
+    const cacheCanvas = existing?.canvas ?? document.createElement('canvas')
+    const startCamera = { ...cameraRef.current }
+    const cacheCamera = {
+      x: startCamera.x + pad,
+      y: startCamera.y + pad,
+      scale: startCamera.scale,
+    }
+    const cssWidth = width + pad * 2
+    const cssHeight = height + pad * 2
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.25)
+
+    drawBoardLayer(
+      cacheCanvas,
+      surface,
+      cacheCamera,
+      boardIndex,
+      selectedItem,
+      hoveredPersonId,
+      hoveredConnId,
+      connector,
+      showCircleLabels,
+      showPersonLabels,
+      circleShapeMode,
+      circleFillMode,
+      selectedPeopleIds,
+      marqueeRef.current,
+      selectedCircleIds,
+      EMPTY_ANIM_FRAME,
+      new Map(),
+      null,
+      {
+        viewportWidth: cssWidth,
+        viewportHeight: cssHeight,
+        dprCap: 1.25,
+        performanceMode: true,
+      },
+    )
+
+    const next = { canvas: cacheCanvas, startCamera, pad, cssWidth, cssHeight, dpr }
+    cameraBitmapCacheRef.current = next
+    return next
+  }
+
+  function drawCameraBitmapCache() {
+    const canvas = peopleCanvasRef.current
+    const surface = surfaceRef.current
+    if (!canvas || !surface) return false
+    const cache = ensureCameraBitmapCache()
+    if (!cache) return false
+
+    const width = Math.max(1, surface.clientWidth)
+    const height = Math.max(1, surface.clientHeight)
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.75)
+    const nextWidth = Math.round(width * dpr)
+    const nextHeight = Math.round(height * dpr)
+    if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
+      canvas.width = nextWidth
+      canvas.height = nextHeight
+      canvas.style.width = `${width}px`
+      canvas.style.height = `${height}px`
+    }
+
+    const current = cameraRef.current
+    const ratio = current.scale / cache.startCamera.scale
+    const maxPan = cache.pad * 0.82
+    const dx = current.x - cache.startCamera.x
+    const dy = current.y - cache.startCamera.y
+    if (Math.abs(dx) > maxPan || Math.abs(dy) > maxPan || ratio < 0.68 || ratio > 1.48) {
+      cameraBitmapCacheRef.current = null
+      return false
+    }
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return false
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    ctx.clearRect(0, 0, width, height)
+    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingQuality = ratio > 1 ? 'medium' : 'low'
+    ctx.translate(
+      current.x - (cache.pad + cache.startCamera.x) * ratio,
+      current.y - (cache.pad + cache.startCamera.y) * ratio,
+    )
+    ctx.scale(ratio, ratio)
+    ctx.drawImage(
+      cache.canvas,
+      0,
+      0,
+      cache.canvas.width,
+      cache.canvas.height,
+      0,
+      0,
+      cache.cssWidth,
+      cache.cssHeight,
+    )
+    return true
+  }
+
   // One imperative frame of a gesture: move the DOM and repaint the (culled)
   // people canvas at the live camera, so newly revealed people fill in mid-pan.
   function applyLiveCamera() {
     const cam = cameraRef.current
     applyDomCamera()
+    if (drawCameraBitmapCache()) return
     const canvas = peopleCanvasRef.current
     const surface = surfaceRef.current
     if (canvas && surface) {
@@ -2385,6 +2535,9 @@ function App() {
         marqueeRef.current,
         selectedCircleIds,
         EMPTY_ANIM_FRAME,
+        new Map(),
+        null,
+        { performanceMode: true, dprCap: 1.25 },
       )
     }
   }
@@ -2421,8 +2574,53 @@ function App() {
       window.cancelAnimationFrame(gestureRafRef.current)
       gestureRafRef.current = null
     }
+    clearCameraBitmapCache()
     gestureActiveRef.current = false
     setCamera(cameraRef.current)
+  }
+
+  function cancelPanInertia() {
+    if (panInertiaRafRef.current != null) {
+      window.cancelAnimationFrame(panInertiaRafRef.current)
+      panInertiaRafRef.current = null
+    }
+  }
+
+  function startPanInertia(velocityX: number, velocityY: number) {
+    cancelPanInertia()
+    if (prefersReducedMotion()) {
+      settleGesture()
+      return
+    }
+    let vx = velocityX
+    let vy = velocityY
+    const limited = limitPanVelocity(vx, vy)
+    vx = limited.x
+    vy = limited.y
+    if (Math.hypot(vx, vy) < 0.08) {
+      settleGesture()
+      return
+    }
+    panInertiaLastTRef.current = performance.now()
+    const step = (now: number) => {
+      const dt = Math.min(32, Math.max(1, now - panInertiaLastTRef.current))
+      panInertiaLastTRef.current = now
+      const decay = Math.exp(-dt / 360)
+      vx *= decay
+      vy *= decay
+      driveCameraRef.current({
+        ...cameraRef.current,
+        x: cameraRef.current.x + vx * dt,
+        y: cameraRef.current.y + vy * dt,
+      })
+      if (Math.hypot(vx, vy) < 0.025) {
+        panInertiaRafRef.current = null
+        settleGesture()
+        return
+      }
+      panInertiaRafRef.current = window.requestAnimationFrame(step)
+    }
+    panInertiaRafRef.current = window.requestAnimationFrame(step)
   }
 
   // Keep stable refs pointing at the latest gesture closures (so the wheel
@@ -2442,6 +2640,7 @@ function App() {
     if (dragRafRef.current != null) window.cancelAnimationFrame(dragRafRef.current)
     if (boardAnimRafRef.current != null) window.cancelAnimationFrame(boardAnimRafRef.current)
     if (focusAnimRef.current != null) window.cancelAnimationFrame(focusAnimRef.current)
+    if (panInertiaRafRef.current != null) window.cancelAnimationFrame(panInertiaRafRef.current)
   }, [])
 
   // Track viewport size so culling has the current visible rectangle.
@@ -2720,10 +2919,33 @@ function App() {
     if (surface && surface.style.cursor !== value) surface.style.cursor = value
   }
 
+  function startBoardPan(event: ReactPointerEvent<HTMLDivElement>) {
+    cancelPanInertia()
+    setSelectedPeopleIds([])
+    setSelectedCircleIds([])
+    selectItem(null)
+    setOpenNotesPersonId(null)
+    panRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: cameraRef.current.x,
+      originY: cameraRef.current.y,
+      lastX: event.clientX,
+      lastY: event.clientY,
+      lastT: event.timeStamp,
+      velocityX: 0,
+      velocityY: 0,
+      moved: false,
+    }
+    setSurfaceCursor('grabbing')
+  }
+
   function handleSurfacePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     if (event.pointerType !== 'touch' && event.button !== 0 && event.button !== 2) return
     const isRightClick = event.pointerType !== 'touch' && event.button === 2
     isRightClickDragRef.current = isRightClick
+    cancelPanInertia()
 
 
 
@@ -2778,6 +3000,12 @@ function App() {
           y: (initialMid.y - initialCamera.y) / initialCamera.scale,
         },
       }
+      return
+    }
+
+    if (boardToolMode === 'pan' && !isRightClick) {
+      setCreateMenu(null)
+      startBoardPan(event)
       return
     }
 
@@ -2954,6 +3182,12 @@ function App() {
       startY: event.clientY,
       originX: camera.x,
       originY: camera.y,
+      lastX: event.clientX,
+      lastY: event.clientY,
+      lastT: event.timeStamp,
+      velocityX: 0,
+      velocityY: 0,
+      moved: false,
     }
   }
 
@@ -3025,8 +3259,19 @@ function App() {
 
     const pan = panRef.current
     if (pan?.pointerId === event.pointerId) {
+      const now = event.timeStamp
+      const dt = Math.max(1, now - pan.lastT)
+      const dx = event.clientX - pan.lastX
+      const dy = event.clientY - pan.lastY
+      const velocity = limitPanVelocity(dx / dt, dy / dt)
+      pan.velocityX = velocity.x
+      pan.velocityY = velocity.y
+      pan.lastX = event.clientX
+      pan.lastY = event.clientY
+      pan.lastT = now
       if (Math.hypot(event.clientX - pan.startX, event.clientY - pan.startY) > DRAG_START_THRESHOLD) {
         suppressDoubleClickUntilRef.current = Date.now() + 700
+        pan.moved = true
       }
       driveCamera({
         ...cameraRef.current,
@@ -3240,13 +3485,15 @@ function App() {
       return
     }
 
-    if (activePointersRef.current.length === 0) {
-      settleGesture()
-    }
-
     const activePan = panRef.current?.pointerId === event.pointerId ? panRef.current : null
     if (activePan) {
       panRef.current = null
+      if (activePointersRef.current.length === 0 && activePan.moved) {
+        startPanInertia(activePan.velocityX, activePan.velocityY)
+      } else {
+        settleGesture()
+      }
+    } else if (activePointersRef.current.length === 0) {
       settleGesture()
     }
 
@@ -4272,7 +4519,7 @@ Content-Type: application/json
   }
 
   return (
-    <main className={`app-shell ${searchOpen ? 'is-search-open' : ''} ${showSettings ? 'is-settings-open' : ''} ${selectedItem ? 'is-inspector-open' : ''}`}>
+    <main className={`app-shell ${searchOpen ? 'is-search-open' : ''} ${showSettings ? 'is-settings-open' : ''} ${selectedItem ? 'is-inspector-open' : ''} ${boardToolMode === 'pan' ? 'is-pan-mode' : ''}`}>
       {graphLoadError && (
         <div style={{
           position: 'absolute',
@@ -4312,6 +4559,36 @@ Content-Type: application/json
           </button>
         </div>
       )}
+      <div className="board-mode-menu" aria-label="Board interaction mode">
+        <button
+          type="button"
+          className={boardToolMode === 'edit' ? 'is-active' : ''}
+          aria-label="Edit mode"
+          title="Edit mode"
+          aria-pressed={boardToolMode === 'edit'}
+          onClick={() => {
+            cancelPanInertia()
+            setBoardToolMode('edit')
+          }}
+        >
+          <PointerIcon />
+        </button>
+        <button
+          type="button"
+          className={boardToolMode === 'pan' ? 'is-active' : ''}
+          aria-label="Pan mode"
+          title="Pan mode"
+          aria-pressed={boardToolMode === 'pan'}
+          onClick={() => {
+            cancelPanInertia()
+            setBoardToolMode('pan')
+            setCreateMenu(null)
+          }}
+        >
+          <PanIcon />
+        </button>
+      </div>
+
       <div className="toolbar" aria-label="Graph controls" style={{ justifyContent: 'flex-end' }}>
         <div
           ref={searchPanelRef}
@@ -6758,6 +7035,28 @@ function SearchIcon() {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="11" cy="11" r="7" />
       <path d="m20 20-3.5-3.5" />
+    </svg>
+  )
+}
+
+function PointerIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5 3l9 18 2.4-7.6L21 11 5 3z" />
+      <path d="m13.5 13.5 4 4" />
+    </svg>
+  )
+}
+
+function PanIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 3v18" />
+      <path d="m8 7 4-4 4 4" />
+      <path d="m8 17 4 4 4-4" />
+      <path d="M3 12h18" />
+      <path d="m7 8-4 4 4 4" />
+      <path d="m17 8 4 4-4 4" />
     </svg>
   )
 }

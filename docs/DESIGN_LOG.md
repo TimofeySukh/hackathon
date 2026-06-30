@@ -927,3 +927,22 @@ rediscover, write it here.
   custom wavy/polygon circles and uses a smaller sticky leave band. Edge clicks also start
   the same press feedback as body clicks, while actual resize movement releases that press
   scale so the live radius is not visually over-inflated.
+
+## 2026-06-30 — Mobile board navigation and dense-render LOD
+
+- Decision: Added a vertical top-left board mode switch with edit and pan modes. Pan mode
+  makes one-finger/touch dragging move the canvas instead of selecting nodes, while keeping
+  pinch zoom and double-tap create available.
+- Why: Dense mobile boards make two-finger navigation and accidental node grabs expensive
+  and frustrating. A persistent mode control gives users a fast way to travel across a
+  large graph without fighting the editing hit targets.
+- Decision: Added inertial camera scrolling after a completed pan gesture.
+- Why: Large boards need scroll-like momentum on phones so users can cover distance with
+  fewer gestures.
+- Decision: Added a live camera bitmap cache, people-dot LOD, edge skipping during dense
+  intermediate zooms, tiny-circle arc rendering, and dense-board connection hover culling.
+- Why: The worst mobile case is an intermediate zoom where many people are still visible
+  but labels are hidden, or a far zoom with hundreds/thousands of nodes on screen. Live
+  gesture frames should transform a cached picture or draw cheap dots/arcs rather than
+  recomputing every avatar sprite, dashed circle outline, membership curve, and connection
+  hit candidate.

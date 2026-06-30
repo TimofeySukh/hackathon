@@ -8,8 +8,11 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
 
 ## Behavior
 
-- **Pan / zoom**: drag empty space to pan; mouse wheel or toolbar buttons to zoom
-  (`MIN_SCALE`/`MAX_SCALE` clamp).
+- **Pan / zoom**: drag empty space to pan in edit mode; mouse wheel, trackpad pinch,
+  or two-finger touch pan/zoom the board (`MIN_SCALE`/`MAX_SCALE` clamp). The vertical
+  mode switch in the top-left can be changed to pan mode, where a one-finger drag always
+  moves the canvas instead of selecting or dragging a person/circle. Releasing a moved pan
+  gesture continues with short inertial scrolling before settling.
 - **Move**: drag a person to reposition inside its owning circle; nearby people in the
   same circle are pushed aside instead of overlapping. Drag a circle center or body to move
   the whole circle and everything it contains. Live pointer frames never run the global
@@ -66,7 +69,13 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
 - **Circle rendering performance**: clean circles render with the native Canvas `arc`
   path instead of a sampled polyline. Wavy and polygon circles still use sampled paths,
   and circle paths are cached at a large-board-friendly size so dense imports do not
-  rebuild every visible circle path on each repaint.
+  rebuild every visible circle path on each repaint. During pan/zoom, the board first
+  renders an expanded bitmap snapshot and transforms that cached image for live frames;
+  the final settled frame redraws sharply as vectors. Dense intermediate zoom levels use
+  a people-dot LOD and skip non-essential membership/custom edge drawing while moving, so
+  mobile devices do not redraw thousands of full avatars and curves for every gesture
+  frame. Tiny far-away transparent circles use simple arc strokes instead of dashed outline
+  paths.
 - **Select**: click a circle, person, or connection to load it into the inspector for
   rename / styling / notes / delete.
 - **Undo**: Ctrl/Cmd+Z reverts the last graph-mutating action — create, delete, move,
@@ -154,7 +163,9 @@ This is the most Material-3-aligned part of the app today; keep it that way.
     boards.
   - `drawBoardLayer` — Canvas 2D renderer for circles, people, labels, edges, selected
     handles, and the draft connector. Clean circles use native `Path2D.arc`; sampled
-    outline paths are reserved for wavy/polygon/morph states.
+    outline paths are reserved for wavy/polygon/morph states. The renderer accepts a
+    performance mode for live camera frames, plus viewport overrides for the expanded
+    pan/zoom bitmap cache.
   - `hitTestBoard` plus `handleSurfacePointerDown/Move/Up` — canvas interaction model
     for selecting, dragging, resizing, connecting, and context menus.
   - create-menu rendering; inspector `<aside className="inspector">`.

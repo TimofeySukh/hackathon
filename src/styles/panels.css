@@ -282,7 +282,7 @@
 }
 
 .search-box.is-open {
-  width: min(360px, calc(100vw - 32px));
+  width: min(360px, calc(100vw - 158px));
   padding-right: 8px;
 }
 
