@@ -41,6 +41,7 @@ import {
 } from './constants'
 import { colorMix, getCircleColors, lerpCircleColors, lerpHex } from './colors'
 import {
+  distanceToSegment,
   distanceToCurvePath,
   drawCurvePath,
   ellipsize,
@@ -771,19 +772,17 @@ function drawCircleFills(
       ctx.restore()
     }
 
-    // Resize-edge hover — logical circle only; does not thicken the shape outline.
+    // Resize-edge hover follows the rendered outline, including wavy/polygon circles.
     if (edgeHoverT > 0.001) {
       // For transparent circles, the hover styling is integrated directly into the idle outline (resting dashed border)
       // when not selected. This avoids drawing multiple clashing dashed outlines.
       if (!isTransparent || showSelectionRing) {
         ctx.save()
         applyLiftTransformForCircle(ctx, circle, index, anim)
-        ctx.beginPath()
-        ctx.arc(circle.x, circle.y, circle.radius, 0, Math.PI * 2)
         ctx.strokeStyle = showSelectionRing ? tone.border : '#64748b'
         ctx.globalAlpha = 0.18 + 0.42 * edgeHoverT
         ctx.lineWidth = Math.max(2 / scale, 1.2) + edgeHoverT * Math.max(1 / scale, 0.5)
-        ctx.stroke()
+        ctx.stroke(path)
         ctx.restore()
       }
     }
@@ -1226,6 +1225,30 @@ function connectorHandlesFor(node: CircleNode | PersonNode, nodeScale = 1, hasFa
   ]
 }
 
+function circleUsesCustomOutline(circle: CircleNode) {
+  const amplitude = circle.amplitude ?? 0
+  const sides = circle.sides ?? 25
+  const shapeType: ShapeType = circle.shapeType ?? (amplitude > 0 ? 'wavy' : sides >= 25 ? 'circle' : 'polygon')
+  return circle.shapeCustom === true && (shapeType !== 'circle' || amplitude > 0 || sides < 25)
+}
+
+function distanceToCircleOutline(circle: CircleNode, point: { x: number; y: number }) {
+  if (!circleUsesCustomOutline(circle)) {
+    return Math.abs(Math.hypot(point.x - circle.x, point.y - circle.y) - circle.radius)
+  }
+
+  const amplitude = circle.amplitude ?? 0
+  const sides = circle.sides ?? 25
+  const shapeType: ShapeType = circle.shapeType ?? (amplitude > 0 ? 'wavy' : sides >= 25 ? 'circle' : 'polygon')
+  const samples = Math.max(72, Math.min(240, Math.round(circle.radius * 1.25)))
+  const points = sampleCircleOutline(circle.x, circle.y, circle.radius, sides, amplitude, samples, shapeType)
+  let best = Infinity
+  for (let i = 0; i < points.length; i += 1) {
+    best = Math.min(best, distanceToSegment(point, points[i], points[(i + 1) % points.length]))
+  }
+  return best
+}
+
 function findBestCircleEdge(
   circles: CircleNode[],
   point: { x: number; y: number },
@@ -1235,8 +1258,7 @@ function findBestCircleEdge(
   let best: CircleNode | null = null
   let bestDist = Infinity
   for (const circle of circles) {
-    const d = Math.hypot(point.x - circle.x, point.y - circle.y)
-    const edgeDist = Math.abs(d - circle.radius)
+    const edgeDist = distanceToCircleOutline(circle, point)
     if (edgeDist <= hitSize && edgeDist < bestDist) {
       bestDist = edgeDist
       best = circle
@@ -1257,8 +1279,7 @@ export function resolveCircleEdgeHover(
   if (stickyEdgeId) {
     const sticky = index.circlesById.get(stickyEdgeId)
     if (sticky) {
-      const d = Math.hypot(point.x - sticky.x, point.y - sticky.y)
-      if (Math.abs(d - sticky.radius) <= leaveSize) return stickyEdgeId
+      if (distanceToCircleOutline(sticky, point) <= leaveSize) return stickyEdgeId
     }
   }
 

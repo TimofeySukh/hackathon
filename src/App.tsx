@@ -2881,6 +2881,7 @@ function App() {
       stopPressFeedback([
         ...(moveCircleRef.current?.liftIds ?? []),
         ...(movePersonRef.current?.liftIds ?? []),
+        ...(resizeCircleRef.current ? [resizeCircleRef.current.circleId] : []),
         ...(connector ? [connector.sourceId] : []),
       ])
       stopLiftFeedback([
@@ -3261,7 +3262,10 @@ function App() {
     const resizing = resizeCircleRef.current
     if (resizing?.pointerId === event.pointerId) {
       const moveDistance = Math.hypot(event.clientX - (resizing.startX ?? event.clientX), event.clientY - (resizing.startY ?? event.clientY))
-      if (moveDistance > DRAG_START_THRESHOLD) suppressDoubleClickUntilRef.current = Date.now() + 700
+      if (moveDistance > DRAG_START_THRESHOLD) {
+        suppressDoubleClickUntilRef.current = Date.now() + 700
+        stopPressFeedback([resizing.circleId])
+      }
       ensureGestureSnapshot()
       const world = screenToWorld({ x: event.clientX, y: event.clientY })
 
@@ -3422,6 +3426,7 @@ function App() {
     const endingPressIds = [
       ...(activeMoveCircle?.liftIds ?? []),
       ...(activeMovePerson?.liftIds ?? []),
+      ...(activeResizeCircle ? [activeResizeCircle.circleId] : []),
     ]
 
     if (moveCircleRef.current?.pointerId === event.pointerId) moveCircleRef.current = null
@@ -3743,6 +3748,7 @@ function App() {
         people: graph.people.map((p) => ({ ...p })),
       },
     }
+    startPressFeedback([circle.id])
   }
 
   // Double-tap creates a person exactly where you tapped. It only adopts a

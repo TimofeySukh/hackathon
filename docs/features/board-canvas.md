@@ -28,6 +28,9 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   circles toward the center, and nested subset circles shrink with the parent when position
   packing alone cannot fit them. Live resize frames update only the resized circle and
   contained nodes; large boards skip global collision cleanup after the resize gesture.
+  Resize hover and hit testing follow the rendered circle outline, including wavy and
+  polygon shapes, rather than an invisible perfect-circle radius. Clicking the resize edge
+  without moving still plays the same press feedback as clicking the body.
 - **Create**: right-click a circle to open the create menu, which now offers two actions —
   add person and add circle. "Add circle" auto-detects containment from the target point:
   inside the source circle it nests a subset blob, outside it spawns a connected circle.
@@ -129,7 +132,8 @@ This is the most Material-3-aligned part of the app today; keep it that way.
 - **Layering**: circle fills render first, then relationship links, then circle centers,
   labels, and people. This keeps links readable even when they pass through large circles.
   Drag lift feedback is a transient draw transform only; it does not mutate persisted
-  coordinates, radii, labels, or avatar sizes.
+  coordinates, radii, labels, or avatar sizes. Resize-edge hover highlights the actual
+  rendered outline so the visible affordance and hit area stay aligned.
 - **Components used**: create menu (M3 menu), inspector (side sheet), toolbar (icon
   buttons). These follow the recipes in the design system.
 - **Known gaps vs. Material 3 target**:

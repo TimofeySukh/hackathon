@@ -12,8 +12,9 @@ export const ZONE_ONLY_SCALE = 0.35
 export const CONNECT_THRESHOLD = 40
 export const MIN_CIRCLE_RADIUS = 72
 export const EDGE_RESIZE_HIT_SIZE = 16
-// Wider band kept while the pointer stays near a resize edge to avoid hover flicker.
-export const EDGE_RESIZE_HIT_LEAVE_SIZE = 48
+// Wider than the entry band to avoid hover flicker, but still close to the
+// rendered edge so resize affordance does not feel detached from the shape.
+export const EDGE_RESIZE_HIT_LEAVE_SIZE = 28
 export const EDGE_HOVER_ANIM_MS = 320
 export const MORPH_ANIM_MS = 380
 export const COLOR_ANIM_MS = 220

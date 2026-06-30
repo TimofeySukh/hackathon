@@ -897,3 +897,7 @@ rediscover, write it here.
   with a spring-back, and movement past the drag threshold continues into the 10% drag
   lift. Dragging after a first click still suppresses the browser `dblclick` create event,
   preventing accidental person creation when the second click becomes a move gesture.
+- Follow-up: Resize-edge hit testing now measures distance to the rendered outline for
+  custom wavy/polygon circles and uses a smaller sticky leave band. Edge clicks also start
+  the same press feedback as body clicks, while actual resize movement releases that press
+  scale so the live radius is not visually over-inflated.
