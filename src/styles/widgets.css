@@ -995,22 +995,25 @@
 }
 
 /* ---- Onboarding coach card ------------------------------------------------ */
-/* A small floating tour card. Bottom-center on desktop so it clears the
-   bottom-right inspector; on narrow screens the inspector spans the bottom, so
-   it moves up under the toolbar instead. */
+/* Onboarding guide rail. It is intentionally presented as product guidance, not
+   a dismiss-first modal: no close icon, clear setup actions, and the LinkedIn
+   archive guide is visible inline. */
 .onboarding-coach {
   position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 88px;
+  bottom: auto;
+  left: 16px;
+  transform: none;
   z-index: 95;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  width: min(380px, calc(100vw - 32px));
+  gap: 10px;
+  width: min(460px, calc(100vw - 32px));
+  max-height: calc(100vh - 112px);
+  overflow-y: auto;
   padding: 18px 18px 14px;
-  border-radius: 20px;
-  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-r-lg);
+  border: none;
   background: var(--md-surface-container-high);
   box-shadow: var(--md-elev-2);
   color: var(--md-on-surface);
@@ -1023,47 +1026,24 @@
 @keyframes onboardingCoachIn {
   from {
     opacity: 0;
-    transform: translate(-50%, 16px) scale(0.97);
+    transform: translateX(-12px) scale(0.98);
   }
   to {
     opacity: 1;
-    transform: translate(-50%, 0) scale(1);
+    transform: translateX(0) scale(1);
   }
-}
-
-.onboarding-coach__close {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--md-on-surface-variant);
-  font-size: 20px;
-  line-height: 1;
-  cursor: pointer;
-  transition: background-color 0.15s;
-}
-
-.onboarding-coach__close:hover {
-  background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
 }
 
 .onboarding-coach__eyebrow {
   font-size: 12px;
   font-weight: 500;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
   color: var(--md-primary);
 }
 
 .onboarding-coach__title {
-  font-size: 17px;
+  font-size: 20px;
   font-weight: 500;
-  padding-right: 24px;
   color: var(--md-on-surface);
 }
 
@@ -1072,6 +1052,164 @@
   font-size: 14px;
   line-height: 1.45;
   color: var(--md-on-surface-variant);
+}
+
+.onboarding-coach__link-btn {
+  display: inline;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--md-primary);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.onboarding-coach__overview {
+  display: grid;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.onboarding-coach__task {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: var(--md-r-md);
+  background: var(--md-surface-container-low);
+  color: var(--md-on-surface);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 0.2s,
+    transform var(--md-dur-short) var(--md-ease-spring);
+  will-change: transform;
+}
+
+.onboarding-coach__task:hover {
+  background: var(--md-secondary-container);
+}
+
+.onboarding-coach__task:active {
+  transform: scale(0.985);
+}
+
+.onboarding-coach__task.is-done {
+  background: var(--md-primary-container);
+  cursor: default;
+}
+
+.onboarding-coach__task-index {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--md-r-full);
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.onboarding-coach__task strong,
+.onboarding-coach__task small {
+  display: block;
+}
+
+.onboarding-coach__task strong {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.onboarding-coach__task small {
+  margin-top: 3px;
+  color: var(--md-on-surface-variant);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.onboarding-coach__guide {
+  display: grid;
+  gap: 10px;
+}
+
+.onboarding-coach__guide-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.onboarding-coach__guide-steps {
+  display: grid;
+  gap: 10px;
+}
+
+.onboarding-coach__guide-step {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--md-r-md);
+  background: var(--md-surface-container-low);
+}
+
+.onboarding-coach__guide-copy {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.onboarding-coach__guide-index {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--md-r-full);
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.onboarding-coach__guide-step h3 {
+  margin: 0 0 4px;
+  color: var(--md-on-surface);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.onboarding-coach__guide-step p {
+  margin: 0;
+  color: var(--md-on-surface-variant);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.onboarding-coach__guide-step img {
+  display: block;
+  width: 100%;
+  max-height: 210px;
+  object-fit: contain;
+  object-position: top;
+  border-radius: var(--md-r-sm);
+  background: #ffffff;
+}
+
+.onboarding-coach__note {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--md-r-sm);
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .onboarding-coach__footer {
@@ -1113,7 +1251,8 @@
 }
 
 .onboarding-coach__skip,
-.onboarding-coach__back {
+.onboarding-coach__back,
+.onboarding-coach__secondary {
   border: none;
   background: transparent;
   color: var(--md-on-surface-variant);
@@ -1129,18 +1268,23 @@
 }
 
 .onboarding-coach__skip:hover,
-.onboarding-coach__back:hover {
+.onboarding-coach__back:hover,
+.onboarding-coach__secondary:hover {
   background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
 }
 
 .onboarding-coach__skip:active,
-.onboarding-coach__back:active {
+.onboarding-coach__back:active,
+.onboarding-coach__secondary:active {
   transform: scale(0.96);
 }
 
 /* The post-action "Great!" beat: a compact card that pops in for ~1s before the
    tour advances. */
 .onboarding-coach--cheer {
+  top: auto;
+  bottom: 24px;
+  left: 50%;
   flex-direction: row;
   align-items: center;
   justify-content: center;
@@ -1148,6 +1292,8 @@
   width: auto;
   min-width: 160px;
   padding: 16px 28px;
+  overflow: visible;
+  transform: translateX(-50%);
   animation: onboardingCheerPop 260ms var(--md-ease-emphasized, cubic-bezier(0.2, 0, 0, 1));
 }
 
@@ -1211,8 +1357,25 @@
   transform: scale(0.96);
 }
 
+.onboarding-coach__primary--compact {
+  padding: 8px 14px;
+}
+
 @media (max-width: 720px) {
   .onboarding-coach {
+    top: auto;
+    left: 12px;
+    right: 12px;
+    bottom: 16px;
+    width: auto;
+    max-height: min(78vh, 680px);
+    border-radius: var(--md-r-xl);
+  }
+
+  .onboarding-coach--cheer {
+    left: 50%;
+    right: auto;
+    width: auto;
     bottom: 16px;
   }
 }

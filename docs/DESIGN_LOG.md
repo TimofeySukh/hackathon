@@ -858,6 +858,21 @@ rediscover, write it here.
 - Decision: Integrated throttled (150ms) style-change ripples in `updateCircleStyle` when shape, rounding, sides, opacity, tone, custom color, or image properties are updated.
 - Why: Gives real-time tactile wave feedback to the canvas when modifying any visual settings of a circle.
 
+### 2026-06-30 — Onboarding Focuses on Account Save and LinkedIn Import
+
+- Decision: Replaced the gesture tutorial onboarding with a product setup guide focused on
+  signing in, adding people from LinkedIn profile links, and importing the LinkedIn archive.
+- Why: Pan/zoom/move/resize instructions are obvious in this product context, while account
+  save and LinkedIn import are the value-critical actions users need to discover early.
+- Decision: Changed the onboarding surface from a small close-icon card into a left-side
+  guide rail on desktop and a bottom sheet on mobile, with `Not now` as the dismiss action.
+- Why: The old close icon made the guide look like a popup to dismiss. The guide rail reads
+  as part of the product workflow and leaves the primary board visible.
+- Decision: Moved the LinkedIn sync steps into shared `LINKEDIN_GUIDE_STEPS` data and render
+  the complete screenshot-backed guide inline in onboarding as well as in Settings.
+- Why: The archive-import guide was hidden behind a small Settings help button even though it
+  is central to getting a useful graph.
+
 ## 2026-06-27 — Hybrid natural-language smart search
 
 - Decision: Smart search uses NeuralDeep (`https://api.neuraldeep.ru/v1`) with model
