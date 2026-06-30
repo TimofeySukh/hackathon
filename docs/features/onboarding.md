@@ -12,29 +12,31 @@ the full LinkedIn archive.
 - In production it is shown once per browser, tracked by `social-onboarding-done-v1` in
   `localStorage`; in development it reopens for signed-out visitors.
 - The guide no longer teaches obvious canvas gestures such as pan, zoom, move, or resize.
-- The first screen presents a setup checklist:
-  - sign in to save the board across devices
-  - add one person from a LinkedIn profile URL through Search
-  - import the full LinkedIn archive
-- The profile-link step opens Search with an example LinkedIn URL. Completing a profile or
-  ZIP import still advances the guide through the existing `import` onboarding action.
-- The archive-import step renders the full LinkedIn sync guide inline, including all four
+- The setup panel is a single screen, not a step-by-step tour.
+- The top of the panel shows the account save action. Signed-out users get a prominent
+  `Sign in` button; signed-in users see a saved status.
+- The next section shows that people can be added from a LinkedIn profile URL and opens
+  Search with an example URL.
+- The archive section renders the full LinkedIn sync guide inline, including all four
   screenshot-backed steps from the Settings guide. Users can also open the same guide in
   Settings or upload the ZIP directly.
-- The guide can be dismissed with `Not now` and completed with `Done`.
+- Completing a profile or ZIP import still advances the guide through the existing
+  `import` onboarding action.
+- The guide can be dismissed with `Not now`.
 
 ## Design
 
 The guide follows the global Material 3 direction in [`../DESIGN_SYSTEM.md`](../DESIGN_SYSTEM.md).
 
-- Surfaces / elevation used: `--md-surface-container-high` with `--md-elev-2`.
-- Components used: guide rail, checklist task buttons, text buttons, primary button, and
-  screenshot-backed guide steps.
-- Color roles used: primary for step indexes and primary actions, secondary container for
-  hover state layers, primary container for signed-in/save status and archive note.
-- Feature-specific layout: desktop uses a left-side guide rail so it reads as product
-  guidance instead of a bottom popup; mobile uses a bottom sheet with dynamic offset above
-  inspector/style sheets.
+- Surfaces / elevation used: desktop uses a docked side sheet on `--md-surface` with a
+  subtle right divider and `--md-elev-1`; mobile uses a full-screen setup sheet.
+- Components used: side sheet, section actions, text buttons, primary buttons, status chip,
+  and screenshot-backed guide steps.
+- Color roles used: primary for actions and guide indexes, primary container for the account
+  save section, surface containers for guide step items.
+- Feature-specific layout: the panel is docked to the app edge so it reads as a first-run
+  workspace setup surface instead of a dismissible popup. The full LinkedIn guide is visible
+  in the same scroll surface.
 - Known gaps vs. the Material 3 target: the component still lives close to `App.tsx`
   state and should move into a feature folder if onboarding grows.
 

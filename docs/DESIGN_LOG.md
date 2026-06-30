@@ -865,9 +865,14 @@ rediscover, write it here.
 - Why: Pan/zoom/move/resize instructions are obvious in this product context, while account
   save and LinkedIn import are the value-critical actions users need to discover early.
 - Decision: Changed the onboarding surface from a small close-icon card into a left-side
-  guide rail on desktop and a bottom sheet on mobile, with `Not now` as the dismiss action.
-- Why: The old close icon made the guide look like a popup to dismiss. The guide rail reads
-  as part of the product workflow and leaves the primary board visible.
+  setup sheet on desktop and a full-screen setup sheet on mobile, with `Not now` as the
+  dismiss action.
+- Why: The old close icon made the guide look like a popup to dismiss. The setup sheet reads
+  as part of the product workflow and leaves the primary board visible on desktop.
+- Decision: Removed step navigation from onboarding. The account save action, LinkedIn URL
+  import, and full archive guide now appear together on the first onboarding surface.
+- Why: The important actions should be visible immediately; hiding the archive guide behind
+  `Next` still made it feel secondary.
 - Decision: Moved the LinkedIn sync steps into shared `LINKEDIN_GUIDE_STEPS` data and render
   the complete screenshot-backed guide inline in onboarding as well as in Settings.
 - Why: The archive-import guide was hidden behind a small Settings help button even though it

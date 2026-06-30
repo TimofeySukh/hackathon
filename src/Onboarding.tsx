@@ -1,12 +1,7 @@
-// A product-first onboarding guide. It focuses on the durable setup actions that
-// make the board useful: account save, adding people by LinkedIn link, and the
-// full LinkedIn archive import guide. Step data + types live in ./onboardingSteps.
-import {
-  ONBOARDING_STEPS,
-  ONBOARDING_DONE_STEP,
-  ONBOARDING_PROGRESS_STEPS,
-} from './onboardingSteps'
+// First-run setup for the actions that make a blank board valuable: save the
+// graph, add people from LinkedIn profile URLs, and import the LinkedIn archive.
 import { LINKEDIN_GUIDE_STEPS } from './linkedinGuideSteps'
+import { ONBOARDING_DONE_STEP, ONBOARDING_STEPS } from './onboardingSteps'
 
 const EXAMPLE_PROFILE_URL = 'www.linkedin.com/in/velizar-seleznev'
 
@@ -29,7 +24,6 @@ export function OnboardingCoach({
   step,
   celebrating,
   onNext,
-  onBack,
   onSkip,
   onOpenSearch,
   onOpenSignIn,
@@ -50,129 +44,94 @@ export function OnboardingCoach({
         style={offset > 0 ? { bottom: `${offset + 12}px` } : undefined}
       >
         <span className="onboarding-coach__cheer-check" aria-hidden="true">✓</span>
-        <strong className="onboarding-coach__cheer-text">Great!</strong>
+        <strong className="onboarding-coach__cheer-text">Added</strong>
       </div>
     )
   }
 
   const isDone = step === ONBOARDING_DONE_STEP
-  const showProgress = ONBOARDING_PROGRESS_STEPS.includes(step)
-  const canGoBack = step > 0 && step < ONBOARDING_DONE_STEP
 
-  function renderPrimary() {
-    switch (current.cta) {
-      case 'start':
-        return (
-          <button type="button" className="onboarding-coach__primary" onClick={onNext}>
-            Show me
-          </button>
-        )
-      case 'open-signin':
-        return (
-          <button type="button" className="onboarding-coach__primary" onClick={onOpenSignIn}>
-            Sign in
-          </button>
-        )
-      case 'try-profile-link':
-        return (
-          <button type="button" className="onboarding-coach__primary" onClick={() => onOpenSearch(EXAMPLE_PROFILE_URL)}>
-            Try profile link
-          </button>
-        )
-      case 'import-zip':
-        return (
-          <button type="button" className="onboarding-coach__primary" onClick={onImportLinkedInZip}>
-            Import LinkedIn ZIP
-          </button>
-        )
-      case 'done':
-        return (
+  if (isDone) {
+    return (
+      <aside
+        className="onboarding-coach onboarding-coach--done"
+        aria-label="Getting started complete"
+        aria-live="polite"
+        style={offset > 0 ? { bottom: `${offset + 12}px` } : undefined}
+      >
+        <span className="onboarding-coach__eyebrow">{current.eyebrow}</span>
+        <strong className="onboarding-coach__title">{current.title}</strong>
+        <p className="onboarding-coach__body">{current.body}</p>
+        <div className="onboarding-coach__footer">
+          <span />
           <button type="button" className="onboarding-coach__primary" onClick={onNext}>
             Done
           </button>
-        )
-      default:
-        return null
-    }
-  }
-
-  function renderBodyText(text: string) {
-    const urlPattern = /(https?:\/\/[^\s]+|www\.[^\s]+)/g
-    const parts = text.split(urlPattern)
-    return parts.map((part, index) => {
-      if (urlPattern.test(part)) {
-        const cleanUrl = part.replace(/[),.;]+$/, '')
-        return (
-          <button
-            key={index}
-            type="button"
-            className="onboarding-coach__link-btn"
-            onClick={() => onOpenSearch(cleanUrl)}
-          >
-            {part}
-          </button>
-        )
-      }
-      return part
-    })
-  }
-
-  function renderOverview() {
-    if (current.layout !== 'overview') return null
-    return (
-      <div className="onboarding-coach__overview">
-        <button
-          type="button"
-          className={`onboarding-coach__task ${isSignedIn ? 'is-done' : ''}`}
-          onClick={isSignedIn ? undefined : onOpenSignIn}
-        >
-          <span className="onboarding-coach__task-index">{isSignedIn ? '✓' : '1'}</span>
-          <span>
-            <strong>{isSignedIn ? 'Board is saved' : 'Sign in to save'}</strong>
-            <small>{isSignedIn ? 'Your changes sync across devices.' : 'Keep local editing, but claim the graph before serious import.'}</small>
-          </span>
-        </button>
-        <button
-          type="button"
-          className="onboarding-coach__task"
-          onClick={() => onOpenSearch(EXAMPLE_PROFILE_URL)}
-        >
-          <span className="onboarding-coach__task-index">2</span>
-          <span>
-            <strong>Add one person by URL</strong>
-            <small>Paste a LinkedIn profile link in Search to create a contact.</small>
-          </span>
-        </button>
-        <button
-          type="button"
-          className="onboarding-coach__task"
-          onClick={onNext}
-        >
-          <span className="onboarding-coach__task-index">3</span>
-          <span>
-            <strong>Import the archive</strong>
-            <small>Use the full LinkedIn guide for a complete network import.</small>
-          </span>
-        </button>
-      </div>
+        </div>
+      </aside>
     )
   }
 
-  function renderLinkedInGuide() {
-    if (current.layout !== 'linkedin-guide') return null
-    return (
-      <div className="onboarding-coach__guide">
-        <div className="onboarding-coach__guide-actions">
-          <button type="button" className="onboarding-coach__primary onboarding-coach__primary--compact" onClick={onImportLinkedInZip}>
-            Import LinkedIn ZIP
-          </button>
-          <button type="button" className="onboarding-coach__secondary" onClick={onOpenLinkedInGuide}>
-            Open in Settings
-          </button>
-          <button type="button" className="onboarding-coach__secondary" onClick={() => onOpenSearch(EXAMPLE_PROFILE_URL)}>
-            Add by link instead
-          </button>
+  return (
+    <aside
+      className="onboarding-coach onboarding-coach--setup"
+      aria-label="Getting started"
+      aria-live="polite"
+      style={offset > 0 ? { bottom: `${offset + 12}px` } : undefined}
+    >
+      <header className="onboarding-coach__header">
+        <span className="onboarding-coach__eyebrow">{current.eyebrow}</span>
+        <strong className="onboarding-coach__title">{current.title}</strong>
+        <p className="onboarding-coach__body">{current.body}</p>
+      </header>
+
+      <section className="onboarding-coach__save">
+        <div>
+          <span className="onboarding-coach__section-kicker">Account</span>
+          <h3>{isSignedIn ? 'Your board is saved' : 'Save the board before importing'}</h3>
+          <p>
+            {isSignedIn
+              ? 'This graph syncs across devices as you add people.'
+              : 'Anonymous boards stay in this browser. Sign in before importing a large archive.'}
+          </p>
         </div>
+        {isSignedIn ? (
+          <span className="onboarding-coach__status">Signed in</span>
+        ) : (
+          <button type="button" className="onboarding-coach__primary" onClick={onOpenSignIn}>
+            Sign in
+          </button>
+        )}
+      </section>
+
+      <section className="onboarding-coach__link-import">
+        <div>
+          <span className="onboarding-coach__section-kicker">Quick add</span>
+          <h3>Add a person from a LinkedIn URL</h3>
+          <p>Paste a profile link into Search. DataNode creates the person, company circle, notes, and saved link.</p>
+        </div>
+        <button type="button" className="onboarding-coach__primary" onClick={() => onOpenSearch(EXAMPLE_PROFILE_URL)}>
+          Try profile link
+        </button>
+      </section>
+
+      <section className="onboarding-coach__archive">
+        <div className="onboarding-coach__archive-header">
+          <div>
+            <span className="onboarding-coach__section-kicker">Full import</span>
+            <h2>How to sync your LinkedIn</h2>
+            <p>Request the larger LinkedIn archive, wait for the email, then upload the ZIP here.</p>
+          </div>
+          <div className="onboarding-coach__archive-actions">
+            <button type="button" className="onboarding-coach__primary" onClick={onImportLinkedInZip}>
+              Import ZIP
+            </button>
+            <button type="button" className="onboarding-coach__secondary" onClick={onOpenLinkedInGuide}>
+              Open guide
+            </button>
+          </div>
+        </div>
+
         <div className="onboarding-coach__guide-steps">
           {LINKEDIN_GUIDE_STEPS.map((guideStep) => (
             <article key={guideStep.n} className="onboarding-coach__guide-step">
@@ -187,59 +146,13 @@ export function OnboardingCoach({
             </article>
           ))}
         </div>
-        <p className="onboarding-coach__note">
-          Wait up to 24 hours. LinkedIn will email you when the archive is ready. Then come back and upload the ZIP.
-        </p>
-      </div>
-    )
-  }
+      </section>
 
-  return (
-    <div
-      className="onboarding-coach"
-      role="complementary"
-      aria-label="Getting started"
-      aria-live="polite"
-      style={offset > 0 ? { bottom: `${offset + 12}px` } : undefined}
-    >
-      {current.eyebrow && <span className="onboarding-coach__eyebrow">{current.eyebrow}</span>}
-      <strong className="onboarding-coach__title">{current.title}</strong>
-      <p className="onboarding-coach__body">{renderBodyText(current.body)}</p>
-      {renderOverview()}
-      {renderLinkedInGuide()}
-
-      <div className="onboarding-coach__footer">
-        {showProgress ? (
-          <div className="onboarding-coach__dots" aria-hidden="true">
-            {ONBOARDING_PROGRESS_STEPS.map((i) => (
-              <span
-                key={i}
-                className={`onboarding-coach__dot ${i === step ? 'is-active' : ''} ${i < step ? 'is-done' : ''}`}
-              />
-            ))}
-          </div>
-        ) : (
-          <span />
-        )}
-        <div className="onboarding-coach__actions">
-          {canGoBack && (
-            <button type="button" className="onboarding-coach__back" onClick={onBack}>
-              ← Back
-            </button>
-          )}
-          {!isDone && step > 0 && (
-            <button type="button" className="onboarding-coach__skip" onClick={onNext}>
-              Next
-            </button>
-          )}
-          {!isDone && (
-            <button type="button" className="onboarding-coach__skip" onClick={onSkip}>
-              Not now
-            </button>
-          )}
-          {renderPrimary()}
-        </div>
-      </div>
-    </div>
+      <footer className="onboarding-coach__footer">
+        <button type="button" className="onboarding-coach__skip" onClick={onSkip}>
+          Not now
+        </button>
+      </footer>
+    </aside>
   )
 }
