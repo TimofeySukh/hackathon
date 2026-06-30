@@ -16,12 +16,34 @@ const getStatus = (session: Session | null): AuthStatus => (session ? 'authentic
 const AUTH_RETURN_HASH_KEY = 'sdn.authReturnHash'
 const AUTH_RETURN_EXPIRES_KEY = 'sdn.authReturnHashExpiresAt'
 const AUTH_RETURN_TTL_MS = 10 * 60 * 1000
+const AUTH_RETURN_SEARCH_PARAM = 'sdn_auth_return'
+const BOARD_AUTH_RETURN_VALUE = 'board'
 
 function getAuthRedirectUrl() {
-  return window.location.origin + window.location.pathname
+  const url = new URL(window.location.origin + window.location.pathname)
+  url.searchParams.set(AUTH_RETURN_SEARCH_PARAM, BOARD_AUTH_RETURN_VALUE)
+  return url.toString()
+}
+
+function readUrlAuthReturnHash() {
+  const params = new URLSearchParams(window.location.search)
+  return params.get(AUTH_RETURN_SEARCH_PARAM) === BOARD_AUTH_RETURN_VALUE ? '#board' : null
+}
+
+function clearUrlAuthReturnHash() {
+  if (!window.location.search.includes(AUTH_RETURN_SEARCH_PARAM)) return
+
+  const url = new URL(window.location.href)
+  url.searchParams.delete(AUTH_RETURN_SEARCH_PARAM)
+  const query = url.searchParams.toString()
+  const cleanUrl = `${url.pathname}${query ? `?${query}` : ''}${url.hash}`
+  window.history.replaceState(window.history.state, '', cleanUrl)
 }
 
 function readAuthReturnHash() {
+  const urlReturnHash = readUrlAuthReturnHash()
+  if (urlReturnHash) return urlReturnHash
+
   const expiresAt = Number(window.sessionStorage.getItem(AUTH_RETURN_EXPIRES_KEY) || 0)
   if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
     window.sessionStorage.removeItem(AUTH_RETURN_HASH_KEY)
@@ -46,6 +68,7 @@ export function consumeAuthReturnHash() {
   const hash = readAuthReturnHash()
   window.sessionStorage.removeItem(AUTH_RETURN_HASH_KEY)
   window.sessionStorage.removeItem(AUTH_RETURN_EXPIRES_KEY)
+  clearUrlAuthReturnHash()
   return hash
 }
 
