@@ -13,7 +13,7 @@ import googleIcon from './assets/brands/google.svg'
 import sdnLogo from './assets/sdn-logo.svg'
 
 zip.configure({ useWebWorkers: false })
-import { useAuth } from './lib/useAuth'
+import { consumeAuthReturnHash, hasPendingBoardAuthReturn, useAuth } from './lib/useAuth'
 import LandingPage from './LandingPage'
 import ContactPage from './ContactPage'
 import PrivacyPage from './PrivacyPage'
@@ -530,7 +530,7 @@ function markLocalFlag(key: string) {
 }
 
 
-function AuthPrivacyNotice() {
+function AuthPrivacyNotice({ onOpenPrivacy }: { onOpenPrivacy: () => void }) {
   return (
     <p className="auth-card__privacy">
       By creating an account, you agree to our{' '}
@@ -538,7 +538,7 @@ function AuthPrivacyNotice() {
         href="#privacy"
         onClick={(event) => {
           event.preventDefault()
-          window.location.hash = '#privacy'
+          onOpenPrivacy()
         }}
       >
         Privacy Policy
@@ -551,6 +551,7 @@ function AuthPrivacyNotice() {
 function App() {
   const [viewMode, setViewMode] = useState<'landing' | 'board' | 'docs' | 'contact' | 'privacy'>(() => {
     if (window.location.hash === '#board') return 'board';
+    if (!window.location.hash && hasPendingBoardAuthReturn()) return 'board';
     if (window.location.hash === '#docs' || window.location.hash.startsWith('#docs/')) return 'docs';
     if (window.location.hash === '#contact') return 'contact';
     if (window.location.hash === '#privacy') return 'privacy';
@@ -614,9 +615,17 @@ function App() {
   const auth = useAuth()
   const userId = auth.session?.user?.id ?? null
 
-  // Redirect authenticated users from landing page to the board.
+  // Redirect authenticated users from the auth callback route to the board.
   useEffect(() => {
-    if (auth.status === 'authenticated' && viewMode === 'landing') {
+    if (auth.status !== 'authenticated') return
+
+    const authReturnHash = consumeAuthReturnHash()
+    if (authReturnHash) {
+      window.location.hash = authReturnHash
+      return
+    }
+
+    if (viewMode === 'landing') {
       window.location.hash = '#board'
     }
   }, [auth.status, viewMode])
@@ -3960,7 +3969,7 @@ function App() {
           ? 'Send reset link'
           : authDialogMode === 'update'
             ? 'Update password'
-            : 'Sign in with email'
+          : 'Sign in with email'
   const agentApiUrl = getGraphApiBaseUrl() ?? ''
   const agentTokenForInstructions = newAgentToken ?? '<create-a-key-first>'
   const agentCopyInstruction = `You are allowed to connect to my DataNode graph through MCP.
@@ -4044,6 +4053,14 @@ Content-Type: application/json
   "name": "Alice Chen",
   "notes": [{ "body": "Met at conference" }]
 }`
+
+  function openPrivacyFromAuthDialog() {
+    setEmailAuthNotice(null)
+    setEmailAuthError(null)
+    auth.clearError()
+    setShowSignInModal(false)
+    window.location.hash = '#privacy'
+  }
 
 
 
@@ -4248,7 +4265,9 @@ Content-Type: application/json
               {(emailAuthError || (authDialogMode !== 'reset' ? auth.error : null)) && (
                 <p className="auth-card__error" role="alert">{emailAuthError || auth.error}</p>
               )}
-              {(authDialogMode === 'signin' || authDialogMode === 'signup') && <AuthPrivacyNotice />}
+              {(authDialogMode === 'signin' || authDialogMode === 'signup') && (
+                <AuthPrivacyNotice onOpenPrivacy={openPrivacyFromAuthDialog} />
+              )}
             </div>
           </div>
         )}
@@ -6032,7 +6051,9 @@ Content-Type: application/json
             {(emailAuthError || (authDialogMode !== 'reset' ? auth.error : null)) && (
               <p className="auth-card__error" role="alert">{emailAuthError || auth.error}</p>
             )}
-            {(authDialogMode === 'signin' || authDialogMode === 'signup') && <AuthPrivacyNotice />}
+            {(authDialogMode === 'signin' || authDialogMode === 'signup') && (
+              <AuthPrivacyNotice onOpenPrivacy={openPrivacyFromAuthDialog} />
+            )}
           </div>
         </div>
       )}

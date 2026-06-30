@@ -13,9 +13,40 @@ type AuthState = {
 }
 
 const getStatus = (session: Session | null): AuthStatus => (session ? 'authenticated' : 'anonymous')
+const AUTH_RETURN_HASH_KEY = 'sdn.authReturnHash'
+const AUTH_RETURN_EXPIRES_KEY = 'sdn.authReturnHashExpiresAt'
+const AUTH_RETURN_TTL_MS = 10 * 60 * 1000
 
 function getAuthRedirectUrl() {
   return window.location.origin + window.location.pathname
+}
+
+function readAuthReturnHash() {
+  const expiresAt = Number(window.sessionStorage.getItem(AUTH_RETURN_EXPIRES_KEY) || 0)
+  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+    window.sessionStorage.removeItem(AUTH_RETURN_HASH_KEY)
+    window.sessionStorage.removeItem(AUTH_RETURN_EXPIRES_KEY)
+    return null
+  }
+
+  const hash = window.sessionStorage.getItem(AUTH_RETURN_HASH_KEY)
+  return hash?.startsWith('#') ? hash : null
+}
+
+export function hasPendingBoardAuthReturn() {
+  return readAuthReturnHash() === '#board'
+}
+
+function rememberBoardAuthReturn() {
+  window.sessionStorage.setItem(AUTH_RETURN_HASH_KEY, '#board')
+  window.sessionStorage.setItem(AUTH_RETURN_EXPIRES_KEY, String(Date.now() + AUTH_RETURN_TTL_MS))
+}
+
+export function consumeAuthReturnHash() {
+  const hash = readAuthReturnHash()
+  window.sessionStorage.removeItem(AUTH_RETURN_HASH_KEY)
+  window.sessionStorage.removeItem(AUTH_RETURN_EXPIRES_KEY)
+  return hash
 }
 
 function createE2EFakeSession(): Session {
@@ -55,8 +86,15 @@ export function useAuth() {
     if (!supabase) return undefined
 
     let isMounted = true
+    let latestAuthenticatedSession: Session | null = null
 
     const loadWorkspace = async (session: Session | null) => {
+      if (session?.user) {
+        latestAuthenticatedSession = session
+      } else if (latestAuthenticatedSession) {
+        return
+      }
+
       if (!session?.user) {
         if (isMounted) {
           setAuthState({
@@ -79,53 +117,15 @@ export function useAuth() {
       }
     }
 
-    const sessionTimeout = setTimeout(() => {
-      if (isMounted) {
-        setAuthState((current) => {
-          if (current.status === 'loading') {
-            console.warn('Supabase session fetch timed out, falling back to local mode.')
-            return {
-              session: null,
-              status: 'anonymous',
-              error: 'Session fetch timed out',
-              isPasswordRecovery: false,
-            }
-          }
-          return current
-        })
-      }
-    }, 1500)
-
-    supabase.auth.getSession().then(({ data, error }) => {
-      clearTimeout(sessionTimeout)
-      if (!isMounted) return
-
-      if (error) {
-        setAuthState({
-          session: null,
-          status: 'anonymous',
-          error: error.message,
-          isPasswordRecovery: false,
-        })
-        return
-      }
-
-      void loadWorkspace(data.session)
-    }).catch((err) => {
-      clearTimeout(sessionTimeout)
-      if (!isMounted) return
-      console.error('Failed to get session:', err)
-      setAuthState({
-        session: null,
-        status: 'anonymous',
-        error: err instanceof Error ? err.message : String(err),
-        isPasswordRecovery: false,
-      })
-    })
-
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        latestAuthenticatedSession = null
+        void loadWorkspace(null)
+        return
+      }
+
       if (event === 'PASSWORD_RECOVERY') {
         setAuthState((current) => ({
           ...current,
@@ -140,6 +140,31 @@ export function useAuth() {
       void loadWorkspace(session)
     })
 
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (!isMounted) return
+
+      if (error) {
+        setAuthState({
+          session: null,
+          status: 'anonymous',
+          error: error.message,
+          isPasswordRecovery: false,
+        })
+        return
+      }
+
+      void loadWorkspace(data.session)
+    }).catch((err) => {
+      if (!isMounted) return
+      console.error('Failed to get session:', err)
+      setAuthState({
+        session: null,
+        status: 'anonymous',
+        error: err instanceof Error ? err.message : String(err),
+        isPasswordRecovery: false,
+      })
+    })
+
     return () => {
       isMounted = false
       subscription.unsubscribe()
@@ -149,6 +174,7 @@ export function useAuth() {
   const signInWithGoogle = async () => {
     if (!supabase) return
 
+    rememberBoardAuthReturn()
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -171,6 +197,7 @@ export function useAuth() {
       return { error: error.message }
     }
 
+    rememberBoardAuthReturn()
     return { error: null }
   }
 
@@ -199,6 +226,10 @@ export function useAuth() {
 
     // When email confirmation is required, Supabase returns a user but no session.
     const needsConfirmation = Boolean(data.user && !data.session && !alreadyRegistered)
+
+    if (data.session) {
+      rememberBoardAuthReturn()
+    }
 
     return { error: null, needsConfirmation, alreadyRegistered }
   }
@@ -245,6 +276,7 @@ export function useAuth() {
       return { error: error.message }
     }
 
+    rememberBoardAuthReturn()
     setAuthState((currentState) => ({ ...currentState, error: null, isPasswordRecovery: false }))
     return { error: null }
   }
@@ -264,6 +296,8 @@ export function useAuth() {
 
     if (error) {
       setAuthState((currentState) => ({ ...currentState, error: error.message }))
+    } else {
+      consumeAuthReturnHash()
     }
   }
 

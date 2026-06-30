@@ -24,6 +24,9 @@ password so a database user is created without forcing profile setup.
   a hash fragment. The app moves authenticated users from the landing page to `#board`
   only after Supabase has detected a valid session, so auth callback fragments are not
   mixed with the hash router.
+- Login attempts remember a short-lived board return target in `sessionStorage`. OAuth
+  callbacks that arrive at the clean app URL render the board route while Supabase
+  restores the session, avoiding a landing-page flash or a false signed-out prompt.
 - After a successful password update, the dialog stays open in a final success state so the
   user sees that the password changed and the session is active.
 - New passwords require at least 8 characters, with no composition rule.
