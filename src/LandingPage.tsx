@@ -222,18 +222,13 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
                 Open board
               </button>
             </div>
-            <button
-              type="button"
-              className="board-preview-frame board-preview-shot-btn"
-              onClick={handleLaunchApp}
-              aria-label="Open board"
-            >
+            <figure className="board-preview-frame" aria-label="Product preview">
               <img
                 src={productBoardInspector}
-                alt=""
+                alt="Social Datanode board preview with the person inspector open"
                 className="board-preview-image"
               />
-            </button>
+            </figure>
           </div>
         </section>
 

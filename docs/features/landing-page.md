@@ -62,11 +62,14 @@ Required elements:
 1. Header at the top.
 2. A real product screenshot of the board with the inspector open.
 3. A short headline, lead line, and three deck-style slogans beside the screenshot.
-4. A single primary **Open board** button and a clickable product screenshot.
+4. A single primary **Open board** button.
 
 Do not bring back the stepped-path ribbon as the main hero element.
 
 The three slogans should stay as compact deck cards, not oversized feature cards.
+
+The product screenshot is a visual preview only. Clicking it must not open the board or
+perform any navigation; the button owns the hero CTA.
 
 The hero copy must clearly introduce the user problem and the product answer:
 people often keep relationship context in their head or in flat spreadsheets, while
@@ -121,7 +124,7 @@ After the hero, the landing page includes:
 5. **Core Capabilities** — five human-readable scatter cards; the agent card links to Docs.
 6. **LinkedIn import** — deck cards describing the import flow.
 
-The hero is the only primary board CTA: an **Open board** button plus a clickable product screenshot.
+The hero is the only primary board CTA: an **Open board** button beside the non-clickable product screenshot.
 
 Deck cards across these sections share the white rounded-card, slight rotation,
 and hover straightening behavior from the hero slogan stack.

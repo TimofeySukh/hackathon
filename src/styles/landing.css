@@ -236,22 +236,6 @@
   padding: 0 28px;
 }
 
-.board-preview-shot-btn {
-  display: block;
-  margin: 0;
-  padding: 6px;
-  border: 1px solid rgba(195, 199, 207, 0.45);
-  background: var(--lp-surface);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.board-preview-shot-btn:focus-visible {
-  outline: 2px solid var(--lp-primary);
-  outline-offset: 3px;
-}
-
 /* Interactive Demo Inspector Section */
 .interactive-demo-section {
   border-top: 1px solid rgba(195, 199, 207, 0.5);
@@ -1269,8 +1253,7 @@
     margin-right: auto;
   }
 
-  .board-preview-frame,
-  .board-preview-shot-btn {
+  .board-preview-frame {
     transform: none;
     max-width: min(100%, 980px);
     margin: 0 auto;
