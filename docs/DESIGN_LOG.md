@@ -17,6 +17,15 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-06-30 — Keep Supabase auth callbacks off the hash router
+
+- Decision: Google OAuth, email confirmation, and password recovery callbacks now return
+  to the clean app origin/path without `#board`; the app redirects authenticated users
+  to `#board` only after Supabase has restored the session.
+- Why: Supabase Auth uses callback URL parameters/fragments to exchange or detect the
+  session. Mixing those callback values with the app's hash router can leave production
+  users back on the landing page as anonymous after sign-in.
+
 ### 2026-06-29 — LinkedIn Company Imports Use Stable Mixed Tones
 
 - Decision: new LinkedIn company circles get a deterministic tone from the circle palette

@@ -473,8 +473,10 @@ Configure Supabase Auth redirect URLs for each app URL used by the team, includi
 - `http://10.29.0.117:5175`
 - the deployed production URL
 
-The app redirects Google OAuth, email confirmation, and password recovery back to
-`window.location.origin`, so each origin must be allowlisted in Supabase.
+The app redirects Google OAuth, email confirmation, and password recovery back to the
+clean app origin/path without a hash fragment. Each origin used by the team must be
+allowlisted in Supabase. Do not include `#board` in Supabase callback URLs; the client
+navigates to `#board` only after Supabase has restored a valid session.
 For a stable multi-device login flow, prefer one deployed frontend origin on your server instead of ad-hoc local ports.
 
 If a teammate runs Vite on a different port such as `5173`, `5174`, or `5175`, or opens the app through a LAN IP instead of `localhost`, that exact origin must be in the Supabase Auth URL configuration.

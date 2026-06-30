@@ -14,6 +14,10 @@ type AuthState = {
 
 const getStatus = (session: Session | null): AuthStatus => (session ? 'authenticated' : 'anonymous')
 
+function getAuthRedirectUrl() {
+  return window.location.origin + window.location.pathname
+}
+
 function createE2EFakeSession(): Session {
   const nowIso = new Date().toISOString()
   return {
@@ -148,7 +152,7 @@ export function useAuth() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin + window.location.pathname + '#board',
+        redirectTo: getAuthRedirectUrl(),
       },
     })
 
@@ -179,7 +183,7 @@ export function useAuth() {
       email,
       password,
       options: {
-        emailRedirectTo: window.location.origin + window.location.pathname + '#board',
+        emailRedirectTo: getAuthRedirectUrl(),
       },
     })
 
@@ -206,7 +210,7 @@ export function useAuth() {
       type: 'signup',
       email,
       options: {
-        emailRedirectTo: window.location.origin + window.location.pathname + '#board',
+        emailRedirectTo: getAuthRedirectUrl(),
       },
     })
 
@@ -221,7 +225,7 @@ export function useAuth() {
     if (!supabase) return { error: 'Auth is not configured.' as string | null }
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin + window.location.pathname + '#board',
+      redirectTo: getAuthRedirectUrl(),
     })
 
     if (error) {
