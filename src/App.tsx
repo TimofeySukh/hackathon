@@ -1172,6 +1172,7 @@ function App() {
   // Without this, pointermove fires immediately for any mouse movement,
   // stripping the CSS transition before the thumb has a chance to animate.
   const pickerDownRef = useRef<{ x: number; y: number; moved: boolean } | null>(null)
+  const pendingSelectRef = useRef<SelectedItem | null>(null)
   const [selectedPeopleIds, setSelectedPeopleIds] = useState<string[]>([])
   const [selectedCircleIds, setSelectedCircleIds] = useState<string[]>([])
   const [hoveredPersonId, setHoveredPersonId] = useState<string | null>(null)
@@ -3059,10 +3060,10 @@ function App() {
           })
           selectItem(null)
         } else {
+          pendingSelectRef.current = { type: 'person', id: hit.person.id }
           if (!selectedPeopleIds.includes(hit.person.id)) {
             setSelectedPeopleIds([])
             setSelectedCircleIds([])
-            selectItem({ type: 'person', id: hit.person.id })
           }
           startPersonMove(event, hit.person)
         }
@@ -3101,13 +3102,11 @@ function App() {
           })
           selectItem(null)
         } else {
+          pendingSelectRef.current = { type: 'circle', id: hit.circle.id, showHandles: true }
           if (!selectedCircleIds.includes(hit.circle.id)) {
             setSelectedPeopleIds([])
             setSelectedCircleIds([])
           }
-          selectItem({ type: 'circle', id: hit.circle.id, showHandles: true })
-          // When this zone is part of a multi/mixed selection, grabbing its center
-          // drags the whole group instead of starting a connector.
           const isGroupDrag =
             selectedCircleIds.includes(hit.circle.id) &&
             selectedCircleIds.length + selectedPeopleIds.length > 1
@@ -3128,6 +3127,7 @@ function App() {
         selectItem(null)
       }
       setOpenNotesPersonId(null)
+      pendingSelectRef.current = null
       const marqueeState = {
         startX: event.clientX,
         startY: event.clientY,
@@ -3142,6 +3142,7 @@ function App() {
     if (hit?.type === 'circle-edge') {
       setSelectedPeopleIds([])
       setSelectedCircleIds([])
+      pendingSelectRef.current = null
       startCircleResize(event, hit.circle)
       return
     }
@@ -3162,10 +3163,10 @@ function App() {
         })
         selectItem(null)
       } else {
+        pendingSelectRef.current = { type: 'circle', id: hit.circle.id, showHandles: false }
         if (!selectedCircleIds.includes(hit.circle.id)) {
           setSelectedPeopleIds([])
           setSelectedCircleIds([])
-          selectItem({ type: 'circle', id: hit.circle.id, showHandles: false })
         }
         startCircleMove(event, hit.circle)
       }
@@ -3175,7 +3176,21 @@ function App() {
     if (hit?.type === 'connection') {
       setSelectedPeopleIds([])
       setSelectedCircleIds([])
-      selectItem({ type: 'connection', id: hit.connection.id })
+      pendingSelectRef.current = { type: 'connection', id: hit.connection.id }
+      event.currentTarget.setPointerCapture(event.pointerId)
+      panRef.current = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        originX: cameraRef.current.x,
+        originY: cameraRef.current.y,
+        lastX: event.clientX,
+        lastY: event.clientY,
+        lastT: event.timeStamp,
+        velocityX: 0,
+        velocityY: 0,
+        moved: false,
+      }
       return
     }
 
@@ -3183,6 +3198,7 @@ function App() {
     setSelectedCircleIds([])
     selectItem(null)
     setOpenNotesPersonId(null)
+    pendingSelectRef.current = null
     panRef.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -3641,14 +3657,33 @@ function App() {
       settleGesture()
     }
 
-    if (!completedNodeMove && !completedResize && boardToolMode !== 'select') {
-      if (activeMovePerson) {
-        const targetScale = cameraRef.current.scale
-        focusCameraOnWorld(activeMovePerson.originX, activeMovePerson.originY, targetScale)
-      } else if (activeMoveCircle) {
-        const targetScale = cameraRef.current.scale
-        focusCameraOnWorld(activeMoveCircle.originX, activeMoveCircle.originY, targetScale)
+    if (pendingSelectRef.current) {
+      if (boardToolMode !== 'select') {
+        selectItem(pendingSelectRef.current)
+
+        const dragDistance = activeMovePerson
+          ? Math.hypot(event.clientX - activeMovePerson.startX, event.clientY - activeMovePerson.startY)
+          : activeMoveCircle
+            ? Math.hypot(event.clientX - activeMoveCircle.startX, event.clientY - activeMoveCircle.startY)
+            : panRef.current?.pointerId === event.pointerId
+              ? Math.hypot(event.clientX - panRef.current.startX, event.clientY - panRef.current.startY)
+              : 0
+
+        if (dragDistance < 25) {
+          if (pendingSelectRef.current.type === 'person') {
+            const person = graph.people.find((p) => p.id === pendingSelectRef.current!.id)
+            if (person) {
+              focusCameraOnWorld(person.x, person.y, cameraRef.current.scale)
+            }
+          } else if (pendingSelectRef.current.type === 'circle') {
+            const circle = graph.circles.find((c) => c.id === pendingSelectRef.current!.id)
+            if (circle) {
+              focusCameraOnWorld(circle.x, circle.y, cameraRef.current.scale)
+            }
+          }
+        }
       }
+      pendingSelectRef.current = null
     }
 
     // Resolve the connector against its latest endpoint (which may still be queued

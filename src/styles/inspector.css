@@ -324,6 +324,9 @@
     right: 16px;
     bottom: 16px;
     width: auto;
+    max-height: 42vh;
+    max-height: 42dvh;
+    overflow-y: auto;
   }
 
   .help-panel {
