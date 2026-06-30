@@ -1266,7 +1266,7 @@ function App() {
   function focusCameraOnWorld(wx: number, wy: number, targetScale: number) {
     const start = { ...cameraRef.current }
     const cx = window.innerWidth / 2
-    const cy = window.innerHeight * 0.44
+    const cy = window.innerWidth <= 720 ? window.innerHeight * 0.22 : window.innerHeight * 0.44
     const end = { x: cx - wx * targetScale, y: cy - wy * targetScale, scale: targetScale }
     if (focusAnimRef.current != null) window.cancelAnimationFrame(focusAnimRef.current)
     // eslint-disable-next-line react-hooks/purity -- animation start time is read from an event handler, not render.
@@ -3187,8 +3187,8 @@ function App() {
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
-      originX: camera.x,
-      originY: camera.y,
+      originX: cameraRef.current.x,
+      originY: cameraRef.current.y,
       lastX: event.clientX,
       lastY: event.clientY,
       lastT: event.timeStamp,
@@ -3639,6 +3639,16 @@ function App() {
       })
       isRightClickDragRef.current = false
       settleGesture()
+    }
+
+    if (!completedNodeMove && !completedResize && boardToolMode !== 'select') {
+      if (activeMovePerson) {
+        const targetScale = cameraRef.current.scale
+        focusCameraOnWorld(activeMovePerson.originX, activeMovePerson.originY, targetScale)
+      } else if (activeMoveCircle) {
+        const targetScale = cameraRef.current.scale
+        focusCameraOnWorld(activeMoveCircle.originX, activeMoveCircle.originY, targetScale)
+      }
     }
 
     // Resolve the connector against its latest endpoint (which may still be queued

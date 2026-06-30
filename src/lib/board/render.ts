@@ -102,8 +102,7 @@ function getCircleLabelLayout(ctx: CanvasRenderingContext2D, name: string): { el
 }
 
 
-const PERSON_DETAIL_SCALE = 0.72
-const PERSON_DOT_VISIBLE_LIMIT = 260
+
 const PEOPLE_EDGE_VISIBLE_LIMIT = 420
 const CIRCLE_TINY_SCREEN_RADIUS = 10
 
@@ -499,9 +498,7 @@ export function drawBoardLayer(
   const visibleCircleIds = new Set(visibleCircles.map((circle) => circle.id))
   const visiblePeopleIds = new Set(visiblePeople.map((person) => person.id))
   const performanceMode = options.performanceMode === true
-  const dotPeople =
-    camera.scale < PERSON_DETAIL_SCALE &&
-    visiblePeople.length > PERSON_DOT_VISIBLE_LIMIT
+  const dotPeople = false
   const skipMembershipEdges =
     performanceMode ||
     dotPeople ||
