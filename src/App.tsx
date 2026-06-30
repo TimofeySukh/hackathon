@@ -26,7 +26,6 @@ import { enrichLinkedInProfile } from './lib/linkedinEnrichment'
 import { searchGraphByQuery } from './lib/search/graphSearch'
 import { mapSmartSearchResults, shouldUseSmartSearch, smartSearchGraph, type AgentSearchStep } from './lib/smartSearch'
 import { OnboardingCoach } from './Onboarding'
-import { LINKEDIN_GUIDE_STEPS } from './linkedinGuideSteps'
 import { SelectionIndicator } from './components/SelectionIndicator'
 import { M3Slider } from './components/M3Slider'
 import { ONBOARDING_STEPS, ONBOARDING_DONE_STEP } from './onboardingSteps'
@@ -4857,7 +4856,32 @@ Content-Type: application/json
             <strong className="linkedin-guide-panel__title">How to sync your LinkedIn</strong>
           </div>
           <div className="linkedin-guide-panel__steps">
-            {LINKEDIN_GUIDE_STEPS.map((step) => (
+            {[
+              {
+                n: 1,
+                title: 'Open Settings & Privacy',
+                body: 'Open your LinkedIn profile menu (top-right "Me" icon) and click Settings & Privacy.',
+                img: '/linkedin-sync/settings-privacy.png',
+              },
+              {
+                n: 2,
+                title: 'Open Data privacy',
+                body: 'In Settings, select Data privacy from the left sidebar.',
+                img: '/linkedin-sync/data-privacy.png',
+              },
+              {
+                n: 3,
+                title: 'Open Download my data',
+                body: 'In the data section, press Download your data.',
+                img: '/linkedin-sync/download-data.png',
+              },
+              {
+                n: 4,
+                title: 'Request the larger archive',
+                body: 'Select the larger data archive, then press Request archive.',
+                img: '/linkedin-sync/request-archive.png',
+              },
+            ].map((step) => (
               <div key={step.n} className="linkedin-guide-step">
                 <div className="linkedin-guide-step__copy">
                   <span className="linkedin-guide-step__index">{step.n}</span>
@@ -6171,7 +6195,6 @@ Content-Type: application/json
           onSkip={finishOnboarding}
           onOpenSearch={(query) => {
             setShowSettings(false)
-            setShowLinkedInGuide(false)
             setSearchOpen(true)
             if (query) {
               setSearchQuery(query)
@@ -6179,19 +6202,6 @@ Content-Type: application/json
             }
             window.requestAnimationFrame(() => searchInputRef.current?.focus())
           }}
-          onOpenSignIn={() => {
-            setShowSettings(false)
-            setShowLinkedInGuide(false)
-            closeSearch()
-            openSignInModal()
-          }}
-          onOpenLinkedInGuide={() => {
-            closeSearch()
-            setShowSettings(false)
-            setShowLinkedInGuide(true)
-          }}
-          onImportLinkedInZip={() => fileInputRef.current?.click()}
-          isSignedIn={auth.status === 'authenticated'}
           offset={onboardingOffset}
         />
       )}
