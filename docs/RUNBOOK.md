@@ -478,8 +478,9 @@ clean app origin/path without a hash fragment. Each origin used by the team must
 allowlisted in Supabase. Do not include `#board` in Supabase callback URLs; the client
 navigates to `#board` after Supabase has restored a valid session. Login attempts include
 the `sdn_auth_return=board` callback URL parameter and also store a short-lived board
-return target in browser `sessionStorage`, so an OAuth callback renders the board route
-while the session is restored.
+return target in browser `localStorage` and `sessionStorage`. Supabase callback
+parameters also render the board route while the session is restored, even if the provider
+or allowlist handling drops the custom return parameter.
 For a stable multi-device login flow, prefer one deployed frontend origin on your server instead of ad-hoc local ports.
 
 If a teammate runs Vite on a different port such as `5173`, `5174`, or `5175`, or opens the app through a LAN IP instead of `localhost`, that exact origin must be in the Supabase Auth URL configuration.

@@ -18,6 +18,16 @@ const AUTH_RETURN_EXPIRES_KEY = 'sdn.authReturnHashExpiresAt'
 const AUTH_RETURN_TTL_MS = 10 * 60 * 1000
 const AUTH_RETURN_SEARCH_PARAM = 'sdn_auth_return'
 const BOARD_AUTH_RETURN_VALUE = 'board'
+const AUTH_CALLBACK_PARAMS = new Set([
+  'access_token',
+  'code',
+  'error',
+  'error_code',
+  'error_description',
+  'refresh_token',
+  'type',
+])
+let sawAuthCallbackDuringPageLoad = false
 
 function getAuthRedirectUrl() {
   const url = new URL(window.location.origin + window.location.pathname)
@@ -30,6 +40,17 @@ function readUrlAuthReturnHash() {
   return params.get(AUTH_RETURN_SEARCH_PARAM) === BOARD_AUTH_RETURN_VALUE ? '#board' : null
 }
 
+function hasSupabaseAuthCallbackParams() {
+  const searchParams = new URLSearchParams(window.location.search)
+  const hashParams = new URLSearchParams(window.location.hash.startsWith('#') ? window.location.hash.slice(1) : '')
+
+  for (const param of AUTH_CALLBACK_PARAMS) {
+    if (searchParams.has(param) || hashParams.has(param)) return true
+  }
+
+  return false
+}
+
 function clearUrlAuthReturnHash() {
   if (!window.location.search.includes(AUTH_RETURN_SEARCH_PARAM)) return
 
@@ -40,34 +61,91 @@ function clearUrlAuthReturnHash() {
   window.history.replaceState(window.history.state, '', cleanUrl)
 }
 
+function getStoredAuthReturnHash(storage: Storage) {
+  const expiresAt = Number(storage.getItem(AUTH_RETURN_EXPIRES_KEY) || 0)
+  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+    storage.removeItem(AUTH_RETURN_HASH_KEY)
+    storage.removeItem(AUTH_RETURN_EXPIRES_KEY)
+    return null
+  }
+
+  const hash = storage.getItem(AUTH_RETURN_HASH_KEY)
+  return hash?.startsWith('#') ? hash : null
+}
+
+function readStoredAuthReturnHash() {
+  try {
+    const localHash = getStoredAuthReturnHash(window.localStorage)
+    if (localHash) return localHash
+  } catch {
+    // Ignore storage access errors; the URL callback parameters are still enough.
+  }
+
+  try {
+    return getStoredAuthReturnHash(window.sessionStorage)
+  } catch {
+    return null
+  }
+}
+
 function readAuthReturnHash() {
   const urlReturnHash = readUrlAuthReturnHash()
   if (urlReturnHash) return urlReturnHash
 
-  const expiresAt = Number(window.sessionStorage.getItem(AUTH_RETURN_EXPIRES_KEY) || 0)
-  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
-    window.sessionStorage.removeItem(AUTH_RETURN_HASH_KEY)
-    window.sessionStorage.removeItem(AUTH_RETURN_EXPIRES_KEY)
-    return null
+  const storedReturnHash = readStoredAuthReturnHash()
+  if (storedReturnHash) return storedReturnHash
+
+  if (hasSupabaseAuthCallbackParams()) {
+    sawAuthCallbackDuringPageLoad = true
+    return '#board'
   }
 
-  const hash = window.sessionStorage.getItem(AUTH_RETURN_HASH_KEY)
-  return hash?.startsWith('#') ? hash : null
+  return sawAuthCallbackDuringPageLoad ? '#board' : null
 }
 
 export function hasPendingBoardAuthReturn() {
   return readAuthReturnHash() === '#board'
 }
 
+function rememberBoardAuthReturnIn(storage: Storage) {
+  storage.setItem(AUTH_RETURN_HASH_KEY, '#board')
+  storage.setItem(AUTH_RETURN_EXPIRES_KEY, String(Date.now() + AUTH_RETURN_TTL_MS))
+}
+
 function rememberBoardAuthReturn() {
-  window.sessionStorage.setItem(AUTH_RETURN_HASH_KEY, '#board')
-  window.sessionStorage.setItem(AUTH_RETURN_EXPIRES_KEY, String(Date.now() + AUTH_RETURN_TTL_MS))
+  try {
+    rememberBoardAuthReturnIn(window.localStorage)
+  } catch {
+    // Some privacy modes can block localStorage; sessionStorage is the fallback.
+  }
+
+  try {
+    rememberBoardAuthReturnIn(window.sessionStorage)
+  } catch {
+    // URL callback parameters still keep auth callbacks off the landing page.
+  }
+}
+
+function clearStoredAuthReturnHash() {
+  try {
+    window.localStorage.removeItem(AUTH_RETURN_HASH_KEY)
+    window.localStorage.removeItem(AUTH_RETURN_EXPIRES_KEY)
+  } catch {
+    // Ignore storage access errors.
+  }
+
+  try {
+    window.sessionStorage.removeItem(AUTH_RETURN_HASH_KEY)
+    window.sessionStorage.removeItem(AUTH_RETURN_EXPIRES_KEY)
+  } catch {
+    // Ignore storage access errors.
+  }
 }
 
 export function consumeAuthReturnHash() {
   const hash = readAuthReturnHash()
-  window.sessionStorage.removeItem(AUTH_RETURN_HASH_KEY)
-  window.sessionStorage.removeItem(AUTH_RETURN_EXPIRES_KEY)
+  sawAuthCallbackDuringPageLoad = false
+  clearStoredAuthReturnHash()
   clearUrlAuthReturnHash()
   return hash
 }

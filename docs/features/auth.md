@@ -25,9 +25,10 @@ password so a database user is created without forcing profile setup.
   only after Supabase has detected a valid session, so auth callback fragments are not
   mixed with the hash router.
 - Login attempts include a `sdn_auth_return=board` callback URL parameter and mirror that
-  return target in `sessionStorage`. OAuth callbacks render the board route on the first
-  app render while Supabase restores the session, avoiding a landing-page flash or a
-  false signed-out prompt.
+  return target in `localStorage` and `sessionStorage`. Supabase callback signatures
+  (`code`, token hash parameters, recovery/error parameters) also resolve to the board
+  route on the first app render while Supabase restores the session, avoiding a
+  landing-page flash or a false signed-out prompt.
 - After a successful password update, the dialog stays open in a final success state so the
   user sees that the password changed and the session is active.
 - New passwords require at least 8 characters, with no composition rule.

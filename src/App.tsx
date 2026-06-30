@@ -548,30 +548,22 @@ function AuthPrivacyNotice({ onOpenPrivacy }: { onOpenPrivacy: () => void }) {
   )
 }
 
+function resolveViewModeFromLocation(): 'landing' | 'board' | 'docs' | 'contact' | 'privacy' {
+  const hash = window.location.hash
+  if (hash === '#board') return 'board'
+  if (hash === '#docs' || hash.startsWith('#docs/')) return 'docs'
+  if (hash === '#contact') return 'contact'
+  if (hash === '#privacy') return 'privacy'
+  if (hasPendingBoardAuthReturn()) return 'board'
+  return 'landing'
+}
+
 function App() {
-  const [viewMode, setViewMode] = useState<'landing' | 'board' | 'docs' | 'contact' | 'privacy'>(() => {
-    if (window.location.hash === '#board') return 'board';
-    if (!window.location.hash && hasPendingBoardAuthReturn()) return 'board';
-    if (window.location.hash === '#docs' || window.location.hash.startsWith('#docs/')) return 'docs';
-    if (window.location.hash === '#contact') return 'contact';
-    if (window.location.hash === '#privacy') return 'privacy';
-    return 'landing';
-  });
+  const [viewMode, setViewMode] = useState<'landing' | 'board' | 'docs' | 'contact' | 'privacy'>(resolveViewModeFromLocation);
 
   useEffect(() => {
     const handleHashChange = () => {
-      const hash = window.location.hash;
-      if (hash === '#board') {
-        setViewMode('board');
-      } else if (hash === '#docs' || hash.startsWith('#docs/')) {
-        setViewMode('docs');
-      } else if (hash === '#contact') {
-        setViewMode('contact');
-      } else if (hash === '#privacy') {
-        setViewMode('privacy');
-      } else {
-        setViewMode('landing');
-      }
+      setViewMode(resolveViewModeFromLocation());
     };
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);

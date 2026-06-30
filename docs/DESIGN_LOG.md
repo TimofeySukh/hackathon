@@ -20,11 +20,12 @@ rediscover, write it here.
 ### 2026-06-30 — Keep auth callbacks on the board route while sessions restore
 
 - Decision: login flows now include a `sdn_auth_return=board` callback URL parameter and
-  mirror that return marker in `sessionStorage`. OAuth callbacks still avoid hash routing,
-  but the client renders the board route during session restoration and consumes the
-  marker once authenticated.
+  mirror that return marker in `localStorage` and `sessionStorage`. Supabase callback
+  parameters are also treated as a board return on the first render, and the client
+  consumes the marker once authenticated.
 - Why: a slow Supabase session restore could otherwise show the landing page first, and
-  the old 1.5s timeout could mark the user anonymous before the callback session arrived.
+  provider or allowlist handling can drop custom query parameters before the frontend
+  sees them.
 
 ### 2026-06-30 — Keep Supabase auth callbacks off the hash router
 
