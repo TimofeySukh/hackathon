@@ -51,6 +51,9 @@ Auth behavior:
   modal as a visual surprise.
 - The auth flow should feel intentional from the landing header and then move
   the user into the main product when appropriate.
+- Signed-in users must still be able to open and stay on the landing page. Do not
+  redirect authenticated visitors from the landing page to `#board` unless they click an
+  explicit board CTA or navigate directly to `#board`.
 
 ## First Viewport
 

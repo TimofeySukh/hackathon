@@ -27,11 +27,20 @@ rediscover, write it here.
   provider or allowlist handling can drop custom query parameters before the frontend
   sees them.
 
+### 2026-06-30 — Keep landing reachable after sign-in
+
+- Decision: authenticated users are no longer redirected from the landing page to
+  `#board`. Landing, docs, contact, and privacy remain reachable after sign-in; the board
+  opens only from an explicit board CTA, a direct `#board` URL, or an auth callback return
+  marker from a login flow.
+- Why: signing in should not make the marketing and public information pages inaccessible
+  or create surprising navigation.
+
 ### 2026-06-30 — Keep Supabase auth callbacks off the hash router
 
 - Decision: Google OAuth, email confirmation, and password recovery callbacks now return
-  to the clean app origin/path without `#board`; the app redirects authenticated users
-  to `#board` only after Supabase has restored the session.
+  to the clean app origin/path without `#board`; auth callback flows use a stored return
+  marker to open the board only after Supabase has restored the session.
 - Why: Supabase Auth uses callback URL parameters/fragments to exchange or detect the
   session. Mixing those callback values with the app's hash router can leave production
   users back on the landing page as anonymous after sign-in.

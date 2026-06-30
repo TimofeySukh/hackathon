@@ -632,20 +632,16 @@ function App() {
   const auth = useAuth()
   const userId = auth.session?.user?.id ?? null
 
-  // Redirect authenticated users from the auth callback route to the board.
+  // Redirect only authenticated auth callback returns to the board. A normal signed-in
+  // visitor can still open and stay on the landing/docs/contact/privacy pages.
   useEffect(() => {
     if (auth.status !== 'authenticated') return
 
     const authReturnHash = consumeAuthReturnHash()
     if (authReturnHash) {
       window.location.hash = authReturnHash
-      return
     }
-
-    if (viewMode === 'landing') {
-      window.location.hash = '#board'
-    }
-  }, [auth.status, viewMode])
+  }, [auth.status])
 
   // Sign-in dialog: a single "Sign in" button opens this; it holds every
   // sign-in option so the Settings panel itself stays compact.
