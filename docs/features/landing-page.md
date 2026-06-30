@@ -68,6 +68,10 @@ Do not bring back the stepped-path ribbon as the main hero element.
 
 The three slogans should stay as compact deck cards, not oversized feature cards.
 
+The hero copy must clearly introduce the user problem and the product answer:
+people often keep relationship context in their head or in flat spreadsheets, while
+Social Datanode turns people, notes, groups, and links into a visual board.
+
 ## Copy
 
 Do not invent extra product claims beyond the user's provided direction.
@@ -78,6 +82,10 @@ Avoid long paragraphs in the hero.
 The landing can communicate that Social Datanode helps organize relationship
 information on a visual board, but it should not over-explain the product or add
 new promises that were not requested.
+
+Use a direct problem/solution structure near the top of the page. The problem is
+that relationship knowledge is scattered across memory and non-visual tables. The
+solution is a spatial interface for managing people, notes, groups, and links.
 
 ## Interactive Section
 
@@ -103,13 +111,15 @@ it feels like the product, not a separate marketing illustration.
 
 After the hero, the landing page includes:
 
-1. **How it works** — three step cards describing start-from-You, drag-to-create,
+1. **Problem and solution** — two compact deck cards explaining scattered relationship
+   memory and Social Datanode's visual board answer.
+2. **How it works** — three step cards describing start-from-You, drag-to-create,
    and organize-in-place gestures.
-2. **Trust strip** — four compact deck cards about anonymous use, local save,
+3. **Trust strip** — four compact deck cards about anonymous use, local save,
    private sync, and no collaboration yet.
-3. **Interactive demo** — inspector simulator (see above).
-4. **Core Capabilities** — five human-readable scatter cards; the agent card links to Docs.
-5. **LinkedIn import** — deck cards describing the import flow.
+4. **Interactive demo** — inspector simulator (see above).
+5. **Core Capabilities** — five human-readable scatter cards; the agent card links to Docs.
+6. **LinkedIn import** — deck cards describing the import flow.
 
 The hero is the only primary board CTA: an **Open board** button plus a clickable product screenshot.
 

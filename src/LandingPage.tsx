@@ -17,6 +17,19 @@ const HOW_IT_WORKS_STEPS = [
   },
 ] as const
 
+const PROBLEM_SOLUTION_CARDS = [
+  {
+    label: 'The problem',
+    title: 'Relationship context lives in your head',
+    body: 'People remember who knows whom, where they met, and what matters - until the network gets too large. Spreadsheets can store rows, but they hide the shape of the network.',
+  },
+  {
+    label: 'The solution',
+    title: 'A visual place to manage people',
+    body: 'Social Datanode gives every person, note, link, and group a place on a board, so you can organize relationships spatially instead of flattening them into a table.',
+  },
+] as const
+
 const TRUST_ITEMS = [
   'Try without signing in',
   'Anonymous edits stay in your browser',
@@ -196,14 +209,14 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
           <div className="board-preview-layout">
             <div className="board-preview-copy">
               <span className="demo-eyebrow">Social Datanode</span>
-              <h1 className="demo-title">See your network as a graph</h1>
+              <h1 className="demo-title">Turn relationship memory into a visual board</h1>
               <p className="section-lead">
-                Circles, people, and links on one infinite canvas — pan, zoom, and grow without leaving the visual surface.
+                Most people keep their network in their head or in flat spreadsheets. Social Datanode makes that context visible with people, notes, groups, and links on one canvas.
               </p>
               <div className="lp-deck lp-deck--compact">
-                <div className="lp-deck-card lp-deck-card--tilt-1">Structure your network</div>
-                <div className="lp-deck-card lp-deck-card--tilt-2">Brainstorm while looking at the graph</div>
-                <div className="lp-deck-card lp-deck-card--tilt-3">Keep people, notes, and context in one visual workspace</div>
+                <div className="lp-deck-card lp-deck-card--tilt-1">Stop losing context after meetings and introductions</div>
+                <div className="lp-deck-card lp-deck-card--tilt-2">Replace flat contact rows with visible circles and relationships</div>
+                <div className="lp-deck-card lp-deck-card--tilt-3">Keep notes and links next to the people they belong to</div>
               </div>
               <button type="button" className="lp-btn lp-btn-filled landing-hero-cta" onClick={handleLaunchApp}>
                 Open board
@@ -221,6 +234,25 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
                 className="board-preview-image"
               />
             </button>
+          </div>
+        </section>
+
+        <section className="landing-section problem-solution-section" aria-labelledby="problem-solution-title">
+          <div className="section-header problem-solution-header">
+            <span className="demo-eyebrow">Problem and solution</span>
+            <h2 id="problem-solution-title" className="section-title">From scattered memory to a readable map</h2>
+          </div>
+          <div className="problem-solution-grid">
+            {PROBLEM_SOLUTION_CARDS.map((card, index) => (
+              <article
+                key={card.label}
+                className={`problem-solution-card lp-deck-card lp-deck-card--tilt-${index + 1}`}
+              >
+                <span className="problem-solution-card__label">{card.label}</span>
+                <h3 className="problem-solution-card__title">{card.title}</h3>
+                <p className="problem-solution-card__body">{card.body}</p>
+              </article>
+            ))}
           </div>
         </section>
 
