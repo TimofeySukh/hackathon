@@ -357,15 +357,28 @@ export function readAnimFrame(anims: Map<string, BoardAnim>, now: number): AnimF
   const ringReveal = new Map<string, number>()
   const edgeHoverReveal = new Map<string, number>()
   const colorReveal = new Map<string, ColorMorph & { t: number }>()
+  const setLiftScale = (id: string, next: number) => {
+    const current = liftScales.get(id)
+    if (current === undefined || Math.abs(next - 1) > Math.abs(current - 1)) {
+      liftScales.set(id, next)
+    }
+  }
 
   for (const [key, a] of anims) {
     const t = a.start < 0 ? 0 : Math.min(1, Math.max(0, (now - a.start) / a.duration))
     if (key.startsWith('pop:')) {
       scales.set(key.slice(4), Math.max(0, easeOutBack(t)))
+    } else if (key.startsWith('tap:')) {
+      const pressT = Math.min(1, t / 0.34)
+      const releaseT = Math.min(1, Math.max(0, (t - 0.34) / 0.66))
+      const next = t < 0.34
+        ? 1 - 0.045 * easeOutCubic(pressT)
+        : 0.955 + 0.045 * easeOutBack(releaseT)
+      setLiftScale(key.slice(4), next)
     } else if (key.startsWith('lift-in:')) {
-      liftScales.set(key.slice(8), 1 + 0.1 * easeOutCubic(t))
+      setLiftScale(key.slice(8), 1 + 0.1 * easeOutCubic(t))
     } else if (key.startsWith('lift-out:')) {
-      liftScales.set(key.slice(9), 1.1 - 0.1 * easeOutCubic(t))
+      setLiftScale(key.slice(9), 1.1 - 0.1 * easeOutCubic(t))
     } else if (key.startsWith('morph:') && a.morph) {
       morphs.set(key.slice(6), { ...a.morph, t: easeInOutCubic(t) })
     } else if (key.startsWith('handles-out:')) {

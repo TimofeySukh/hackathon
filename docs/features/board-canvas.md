@@ -17,10 +17,12 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   nested circle crosses the current parent boundary and when it moves back inward. On small
   boards, the final drop still runs containment/collision cleanup; on large boards, final
   cleanup is skipped so one interaction cannot reflow or freeze a dense import. While a
-  person or circle is being moved, the grabbed root renders with a 10% lift scale and
-  eases back after drop. For circles, the renderer applies one canvas transform to the
-  circle root and its descendants so the zone reads like one scaled picture rather than
-  separately animated parts.
+  person or circle is being moved past the 5px drag threshold, the grabbed root renders
+  with a 10% lift scale and eases back after drop. A plain click that stays under the
+  threshold plays a separate short press pulse instead of starting the drag lift or running
+  geometry cleanup. For circles, the renderer applies one canvas transform to the circle
+  root and its descendants so the zone reads like one scaled picture rather than separately
+  animated parts.
 - **Resize**: drag a circle's edge; parent circles auto-fit (expand and shrink back to a
   minimum) as their contents move. Shrinking a circle pulls its contained people and subset
   circles toward the center, and nested subset circles shrink with the parent when position
@@ -33,7 +35,9 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   tapped point. It adopts a circle only when the tap lands inside one (or on someone already
   in a circle); tapping empty space leaves the person free-floating with no owning circle.
   The creation deliberately skips containment fitting so the rest of the board never reflows
-  or jumps. This replaces the older Shift-drag-from-center shortcut.
+  or jumps. If the second click turns into a drag, the drag suppresses the browser's
+  follow-up `dblclick` event so no accidental person is created on drop. This replaces the
+  older Shift-drag-from-center shortcut.
 - **Connect**: with the "Draw Connection" center behavior, drag from a circle center to
   another node to draw a relationship link. A dashed draft edge previews the connection.
   Links render as adaptive quadratic curves: longer and more diagonal links get a little

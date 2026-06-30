@@ -104,6 +104,8 @@ const undoHistory: GraphState[] = []
 const prefersReducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
+const DRAG_START_THRESHOLD = 5
+
 function shouldRunGlobalInteractionLayout(state: GraphState) {
   return state.circles.length + state.people.length <= BOARD_INTERACTION_LAYOUT_LIMIT
 }
@@ -243,6 +245,8 @@ type MoveCircleState = {
   personOrigins?: Record<string, { x: number; y: number }>
   disconnectedCircleIds?: string[]
   liftIds: string[]
+  liftStarted: boolean
+  moved: boolean
   graphSnapshot?: GraphState
   lastX: number
   lastY: number
@@ -259,6 +263,8 @@ type MovePersonState = {
   // Mixed selection: zones (and their contents) dragged along with the people.
   circleOrigins?: Record<string, { x: number; y: number }>
   liftIds: string[]
+  liftStarted: boolean
+  moved: boolean
   graphSnapshot?: GraphState
   lastX: number
   lastY: number
@@ -1083,6 +1089,7 @@ function App() {
   const animNowRef = useRef(0)
   const paintBoardRef = useRef<(now?: number) => void>(() => {})
   const liftedNodeIdsRef = useRef<Set<string>>(new Set())
+  const suppressDoubleClickUntilRef = useRef(0)
   const handleExitNodesRef = useRef<Map<string, CircleNode | PersonNode>>(new Map())
   const prevSelectionRef = useRef<SelectedItem>(null)
   const ringCircleIdRef = useRef<string | null>(null)
@@ -2700,9 +2707,20 @@ function App() {
     const uniqueIds = [...new Set(ids)]
     if (uniqueIds.length === 0) return
     for (const id of uniqueIds) {
+      const wasLifted = liftedNodeIdsRef.current.has(id) || boardAnimsRef.current.has(`lift-in:${id}`)
+      if (!wasLifted) continue
       liftedNodeIdsRef.current.delete(id)
       boardAnimsRef.current.delete(`lift-in:${id}`)
       startBoardAnim(`lift-out:${id}`, 180)
+    }
+  }
+
+  function startTapFeedback(ids: string[]) {
+    if (prefersReducedMotion()) return
+    const uniqueIds = [...new Set(ids)]
+    for (const id of uniqueIds) {
+      boardAnimsRef.current.delete(`tap:${id}`)
+      startBoardAnim(`tap:${id}`, 190)
     }
   }
 
@@ -3122,6 +3140,9 @@ function App() {
 
     const pan = panRef.current
     if (pan?.pointerId === event.pointerId) {
+      if (Math.hypot(event.clientX - pan.startX, event.clientY - pan.startY) > DRAG_START_THRESHOLD) {
+        suppressDoubleClickUntilRef.current = Date.now() + 700
+      }
       driveCamera({
         ...cameraRef.current,
         x: pan.originX + event.clientX - pan.startX,
@@ -3134,6 +3155,16 @@ function App() {
     // pointer frame rewrite the whole board.
     const moving = moveCircleRef.current
     if (moving?.pointerId === event.pointerId) {
+      const moveDistance = Math.hypot(event.clientX - moving.startX, event.clientY - moving.startY)
+      if (moveDistance <= DRAG_START_THRESHOLD) return
+      if (!moving.moved) {
+        moving.moved = true
+        suppressDoubleClickUntilRef.current = Date.now() + 700
+      }
+      if (!moving.liftStarted) {
+        moving.liftStarted = true
+        startLiftFeedback(moving.liftIds)
+      }
       ensureGestureSnapshot()
       const deltaX = (event.clientX - moving.lastX) / camera.scale
       const deltaY = (event.clientY - moving.lastY) / camera.scale
@@ -3171,6 +3202,16 @@ function App() {
 
     const movingPerson = movePersonRef.current
     if (movingPerson?.pointerId === event.pointerId) {
+      const moveDistance = Math.hypot(event.clientX - movingPerson.startX, event.clientY - movingPerson.startY)
+      if (moveDistance <= DRAG_START_THRESHOLD) return
+      if (!movingPerson.moved) {
+        movingPerson.moved = true
+        suppressDoubleClickUntilRef.current = Date.now() + 700
+      }
+      if (!movingPerson.liftStarted) {
+        movingPerson.liftStarted = true
+        startLiftFeedback(movingPerson.liftIds)
+      }
       ensureGestureSnapshot()
       const deltaX = (event.clientX - movingPerson.lastX) / camera.scale
       const deltaY = (event.clientY - movingPerson.lastY) / camera.scale
@@ -3193,6 +3234,8 @@ function App() {
 
     const resizing = resizeCircleRef.current
     if (resizing?.pointerId === event.pointerId) {
+      const moveDistance = Math.hypot(event.clientX - (resizing.startX ?? event.clientX), event.clientY - (resizing.startY ?? event.clientY))
+      if (moveDistance > DRAG_START_THRESHOLD) suppressDoubleClickUntilRef.current = Date.now() + 700
       ensureGestureSnapshot()
       const world = screenToWorld({ x: event.clientX, y: event.clientY })
 
@@ -3208,6 +3251,9 @@ function App() {
 
     if (connector) {
       const world = screenToWorld({ x: event.clientX, y: event.clientY })
+      if (Math.hypot(world.x - connector.startX, world.y - connector.startY) * cameraRef.current.scale > DRAG_START_THRESHOLD) {
+        suppressDoubleClickUntilRef.current = Date.now() + 700
+      }
       pendingConnectorRef.current = { ...connector, endX: world.x, endY: world.y }
       scheduleDrag()
       setSurfaceCursor('grabbing')
@@ -3335,33 +3381,34 @@ function App() {
     const disconnectedCircleIds = activeMoveCircle ? activeMoveCircle.disconnectedCircleIds : null
     const wasRightClickDrag = isRightClickDragRef.current
 
+    const resizeMoveDist = activeResizeCircle
+      ? Math.hypot(event.clientX - (activeResizeCircle.startX ?? event.clientX), event.clientY - (activeResizeCircle.startY ?? event.clientY))
+      : 0
+    const nodeMoveDist = activeMoveCircle
+      ? Math.hypot(event.clientX - activeMoveCircle.startX, event.clientY - activeMoveCircle.startY)
+      : activeMovePerson
+        ? Math.hypot(event.clientX - activeMovePerson.startX, event.clientY - activeMovePerson.startY)
+        : 0
     const wasResize = activeResizeCircle !== null
     const wasNodeMove = activeMoveCircle !== null || activeMovePerson !== null
-
-    const endingMove = wasNodeMove || wasResize
+    const completedResize = wasResize && resizeMoveDist > DRAG_START_THRESHOLD
+    const completedNodeMove = (activeMoveCircle?.moved ?? false) || (activeMovePerson?.moved ?? false)
+    const endingMove = completedNodeMove || completedResize
+    const tapFeedbackIds = !endingMove && wasNodeMove
+      ? activeMoveCircle?.liftIds ?? activeMovePerson?.liftIds ?? []
+      : []
 
     if (moveCircleRef.current?.pointerId === event.pointerId) moveCircleRef.current = null
     if (movePersonRef.current?.pointerId === event.pointerId) movePersonRef.current = null
     if (resizeCircleRef.current?.pointerId === event.pointerId) resizeCircleRef.current = null
     stopLiftFeedback(endingLiftIds)
+    startTapFeedback(tapFeedbackIds)
 
     if (endingMove) {
-      if (wasResize) {
-        const dx = activeResizeCircle.startX !== undefined ? event.clientX - activeResizeCircle.startX : 0
-        const dy = activeResizeCircle.startY !== undefined ? event.clientY - activeResizeCircle.startY : 0
-        if (Math.hypot(dx, dy) > 5) {
-          notifyOnboarding('resize')
-        }
-      } else if (wasNodeMove) {
-        let nodeMoveDist = 0
-        if (activeMoveCircle) {
-          nodeMoveDist = Math.hypot(event.clientX - activeMoveCircle.startX, event.clientY - activeMoveCircle.startY)
-        } else if (activeMovePerson) {
-          nodeMoveDist = Math.hypot(event.clientX - activeMovePerson.startX, event.clientY - activeMovePerson.startY)
-        }
-        if (nodeMoveDist > 5) {
-          notifyOnboarding('move')
-        }
+      if (completedResize) {
+        notifyOnboarding('resize')
+      } else if (completedNodeMove && nodeMoveDist > DRAG_START_THRESHOLD) {
+        notifyOnboarding('move')
       }
 
       const nextResolved = {
@@ -3494,6 +3541,8 @@ function App() {
           })
         }
       }
+    } else if (distance * cameraRef.current.scale <= DRAG_START_THRESHOLD) {
+      startTapFeedback([conn.sourceId])
     }
     setConnector(null)
   }
@@ -3575,6 +3624,8 @@ function App() {
       personOrigins,
       disconnectedCircleIds: targets,
       liftIds: targets,
+      liftStarted: false,
+      moved: false,
       graphSnapshot: {
         ...graph,
         circles: graph.circles.map((c) => ({ ...c })),
@@ -3583,7 +3634,6 @@ function App() {
       lastX: event.clientX,
       lastY: event.clientY,
     }
-    startLiftFeedback(targets)
   }
 
   function startPersonMove(event: ReactPointerEvent<HTMLElement>, person: PersonNode) {
@@ -3636,6 +3686,8 @@ function App() {
       selectedOrigins,
       circleOrigins,
       liftIds,
+      liftStarted: false,
+      moved: false,
       graphSnapshot: {
         ...graph,
         circles: graph.circles.map((c) => ({ ...c })),
@@ -3644,7 +3696,6 @@ function App() {
       lastX: event.clientX,
       lastY: event.clientY,
     }
-    startLiftFeedback(liftIds)
   }
 
   function startCircleResize(event: ReactPointerEvent<Element>, circle: CircleNode) {
@@ -3673,6 +3724,11 @@ function App() {
   // the board never reflows or visibly jumps around the new person.
   function handleSurfaceDoubleClick(event: React.MouseEvent<HTMLDivElement>) {
     if (event.button !== 0) return
+    if (Date.now() <= suppressDoubleClickUntilRef.current) {
+      suppressDoubleClickUntilRef.current = 0
+      event.preventDefault()
+      return
+    }
 
     if (cameraRef.current.scale < ZONE_ONLY_SCALE) return
     const hit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {

@@ -893,3 +893,6 @@ rediscover, write it here.
   as one scaled picture. The effect has no shadow and does not mutate graph geometry.
 - Why: Drag feedback should clearly show motion and elevation while preserving the mental
   model that a circle with contents is one movable object.
+- Follow-up: Plain clicks now stay below the drag threshold and play a separate tap pulse.
+  Dragging after a first click suppresses the browser `dblclick` create event, preventing
+  accidental person creation when the second click becomes a move gesture.
