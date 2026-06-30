@@ -39,7 +39,7 @@ import {
   RING_VERTEX_SPREAD_END,
   ZONE_ONLY_SCALE,
 } from './constants'
-import { colorMix, getCircleColors, lerpCircleColors } from './colors'
+import { colorMix, getCircleColors, lerpCircleColors, lerpHex } from './colors'
 import {
   distanceToCurvePath,
   drawCurvePath,
@@ -690,24 +690,29 @@ function drawCircleFills(
     // Idle transparent outline (resting dashed border) — keep visible during edge hover too.
     if (isTransparent && !showSelectionRing) {
       ctx.save()
-      ctx.strokeStyle = tone.border
-      ctx.lineWidth = Math.max(2.2 / scale, 1.4)
-      ctx.setLineDash([8 / scale, 7 / scale])
+      ctx.strokeStyle = lerpHex(tone.border, '#64748b', edgeHoverT)
+      ctx.lineWidth = Math.max(2.2 / scale, 1.4) + edgeHoverT * Math.max(1.2 / scale, 0.6)
+      const d1 = (8 - 2 * edgeHoverT) / scale
+      const d2 = (7 - 2 * edgeHoverT) / scale
+      ctx.setLineDash([d1, d2])
       ctx.stroke(path)
       ctx.restore()
     }
 
     // Resize-edge hover — logical circle only; does not thicken the shape outline.
     if (edgeHoverT > 0.001) {
-      ctx.save()
-      ctx.beginPath()
-      ctx.arc(circle.x, circle.y, circle.radius, 0, Math.PI * 2)
-      ctx.strokeStyle = showSelectionRing ? tone.border : '#64748b'
-      ctx.globalAlpha = 0.18 + 0.42 * edgeHoverT
-      ctx.lineWidth = Math.max(2 / scale, 1.2) + edgeHoverT * Math.max(1 / scale, 0.5)
-      if (isTransparent && !showSelectionRing) ctx.setLineDash([6 / scale, 5 / scale])
-      ctx.stroke()
-      ctx.restore()
+      // For transparent circles, the hover styling is integrated directly into the idle outline (resting dashed border)
+      // when not selected. This avoids drawing multiple clashing dashed outlines.
+      if (!isTransparent || showSelectionRing) {
+        ctx.save()
+        ctx.beginPath()
+        ctx.arc(circle.x, circle.y, circle.radius, 0, Math.PI * 2)
+        ctx.strokeStyle = showSelectionRing ? tone.border : '#64748b'
+        ctx.globalAlpha = 0.18 + 0.42 * edgeHoverT
+        ctx.lineWidth = Math.max(2 / scale, 1.2) + edgeHoverT * Math.max(1 / scale, 0.5)
+        ctx.stroke()
+        ctx.restore()
+      }
     }
 
     // Selection ring — animates in and out (independent of resize hover).
