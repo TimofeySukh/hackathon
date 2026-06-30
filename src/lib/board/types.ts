@@ -180,6 +180,10 @@ export type AnimFrame = {
   // nodeId -> current draw-scale multiplier (1 = at rest). Drives the press
   // bounce on selection and the grow-in pop for freshly created nodes.
   scales: Map<string, number>
+  // nodeId -> active root draw-scale multiplier for lifted drag feedback. For a
+  // circle root, descendants render through the same transform so the zone reads
+  // as one scaled picture.
+  liftScales: Map<string, number>
   // circleId -> in-flight shape morph (with eased progress `t`) that overrides
   // the circle's stored shape while the animation runs.
   morphs: Map<string, CircleMorph & { t: number }>

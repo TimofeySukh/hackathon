@@ -16,7 +16,11 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   collision solver, but they do refit parent circles in-place when the dragged person or
   nested circle crosses the current parent boundary and when it moves back inward. On small
   boards, the final drop still runs containment/collision cleanup; on large boards, final
-  cleanup is skipped so one interaction cannot reflow or freeze a dense import.
+  cleanup is skipped so one interaction cannot reflow or freeze a dense import. While a
+  person or circle is being moved, the grabbed root renders with a 10% lift scale and
+  eases back after drop. For circles, the renderer applies one canvas transform to the
+  circle root and its descendants so the zone reads like one scaled picture rather than
+  separately animated parts.
 - **Resize**: drag a circle's edge; parent circles auto-fit (expand and shrink back to a
   minimum) as their contents move. Shrinking a circle pulls its contained people and subset
   circles toward the center, and nested subset circles shrink with the parent when position
@@ -120,6 +124,8 @@ This is the most Material-3-aligned part of the app today; keep it that way.
   not a color swap.
 - **Layering**: circle fills render first, then relationship links, then circle centers,
   labels, and people. This keeps links readable even when they pass through large circles.
+  Drag lift feedback is a transient draw transform only; it does not mutate persisted
+  coordinates, radii, labels, or avatar sizes.
 - **Components used**: create menu (M3 menu), inspector (side sheet), toolbar (icon
   buttons). These follow the recipes in the design system.
 - **Known gaps vs. Material 3 target**:

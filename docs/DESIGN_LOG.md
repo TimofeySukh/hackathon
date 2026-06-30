@@ -884,3 +884,12 @@ rediscover, write it here.
   MCP, and `datanode-cli`.
 - Why: Full LinkedIn graph exports can exceed 1M tokens. Agents need deterministic local
   retrieval that returns large groups in compact chunks before involving an LLM.
+
+## 2026-06-30 — Unified drag lift for board nodes
+
+- Decision: Dragging a person or circle now uses a transient canvas lift scale instead of
+  resizing individual visual parts. Circle drags treat the circle as the lifted root; its
+  descendant circles and people inherit the same draw transform, so the dragged zone reads
+  as one scaled picture. The effect has no shadow and does not mutate graph geometry.
+- Why: Drag feedback should clearly show motion and elevation while preserving the mental
+  model that a circle with contents is one movable object.

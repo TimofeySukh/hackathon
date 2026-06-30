@@ -63,6 +63,7 @@ export const BOARD_GRID_SIZE = 360
 
 export const EMPTY_ANIM_FRAME: AnimFrame = {
   scales: new Map(),
+  liftScales: new Map(),
   morphs: new Map(),
   handleReveal: new Map(),
   favoriteReveal: new Map(),

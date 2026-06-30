@@ -349,6 +349,7 @@ function selectionShowsHandles(selectedItem: SelectedItem | null) {
 export function readAnimFrame(anims: Map<string, BoardAnim>, now: number): AnimFrame {
   if (anims.size === 0) return EMPTY_ANIM_FRAME
   const scales = new Map<string, number>()
+  const liftScales = new Map<string, number>()
   const morphs = new Map<string, CircleMorph & { t: number }>()
   const handleReveal = new Map<string, number>()
   const favoriteReveal = new Map<string, number>()
@@ -361,6 +362,10 @@ export function readAnimFrame(anims: Map<string, BoardAnim>, now: number): AnimF
     const t = a.start < 0 ? 0 : Math.min(1, Math.max(0, (now - a.start) / a.duration))
     if (key.startsWith('pop:')) {
       scales.set(key.slice(4), Math.max(0, easeOutBack(t)))
+    } else if (key.startsWith('lift-in:')) {
+      liftScales.set(key.slice(8), 1 + 0.1 * easeOutCubic(t))
+    } else if (key.startsWith('lift-out:')) {
+      liftScales.set(key.slice(9), 1.1 - 0.1 * easeOutCubic(t))
     } else if (key.startsWith('morph:') && a.morph) {
       morphs.set(key.slice(6), { ...a.morph, t: easeInOutCubic(t) })
     } else if (key.startsWith('handles-out:')) {
@@ -388,7 +393,7 @@ export function readAnimFrame(anims: Map<string, BoardAnim>, now: number): AnimF
     }
   }
 
-  return { scales, morphs, handleReveal, favoriteReveal, favoriteTilt, ringReveal, edgeHoverReveal, colorReveal }
+  return { scales, liftScales, morphs, handleReveal, favoriteReveal, favoriteTilt, ringReveal, edgeHoverReveal, colorReveal }
 }
 
 export function drawBoardLayer(
@@ -428,21 +433,21 @@ export function drawBoardLayer(
   ctx.translate(camera.x, camera.y)
   ctx.scale(camera.scale, camera.scale)
 
-  drawCircleFills(ctx, visibleCircles, selectedItem, camera.scale, circleShapeMode, circleFillMode, selectedCircleIds, anim, activeEdgeHoverId)
+  drawCircleFills(ctx, visibleCircles, index, selectedItem, camera.scale, circleShapeMode, circleFillMode, selectedCircleIds, anim, activeEdgeHoverId)
 
   if (camera.scale < ZONE_ONLY_SCALE) {
     // Far-zoom simplified view: only the colored zones and the labels of the
     // ones still large enough on screen to read. Everything else is hidden.
     if (showCircleLabels) {
       for (const circle of visibleCircles) {
-        if (circle.radius * camera.scale >= 26) drawCircleLabel(ctx, circle, camera.scale, true)
+        if (circle.radius * camera.scale >= 26) drawCircleLabel(ctx, circle, camera.scale, true, index, anim)
       }
     }
   } else {
     drawCircleEdges(ctx, visibleCircles, index, camera.scale, selectedItem, hoveredConnId)
     drawPersonEdges(ctx, visiblePeople, index, camera.scale, selectedItem, hoveredConnId)
     drawCustomConnections(ctx, visiblePeopleIds, visibleCircleIds, index, selectedItem, hoveredConnId, camera.scale)
-    drawCircleDetails(ctx, visibleCircles, camera.scale, circleFillMode, showCircleLabels, anim)
+    drawCircleDetails(ctx, visibleCircles, index, camera.scale, circleFillMode, showCircleLabels, anim)
     drawPeople(ctx, visiblePeople, index, selectedItem, hoveredPersonId, camera.scale, dpr, showPersonLabels, selectedPeopleIds, anim)
     if (connector) drawConnector(ctx, connector, camera.scale)
     drawSelectionHandles(ctx, selectedItem, index, anim, handleExitNodes, visiblePeople)
@@ -658,9 +663,64 @@ function resolveCircleColors(circle: CircleNode, anim: AnimFrame) {
   return getCircleColors(circle)
 }
 
+function findLiftForCircle(circle: CircleNode, index: BoardIndex, anim: AnimFrame) {
+  let current: CircleNode | undefined = circle
+  while (current) {
+    const liftScale = anim.liftScales.get(current.id)
+    if (liftScale !== undefined && Math.abs(liftScale - 1) > 0.001) {
+      return { x: current.x, y: current.y, scale: liftScale }
+    }
+    current = current.parentId ? index.circlesById.get(current.parentId) : undefined
+  }
+  return null
+}
+
+function findLiftForPerson(person: PersonNode, index: BoardIndex, anim: AnimFrame) {
+  const personLiftScale = anim.liftScales.get(person.id)
+  if (personLiftScale !== undefined && Math.abs(personLiftScale - 1) > 0.001) {
+    return { x: person.x, y: person.y, scale: personLiftScale }
+  }
+
+  let current = person.circleId ? index.circlesById.get(person.circleId) : undefined
+  while (current) {
+    const liftScale = anim.liftScales.get(current.id)
+    if (liftScale !== undefined && Math.abs(liftScale - 1) > 0.001) {
+      return { x: current.x, y: current.y, scale: liftScale }
+    }
+    current = current.parentId ? index.circlesById.get(current.parentId) : undefined
+  }
+  return null
+}
+
+function applyLiftTransform(ctx: CanvasRenderingContext2D, lift: { x: number; y: number; scale: number } | null) {
+  if (!lift) return
+  ctx.translate(lift.x, lift.y)
+  ctx.scale(lift.scale, lift.scale)
+  ctx.translate(-lift.x, -lift.y)
+}
+
+function applyLiftTransformForCircle(
+  ctx: CanvasRenderingContext2D,
+  circle: CircleNode,
+  index: BoardIndex,
+  anim: AnimFrame,
+) {
+  applyLiftTransform(ctx, findLiftForCircle(circle, index, anim))
+}
+
+function applyLiftTransformForPerson(
+  ctx: CanvasRenderingContext2D,
+  person: PersonNode,
+  index: BoardIndex,
+  anim: AnimFrame,
+) {
+  applyLiftTransform(ctx, findLiftForPerson(person, index, anim))
+}
+
 function drawCircleFills(
   ctx: CanvasRenderingContext2D,
   circles: CircleNode[],
+  index: BoardIndex,
   selectedItem: SelectedItem,
   scale: number,
   circleShapeMode: CircleShapeMode,
@@ -674,6 +734,7 @@ function drawCircleFills(
     const isTransparent = (circle.fillMode ?? circleFillMode) === 'transparent'
     const path = getCirclePath(circle, circleShapeMode, anim.morphs.get(circle.id))
     ctx.save()
+    applyLiftTransformForCircle(ctx, circle, index, anim)
     ctx.globalAlpha = isTransparent ? 0.34 : 1
     ctx.fillStyle = tone.fill
     ctx.fill(path)
@@ -690,6 +751,7 @@ function drawCircleFills(
     // Idle transparent outline (resting dashed border) — keep visible during edge hover too.
     if (isTransparent && !showSelectionRing) {
       ctx.save()
+      applyLiftTransformForCircle(ctx, circle, index, anim)
       ctx.strokeStyle = lerpHex(tone.border, '#64748b', edgeHoverT)
       ctx.lineWidth = Math.max(2.2 / scale, 1.4) + edgeHoverT * Math.max(1.2 / scale, 0.6)
       const d1 = (8 - 2 * edgeHoverT) / scale
@@ -705,6 +767,7 @@ function drawCircleFills(
       // when not selected. This avoids drawing multiple clashing dashed outlines.
       if (!isTransparent || showSelectionRing) {
         ctx.save()
+        applyLiftTransformForCircle(ctx, circle, index, anim)
         ctx.beginPath()
         ctx.arc(circle.x, circle.y, circle.radius, 0, Math.PI * 2)
         ctx.strokeStyle = showSelectionRing ? tone.border : '#64748b'
@@ -724,6 +787,7 @@ function drawCircleFills(
         const gapUnit = dashUnit * 0.875
         const gapLen = gapUnit * (1 - ringT)
         ctx.save()
+        applyLiftTransformForCircle(ctx, circle, index, anim)
         ctx.strokeStyle = tone.border
         ctx.lineWidth = lineWidth * (0.88 + 0.12 * ringT)
         if (gapLen > 0.4 / scale) {
@@ -735,15 +799,20 @@ function drawCircleFills(
         ctx.restore()
       } else if (isRound) {
         ctx.save()
+        applyLiftTransformForCircle(ctx, circle, index, anim)
         ctx.strokeStyle = tone.border
         ctx.lineWidth = lineWidth
         ctx.globalAlpha = ringT
         ctx.stroke(path)
         ctx.restore()
       } else if (ringAnim !== undefined && ringT < RING_VERTEX_SPREAD_END) {
+        ctx.save()
+        applyLiftTransformForCircle(ctx, circle, index, anim)
         strokeOutlineWithVertexSpread(ctx, circle, ringT / RING_VERTEX_SPREAD_END, tone.border, lineWidth)
+        ctx.restore()
       } else {
         ctx.save()
+        applyLiftTransformForCircle(ctx, circle, index, anim)
         ctx.strokeStyle = tone.border
         ctx.lineWidth = lineWidth
         ctx.globalAlpha = ringAnim !== undefined ? 0.55 + 0.45 * ringT : 1
@@ -859,14 +928,15 @@ function getCirclePath(
 function drawCircleDetails(
   ctx: CanvasRenderingContext2D,
   circles: CircleNode[],
+  index: BoardIndex,
   scale: number,
   circleFillMode: CircleFillMode,
   showCircleLabels: boolean,
   anim: AnimFrame = EMPTY_ANIM_FRAME,
 ) {
   for (const circle of circles) {
-    if (showCircleLabels) drawCircleLabel(ctx, circle, scale)
-    drawCircleCenter(ctx, circle, scale, circleFillMode, anim.scales.get(circle.id) ?? 1, anim)
+    if (showCircleLabels) drawCircleLabel(ctx, circle, scale, false, index, anim)
+    drawCircleCenter(ctx, circle, scale, circleFillMode, anim.scales.get(circle.id) ?? 1, anim, index)
   }
 }
 
@@ -904,10 +974,12 @@ function drawCircleCenter(
   circleFillMode: CircleFillMode,
   nodeScale = 1,
   anim: AnimFrame = EMPTY_ANIM_FRAME,
+  index?: BoardIndex,
 ) {
   const tone = resolveCircleColors(circle, anim)
   const radius = CIRCLE_CENTER_RADIUS * nodeScale
   ctx.save()
+  if (index) applyLiftTransformForCircle(ctx, circle, index, anim)
   ctx.beginPath()
   ctx.arc(circle.x, circle.y, radius, 0, Math.PI * 2)
   ctx.fillStyle = tone.centerBg
@@ -934,10 +1006,18 @@ function drawCircleCenter(
   ctx.restore()
 }
 
-function drawCircleLabel(ctx: CanvasRenderingContext2D, circle: CircleNode, scale: number, force = false) {
+function drawCircleLabel(
+  ctx: CanvasRenderingContext2D,
+  circle: CircleNode,
+  scale: number,
+  force = false,
+  index?: BoardIndex,
+  anim: AnimFrame = EMPTY_ANIM_FRAME,
+) {
   if (!force && scale < 0.50) return
   const fontSize = 13 / scale
   ctx.save()
+  if (index) applyLiftTransformForCircle(ctx, circle, index, anim)
   ctx.font = `500 ${fontSize}px Inter, system-ui, sans-serif`
   const maxWidth = 170 / scale
   const text = ellipsize(ctx, circle.name, maxWidth)
@@ -985,6 +1065,8 @@ function drawPeople(
     const strokeWidth = isSelected || isHovered ? 2.5 : 1.5
     // Press bounce on selection + grow-in pop for new people (1 = at rest).
     const drawRadius = PERSON_VISUAL_RADIUS * (anim.scales.get(person.id) ?? 1)
+    ctx.save()
+    applyLiftTransformForPerson(ctx, person, index, anim)
     ctx.drawImage(
       getPersonSprite(person, circleColor, spriteRes, stroke, strokeWidth),
       person.x - drawRadius,
@@ -1016,6 +1098,7 @@ function drawPeople(
       drawFavoritePersonOutline(ctx, person, '#ffd600', drawRadius, 1)
     }
     if (showPersonLabels && (scale >= 0.70 || isSelected || isHovered)) drawPersonLabel(ctx, person, scale)
+    ctx.restore()
   }
 }
 
@@ -1073,6 +1156,12 @@ function drawSelectionHandles(
     const worldRadius = 6 * reveal
     const hasFavorite = itemType === 'person' && (node as PersonNode).isFavorite === true
 
+    ctx.save()
+    if (itemType === 'circle') {
+      applyLiftTransformForCircle(ctx, node as CircleNode, index, anim)
+    } else {
+      applyLiftTransformForPerson(ctx, node as PersonNode, index, anim)
+    }
     for (const handle of connectorHandlesFor(node, nodeScale, hasFavorite)) {
       const x = node.x + (handle.x - node.x) * reveal
       const y = node.y + (handle.y - node.y) * reveal
@@ -1081,6 +1170,7 @@ function drawSelectionHandles(
       ctx.fillStyle = color
       ctx.fill()
     }
+    ctx.restore()
   }
 
   if (selectionShowsHandles(selectedItem)) {

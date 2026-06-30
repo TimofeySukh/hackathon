@@ -50,6 +50,7 @@ import type {
   SelectedItem,
   HsvColor,
   BoardAnim,
+  AnimFrame,
   Connection,
 } from './lib/board/types'
 import {
@@ -241,6 +242,7 @@ type MoveCircleState = {
   circleOrigins?: Record<string, { x: number; y: number }>
   personOrigins?: Record<string, { x: number; y: number }>
   disconnectedCircleIds?: string[]
+  liftIds: string[]
   graphSnapshot?: GraphState
   lastX: number
   lastY: number
@@ -256,6 +258,7 @@ type MovePersonState = {
   selectedOrigins?: Record<string, { x: number; y: number }>
   // Mixed selection: zones (and their contents) dragged along with the people.
   circleOrigins?: Record<string, { x: number; y: number }>
+  liftIds: string[]
   graphSnapshot?: GraphState
   lastX: number
   lastY: number
@@ -1079,6 +1082,7 @@ function App() {
   const boardAnimRafRef = useRef<number | null>(null)
   const animNowRef = useRef(0)
   const paintBoardRef = useRef<(now?: number) => void>(() => {})
+  const liftedNodeIdsRef = useRef<Set<string>>(new Set())
   const handleExitNodesRef = useRef<Map<string, CircleNode | PersonNode>>(new Map())
   const prevSelectionRef = useRef<SelectedItem>(null)
   const ringCircleIdRef = useRef<string | null>(null)
@@ -2585,11 +2589,22 @@ function App() {
   // Single canonical board paint. Reads the live animation frame, so an ordinary
   // state-driven repaint composes cleanly with any in-flight pulse/pop, and the
   // rAF loop below reuses the exact same draw through paintBoardRef.
+  function withActiveLiftScales(frame: AnimFrame): AnimFrame {
+    if (liftedNodeIdsRef.current.size === 0) return frame
+    const liftScales = new Map(frame.liftScales)
+    for (const id of liftedNodeIdsRef.current) {
+      if (!boardAnimsRef.current.has(`lift-in:${id}`)) {
+        liftScales.set(id, Math.max(liftScales.get(id) ?? 1, 1.1))
+      }
+    }
+    return { ...frame, liftScales }
+  }
+
   const paintBoard = (now?: number) => {
     const canvas = peopleCanvasRef.current
     const surface = surfaceRef.current
     if (!canvas || !surface) return
-    const frame = readAnimFrame(boardAnimsRef.current, now ?? animNowRef.current)
+    const frame = withActiveLiftScales(readAnimFrame(boardAnimsRef.current, now ?? animNowRef.current))
     drawBoardLayer(
       canvas,
       surface,
@@ -2666,6 +2681,28 @@ function App() {
     boardAnimsRef.current.set(key, { start: -1, duration, fromValue, toValue })
     if (boardAnimRafRef.current == null) {
       boardAnimRafRef.current = window.requestAnimationFrame(tickBoardAnims)
+    }
+  }
+
+  function startLiftFeedback(ids: string[]) {
+    if (prefersReducedMotion()) return
+    const uniqueIds = [...new Set(ids)]
+    if (uniqueIds.length === 0) return
+    for (const id of uniqueIds) {
+      liftedNodeIdsRef.current.add(id)
+      boardAnimsRef.current.delete(`lift-out:${id}`)
+      startBoardAnim(`lift-in:${id}`, 140)
+    }
+  }
+
+  function stopLiftFeedback(ids: string[]) {
+    if (prefersReducedMotion()) return
+    const uniqueIds = [...new Set(ids)]
+    if (uniqueIds.length === 0) return
+    for (const id of uniqueIds) {
+      liftedNodeIdsRef.current.delete(id)
+      boardAnimsRef.current.delete(`lift-in:${id}`)
+      startBoardAnim(`lift-out:${id}`, 180)
     }
   }
 
@@ -2802,6 +2839,10 @@ function App() {
     ]
 
     if (activePointersRef.current.length >= 2) {
+      stopLiftFeedback([
+        ...(moveCircleRef.current?.liftIds ?? []),
+        ...(movePersonRef.current?.liftIds ?? []),
+      ])
       panRef.current = null
       moveCircleRef.current = null
       movePersonRef.current = null
@@ -3283,6 +3324,10 @@ function App() {
     const activeMoveCircle = moveCircleRef.current?.pointerId === event.pointerId ? moveCircleRef.current : null
     const activeMovePerson = movePersonRef.current?.pointerId === event.pointerId ? movePersonRef.current : null
     const activeResizeCircle = resizeCircleRef.current?.pointerId === event.pointerId ? resizeCircleRef.current : null
+    const endingLiftIds = [
+      ...(activeMoveCircle?.liftIds ?? []),
+      ...(activeMovePerson?.liftIds ?? []),
+    ]
 
     const movingPersonId = activeMovePerson ? activeMovePerson.personId : null
     const movingCircleId = activeMoveCircle ? activeMoveCircle.circleId : null
@@ -3298,6 +3343,7 @@ function App() {
     if (moveCircleRef.current?.pointerId === event.pointerId) moveCircleRef.current = null
     if (movePersonRef.current?.pointerId === event.pointerId) movePersonRef.current = null
     if (resizeCircleRef.current?.pointerId === event.pointerId) resizeCircleRef.current = null
+    stopLiftFeedback(endingLiftIds)
 
     if (endingMove) {
       if (wasResize) {
@@ -3528,6 +3574,7 @@ function App() {
       circleOrigins,
       personOrigins,
       disconnectedCircleIds: targets,
+      liftIds: targets,
       graphSnapshot: {
         ...graph,
         circles: graph.circles.map((c) => ({ ...c })),
@@ -3536,6 +3583,7 @@ function App() {
       lastX: event.clientX,
       lastY: event.clientY,
     }
+    startLiftFeedback(targets)
   }
 
   function startPersonMove(event: ReactPointerEvent<HTMLElement>, person: PersonNode) {
@@ -3576,6 +3624,8 @@ function App() {
       }
     }
 
+    const liftIds = draggingSelection ? [...targets, ...selectedCircleIds] : [person.id]
+
     movePersonRef.current = {
       pointerId: event.pointerId,
       personId: person.id,
@@ -3585,6 +3635,7 @@ function App() {
       originY: person.y,
       selectedOrigins,
       circleOrigins,
+      liftIds,
       graphSnapshot: {
         ...graph,
         circles: graph.circles.map((c) => ({ ...c })),
@@ -3593,6 +3644,7 @@ function App() {
       lastX: event.clientX,
       lastY: event.clientY,
     }
+    startLiftFeedback(liftIds)
   }
 
   function startCircleResize(event: ReactPointerEvent<Element>, circle: CircleNode) {
