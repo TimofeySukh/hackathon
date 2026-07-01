@@ -39,6 +39,15 @@ rediscover, write it here.
 - Why: The rounded-square selected state made color choices look like a shape change
   instead of a selection marker. A ring keeps the color chip stable and more legible.
 
+### 2026-07-02 — Split onboarding create into person and circle steps
+
+- Decision: Replaced the single `create` onboarding step with two verified steps:
+  `create-person` (double-click/double-tap empty space) and `create-circle` (drag from a
+  circle center to empty space, then choose Add circle). Right-click and menu-based person
+  creation no longer advance the guide.
+- Why: Users conflated the two creation gestures; separate steps with action checks teach
+  each affordance independently. Bumped onboarding storage to `v3`.
+
 ### 2026-07-02 — Board home logo control
 
 - Decision: Added a compact logo button in the board top-left that navigates to the landing

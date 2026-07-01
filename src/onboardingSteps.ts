@@ -2,7 +2,8 @@ export type OnboardingSurface = 'desktop' | 'mobile'
 export type OnboardingAction =
   | 'mode'
   | 'navigate'
-  | 'create'
+  | 'create-person'
+  | 'create-circle'
   | 'organize'
   | 'select'
   | 'search-import'
@@ -24,10 +25,16 @@ const DESKTOP_ONBOARDING_STEPS: OnboardingStep[] = [
     body: 'Drag empty space to pan. Use the mouse wheel, trackpad scroll, or trackpad pinch to zoom in and out.',
   },
   {
-    trigger: 'create',
+    trigger: 'create-person',
     eyebrow: 'Create',
-    title: 'Add people and circles',
-    body: 'Right-click a circle to add a person or another circle. Double-click empty space to add a person at that point.',
+    title: 'Add a person with a double-click',
+    body: 'Double-click empty space on the board to drop a person at that point.',
+  },
+  {
+    trigger: 'create-circle',
+    eyebrow: 'Create',
+    title: 'Add a circle from the center',
+    body: 'Drag from a circle center to empty space, then choose Add circle in the menu.',
   },
   {
     trigger: 'organize',
@@ -75,10 +82,16 @@ const MOBILE_ONBOARDING_STEPS: OnboardingStep[] = [
     body: 'Switch to Pan for one-finger panning. Pinch with two fingers anywhere on the board to zoom in and out.',
   },
   {
-    trigger: 'create',
+    trigger: 'create-person',
     eyebrow: 'Create',
-    title: 'Add people and circles',
-    body: 'In Edit mode, double-tap empty space to add a person. Drag from a circle center to empty space, then choose Add person or Add circle.',
+    title: 'Add a person with a double-tap',
+    body: 'In Edit mode, double-tap empty space on the board to drop a person at that point.',
+  },
+  {
+    trigger: 'create-circle',
+    eyebrow: 'Create',
+    title: 'Add a circle from the center',
+    body: 'In Edit mode, drag from a circle center to empty space, then choose Add circle in the menu.',
   },
   {
     trigger: 'select',

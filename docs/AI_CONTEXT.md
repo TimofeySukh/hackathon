@@ -102,8 +102,9 @@ Safety invariants:
 
 **Onboarding**:
 
-- First board visit opens a short guide explaining pan/zoom, creation, moving/resizing,
-  area selection, Search-based LinkedIn profile import, Settings, and the LinkedIn archive
+- First board visit opens a short guide explaining pan/zoom, creating a person by
+  double-click/double-tap, creating a circle from a center drag, moving/resizing, area
+  selection, Search-based LinkedIn profile import, Settings, and the LinkedIn archive
   sync guide.
 - Guide steps show a blue completed state with a checkmark for one second after the
   matching action is performed, then auto-advance; the visible button skips a step

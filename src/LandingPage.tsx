@@ -2,7 +2,7 @@ import { Fragment, type MouseEvent } from 'react'
 import sdnLogo from './assets/sdn-logo.svg'
 import productBoardInspector from './assets/landing/product-board-inspector.png'
 
-const BOARD_ONBOARDING_FORCE_KEY = 'social-board-onboarding-open-v2'
+const BOARD_ONBOARDING_FORCE_KEY = 'social-board-onboarding-open-v3'
 
 const HOW_IT_WORKS_STEPS = [
   {

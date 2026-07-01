@@ -507,8 +507,8 @@ const LINKEDIN_GUIDE_HINT_KEY = 'social-linkedin-guide-hint-seen-v1'
 const PERSON_DOUBLE_TAP_MS = 350
 const PERSON_DOUBLE_TAP_DISTANCE = 28
 const SEARCH_LINKEDIN_HINT_KEY = 'social-search-linkedin-hint-seen-v1'
-const BOARD_ONBOARDING_STORAGE_KEY = 'social-board-onboarding-done-v2'
-const BOARD_ONBOARDING_FORCE_KEY = 'social-board-onboarding-open-v2'
+const BOARD_ONBOARDING_STORAGE_KEY = 'social-board-onboarding-done-v3'
+const BOARD_ONBOARDING_FORCE_KEY = 'social-board-onboarding-open-v3'
 const ONBOARDING_COMPLETE_DELAY_MS = 1000
 const ONBOARDING_LINKEDIN_EXAMPLES = [
   {
@@ -1433,6 +1433,7 @@ function App() {
   const [newLinkService, setNewLinkService] = useState<PersonLinkService>('website')
   const [showLinkServicePicker, setShowLinkServicePicker] = useState(false)
   const noteInputRef = useRef<HTMLTextAreaElement>(null)
+  const notesListRef = useRef<HTMLDivElement>(null)
 
   const settingsButtonRef = useRef<HTMLButtonElement>(null)
   const settingsPanelRef = useRef<HTMLDivElement>(null)
@@ -1822,6 +1823,16 @@ function App() {
     }))
   }
 
+  function scrollNotesListToBottom() {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const list = notesListRef.current
+        if (!list) return
+        list.scrollTop = list.scrollHeight
+      })
+    })
+  }
+
   function handleSaveNewNote(personId: string) {
     const trimmed = newNoteBody.trim()
     if (trimmed) {
@@ -1834,6 +1845,7 @@ function App() {
       if (noteInputRef.current) {
         noteInputRef.current.style.height = 'auto'
       }
+      scrollNotesListToBottom()
       requestAnimationFrame(() => {
         noteInputRef.current?.focus()
       })
@@ -4258,7 +4270,7 @@ function App() {
     setSelectedPeopleIds([])
 
     selectItem({ type: 'person', id })
-    completeOnboardingAction('create')
+    completeOnboardingAction('create-person')
     // Grow the new person in so it feels placed, not blinked into existence.
     startBoardAnim('pop:' + id, 360)
   }
@@ -4407,7 +4419,11 @@ function App() {
     // Grow the new person in so it feels placed, not blinked into existence.
     startBoardAnim('pop:' + id, 360)
     setCreateMenu(null)
-    completeOnboardingAction('create')
+  }
+
+  function completeCreateCircleOnboarding() {
+    if (createMenu?.dragSourceType !== 'circle') return
+    completeOnboardingAction('create-circle')
   }
 
   // "Add circle" in the create menu auto-detects containment the same way the
@@ -4461,8 +4477,8 @@ function App() {
     })
 
     selectItem({ type: 'circle', id })
+    completeCreateCircleOnboarding()
     setCreateMenu(null)
-    completeOnboardingAction('create')
   }
 
 
@@ -5537,7 +5553,6 @@ Content-Type: application/json
         key={`${renderedInspectorItem.type}:${renderedInspectorItem.id}`}
         className={`inspector ${isInspectorOpen ? 'is-open' : ''}`}
         aria-label="Selection details"
-        style={{ overflow: 'visible', maxHeight: 'calc(100vh - 120px)' }}
       >
 
             {renderedInspectorItem.type !== 'connection' ? (
@@ -5984,7 +5999,7 @@ Content-Type: application/json
                   </div>
  
                   {/* Scrollable list */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div className="trello-list__notes" ref={notesListRef}>
                     {selectedPerson.notes?.map((note, index) => (
                       <div key={note.id} className="trello-note-shell" style={{ '--note-index': index } as CSSProperties}>
                         {editingNoteId === note.id ? (
@@ -6051,8 +6066,9 @@ Content-Type: application/json
                           value={newNoteBody}
                           onChange={(e) => {
                             setNewNoteBody(e.target.value)
+                            const maxHeight = 200
                             e.target.style.height = 'auto'
-                            e.target.style.height = `${e.target.scrollHeight}px`
+                            e.target.style.height = `${Math.min(e.target.scrollHeight, maxHeight)}px`
                           }}
                           className="trello-list__composer-textarea"
                           autoFocus

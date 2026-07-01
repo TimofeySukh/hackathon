@@ -136,10 +136,11 @@
   width: 100%;
   max-width: 100%;
   min-width: 0;
+  min-height: var(--inspector-control-height, 40px);
   text-align: left;
   border: 1px solid var(--md-outline-variant);
-  border-radius: 9999px;
-  padding: 8px 12px;
+  border-radius: var(--md-r-full);
+  padding: 0 12px;
   font-size: 13px;
   font-weight: 500;
   outline: none;
@@ -378,15 +379,20 @@
 }
 
 .circle-style-popover {
-  position: absolute;
+  position: fixed;
   z-index: 1200;
-  right: 0;
-  bottom: calc(100% + 12px); /* open above the palette icon, anchored to the visual row */
-  width: min(344px, calc(100vw - 48px));
+  left: 16px;
+  right: 16px;
+  bottom: 96px;
+  width: auto;
+  max-height: min(520px, calc(100dvh - 128px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   display: grid;
   gap: 12px;
   padding: 14px;
-  border-radius: 22px;
+  border-radius: var(--md-r-xl);
   background:
     linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.72)),
     var(--md-surface-container);
@@ -399,7 +405,7 @@
   opacity: 0;
   visibility: hidden;
   transform: scale(0.92);
-  transform-origin: bottom right; /* scale up from the palette icon below it */
+  transform-origin: bottom center;
   transition:
     opacity var(--md-dur-medium) var(--md-ease-standard),
     transform var(--md-dur-medium) var(--md-ease-spring-gentle),
@@ -725,19 +731,21 @@
 
 .connections-list {
   display: grid;
-  gap: 7px;
+  gap: var(--inspector-section-gap, 8px);
   width: 100%;
-  padding: 8px;
-  border: 1px solid var(--md-outline-variant);
-  border-radius: var(--md-r-md);
+  padding: var(--inspector-section-padding, 12px);
+  border: none;
+  border-radius: var(--inspector-section-radius, var(--md-r-md));
   background: var(--md-surface-container-high);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--md-outline-variant) 65%, transparent);
+  box-sizing: border-box;
 }
 
 .connections-list__header {
   display: flex;
   align-items: center;
   min-height: 18px;
-  padding: 0 3px;
+  padding: 0 4px 2px 4px;
 }
 
 .connections-list__title {
@@ -749,14 +757,14 @@
 
 .connections-list__items {
   display: grid;
-  gap: 4px;
+  gap: 6px;
 }
 
 .connection-item {
   display: grid;
-  grid-template-columns: 1fr 28px;
+  grid-template-columns: 1fr 32px;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 
 .connection-item__main {
@@ -765,10 +773,10 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
-  min-height: 34px;
+  min-height: var(--inspector-control-height, 40px);
   padding: 4px 8px 4px 4px;
-  border-radius: var(--md-r-sm);
-  background: var(--md-surface);
+  border-radius: var(--inspector-item-radius, var(--md-r-sm));
+  background: var(--md-surface-container-low);
   color: var(--md-on-surface);
   cursor: pointer;
   text-align: left;
@@ -785,7 +793,7 @@
 }
 
 .connection-item__main:hover {
-  background: color-mix(in srgb, var(--md-on-surface) 8%, var(--md-surface));
+  background: color-mix(in srgb, var(--md-on-surface) 6%, var(--md-surface-container-low));
   box-shadow: var(--md-elev-1);
   transform: scale(1.01);
 }
@@ -796,10 +804,10 @@
 
 .connection-item__delete {
   display: grid;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   place-items: center;
-  border-radius: 50%;
+  border-radius: var(--md-r-full);
   background: transparent;
   color: var(--md-on-surface-variant);
   cursor: pointer;
@@ -844,9 +852,9 @@
    Rounded corners (r-sm) but still reads as a rectangle. Focus is a subtle fill deepen. */
 .connection-composer input {
   min-width: 0;
-  height: 40px;
+  height: var(--inspector-control-height, 40px);
   border: none;
-  border-radius: var(--md-r-sm);
+  border-radius: var(--inspector-item-radius, var(--md-r-sm));
   background: var(--md-surface-container-highest);
   color: var(--md-on-surface);
   padding: 0 16px;
@@ -868,8 +876,10 @@
 }
 
 .connection-composer button {
-  height: 40px;
-  border-radius: var(--md-r-sm); /* Rectangular — local rule for the notes/connections menu */
+  height: var(--inspector-control-height, 40px);
+  min-height: var(--inspector-control-height, 40px);
+  border-radius: var(--md-r-full);
+  padding: 0 20px;
   background: var(--md-primary);
   color: var(--md-on-primary);
   padding: 0 20px;
@@ -925,15 +935,16 @@
   transform: scale(0.96);
 }
 
+@media (min-width: 721px) {
+  .circle-style-popover {
+    left: auto;
+    width: min(344px, calc(100vw - 48px));
+  }
+}
+
 @media (max-width: 720px) {
   .circle-style-popover {
-    position: fixed;
-    left: 16px;
-    right: 16px;
-    bottom: 96px;
-    width: auto;
-    max-height: calc(100vh - 128px);
-    overflow-y: auto;
+    bottom: max(96px, calc(42dvh + 24px));
   }
 }
 

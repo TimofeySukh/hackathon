@@ -14,10 +14,10 @@ guide.
 - Landing page board CTAs force-open the guide for that board launch, even if the browser
   has seen it before.
 - A Help button in the board toolbar reopens the guide at any time.
-- Completion is stored locally under `social-board-onboarding-done-v2`.
+- Completion is stored locally under `social-board-onboarding-done-v3`.
 - The guide has separate copy for desktop and touch layouts:
   - Desktop explains direct mouse/trackpad controls: drag empty space, wheel/trackpad
-    zoom, right-click circle creation, double-click person creation, and right-drag area
+    zoom, double-click person creation, center-drag circle creation, and right-drag area
     selection.
   - Mobile explains the top-left modes: Edit, Select, and Pan, plus two-finger pinch zoom.
 - Each step turns into a blue completed state with a checkmark for one second when the
@@ -28,8 +28,10 @@ guide.
   added to the board.
 - The archive-import education is split into two explicit actions: open Settings with the
   gear, then click the `?` next to LinkedIn Data Import.
-- Action triggers are `mode`, `navigate`, `create`, `organize`, `select`,
-  `search-import`, `settings`, and `linkedin-guide`.
+- Action triggers are `mode`, `navigate`, `create-person`, `create-circle`, `organize`,
+  `select`, `search-import`, `settings`, and `linkedin-guide`.
+- The create flow is split into two verified steps: double-click/double-tap empty space to
+  add a person, then drag from a circle center to empty space and choose Add circle.
 
 ## Design
 
