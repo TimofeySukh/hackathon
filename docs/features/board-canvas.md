@@ -77,7 +77,9 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   frame. Tiny far-away transparent circles use simple arc strokes instead of dashed outline
   paths.
 - **Select**: click a circle, person, or connection to load it into the inspector for
-  rename / styling / notes / delete.
+  rename / styling / notes / delete. Circles can only be removed with the inspector's
+  **Delete circle** button, which asks for confirmation first. People and connections
+  can still be deleted with Backspace/Delete.
 - **Undo**: Ctrl/Cmd+Z reverts the last graph-mutating action — create, delete, move,
   resize, connect, merge, change-circle, favorite, add/delete note, and LinkedIn import.
   A whole drag or resize gesture is a single undo step, and the shortcut is ignored while
@@ -87,8 +89,9 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
 - **Demo mode**: the Settings panel includes a demo mode switch. When enabled, chrome,
   stress controls, help text, and the inspector disappear; only the board canvas and
   settings button remain. People and circles can still be moved, and circle edges can
-  still be resized. Existing items can still be selected on the canvas and deleted with
-  Backspace/Delete. Connector handles stay visible. Dragging a circle/person connector to
+  still be resized. People and connections can still be selected on the canvas and deleted
+  with Backspace/Delete. Circles cannot be deleted from the keyboard; use the inspector's
+  **Delete circle** button instead. Connector handles stay visible. Dragging a circle/person connector to
   an existing node creates a link; dragging to empty space opens the create menu so users
   can add a person or a circle without leaving demo mode.
 - **Graph file actions**: the bottom of Settings includes graph import, export, and

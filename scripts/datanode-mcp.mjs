@@ -332,7 +332,7 @@ const toolDefinitions = [
   }),
   tool({
     name: 'delete_circle',
-    description: 'Delete a circle. Its child circles/people are promoted to its parent circle. For large cleanups, create a backup or ask the user to confirm first.',
+    description: 'Delete a circle. People in the deleted circle stay at their current positions but are detached from any circle. Nested child circles move to the deleted circle\'s parent. For large cleanups, create a backup or ask the user to confirm first.',
     riskClass: 'destructive',
     sideEffect: 'deletes circle and rewires children',
     schema: strictObject({

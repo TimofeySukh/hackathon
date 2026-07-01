@@ -1004,3 +1004,16 @@ rediscover, write it here.
   gesture frames should transform a cached picture or draw cheap dots/arcs rather than
   recomputing every avatar sprite, dashed circle outline, membership curve, and connection
   hit candidate.
+
+## 2026-07-01 — Safer circle deletion
+
+- Decision: Circles can no longer be deleted with Backspace/Delete. The inspector's
+  **Delete circle** button is the only UI path, and it shows a confirmation dialog first.
+- Why: Accidental keyboard deletes were too easy on dense boards, and promoting people
+  into the parent circle (often `You`) made deleted circles feel like they "swallowed"
+  contacts into the center.
+- Decision: Deleting a circle now detaches its people in place (`circleId: ''`) instead
+  of reassigning them to the parent circle. Nested child circles still move to the deleted
+  circle's parent.
+- Why: Users expect contacts to stay where they were visually; only membership should
+  change when the circle outline disappears.

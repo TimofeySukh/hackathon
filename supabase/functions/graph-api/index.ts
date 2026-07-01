@@ -622,7 +622,7 @@ function deleteCircle(graph: GraphState, circleId: string) {
 
   graph.people = graph.people.map((p) => {
     if (p.circleId === circleId) {
-      return { ...p, circleId: newParentId }
+      return { ...p, circleId: '' }
     }
     return p
   })

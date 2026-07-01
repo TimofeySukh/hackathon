@@ -1905,6 +1905,15 @@ function App() {
   function deleteCircle(circleId: string) {
     if (circleId === 'you') return
 
+    const circle = graph.circles.find((c) => c.id === circleId)
+    if (!circle) return
+
+    const circleLabel = circle.name.trim() || circle.icon.trim() || 'this circle'
+    const confirmed = window.confirm(
+      `Delete "${circleLabel}"? People in this circle stay where they are but are removed from the circle. Nested circles move to the parent circle.`,
+    )
+    if (!confirmed) return
+
     pushHistory()
     setGraph((current) => {
       const deletedCircle = current.circles.find((c) => c.id === circleId)
@@ -1926,10 +1935,10 @@ function App() {
           return updated
         })
 
-      // 2. Promote people inside the deleted circle to the parent of the deleted circle
+      // 2. Detach people from the deleted circle without moving them
       const nextPeople = current.people.map((p) => {
         if (p.circleId === circleId) {
-          return { ...p, circleId: newParentId }
+          return { ...p, circleId: '' }
         }
         return p
       })
@@ -1978,61 +1987,29 @@ function App() {
   }
 
   function deleteSelectedItem() {
-    if (selectedPeopleIds.length > 0 || selectedCircleIds.length > 0) {
+    if (selectedPeopleIds.length > 0) {
       pushHistory()
       setGraph((current) => {
-        const deletedCircleIds = new Set<string>(selectedCircleIds)
-        let expanded = true
-        while (expanded) {
-          expanded = false
-          for (const c of current.circles) {
-            if (c.parentId && deletedCircleIds.has(c.parentId) && !deletedCircleIds.has(c.id)) {
-              deletedCircleIds.add(c.id)
-              expanded = true
-            }
-          }
-        }
-
         const deletedPeopleIds = new Set<string>(selectedPeopleIds)
-        for (const p of current.people) {
-          if (deletedCircleIds.has(p.circleId)) {
-            deletedPeopleIds.add(p.id)
-          }
-        }
-
-        const nextCircles = current.circles
-          .filter((c) => !deletedCircleIds.has(c.id))
-          .map((c) => {
-            if (c.connectedTo && deletedCircleIds.has(c.connectedTo)) {
-              return { ...c, connectedTo: null }
-            }
-            return c
-          })
 
         const nextPeople = current.people.filter((p) => !deletedPeopleIds.has(p.id))
 
         const nextConnections = (current.connections || []).filter(
           (conn) =>
             !deletedPeopleIds.has(conn.fromId) &&
-            !deletedPeopleIds.has(conn.toId) &&
-            !deletedCircleIds.has(conn.fromId) &&
-            !deletedCircleIds.has(conn.toId)
+            !deletedPeopleIds.has(conn.toId)
         )
 
         return settleInteractionGraph({
           ...current,
-          circles: nextCircles,
           people: nextPeople,
           connections: nextConnections,
         })
       })
       setSelectedPeopleIds([])
-      setSelectedCircleIds([])
       selectItem(null)
     } else if (selectedItem?.type === 'person') {
       deletePerson(selectedItem.id)
-    } else if (selectedItem?.type === 'circle') {
-      deleteCircle(selectedItem.id)
     } else if (selectedItem?.type === 'connection') {
       deleteConnection(selectedItem.id)
     }

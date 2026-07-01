@@ -117,6 +117,7 @@ export default function DocsPage() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [activeArticleId, setActiveArticleId] = useState(readArticleIdFromHash)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set(DEFAULT_COLLAPSED))
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [copiedStatus, setCopiedStatus] = useState<string | null>(null)
   const contentRef = useRef<HTMLElement>(null)
   const searchRef = useRef<HTMLDivElement>(null)
@@ -308,7 +309,7 @@ export default function DocsPage() {
                 </tr>
                 <tr>
                   <td className="docs-param-name">delete_circle</td>
-                  <td>Delete a circle (promotes child elements).</td>
+                  <td>Delete a circle (detaches people in place; nested circles move to parent).</td>
                 </tr>
                 <tr>
                   <td className="docs-param-name">upload_avatar</td>
@@ -470,7 +471,7 @@ ${npxCmd}`}</code>
                 <tr>
                   <td className="docs-param-name">circles:delete</td>
                   <td><code>&lt;circleId&gt;</code></td>
-                  <td>Delete a circle (promotes child elements).</td>
+                  <td>Delete a circle (detaches people in place; nested circles move to parent).</td>
                 </tr>
                 <tr>
                   <td className="docs-param-name">avatars:upload</td>
@@ -1606,7 +1607,7 @@ ${pinnedCmd}`}</code>
               <span className="docs-method-badge delete">DELETE</span>
               <span className="docs-endpoint-path">/circles/:circleId</span>
             </div>
-            <p>Deletes a circle. Its child circles/people are promoted to its parent circle. Requires <code>circles:write</code> scope.</p>
+            <p>Deletes a circle. People in the deleted circle stay at their current positions but are detached from any circle. Nested child circles move to the deleted circle&apos;s parent. Requires <code>circles:write</code> scope.</p>
             <h3>Request Example</h3>
             <div className="docs-code-container">
               <div className="docs-code-header">
@@ -1709,6 +1710,7 @@ ${pinnedCmd}`}</code>
     setActiveArticleId(id)
     setSearchQuery('')
     setSearchOpen(false)
+    setMobileNavOpen(false)
     window.location.hash = `#docs/${id}`
     contentRef.current?.scrollTo({ top: 0 })
   }, [])
@@ -1771,7 +1773,7 @@ ${pinnedCmd}`}</code>
   }, [])
 
   return (
-    <div className="docs-container">
+    <div className={`app-shell docs-container ${mobileNavOpen ? 'docs-nav-open' : ''}`}>
       {/* Toast notifications */}
       {copiedStatus && (
         <div style={{
@@ -1797,6 +1799,14 @@ ${pinnedCmd}`}</code>
           <h1>Developer Docs</h1>
         </div>
         <div className="docs-controls">
+          <button
+            type="button"
+            className="docs-nav-toggle"
+            aria-expanded={mobileNavOpen}
+            onClick={() => setMobileNavOpen((open) => !open)}
+          >
+            {mobileNavOpen ? 'Hide menu' : 'Browse docs'}
+          </button>
           <div className="docs-search-wrapper" ref={searchRef}>
             <svg className="docs-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <circle cx="11" cy="11" r="8"></circle>
@@ -1863,15 +1873,15 @@ ${pinnedCmd}`}</code>
           </div>
           <button
             type="button"
-            className="m3-primary-button docs-back-btn"
-            onClick={() => { window.location.hash = '#board' }}
+            className="docs-back-btn"
+            onClick={() => { window.location.hash = '' }}
           >
-            Back to board
+            Back
           </button>
         </div>
       </header>
 
-      <aside className="docs-sidebar">
+      <aside className={`docs-sidebar ${mobileNavOpen ? 'is-open' : ''}`}>
         {DOC_SECTIONS.map((section) => {
           const visibleGroups = section.groups
             .map((group) => ({
