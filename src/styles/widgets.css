@@ -1047,12 +1047,18 @@
   transform: scale(0.9);
 }
 
+.onboarding-coach.is-complete .onboarding-coach__close {
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  cursor: default;
+  font-size: 18px;
+  font-weight: 600;
+  transform: none;
+}
+
 .onboarding-coach__heading {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 12px;
-  padding-right: 42px;
+  padding-right: 34px;
 }
 
 .onboarding-coach__eyebrow {
@@ -1068,19 +1074,6 @@
   font-size: 18px;
   font-weight: 500;
   line-height: 1.25;
-}
-
-.onboarding-coach__check {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  place-items: center;
-  border-radius: var(--md-r-full);
-  background: var(--md-primary);
-  color: var(--md-on-primary);
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 1;
 }
 
 .onboarding-coach__body {

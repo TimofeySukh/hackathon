@@ -25,21 +25,17 @@ export function OnboardingCoach({ surface, step, completed, onNext, onBack, onSk
       <button
         type="button"
         className="onboarding-coach__close"
-        aria-label="Dismiss guide"
+        aria-label={completed ? 'Step completed' : 'Dismiss guide'}
         onClick={onSkip}
+        disabled={completed}
       >
-        x
+        {completed ? '✓' : 'x'}
       </button>
       <div className="onboarding-coach__heading">
         <span>
           <span className="onboarding-coach__eyebrow">{current.eyebrow}</span>
           <h2 className="onboarding-coach__title">{current.title}</h2>
         </span>
-        {completed && (
-          <span className="onboarding-coach__check" aria-label="Step completed">
-            ✓
-          </span>
-        )}
       </div>
       <p className="onboarding-coach__body">{current.body}</p>
       <div className="onboarding-coach__footer">
