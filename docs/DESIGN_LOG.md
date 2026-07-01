@@ -1050,3 +1050,16 @@ rediscover, write it here.
   circle's parent.
 - Why: Users expect contacts to stay where they were visually; only membership should
   change when the circle outline disappears.
+
+### 2026-07-02 — Onboarding completion feedback and explicit import path
+
+- Decision: Onboarding actions now show a blue completed card with a checkmark for one
+  second before the guide advances.
+- Why: Immediate auto-advance made users miss the fact that they had successfully performed
+  the requested action.
+- Decision: Split the old import step into Search LinkedIn profile import, Settings gear,
+  and LinkedIn Data Import `?` guide steps. During the Search step, empty Search shows
+  built-in Timofey Sukhov and Velizar Seleznev LinkedIn examples.
+- Why: Users cannot immediately import a LinkedIn archive. They first need to learn that
+  Search can add one profile link, and that the archive flow starts in Settings via the
+  highlighted `?` guide.

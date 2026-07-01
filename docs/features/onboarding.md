@@ -4,7 +4,9 @@
 
 Help new users understand the board controls before they start building a graph. The
 guide focuses on the actions that were least discoverable in user testing: zooming,
-panning, creating circles, moving/resizing zones, and selecting an area.
+panning, creating people and circles, moving/resizing zones, selecting an area, adding a
+LinkedIn profile from Search, opening Settings, and finding the LinkedIn archive sync
+guide.
 
 ## Behavior
 
@@ -18,9 +20,16 @@ panning, creating circles, moving/resizing zones, and selecting an area.
     zoom, right-click circle creation, double-click person creation, and right-drag area
     selection.
   - Mobile explains the top-left modes: Edit, Select, and Pan, plus two-finger pinch zoom.
-- Each step auto-advances when the matching action is performed. The visible `Skip`
-  button is only a manual bypass for users who already know that control.
-- Action triggers are `mode`, `navigate`, `create`, `organize`, `select`, and `import`.
+- Each step turns into a blue completed state with a checkmark for one second when the
+  matching action is performed, then auto-advances. The visible `Skip` button is only a
+  manual bypass for users who already know that control.
+- The Search step shows two built-in LinkedIn examples in an empty Search dropdown during
+  onboarding, then completes after the user chooses one and the profile is selected or
+  added to the board.
+- The archive-import education is split into two explicit actions: open Settings with the
+  gear, then click the `?` next to LinkedIn Data Import.
+- Action triggers are `mode`, `navigate`, `create`, `organize`, `select`,
+  `search-import`, `settings`, and `linkedin-guide`.
 
 ## Design
 

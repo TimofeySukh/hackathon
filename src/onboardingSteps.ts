@@ -1,5 +1,13 @@
 export type OnboardingSurface = 'desktop' | 'mobile'
-export type OnboardingAction = 'mode' | 'navigate' | 'create' | 'organize' | 'select' | 'import'
+export type OnboardingAction =
+  | 'mode'
+  | 'navigate'
+  | 'create'
+  | 'organize'
+  | 'select'
+  | 'search-import'
+  | 'settings'
+  | 'linkedin-guide'
 
 export type OnboardingStep = {
   trigger: OnboardingAction
@@ -34,10 +42,22 @@ const DESKTOP_ONBOARDING_STEPS: OnboardingStep[] = [
     body: 'Right-drag empty space to draw a selection box. Hold Shift while clicking to add or remove individual people and circles.',
   },
   {
-    trigger: 'import',
-    eyebrow: 'Import',
-    title: 'Bring in real people',
-    body: 'Open Settings to import a LinkedIn ZIP, or paste a LinkedIn profile URL into Search to add one person.',
+    trigger: 'search-import',
+    eyebrow: 'Search',
+    title: 'Add someone from LinkedIn',
+    body: 'Open Search and choose one of the LinkedIn examples. A profile link can add a real person to the board.',
+  },
+  {
+    trigger: 'settings',
+    eyebrow: 'Settings',
+    title: 'Open Settings',
+    body: 'Click the gear icon to open Settings. This is where imports, account controls, and graph actions live.',
+  },
+  {
+    trigger: 'linkedin-guide',
+    eyebrow: 'LinkedIn archive',
+    title: 'Find the sync guide',
+    body: 'Inside Settings, click the question mark next to LinkedIn Data Import to see how to request and upload your archive.',
   },
 ]
 
@@ -67,10 +87,22 @@ const MOBILE_ONBOARDING_STEPS: OnboardingStep[] = [
     body: 'Switch to Select mode, then drag across the board to select people and circles in that area.',
   },
   {
-    trigger: 'import',
-    eyebrow: 'Import',
-    title: 'Bring in real people',
-    body: 'Open Settings to import a LinkedIn ZIP, or paste a LinkedIn profile URL into Search to add one person.',
+    trigger: 'search-import',
+    eyebrow: 'Search',
+    title: 'Add someone from LinkedIn',
+    body: 'Open Search and choose one of the LinkedIn examples. A profile link can add a real person to the board.',
+  },
+  {
+    trigger: 'settings',
+    eyebrow: 'Settings',
+    title: 'Open Settings',
+    body: 'Tap the gear icon to open Settings. This is where imports, account controls, and graph actions live.',
+  },
+  {
+    trigger: 'linkedin-guide',
+    eyebrow: 'LinkedIn archive',
+    title: 'Find the sync guide',
+    body: 'Inside Settings, tap the question mark next to LinkedIn Data Import to see how to request and upload your archive.',
   },
 ]
 

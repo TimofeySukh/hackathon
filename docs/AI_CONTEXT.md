@@ -4,7 +4,7 @@
 When other docs disagree with this file or with the code, trust the code and update the
 conflicting doc.
 
-Last verified against the repository: 2026-07-01.
+Last verified against the repository: 2026-07-02.
 
 ---
 
@@ -100,12 +100,16 @@ Safety invariants:
 **Onboarding**:
 
 - First board visit opens a short guide explaining pan/zoom, creation, moving/resizing,
-  area selection, and import.
-- Guide steps auto-advance when the matching action is performed; the visible button skips
-  a step manually.
+  area selection, Search-based LinkedIn profile import, Settings, and the LinkedIn archive
+  sync guide.
+- Guide steps show a blue completed state with a checkmark for one second after the
+  matching action is performed, then auto-advance; the visible button skips a step
+  manually.
 - Landing page board CTAs force-open the guide for that launch.
 - The board toolbar Help button reopens the guide.
 - Mobile guide copy explicitly explains Edit / Select / Pan modes.
+- During the Search import step, opening empty Search shows two built-in LinkedIn profile
+  examples (Timofey Sukhov and Velizar Seleznev) so users can learn the link-import path.
 
 **Create**:
 

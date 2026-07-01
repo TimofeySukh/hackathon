@@ -86,8 +86,10 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
 - **Area select**: on desktop, right-drag empty space to draw a marquee selection box.
   On touch/mobile, switch to Select mode and drag across the board.
 - **Onboarding guide**: first board visit opens a short board guide; landing CTAs
-  force-open it for that launch, and the toolbar Help button reopens it. Steps
-  auto-advance after the matching action is performed, while `Skip` manually advances.
+  force-open it for that launch, and the toolbar Help button reopens it. Steps show a
+  blue checkmark completion state for one second after the matching action, then
+  auto-advance, while `Skip` manually advances. The Search step exposes two built-in
+  LinkedIn profile examples, and the archive guide is taught through Settings gear -> `?`.
   The mobile copy explains Edit / Select / Pan modes.
 - **Undo**: Ctrl/Cmd+Z reverts the last graph-mutating action — create, delete, move,
   resize, connect, merge, change-circle, favorite, add/delete note, and LinkedIn import.

@@ -507,6 +507,21 @@ const LINKEDIN_GUIDE_HINT_KEY = 'social-linkedin-guide-hint-seen-v1'
 const SEARCH_LINKEDIN_HINT_KEY = 'social-search-linkedin-hint-seen-v1'
 const BOARD_ONBOARDING_STORAGE_KEY = 'social-board-onboarding-done-v2'
 const BOARD_ONBOARDING_FORCE_KEY = 'social-board-onboarding-open-v2'
+const ONBOARDING_COMPLETE_DELAY_MS = 1000
+const ONBOARDING_LINKEDIN_EXAMPLES = [
+  {
+    name: 'Timofey Sukhov',
+    role: 'CEO',
+    url: 'https://www.linkedin.com/in/timofey-sukhov-775b38404/',
+    avatarUrl: '/timofey_avatar.jpeg',
+  },
+  {
+    name: 'Velizar Seleznev',
+    role: 'CTO',
+    url: 'https://www.linkedin.com/in/velizar-seleznev/',
+    avatarUrl: '/velizar_avatar.jpeg',
+  },
+] as const
 const CIRCLE_CREATION_DEFAULTS_KEY = 'hackathon-board:circle-creation-defaults:v1'
 type BoardToolMode = 'edit' | 'pan' | 'select'
 
@@ -1208,7 +1223,11 @@ function App() {
   const onboardingSurface: OnboardingSurface = isTouchLayout ? 'mobile' : 'desktop'
   const onboardingSteps = useMemo(() => getOnboardingSteps(onboardingSurface), [onboardingSurface])
   const [onboardingStep, setOnboardingStep] = useState(-1)
+  const [completedOnboardingStep, setCompletedOnboardingStep] = useState<number | null>(null)
+  const onboardingStepRef = useRef(onboardingStep)
+  const completedOnboardingStepRef = useRef(completedOnboardingStep)
   const onboardingDecidedRef = useRef(false)
+  const onboardingAdvanceTimerRef = useRef<number | null>(null)
   const [highlightLinkedInGuideHelp, setHighlightLinkedInGuideHelp] = useState(
     () => !hasLocalFlag(LINKEDIN_GUIDE_HINT_KEY),
   )
@@ -1229,6 +1248,11 @@ function App() {
     setBoardToolMode('edit')
   }, [boardToolMode, isTouchLayout])
 
+  useLayoutEffect(() => {
+    onboardingStepRef.current = onboardingStep
+    completedOnboardingStepRef.current = completedOnboardingStep
+  }, [onboardingStep, completedOnboardingStep])
+
   useEffect(() => {
     if (onboardingDecidedRef.current) return
     if (!graphLoaded || auth.status === 'loading') return
@@ -1236,43 +1260,104 @@ function App() {
     const forced = consumeSessionFlag(BOARD_ONBOARDING_FORCE_KEY)
     if (forced || !hasLocalFlag(BOARD_ONBOARDING_STORAGE_KEY)) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
+      onboardingStepRef.current = 0
       setOnboardingStep(0)
     }
   }, [auth.status, graphLoaded])
 
+  useEffect(() => {
+    return () => {
+      if (onboardingAdvanceTimerRef.current !== null) {
+        window.clearTimeout(onboardingAdvanceTimerRef.current)
+      }
+    }
+  }, [])
+
+  function clearOnboardingAdvanceTimer() {
+    if (onboardingAdvanceTimerRef.current === null) return
+    window.clearTimeout(onboardingAdvanceTimerRef.current)
+    onboardingAdvanceTimerRef.current = null
+  }
+
   function finishOnboarding() {
+    clearOnboardingAdvanceTimer()
     markLocalFlag(BOARD_ONBOARDING_STORAGE_KEY)
+    onboardingStepRef.current = -1
+    completedOnboardingStepRef.current = null
+    setCompletedOnboardingStep(null)
     setOnboardingStep(-1)
   }
 
   function onboardingNext() {
-    setOnboardingStep((step) => {
-      if (step < 0) return step
-      const next = step + 1
-      if (next >= onboardingSteps.length) {
-        markLocalFlag(BOARD_ONBOARDING_STORAGE_KEY)
-        return -1
-      }
-      return next
-    })
+    clearOnboardingAdvanceTimer()
+    const step = onboardingStepRef.current
+    if (step < 0) return
+    const next = step + 1
+    const nextStep = next >= onboardingSteps.length ? -1 : next
+    if (nextStep < 0) markLocalFlag(BOARD_ONBOARDING_STORAGE_KEY)
+    onboardingStepRef.current = nextStep
+    completedOnboardingStepRef.current = null
+    setCompletedOnboardingStep(null)
+    setOnboardingStep(nextStep)
   }
 
   function onboardingBack() {
-    setOnboardingStep((step) => (step > 0 ? step - 1 : step))
+    clearOnboardingAdvanceTimer()
+    const nextStep = onboardingStepRef.current > 0 ? onboardingStepRef.current - 1 : onboardingStepRef.current
+    onboardingStepRef.current = nextStep
+    completedOnboardingStepRef.current = null
+    setCompletedOnboardingStep(null)
+    setOnboardingStep(nextStep)
+  }
+
+  function completeOnboardingStep(stepIndex: number) {
+    if (stepIndex < 0 || stepIndex >= onboardingSteps.length) return
+    clearOnboardingAdvanceTimer()
+    onboardingStepRef.current = stepIndex
+    completedOnboardingStepRef.current = stepIndex
+    setOnboardingStep(stepIndex)
+    setCompletedOnboardingStep(stepIndex)
+    onboardingAdvanceTimerRef.current = window.setTimeout(() => {
+      onboardingAdvanceTimerRef.current = null
+      completedOnboardingStepRef.current = null
+      setCompletedOnboardingStep(null)
+      setOnboardingStep((step) => {
+        if (step !== stepIndex) return step
+        const next = step + 1
+        if (next >= onboardingSteps.length) {
+          markLocalFlag(BOARD_ONBOARDING_STORAGE_KEY)
+          onboardingStepRef.current = -1
+          return -1
+        }
+        onboardingStepRef.current = next
+        return next
+      })
+    }, ONBOARDING_COMPLETE_DELAY_MS)
   }
 
   function completeOnboardingAction(action: OnboardingAction) {
-    setOnboardingStep((step) => {
-      if (step < 0) return step
-      const current = onboardingSteps[step]
-      if (!current || current.trigger !== action) return step
-      const next = step + 1
-      if (next >= onboardingSteps.length) {
-        markLocalFlag(BOARD_ONBOARDING_STORAGE_KEY)
-        return -1
-      }
-      return next
-    })
+    const step = onboardingStepRef.current
+    if (step < 0 || completedOnboardingStepRef.current !== null) return
+    const current = onboardingSteps[step]
+    if (!current || current.trigger !== action) return
+    completeOnboardingStep(step)
+  }
+
+  function openLinkedInGuide() {
+    const step = onboardingStepRef.current
+    const currentTrigger = onboardingSteps[step]?.trigger
+    if (currentTrigger === 'linkedin-guide') {
+      completeOnboardingStep(step)
+    } else if (
+      currentTrigger === 'settings' &&
+      onboardingSteps[step + 1]?.trigger === 'linkedin-guide'
+    ) {
+      completeOnboardingStep(step + 1)
+    }
+    markLocalFlag(LINKEDIN_GUIDE_HINT_KEY)
+    setHighlightLinkedInGuideHelp(false)
+    setShowSettings(false)
+    setShowLinkedInGuide(true)
   }
 
 
@@ -1417,15 +1502,16 @@ function App() {
     })
   }
 
-  async function handleImportLinkedInProfileFromSearch() {
+  async function handleImportLinkedInProfileFromSearch(rawValue = searchQuery) {
     if (isImportingLinkedInProfile) return
-    const profileUrl = getLinkedInProfileImportUrl(searchQuery)
+    const profileUrl = getLinkedInProfileImportUrl(rawValue)
     if (!profileUrl) return
     const existingPerson = findPersonByLinkedInProfileUrl(graph.people, profileUrl)
     if (existingPerson && !personNeedsLinkedInEnrichment(existingPerson, graph.circles)) {
       selectItem({ type: 'person', id: existingPerson.id })
       focusCameraOnWorld(existingPerson.x, existingPerson.y, 1.5)
       closeSearch()
+      completeOnboardingAction('search-import')
       return
     }
     setIsImportingLinkedInProfile(true)
@@ -1441,6 +1527,7 @@ function App() {
       selectItem({ type: 'person', id: next.person.id })
       focusCameraOnWorld(next.person.x, next.person.y, 1.5)
       closeSearch()
+      completeOnboardingAction('search-import')
     } catch (err) {
       console.error(err)
       const errorMessage = getErrorMessage(err)
@@ -1448,6 +1535,13 @@ function App() {
     } finally {
       setIsImportingLinkedInProfile(false)
     }
+  }
+
+  function handleOnboardingLinkedInExample(url: string) {
+    setSearchQuery(url)
+    setShowSearchLinkedInHint(false)
+    setActiveSearchIndex(0)
+    void handleImportLinkedInProfileFromSearch(url)
   }
 
   function handleSelectSearchResult(result: SearchResult) {
@@ -2321,6 +2415,10 @@ function App() {
   const currentSearchIndex = searchResults.length > 0
     ? clamp(activeSearchIndex, 0, searchResults.length - 1)
     : 0
+  const isOnboardingSearchImportStep =
+    onboardingStep >= 0 &&
+    completedOnboardingStep === null &&
+    onboardingSteps[onboardingStep]?.trigger === 'search-import'
   const sortedCircles = useMemo(() => {
     function getDepth(circleId: string | null): number {
       let depth = 0
@@ -4810,7 +4908,6 @@ Content-Type: application/json
               } else {
                 setShowSettings(false)
                 setSearchOpen(true)
-                completeOnboardingAction('import')
                 if (!hasLocalFlag(SEARCH_LINKEDIN_HINT_KEY)) {
                   setShowSearchLinkedInHint(true)
                   markLocalFlag(SEARCH_LINKEDIN_HINT_KEY)
@@ -4871,9 +4968,30 @@ Content-Type: application/json
               )}
             </>
           )}
-          {searchOpen && searchQuery.trim() === '' && showSearchLinkedInHint && (
+          {searchOpen && searchQuery.trim() === '' && showSearchLinkedInHint && !isOnboardingSearchImportStep && (
             <div className="search-linkedin-hint" role="note">
               Paste a LinkedIn profile link here to add that person to your board.
+            </div>
+          )}
+          {searchOpen && searchQuery.trim() === '' && isOnboardingSearchImportStep && (
+            <div className="search-onboarding-links" role="listbox" aria-label="LinkedIn examples">
+              <span className="search-onboarding-links__title">Try a LinkedIn profile</span>
+              {ONBOARDING_LINKEDIN_EXAMPLES.map((profile) => (
+                <button
+                  key={profile.url}
+                  type="button"
+                  role="option"
+                  className="search-onboarding-links__item"
+                  disabled={isImportingLinkedInProfile}
+                  onClick={() => handleOnboardingLinkedInExample(profile.url)}
+                >
+                  <img src={profile.avatarUrl} alt="" />
+                  <span>
+                    <span className="search-onboarding-links__name">{profile.name}</span>
+                    <span className="search-onboarding-links__sub">{profile.role} - LinkedIn profile</span>
+                  </span>
+                </button>
+              ))}
             </div>
           )}
           {searchOpen && searchQuery.trim() !== '' && (
@@ -4982,7 +5100,7 @@ Content-Type: application/json
             type="button"
             onClick={() => {
               if (!showSettings) closeSearch()
-              if (!showSettings) completeOnboardingAction('import')
+              if (!showSettings) completeOnboardingAction('settings')
               setShowSettings(!showSettings)
             }}
             aria-label="Settings"
@@ -5039,12 +5157,7 @@ Content-Type: application/json
                   className={`linkedin-guide-help ${highlightLinkedInGuideHelp ? 'is-attention' : ''}`}
                   aria-label="How to sync your LinkedIn"
                   title="How to sync your LinkedIn"
-                  onClick={() => {
-                    markLocalFlag(LINKEDIN_GUIDE_HINT_KEY)
-                    setHighlightLinkedInGuideHelp(false)
-                    setShowSettings(false)
-                    setShowLinkedInGuide(true)
-                  }}
+                  onClick={openLinkedInGuide}
                 >
                   ?
                 </button>
@@ -6551,6 +6664,7 @@ Content-Type: application/json
         <OnboardingCoach
           surface={onboardingSurface}
           step={onboardingStep}
+          completed={completedOnboardingStep === onboardingStep}
           onNext={onboardingNext}
           onBack={onboardingBack}
           onSkip={finishOnboarding}
