@@ -1052,6 +1052,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
   gap: 12px;
+  padding-right: 42px;
 }
 
 .onboarding-coach__eyebrow {
@@ -1063,7 +1064,6 @@
 
 .onboarding-coach__title {
   margin: 0;
-  padding-right: 34px;
   color: var(--md-on-surface);
   font-size: 18px;
   font-weight: 500;
