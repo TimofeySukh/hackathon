@@ -13,6 +13,7 @@ For a concise product summary see [`AI_CONTEXT.md`](AI_CONTEXT.md).
 | `supabase/` | Migrations and Edge Functions. |
 | `scripts/` | CLI, MCP, load tests, local LinkedIn agent search. |
 | `deploy/` | Production and optional cloud test deploy assets. |
+| `public/staticwebapp.config.json` | Azure Static Web Apps SPA fallback and security headers, copied into `dist/` by Vite. |
 | `.agents/skills/` | Project-scoped agent skills (Supabase). |
 | `index.html` | Vite HTML entry. |
 | `package.json` | Dependencies and npm scripts. |

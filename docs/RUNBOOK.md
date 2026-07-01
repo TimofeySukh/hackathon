@@ -430,6 +430,63 @@ To make DigitalOcean the default production path later:
 4. Keep the home-server cron disabled only after the DigitalOcean domain is live and
    verified.
 
+## Azure Static Web Apps Test Deploy
+
+`datanode-test` is prepared as an Azure Static Web Apps Free target. It does not replace
+the home-server `social.datanode.live` deployment and it does not deploy automatically on
+push.
+
+Azure resource:
+
+```text
+Subscription: Azure subscription 1
+Resource group: datanode-hosting-rg
+Static Web App: datanode-test
+SKU: Free
+Location: Central US
+Default host: salmon-smoke-003804210.7.azurestaticapps.net
+```
+
+Files:
+
+- `.github/workflows/deploy-datanode-azure-test.yml`
+- `public/staticwebapp.config.json`
+
+What it does:
+
+- deploys only from a manual GitHub Actions `workflow_dispatch`
+- builds the Vite app with GitHub repository variables `VITE_SUPABASE_URL` and
+  `VITE_SUPABASE_PUBLISHABLE_KEY`
+- uploads the built `dist/` directory to Azure Static Web Apps
+- uses `staticwebapp.config.json` for SPA fallback and security headers
+- keeps Supabase as the backend; no Azure database is provisioned
+
+Required GitHub repository secret:
+
+```text
+AZURE_STATIC_WEB_APPS_API_TOKEN
+```
+
+Deploy:
+
+```bash
+gh workflow run deploy-datanode-azure-test.yml --ref main -f ref=main
+```
+
+DNS for an Azure test hostname:
+
+```text
+test.social.datanode.live CNAME salmon-smoke-003804210.7.azurestaticapps.net
+```
+
+Auth configuration required before sign-in works on the Azure host:
+
+- Supabase Auth URL Configuration: add `https://salmon-smoke-003804210.7.azurestaticapps.net`
+  and `https://salmon-smoke-003804210.7.azurestaticapps.net/**` to the additional redirect URLs.
+- Google OAuth Web Client: add `https://salmon-smoke-003804210.7.azurestaticapps.net` to
+  Authorized JavaScript origins. The Supabase Google provider callback URL remains the
+  Supabase callback URL from the dashboard.
+
 Vite listens on all network interfaces in this repository, so it prints both a local URL and a network URL in the terminal. Open either URL in a browser.
 
 For other devices on the same local network, open the printed network URL, for example:

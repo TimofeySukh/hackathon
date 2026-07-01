@@ -17,6 +17,17 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-07-01 — Azure Static Web Apps Free test target
+
+- Decision: Add an Azure Static Web Apps Free target named `datanode-test` with a manual
+  GitHub Actions deploy instead of Azure-created automatic source integration.
+- Why: The frontend is a static Vite app backed by Supabase, so Azure Static Web Apps can
+  test Azure hosting without adding paid compute, a database, or automatic deploys on every
+  push.
+- Details: The Azure target uses `public/staticwebapp.config.json` for SPA fallback and
+  security headers because the nginx config used by the home server and DigitalOcean
+  container does not apply on Azure Static Web Apps.
+
 ### 2026-07-01 — DigitalOcean test app has an explicit shutdown workflow
 
 - Decision: Add a manual GitHub Actions workflow that deletes the DigitalOcean App

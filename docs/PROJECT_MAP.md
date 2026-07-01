@@ -74,7 +74,9 @@ theme toggle, stress-test slider panel, floating anonymous sign-in banner.
 - `.github/workflows/deploy-social-datanode-live.yml` — production promotion to `production` branch.
 - `.github/workflows/deploy-datanode-digitalocean-test.yml` — manual DigitalOcean test deploy.
 - `.github/workflows/shutdown-datanode-digitalocean-test.yml` — manual DigitalOcean test app deletion.
+- `.github/workflows/deploy-datanode-azure-test.yml` — manual Azure Static Web Apps test deploy.
 - `deploy/social-datanode-live/`, `deploy/digitalocean-app-platform/`.
+- `public/staticwebapp.config.json` — Azure Static Web Apps fallback and security headers.
 
 ## Ownership
 
