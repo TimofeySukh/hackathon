@@ -355,7 +355,8 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
                   type="button"
                   className={`demo-inspector-star-btn ${isFavorite ? 'is-active' : ''}`}
                   onClick={() => setIsFavorite(!isFavorite)}
-                  title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                  data-tooltip={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                  data-tooltip-position="top"
                 >
                   <svg viewBox="0 0 24 24">
                     <path
@@ -453,7 +454,8 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
                 {/* Avatar Picker */}
                 <label
                   className="demo-avatar-btn"
-                  title="Upload avatar image from computer"
+                  data-tooltip="Upload avatar image from computer"
+                  data-tooltip-position="top"
                 >
                   <input
                     type="file"
@@ -485,7 +487,8 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
                           type="button"
                           className="demo-note-delete"
                           onClick={() => setDemoNotes(demoNotes.filter((_, i) => i !== index))}
-                          title="Delete note"
+                          data-tooltip="Delete note"
+                          data-tooltip-position="top"
                         >
                           &times;
                         </button>
@@ -565,7 +568,8 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
                           type="button"
                           className="demo-connection-delete"
                           onClick={() => handleDeleteDemoConnection(c.id)}
-                          title="Delete connection"
+                          data-tooltip="Delete connection"
+                          data-tooltip-position="top"
                         >
                           &times;
                         </button>
