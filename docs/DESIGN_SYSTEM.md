@@ -10,7 +10,7 @@ You)** by Google.
 - When you add a new screen, panel, menu, or control, style it with the tokens and
   component recipes below. Do not invent new colors, radii, shadows, or font weights.
 - **Reuse before you build. Do not reinvent the wheel.** If a control already exists
-  (`SelectionIndicator`, the swatch/preset shape-morph, the pill/button recipes, etc.),
+  (`SelectionIndicator`, the swatch/preset selection ring, the pill/button recipes, etc.),
   reuse it — and *modify it for the new use case* (add a variant/prop) rather than writing a
   second, parallel default. One concept = one component. The whole UI must read as one system:
   same elements, same motion, same tokens everywhere. Before adding a control, grep
@@ -240,11 +240,11 @@ Rules of thumb:
 - **Continuity over appear/disappear.** This is the core of M3 motion: interface elements
   persist and *move* rather than spawn and vanish. Selection state is an object that lives in
   the UI and slides between options — not a property that blinks on each item.
-- **Selection should change, not blink.** Never toggle a per-item `outline`/`background` on
-  `.is-selected`. Express the selected state with continuous motion, matched to the control:
-  - **Shape morph** for swatch-like items (color swatches, presets): the selected item morphs
-    from a circle to a rounded square (`border-radius: 50% → 8–9px`) with `--md-ease-spring`.
-    Best when items are tightly packed and an extra ring/background would crowd them.
+- **Selection should change, not blink.** Express the selected state with a stable affordance
+  matched to the control, not a one-frame color swap:
+  - **Selection ring** for swatch-like items (color swatches, presets): the selected item
+    stays circular and gets a compact primary-color ring. Keep this to `box-shadow` or
+    `outline` so the row does not shift.
   - **Sliding indicator** (`SelectionIndicator`, `src/components/SelectionIndicator.tsx`) for
     segmented controls, tabs, and the active toolbar tool: one persistent pill/track that
     translates and resizes to the selected segment. Mount it in a `position: relative` group,

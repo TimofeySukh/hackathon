@@ -267,6 +267,7 @@
   padding: 0;
   transition:
     border-radius 0.22s cubic-bezier(0.34, 1.45, 0.5, 1),
+    box-shadow 0.18s cubic-bezier(0.2, 0, 0, 1),
     transform 0.22s cubic-bezier(0.34, 1.45, 0.5, 1);
 }
 
@@ -292,10 +293,10 @@
   transition: transform 0.1s cubic-bezier(0.2, 0, 0, 1);
 }
 
-/* The selected color morphs from a circle to a rounded square (M3 shape morph),
-   so the active swatch reads instantly without an extra outline. */
+/* Keep selected colors round and mark them with an external ring. */
 .quick-circle-color.is-selected {
-  border-radius: 9px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--md-primary);
 }
 
 .quick-circle-color:hover:not(.is-selected) {
@@ -629,6 +630,7 @@
   cursor: pointer;
   transition:
     border-radius 0.22s cubic-bezier(0.34, 1.45, 0.5, 1),
+    box-shadow 0.18s cubic-bezier(0.2, 0, 0, 1),
     transform 0.22s cubic-bezier(0.34, 1.45, 0.5, 1);
 }
 
@@ -651,9 +653,10 @@
   transition: transform 0.1s cubic-bezier(0.2, 0, 0, 1);
 }
 
-/* Selected preset morphs circle -> rounded square (M3 shape morph). */
+/* Keep selected color presets round and mark them with an external ring. */
 .circle-style-preset.is-selected {
-  border-radius: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--md-primary);
 }
 
 .circle-style-preset:hover:not(.is-selected) {

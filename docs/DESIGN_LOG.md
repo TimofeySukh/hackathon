@@ -17,6 +17,13 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-07-02 — Color swatches stay round when selected
+
+- Decision: Replaced the selected color swatch shape-morph with a compact primary-color
+  ring while keeping the swatch circular.
+- Why: The rounded-square selected state made color choices look like a shape change
+  instead of a selection marker. A ring keeps the color chip stable and more legible.
+
 ### 2026-07-01 — Documentation realignment for AI readability
 
 - Decision: Added `docs/AI_CONTEXT.md` as the canonical, code-aligned product summary for
