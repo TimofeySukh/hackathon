@@ -1804,6 +1804,8 @@ function App() {
       startBoardAnim(`favorite-out:${personId}`, 360)
     }
   }
+  // Reference to bypass noUnusedLocals error while favorite UI is commented out
+  void togglePersonFavorite;
 
   function addPersonNote(personId: string, title: string, body: string) {
     pushHistory()
@@ -5595,6 +5597,7 @@ Content-Type: application/json
                   aria-label="Selected item name"
                 />
                 <div className="inspector-header-actions">
+                  {/* Hide favorite star button for now (keep code as requested)
                   {selectedPerson && (
                     <button
                       type="button"
@@ -5607,6 +5610,7 @@ Content-Type: application/json
                       </svg>
                     </button>
                   )}
+                  */}
                   <button
                     type="button"
                     className="inspector-close-btn"
