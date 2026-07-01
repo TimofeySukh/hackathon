@@ -7105,6 +7105,8 @@ function ensureLinkedInCompanyCircle(current: GraphState, profile: LinkedInProfi
 
 function buildLinkedInProfileNotes(profile: LinkedInProfileImport, existingNotes: PersonNote[] = []) {
   const notes = existingNotes.filter((note) => note.title !== 'Profile' && note.title !== 'Headline' && note.title !== 'Enrichment')
+  const normalizedHeadline = normalizeLinkedInNoteText(profile.headline)
+  const normalizedDescription = normalizeLinkedInNoteText(profile.description ?? '')
   if (profile.headline) {
     notes.push({
       id: `note-headline-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
@@ -7112,7 +7114,7 @@ function buildLinkedInProfileNotes(profile: LinkedInProfileImport, existingNotes
       body: profile.headline,
     })
   }
-  if (profile.description) {
+  if (profile.description && normalizedDescription !== normalizedHeadline) {
     notes.push({
       id: `note-profile-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
       title: 'Profile',
@@ -7306,6 +7308,34 @@ function sanitizeLegacyDemoLinkedInText(value: string) {
   return value
 }
 
+function normalizeLinkedInNoteText(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/\bat\s+socialdatanode\b/g, '')
+    .replace(/\band\b/g, '&')
+    .replace(/[^a-z0-9&]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function sanitizeLinkedInProfileNotes(notes: PersonNote[] | undefined) {
+  const sanitizedNotes = notes?.map((note) => ({
+    ...note,
+    body: sanitizeLegacyDemoLinkedInText(note.body),
+  }))
+  if (!sanitizedNotes) return sanitizedNotes
+
+  const headline = sanitizedNotes.find((note) => note.title === 'Headline')
+  if (!headline) return sanitizedNotes
+  const normalizedHeadline = normalizeLinkedInNoteText(headline.body)
+  if (!normalizedHeadline) return sanitizedNotes
+
+  return sanitizedNotes.filter((note) => (
+    note.title !== 'Profile' ||
+    normalizeLinkedInNoteText(note.body) !== normalizedHeadline
+  ))
+}
+
 function sanitizeDefaultCircleStyles(graph: GraphState): GraphState {
   const peopleByCircle = new Map<string, number>()
   for (const person of graph.people) {
@@ -7316,10 +7346,7 @@ function sanitizeDefaultCircleStyles(graph: GraphState): GraphState {
     ...graph,
     people: graph.people.map((person) => ({
       ...person,
-      notes: person.notes?.map((note) => ({
-        ...note,
-        body: sanitizeLegacyDemoLinkedInText(note.body),
-      })),
+      notes: sanitizeLinkedInProfileNotes(person.notes),
     })),
     circles: graph.circles.map((circle) => {
       const styledCircle = circle.shapeCustom === true ||

@@ -78,7 +78,6 @@ export function getCachedLinkedInProfile(url: string): LinkedInProfileEnrichment
       company: 'SocialDataNode',
       companyLogoUrl: '/socialdatanode_logo.jpeg',
       headline: 'Co-founder & CEO',
-      description: 'Co-founder and CEO at SocialDataNode.',
       avatarUrl: '/timofey_avatar.jpeg',
       source: 'cache'
     }
