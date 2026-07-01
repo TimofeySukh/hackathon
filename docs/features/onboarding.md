@@ -18,13 +18,16 @@ panning, creating circles, moving/resizing zones, and selecting an area.
     zoom, right-click circle creation, double-click person creation, and right-drag area
     selection.
   - Mobile explains the top-left modes: Edit, Select, and Pan, plus two-finger pinch zoom.
+- Each step auto-advances when the matching action is performed. The visible `Skip`
+  button is only a manual bypass for users who already know that control.
+- Action triggers are `mode`, `navigate`, `create`, `organize`, `select`, and `import`.
 
 ## Design
 
 - The guide is a compact Material 3 floating coach card on desktop.
 - On touch/mobile it behaves like a bottom sheet so it stays clear of the top toolbar and
   mode buttons.
-- The guide uses local progress dots, a dismiss button, and `Back` / `Next` / `Done`
+- The guide uses local progress dots, a dismiss button, and `Back` / `Skip` / `Done`
   actions. It does not block board interaction outside the card.
 
 ## Code

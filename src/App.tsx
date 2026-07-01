@@ -27,6 +27,7 @@ import { searchGraphByQuery } from './lib/search/graphSearch'
 import { mapSmartSearchResults, shouldUseSmartSearch, smartSearchGraph, type AgentSearchStep } from './lib/smartSearch'
 import { OnboardingCoach } from './Onboarding'
 import { getOnboardingSteps, type OnboardingSurface } from './onboardingSteps'
+import type { OnboardingAction } from './onboardingSteps'
 import { SelectionIndicator } from './components/SelectionIndicator'
 import { M3Slider } from './components/M3Slider'
 // STRESS TEST — dev-only performance harness. See src/lib/stressTest.ts.
@@ -1258,6 +1259,20 @@ function App() {
 
   function onboardingBack() {
     setOnboardingStep((step) => (step > 0 ? step - 1 : step))
+  }
+
+  function completeOnboardingAction(action: OnboardingAction) {
+    setOnboardingStep((step) => {
+      if (step < 0) return step
+      const current = onboardingSteps[step]
+      if (!current || current.trigger !== action) return step
+      const next = step + 1
+      if (next >= onboardingSteps.length) {
+        markLocalFlag(BOARD_ONBOARDING_STORAGE_KEY)
+        return -1
+      }
+      return next
+    })
   }
 
 
@@ -2927,6 +2942,7 @@ function App() {
           y: currentCamera.y - event.deltaY,
         })
       }
+      completeOnboardingAction('navigate')
     }
 
     surface.addEventListener('wheel', handleWheel, { passive: false })
@@ -3334,6 +3350,7 @@ function App() {
         x: nextX,
         y: nextY,
       })
+      completeOnboardingAction('navigate')
       return
     }
 
@@ -3351,6 +3368,7 @@ function App() {
       pan.lastT = now
       if (Math.hypot(event.clientX - pan.startX, event.clientY - pan.startY) > DRAG_START_THRESHOLD) {
         suppressDoubleClickUntilRef.current = Date.now() + 700
+        if (!pan.moved) completeOnboardingAction('navigate')
         pan.moved = true
       }
       driveCamera({
@@ -3564,6 +3582,7 @@ function App() {
           setSelectedCircleIds(selectedCIds)
         }
         selectItem(null)
+        completeOnboardingAction('select')
       } else {
         const hit = hitTestBoard(boardIndex, cameraRef.current, selectedItem, {
           x: startX,
@@ -3642,6 +3661,9 @@ function App() {
     const completedResize = wasResize && resizeMoveDist > DRAG_START_THRESHOLD
     const completedNodeMove = (activeMoveCircle?.moved ?? false) || (activeMovePerson?.moved ?? false)
     const endingMove = completedNodeMove || completedResize
+    if (completedResize || completedNodeMove) {
+      completeOnboardingAction('organize')
+    }
     const endingPressIds = [
       ...(activeMoveCircle?.liftIds ?? []),
       ...(activeMovePerson?.liftIds ?? []),
@@ -4055,6 +4077,7 @@ function App() {
     setSelectedPeopleIds([])
 
     selectItem({ type: 'person', id })
+    completeOnboardingAction('create')
     // Grow the new person in so it feels placed, not blinked into existence.
     startBoardAnim('pop:' + id, 360)
   }
@@ -4203,6 +4226,7 @@ function App() {
     // Grow the new person in so it feels placed, not blinked into existence.
     startBoardAnim('pop:' + id, 360)
     setCreateMenu(null)
+    completeOnboardingAction('create')
   }
 
   // "Add circle" in the create menu auto-detects containment the same way the
@@ -4257,6 +4281,7 @@ function App() {
 
     selectItem({ type: 'circle', id })
     setCreateMenu(null)
+    completeOnboardingAction('create')
   }
 
 
@@ -4732,6 +4757,7 @@ Content-Type: application/json
             onClick={() => {
               cancelPanInertia()
               setBoardToolMode('edit')
+              completeOnboardingAction('mode')
             }}
           >
             <PointerIcon />
@@ -4746,6 +4772,7 @@ Content-Type: application/json
               cancelPanInertia()
               setBoardToolMode('select')
               setCreateMenu(null)
+              completeOnboardingAction('mode')
             }}
           >
             <SelectIcon />
@@ -4760,6 +4787,7 @@ Content-Type: application/json
               cancelPanInertia()
               setBoardToolMode('pan')
               setCreateMenu(null)
+              completeOnboardingAction('mode')
             }}
           >
             <PanIcon />
@@ -4782,6 +4810,7 @@ Content-Type: application/json
               } else {
                 setShowSettings(false)
                 setSearchOpen(true)
+                completeOnboardingAction('import')
                 if (!hasLocalFlag(SEARCH_LINKEDIN_HINT_KEY)) {
                   setShowSearchLinkedInHint(true)
                   markLocalFlag(SEARCH_LINKEDIN_HINT_KEY)
@@ -4953,6 +4982,7 @@ Content-Type: application/json
             type="button"
             onClick={() => {
               if (!showSettings) closeSearch()
+              if (!showSettings) completeOnboardingAction('import')
               setShowSettings(!showSettings)
             }}
             aria-label="Settings"

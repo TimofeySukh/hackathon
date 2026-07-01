@@ -48,7 +48,7 @@ export function OnboardingCoach({ surface, step, onNext, onBack, onSkip }: Onboa
             </button>
           )}
           <button type="button" className="onboarding-coach__primary" onClick={onNext}>
-            {isLast ? 'Done' : 'Next'}
+            {isLast ? 'Done' : 'Skip'}
           </button>
         </div>
       </div>

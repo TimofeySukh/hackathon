@@ -101,6 +101,8 @@ Safety invariants:
 
 - First board visit opens a short guide explaining pan/zoom, creation, moving/resizing,
   area selection, and import.
+- Guide steps auto-advance when the matching action is performed; the visible button skips
+  a step manually.
 - Landing page board CTAs force-open the guide for that launch.
 - The board toolbar Help button reopens the guide.
 - Mobile guide copy explicitly explains Edit / Select / Pan modes.

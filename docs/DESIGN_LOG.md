@@ -969,6 +969,11 @@ rediscover, write it here.
 - Why: Modes are useful on touch because one-finger gestures conflict. On desktop they add
   unnecessary chrome and make users think normal pan/select/create gestures require mode
   switching.
+- Follow-up: Guide steps now auto-advance when the matching action is performed, and the
+  primary button is labelled `Skip` until the final `Done` step.
+- Why: A static guide with `Next` still reads like a slideshow. Auto-completion proves the
+  user has successfully performed the control, while `Skip` remains available for users
+  who already know it.
 
 ### 2026-06-27 — Hybrid natural-language smart search
 

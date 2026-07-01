@@ -86,8 +86,9 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
 - **Area select**: on desktop, right-drag empty space to draw a marquee selection box.
   On touch/mobile, switch to Select mode and drag across the board.
 - **Onboarding guide**: first board visit opens a short board guide; landing CTAs
-  force-open it for that launch, and the toolbar Help button reopens it. The mobile copy
-  explains Edit / Select / Pan modes.
+  force-open it for that launch, and the toolbar Help button reopens it. Steps
+  auto-advance after the matching action is performed, while `Skip` manually advances.
+  The mobile copy explains Edit / Select / Pan modes.
 - **Undo**: Ctrl/Cmd+Z reverts the last graph-mutating action — create, delete, move,
   resize, connect, merge, change-circle, favorite, add/delete note, and LinkedIn import.
   A whole drag or resize gesture is a single undo step. History is in-memory only (lost on
