@@ -8,8 +8,9 @@ password so a database user is created without forcing profile setup.
 
 ## Behavior
 
-- Signed-out visitors can edit locally. They are nudged to sign in via a red `!` badge on
-  the Settings gear and a **Sign in** block inside Settings (no floating banner).
+- Signed-out visitors can edit locally. They are nudged via a red `!` badge on the
+  Settings gear and a matching badge on the LinkedIn sync guide `?` inside Settings until
+  the guide is opened once, plus a **Sign in** block inside Settings (no floating banner).
 - Sign-in also opens from the landing header (**Log in** / **Sign up**) and opens the same
   auth dialog as the board.
 - The dialog supports Google sign-in, email sign-in, email/password registration, password

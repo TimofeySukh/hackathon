@@ -16,7 +16,8 @@ Current product behavior (code-aligned):
 - Inspector for rename, notes, connections, circle styling, delete (circles require
   confirmation in the inspector).
 - Settings: LinkedIn ZIP import (+ sync guide), account sign-in/out, Agent API keys, graph
-  import/export/clear. Anonymous users see a `!` badge on the gear.
+  import/export/clear. Anonymous users see matching `!` badges on the gear and LinkedIn
+  guide `?` until the guide is opened once.
 - Toolbar search: local ranked search, signed-in smart search, LinkedIn profile URL import.
 - Signed-in persistence: Supabase `user_graphs.graph` with revision-checked saves and
   Realtime sync. Anonymous: `localStorage`.

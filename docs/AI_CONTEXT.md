@@ -36,6 +36,9 @@ Rules:
 - Auth callbacks land on the clean origin (no hash). A stored return marker opens `#board`
   after the session restores.
 - Logo on the landing page returns home; **Open board** is the primary CTA to `#board`.
+- The board shows a compact logo control in the top-left that returns to the landing home (`#`).
+- The top-left brand on docs, contact, and privacy also returns to the landing home (`#`).
+  Docs no longer uses a separate Back button.
 
 ---
 
@@ -129,7 +132,10 @@ Safety invariants:
   import/export/clear.
 - Search (toolbar): local ranked search; signed-in natural-language **smart search** via AI;
   paste LinkedIn profile URL to import one person.
-- Anonymous users see a red `!` badge on the Settings gear (not a floating banner).
+- Anonymous users see a red `!` badge on the Settings gear until they open the LinkedIn
+  sync guide from the `?` helper inside Settings (not a floating banner).
+- The LinkedIn sync guide `?` inside Settings shows the same badge until the user opens
+  the guide once (no pulse animation).
 
 **Removed — do not document as current**:
 

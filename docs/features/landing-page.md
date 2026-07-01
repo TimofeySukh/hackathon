@@ -44,7 +44,11 @@ Header requirements:
 - Clicking the Social Datanode logo on the landing page returns to the landing home
   (`#` / empty hash). It must not unexpectedly open the board; the board CTA owns that
   action.
+- On `#docs`, `#contact`, and `#privacy`, the top-left brand control also returns to the
+  landing home. Do not add a separate Back button in the docs header.
 - `Contact` opens a separate contact screen at `#contact`.
+- Active header nav item (`Docs` / `Contact`) uses a light primary-container pill, not the
+  same filled style as Sign up / Launch App.
 - On phone widths, the header uses two compact rows: logo plus auth action on the first
   row, Docs/Contact centered below. Header contents must never overflow horizontally.
 
@@ -69,13 +73,13 @@ Required elements:
 
 1. Header at the top.
 2. A real product screenshot of the board with the inspector open.
-3. A short headline, lead line, and three deck-style slogans beside the screenshot.
+3. A short headline, lead line, and three aligned bullet points beside the screenshot.
 4. A single primary **Open guided board** button.
 5. A short non-clickable reassurance line under the CTA.
 
 Do not bring back the stepped-path ribbon as the main hero element.
 
-The three slogans should stay as compact deck cards, not oversized feature cards.
+The three hero points stay as a simple vertical list, not scattered deck cards.
 
 The product screenshot is a visual preview only. Clicking it must not open the board or
 perform any navigation; the button owns the hero CTA.
@@ -90,8 +94,8 @@ Current hero positioning:
 - Lead: describes the product as a private visual board for people, notes, groups, and links.
 - CTA note: explains that the first board opens with a short guide and that visitors can
   sign in later for private sync.
-- The desktop product screenshot sits slightly lower than the text stack so the hero does not
-  feel cramped around the CTA area.
+- The desktop product screenshot aligns with the top of the hero copy stack so the first
+  viewport stays balanced and the preview reads at full size beside the CTA.
 
 ## Copy
 
@@ -111,44 +115,18 @@ solution is a spatial interface for managing people, notes, groups, and links.
 The landing narrative should use user actions and concrete product nouns before abstract
 feature labels. Prefer verbs such as map, remember, import, search, attach, group, and sync.
 
-## Interactive Section
-
-The interactive section should transfer the concrete inspector-style UI shown in
-the reference, not a loose approximation.
-
-Required content:
-
-- editable person name
-- zone selector
-- three zones: `Anthropic`, `Google`, `OpenAI`
-- photo/avatar control
-- notes
-- connections
-
-The interaction is a demo only. It must not save to Supabase, localStorage, or
-the real board graph.
-
-The UI should resemble the real board inspector/menu style closely enough that
-it feels like the product, not a separate marketing illustration.
-
-The demo starts with a realistic local-only example (`Maya Chen`, `OpenAI`, one note, and one
-LinkedIn link) so visitors understand the value before interacting. The reset button restores
-that sample state; it does not delete real data.
-
 ## Below-the-fold Sections
 
 After the hero, the landing page includes:
 
-1. **Problem and solution** — two compact deck cards explaining scattered relationship
-   memory and Social Datanode's visual board answer.
+1. **Problem and solution** — a vertical Before → After stack with distinct styling:
+   scattered memory in a muted dashed card, then a bridge label, then the product answer
+   in a brighter primary-accent card.
 2. **How it works** — three step cards describing the guided control intro, first person,
    and organize-in-place workflow.
-3. **Trust strip** — four compact deck cards about anonymous use, local save,
-   private sync, and no collaboration yet.
-4. **Interactive demo** — inspector simulator (see above).
-5. **Core Capabilities** — five human-readable scatter cards; the agent card links to Docs.
-6. **LinkedIn import** — deck cards describing the import flow.
-7. **Final CTA** — a quiet centered `Open guided board` section before the footer.
+3. **Core Capabilities** — a compact two-column table (capability + what you get).
+4. **LinkedIn import** — deck cards describing the import flow.
+5. **Final CTA** — a quiet centered `Open guided board` section before the footer.
 
 The hero owns the first and most important board CTA. A second **Open guided board** CTA is allowed
 near the bottom after the product story has been explained.
@@ -165,8 +143,7 @@ column. The mobile page must not rely on desktop rotations, negative margins, or
 expansion that can push content outside the viewport.
 
 The mobile hero uses a cropped product preview strip to keep the first screen focused and to
-leave a visible hint of the next section. The hero does not include duplicate trust chips;
-those facts belong in the trust strip below.
+leave a visible hint of the next section.
 
 ## Docs
 
@@ -227,7 +204,6 @@ Buttons should feel consistent across the landing page.
 - Do not turn the three hero slogans into unrelated oversized cards.
 - Do not make a similar-looking element when the instruction is to copy or
   transfer a specific element.
-- Do not save demo inspector edits to real product data.
 
 ## Code
 

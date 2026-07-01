@@ -276,7 +276,7 @@ export default function PrivacyPage({ onLogin, onSignUp, isAuthenticated }: Priv
             <span className="footer-logo-text">Social Datanode</span>
           </a>
           <div className="footer-legal">
-            <a href="#privacy" className="footer-legal-link landing-nav-link--active" aria-current="page">
+            <a href="#privacy" className="footer-legal-link footer-legal-link--active" aria-current="page">
               Privacy Policy
             </a>
             <span className="footer-copyright">

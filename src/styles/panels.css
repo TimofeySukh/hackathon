@@ -80,6 +80,7 @@
   text-align: center;
   cursor: pointer;
   transform: translateY(-3px);
+  overflow: visible;
   transition:
     background-color 0.2s,
     color 0.2s,
@@ -96,25 +97,6 @@
 
 .linkedin-guide-help:active {
   transform: translateY(-3px) scale(0.9);
-}
-
-.linkedin-guide-help.is-attention {
-  border-color: var(--md-primary);
-  color: var(--md-primary);
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--md-primary) 30%, transparent);
-  animation: linkedinGuideHelpPulse 1.7s var(--md-ease-standard, ease-in-out) infinite;
-}
-
-@keyframes linkedinGuideHelpPulse {
-  0% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--md-primary) 34%, transparent);
-  }
-  70% {
-    box-shadow: 0 0 0 9px color-mix(in srgb, var(--md-primary) 0%, transparent);
-  }
-  100% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--md-primary) 0%, transparent);
-  }
 }
 
 /* LinkedIn sync guide: scrollable panel that replaces Settings, same theme. */

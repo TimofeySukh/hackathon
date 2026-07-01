@@ -39,6 +39,43 @@ rediscover, write it here.
 - Why: The rounded-square selected state made color choices look like a shape change
   instead of a selection marker. A ring keeps the color chip stable and more legible.
 
+### 2026-07-02 — Board home logo control
+
+- Decision: Added a compact logo button in the board top-left that navigates to the landing
+  home (`#`). On touch layouts it sits above the Edit / Select / Pan mode menu in a vertical
+  left rail; desktop shows only the logo control there while search/settings stay on the right.
+- Why: The board had no obvious way back to the marketing home, and stacking the home control
+  above the mode menu keeps both affordances reachable on phones without overlapping the toolbar.
+
+### 2026-07-02 — Remove landing interactive demo section
+
+- Decision: Removed the `#product-demo` interactive inspector section and deleted
+  `LandingPersonInspectorDemo.tsx`.
+- Why: The split screenshot + live inspector stage looked muddy and duplicated what the hero
+  screenshot already shows. The landing reads cleaner as a product story ending at How it works
+  → Core capabilities → LinkedIn import → final CTA.
+
+### 2026-07-02 — Landing interactive demo uses real inspector
+
+- Decision: Replaced the bespoke `.demo-inspector-*` mock form with
+  `LandingPersonInspectorDemo`, which mounts the same inspector CSS classes as the board
+  (`.inspector`, `.trello-list`, `.connections-list`, etc.) over the product board screenshot.
+- Why: The mock form looked disconnected on a blank background, had inconsistent sizing,
+  and only partially worked (floating buttons, mismatched controls). Reusing production
+  markup/styles keeps the demo visually and behaviorally aligned with the real panel.
+- Rejected: Maintaining a separate marketing-only inspector stylesheet (~400 lines of
+  duplicate CSS).
+- Follow-up: Overlaying the live inspector on the full screenshot looked muddy (double
+  panel + gradient). Switched to a split stage — cropped board canvas left, inspector panel
+  right on a clean surface.
+
+### 2026-07-02 — Remove landing trust strip
+
+- Decision: Removed the four-card trust strip (`Try first`, `Local by default`, `Private
+  sync`, `Clear limits`) from the landing page.
+- Why: The section repeated hero/onboarding messaging without adding narrative momentum;
+  the scattered deck cards felt like filler between How it works and the interactive demo.
+
 ### 2026-07-01 — Documentation realignment for AI readability
 
 - Decision: Added `docs/AI_CONTEXT.md` as the canonical, code-aligned product summary for
@@ -1072,6 +1109,16 @@ rediscover, write it here.
   circle's parent.
 - Why: Users expect contacts to stay where they were visually; only membership should
   change when the circle outline disappears.
+
+### 2026-07-01 — LinkedIn guide badge instead of pulse animation
+
+- Decision: Kept the anonymous red `!` badge on the Settings gear. Replaced the LinkedIn
+  sync guide pulse animation with the same static `!` badge on the `?` helper inside
+  Settings until the user opens the guide once. Removed the experimental toolbar `?` button.
+- Why: The toolbar duplicate was confusing (two question-mark controls). A static badge
+  matches the Settings gear pattern and reads as “something to check here” without animation.
+- Decision: Both the Settings gear and LinkedIn `?` badges now share the same
+  `highlightLinkedInGuideHelp` flag and disappear together when the user opens the guide.
 
 ### 2026-07-02 — Onboarding completion feedback and explicit import path
 

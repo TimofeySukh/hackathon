@@ -33,6 +33,20 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: opacity 0.2s var(--md-ease-standard);
+}
+
+.docs-brand:hover {
+  opacity: 0.88;
+}
+
+.docs-brand:focus-visible {
+  outline: 2px solid var(--md-primary);
+  outline-offset: 3px;
+  border-radius: var(--md-r-sm);
 }
 
 .docs-brand img {
@@ -40,7 +54,7 @@
   width: 28px;
 }
 
-.docs-brand h1 {
+.docs-brand-title {
   margin: 0;
   font-size: 18px;
   font-weight: 500;
@@ -354,25 +368,6 @@
   font-size: 13px;
   line-height: 1.45;
   color: var(--md-on-surface-variant);
-}
-
-.docs-back-btn {
-  flex-shrink: 0;
-  white-space: nowrap;
-  height: 38px;
-  padding: 0 12px;
-  border: none;
-  border-radius: var(--md-r-sm);
-  background: transparent;
-  color: var(--md-primary);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.2s var(--md-ease-standard);
-}
-
-.docs-back-btn:hover {
-  background: color-mix(in srgb, var(--md-primary) 10%, transparent);
 }
 
 .docs-nav-toggle {
@@ -748,7 +743,7 @@
 }
 
 @media (max-width: 480px) {
-  .docs-brand h1 {
+  .docs-brand-title {
     font-size: 16px;
   }
 

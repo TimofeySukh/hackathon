@@ -119,6 +119,14 @@
   text-underline-offset: 2px;
 }
 
+.footer-legal-link--active,
+.footer-legal-link--active:hover {
+  color: var(--lp-text-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: default;
+}
+
 @media (max-width: 640px) {
   .legal-page-main {
     padding-top: 32px;

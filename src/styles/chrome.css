@@ -3,21 +3,67 @@
 .toolbar {
   position: absolute;
   z-index: 10;
-  top: 16px;
+  top: max(16px, env(safe-area-inset-top, 0px));
   left: 16px;
-  right: 16px;
+  right: max(16px, env(safe-area-inset-right, 0px));
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 14px;
   pointer-events: none;
 }
 
-.board-mode-menu {
+.board-left-rail {
   position: absolute;
   z-index: 11;
-  top: 16px;
-  left: 16px;
+  top: max(16px, env(safe-area-inset-top, 0px));
+  left: max(16px, env(safe-area-inset-left, 0px));
+  display: grid;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.board-home-button {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: var(--md-r-full);
+  background: var(--md-surface-container);
+  box-shadow: var(--md-elev-2);
+  color: var(--md-on-surface);
+  cursor: pointer;
+  pointer-events: auto;
+  transition:
+    background-color var(--md-dur-short) var(--md-ease-standard),
+    transform var(--md-dur-short) var(--md-ease-standard);
+}
+
+.board-home-button:hover {
+  background: color-mix(in srgb, var(--md-on-surface) 8%, var(--md-surface-container));
+}
+
+.board-home-button:active {
+  transform: scale(0.9);
+}
+
+.board-home-button:focus-visible {
+  outline: 2px solid var(--md-primary);
+  outline-offset: 2px;
+}
+
+.board-home-button img {
+  display: block;
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.board-mode-menu {
+  position: relative;
+  top: auto;
+  left: auto;
   display: inline-grid;
   gap: 4px;
   padding: 4px;
@@ -131,6 +177,39 @@
 
 .toolbar__group button:active {
   transform: scale(0.9);
+}
+
+.attention-badge-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.attention-badge {
+  position: absolute;
+  z-index: 2;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background-color: var(--md-error, #ba1a1a);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--md-surface-container, #ecedf2);
+  line-height: 1;
+  pointer-events: none;
+}
+
+.attention-badge--toolbar {
+  top: 4px;
+  right: 4px;
+}
+
+.attention-badge--compact {
+  top: -5px;
+  right: -5px;
 }
 
 

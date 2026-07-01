@@ -45,9 +45,11 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   inside the source circle it nests a subset blob, outside it spawns a connected circle.
   Dragging from a circle center to empty space opens the same creation options at the
   release point.
-- **Double-tap create**: double-click (double-tap) anywhere to drop a person exactly at the
-  tapped point. It adopts a circle only when the tap lands inside one (or on someone already
-  in a circle); tapping empty space leaves the person free-floating with no owning circle.
+- **Double-tap create**: double-click (double-tap) empty space or a circle to drop a person
+  exactly at the tapped point. It adopts a circle only when the tap lands inside one;
+  tapping empty space leaves the person free-floating with no owning circle. Double-tapping
+  an existing person opens the inspector with the name field focused and fully selected so
+  the next keystroke replaces it.
   The creation deliberately skips containment fitting so the rest of the board never reflows
   or jumps. If the second click turns into a drag, the drag suppresses the browser's
   follow-up `dblclick` event so no accidental person is created on drop. This replaces the
@@ -96,6 +98,10 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   auto-advance, while `Skip` manually advances. The Search step exposes two built-in
   LinkedIn profile examples, and the archive guide is taught through Settings gear -> `?`.
   The mobile copy explains Edit / Select / Pan modes.
+- **Home control**: a compact logo button in the top-left returns to the landing page
+  (`#`). On touch/mobile layouts it sits above the Edit / Select / Pan mode menu in a
+  vertical left rail so both controls stay reachable without overlapping the search
+  toolbar on the right.
 - **Undo**: Ctrl/Cmd+Z reverts the last graph-mutating action — create, delete, move,
   resize, connect, merge, change-circle, favorite, add/delete note, and LinkedIn import.
   A whole drag or resize gesture is a single undo step. History is in-memory only (lost on
