@@ -952,6 +952,24 @@ rediscover, write it here.
 - Why: Manual profile-link import belongs directly in Search, and the hint appears exactly
   when the user first opens that control.
 
+### 2026-07-01 — Restore Board Onboarding and Make Modes Mobile-Only
+
+- Decision: Restored a short board onboarding guide focused on the controls users missed
+  in recorded usage: zooming, panning, creating circles, resizing zones, and selecting an
+  area.
+- Why: Removing the tour made the board cleaner, but it also removed the only direct
+  explanation of core spatial controls. The replacement contextual hints covered LinkedIn
+  import but not basic graph manipulation.
+- Decision: Landing page board CTAs now force-open the guide for that board launch, and
+  the board toolbar has a Help button to reopen it.
+- Why: The landing promise and first board experience need to connect; returning users
+  also need a recovery path if they dismiss the guide too early.
+- Decision: The Edit / Select / Pan mode switcher is now visible only on touch/mobile
+  layouts. Desktop keeps direct mouse/trackpad controls instead.
+- Why: Modes are useful on touch because one-finger gestures conflict. On desktop they add
+  unnecessary chrome and make users think normal pan/select/create gestures require mode
+  switching.
+
 ### 2026-06-27 — Hybrid natural-language smart search
 
 - Decision: Smart search uses NeuralDeep (`https://api.neuraldeep.ru/v1`) with model

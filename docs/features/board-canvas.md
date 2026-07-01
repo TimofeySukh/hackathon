@@ -8,11 +8,12 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
 
 ## Behavior
 
-- **Pan / zoom**: drag empty space to pan in edit mode; mouse wheel, trackpad pinch,
-  or two-finger touch pan/zoom the board (`MIN_SCALE`/`MAX_SCALE` clamp). The vertical
-  **tool mode** menu (top-left) switches **Edit**, **Select** (marquee), and **Pan**.
-  Pan mode makes one-finger drag move the canvas; releasing a pan gesture can continue
-  with short inertial scrolling.
+- **Pan / zoom**: on desktop, drag empty space to pan and use mouse wheel, trackpad
+  scroll, or trackpad pinch to zoom (`MIN_SCALE`/`MAX_SCALE` clamp). On touch/mobile,
+  pinch with two fingers to zoom. The vertical **tool mode** menu (top-left) is shown only
+  on touch/mobile layouts and switches **Edit**, **Select** (marquee), and **Pan**. Pan
+  mode makes one-finger drag move the canvas; releasing a pan gesture can continue with
+  short inertial scrolling.
 - **Move**: drag a person to reposition inside its owning circle; nearby people in the
   same circle are pushed aside instead of overlapping. Drag a circle center or body to move
   the whole circle and everything it contains. Live pointer frames never run the global
@@ -37,6 +38,8 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
 - **Create**: right-click a circle to open the create menu, which now offers two actions —
   add person and add circle. "Add circle" auto-detects containment from the target point:
   inside the source circle it nests a subset blob, outside it spawns a connected circle.
+  Dragging from a circle center to empty space opens the same creation options at the
+  release point.
 - **Double-tap create**: double-click (double-tap) anywhere to drop a person exactly at the
   tapped point. It adopts a circle only when the tap lands inside one (or on someone already
   in a circle); tapping empty space leaves the person free-floating with no owning circle.
@@ -80,6 +83,11 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   rename / styling / notes / delete. Circles can only be removed with the inspector's
   **Delete circle** button, which asks for confirmation first. People and connections
   can still be deleted with Backspace/Delete.
+- **Area select**: on desktop, right-drag empty space to draw a marquee selection box.
+  On touch/mobile, switch to Select mode and drag across the board.
+- **Onboarding guide**: first board visit opens a short board guide; landing CTAs
+  force-open it for that launch, and the toolbar Help button reopens it. The mobile copy
+  explains Edit / Select / Pan modes.
 - **Undo**: Ctrl/Cmd+Z reverts the last graph-mutating action — create, delete, move,
   resize, connect, merge, change-circle, favorite, add/delete note, and LinkedIn import.
   A whole drag or resize gesture is a single undo step. History is in-memory only (lost on

@@ -139,7 +139,7 @@ async function main() {
 
     await page.addInitScript(() => {
       window.localStorage.clear()
-      window.localStorage.setItem('social-onboarding-done-v1', '1')
+      window.localStorage.setItem('social-board-onboarding-done-v2', '1')
     })
 
     await page.goto(`${server.url}/#board`, { waitUntil: 'networkidle' })

@@ -398,7 +398,7 @@ async function main() {
     page.on('pageerror', (error) => console.error(error))
     await page.addInitScript(() => {
       window.localStorage.clear()
-      window.localStorage.setItem('social-onboarding-done-v1', '1')
+      window.localStorage.setItem('social-board-onboarding-done-v2', '1')
     })
 
     await page.goto(`${vite.url}/#board`, { waitUntil: 'networkidle' })
@@ -465,7 +465,7 @@ async function main() {
     const failedLoadPage = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
     await failedLoadPage.addInitScript(() => {
       window.localStorage.clear()
-      window.localStorage.setItem('social-onboarding-done-v1', '1')
+      window.localStorage.setItem('social-board-onboarding-done-v2', '1')
     })
     await failedLoadPage.goto(`${vite.url}/#board`, { waitUntil: 'networkidle' })
     await failedLoadPage.getByLabel('Settings', { exact: true }).waitFor({ timeout: 10000 })

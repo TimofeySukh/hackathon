@@ -90,9 +90,20 @@ Safety invariants:
 
 **Tool modes** (top-left vertical menu):
 
+- Visible only on touch/mobile layouts.
 - **Edit** — default: drag nodes, create, connect, resize.
-- **Select** — marquee multi-select (right-click drag also works in edit).
+- **Select** — marquee multi-select.
 - **Pan** — one-finger/touch drag moves the camera; pinch zoom still works.
+- Desktop does not show the mode menu: drag empty space to pan, wheel/trackpad to zoom,
+  right-drag to marquee select, and right-click a circle to open create actions.
+
+**Onboarding**:
+
+- First board visit opens a short guide explaining pan/zoom, creation, moving/resizing,
+  area selection, and import.
+- Landing page board CTAs force-open the guide for that launch.
+- The board toolbar Help button reopens the guide.
+- Mobile guide copy explicitly explains Edit / Select / Pan modes.
 
 **Create**:
 
@@ -181,6 +192,7 @@ Feature docs to read for specifics:
 - Board: [`features/board-canvas.md`](features/board-canvas.md)
 - Auth: [`features/auth.md`](features/auth.md)
 - Search: [`features/board-search.md`](features/board-search.md), [`features/smart-search.md`](features/smart-search.md)
+- Onboarding: [`features/onboarding.md`](features/onboarding.md)
 - Agent API: [`features/agent-api.md`](features/agent-api.md)
 - Realtime: [`features/realtime-sync.md`](features/realtime-sync.md)
 - Landing: [`features/landing-page.md`](features/landing-page.md)

@@ -982,6 +982,195 @@
   }
 }
 
+/* ---- Board onboarding guide --------------------------------------------- */
+.onboarding-coach {
+  position: fixed;
+  z-index: 95;
+  left: 50%;
+  bottom: 24px;
+  display: grid;
+  width: min(420px, calc(100vw - 32px));
+  gap: 8px;
+  padding: 18px;
+  border-radius: var(--md-r-lg);
+  background: var(--md-surface-container-high);
+  color: var(--md-on-surface);
+  box-shadow: var(--md-elev-2);
+  transform: translateX(-50%);
+  animation: onboardingCoachIn var(--md-dur-medium) var(--md-ease-decelerate);
+  pointer-events: auto;
+}
+
+@keyframes onboardingCoachIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+.onboarding-coach__close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: var(--md-r-full);
+  background: transparent;
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  transition:
+    background-color var(--md-dur-short) var(--md-ease-standard),
+    transform var(--md-dur-short) var(--md-ease-standard);
+}
+
+.onboarding-coach__close:hover {
+  background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+}
+
+.onboarding-coach__close:active {
+  transform: scale(0.9);
+}
+
+.onboarding-coach__eyebrow {
+  color: var(--md-primary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.onboarding-coach__title {
+  margin: 0;
+  padding-right: 34px;
+  color: var(--md-on-surface);
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.onboarding-coach__body {
+  margin: 0;
+  color: var(--md-on-surface-variant);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.onboarding-coach__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.onboarding-coach__dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.onboarding-coach__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--md-r-full);
+  background: var(--md-outline-variant);
+  transition:
+    width var(--md-dur-short) var(--md-ease-standard),
+    background-color var(--md-dur-short) var(--md-ease-standard);
+}
+
+.onboarding-coach__dot.is-done {
+  background: color-mix(in srgb, var(--md-primary) 55%, var(--md-outline-variant));
+}
+
+.onboarding-coach__dot.is-active {
+  width: 18px;
+  background: var(--md-primary);
+}
+
+.onboarding-coach__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.onboarding-coach__primary,
+.onboarding-coach__secondary {
+  min-width: 72px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: var(--md-r-full);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition:
+    background-color var(--md-dur-short) var(--md-ease-standard),
+    transform var(--md-dur-short) var(--md-ease-standard);
+}
+
+.onboarding-coach__primary {
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+}
+
+.onboarding-coach__primary:hover {
+  background: color-mix(in srgb, var(--md-on-primary) 8%, var(--md-primary));
+}
+
+.onboarding-coach__secondary {
+  background: transparent;
+  color: var(--md-on-surface-variant);
+}
+
+.onboarding-coach__secondary:hover {
+  background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+}
+
+.onboarding-coach__primary:active,
+.onboarding-coach__secondary:active {
+  transform: scale(0.96);
+}
+
+@media (max-width: 720px), (hover: none), (pointer: coarse) {
+  .onboarding-coach {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    width: auto;
+    border-radius: var(--md-r-xl);
+    transform: none;
+    animation-name: onboardingCoachMobileIn;
+  }
+
+  @keyframes onboardingCoachMobileIn {
+    from {
+      opacity: 0;
+      transform: translateY(14px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .onboarding-coach__footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .onboarding-coach__actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
 /* Respect users who ask for reduced motion: keep the UI functional, drop the
    movement. Animations collapse to an instant final frame. */
 @media (prefers-reduced-motion: reduce) {

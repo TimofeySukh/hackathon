@@ -25,6 +25,8 @@ import { GraphRevisionConflictError, loadGraphRecord, saveGraph, loadLocalGraph,
 import { enrichLinkedInProfile } from './lib/linkedinEnrichment'
 import { searchGraphByQuery } from './lib/search/graphSearch'
 import { mapSmartSearchResults, shouldUseSmartSearch, smartSearchGraph, type AgentSearchStep } from './lib/smartSearch'
+import { OnboardingCoach } from './Onboarding'
+import { getOnboardingSteps, type OnboardingSurface } from './onboardingSteps'
 import { SelectionIndicator } from './components/SelectionIndicator'
 import { M3Slider } from './components/M3Slider'
 // STRESS TEST — dev-only performance harness. See src/lib/stressTest.ts.
@@ -502,6 +504,8 @@ const authCardStyle: CSSProperties = {
 
 const LINKEDIN_GUIDE_HINT_KEY = 'social-linkedin-guide-hint-seen-v1'
 const SEARCH_LINKEDIN_HINT_KEY = 'social-search-linkedin-hint-seen-v1'
+const BOARD_ONBOARDING_STORAGE_KEY = 'social-board-onboarding-done-v2'
+const BOARD_ONBOARDING_FORCE_KEY = 'social-board-onboarding-open-v2'
 const CIRCLE_CREATION_DEFAULTS_KEY = 'hackathon-board:circle-creation-defaults:v1'
 type BoardToolMode = 'edit' | 'pan' | 'select'
 
@@ -542,6 +546,20 @@ function markLocalFlag(key: string) {
   } catch {
     // ignore
   }
+}
+
+function consumeSessionFlag(key: string): boolean {
+  try {
+    const value = window.sessionStorage.getItem(key) === '1'
+    window.sessionStorage.removeItem(key)
+    return value
+  } catch {
+    return false
+  }
+}
+
+function isTouchBoardLayout(): boolean {
+  return window.matchMedia('(hover: none), (pointer: coarse), (max-width: 720px)').matches
 }
 
 
@@ -599,6 +617,7 @@ function App() {
   const pinchRef = useRef<PinchState | null>(null)
   const marqueeRef = useRef<MarqueeState | null>(null)
   const isRightClickDragRef = useRef(false)
+  const rightClickMarqueeMovedRef = useRef(false)
   // Drag updates are coalesced to one React commit per animation frame (like the
   // pan/zoom gesture) so a move event flood doesn't trigger a re-render storm.
   const dragRafRef = useRef<number | null>(null)
@@ -1184,9 +1203,62 @@ function App() {
 
   const [showSettings, setShowSettings] = useState(false)
   const [boardToolMode, setBoardToolMode] = useState<BoardToolMode>('edit')
+  const [isTouchLayout, setIsTouchLayout] = useState(isTouchBoardLayout)
+  const onboardingSurface: OnboardingSurface = isTouchLayout ? 'mobile' : 'desktop'
+  const onboardingSteps = useMemo(() => getOnboardingSteps(onboardingSurface), [onboardingSurface])
+  const [onboardingStep, setOnboardingStep] = useState(-1)
+  const onboardingDecidedRef = useRef(false)
   const [highlightLinkedInGuideHelp, setHighlightLinkedInGuideHelp] = useState(
     () => !hasLocalFlag(LINKEDIN_GUIDE_HINT_KEY),
   )
+
+  useEffect(() => {
+    const media = window.matchMedia('(hover: none), (pointer: coarse), (max-width: 720px)')
+    const updateTouchLayout = () => {
+      setIsTouchLayout(media.matches)
+    }
+    updateTouchLayout()
+    media.addEventListener('change', updateTouchLayout)
+    return () => media.removeEventListener('change', updateTouchLayout)
+  }, [])
+
+  useEffect(() => {
+    if (isTouchLayout || boardToolMode === 'edit') return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setBoardToolMode('edit')
+  }, [boardToolMode, isTouchLayout])
+
+  useEffect(() => {
+    if (onboardingDecidedRef.current) return
+    if (!graphLoaded || auth.status === 'loading') return
+    onboardingDecidedRef.current = true
+    const forced = consumeSessionFlag(BOARD_ONBOARDING_FORCE_KEY)
+    if (forced || !hasLocalFlag(BOARD_ONBOARDING_STORAGE_KEY)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setOnboardingStep(0)
+    }
+  }, [auth.status, graphLoaded])
+
+  function finishOnboarding() {
+    markLocalFlag(BOARD_ONBOARDING_STORAGE_KEY)
+    setOnboardingStep(-1)
+  }
+
+  function onboardingNext() {
+    setOnboardingStep((step) => {
+      if (step < 0) return step
+      const next = step + 1
+      if (next >= onboardingSteps.length) {
+        markLocalFlag(BOARD_ONBOARDING_STORAGE_KEY)
+        return -1
+      }
+      return next
+    })
+  }
+
+  function onboardingBack() {
+    setOnboardingStep((step) => (step > 0 ? step - 1 : step))
+  }
 
 
   const [showAgentSettings, setShowAgentSettings] = useState(false)
@@ -2923,6 +2995,7 @@ function App() {
     if (event.pointerType !== 'touch' && event.button !== 0 && event.button !== 2) return
     const isRightClick = event.pointerType !== 'touch' && event.button === 2
     isRightClickDragRef.current = isRightClick
+    if (isRightClick) rightClickMarqueeMovedRef.current = false
     cancelPanInertia()
 
 
@@ -3202,6 +3275,13 @@ function App() {
     if (marqueeRef.current) {
       marqueeRef.current.currentX = event.clientX
       marqueeRef.current.currentY = event.clientY
+      if (isRightClickDragRef.current) {
+        const distance = Math.hypot(
+          event.clientX - marqueeRef.current.startX,
+          event.clientY - marqueeRef.current.startY,
+        )
+        if (distance > DRAG_START_THRESHOLD) rightClickMarqueeMovedRef.current = true
+      }
       setMarquee({ ...marqueeRef.current })
       setSurfaceCursor('crosshair')
       return
@@ -3747,8 +3827,17 @@ function App() {
       y: event.clientY,
     }, hoveredCircleEdgeIdRef.current)
     if (hit?.type !== 'circle-body' && hit?.type !== 'circle-edge' && hit?.type !== 'circle-center') return
+    if (rightClickMarqueeMovedRef.current) return
 
     selectItem({ type: 'circle', id: hit.circle.id })
+    const world = screenToWorld({ x: event.clientX, y: event.clientY })
+    setCreateMenu({
+      sourceCircleId: hit.circle.id,
+      x: world.x,
+      y: world.y,
+      screenX: event.clientX,
+      screenY: event.clientY,
+    })
   }
 
   function startConnector(
@@ -4632,49 +4721,51 @@ Content-Type: application/json
           </button>
         </div>
       )}
-      <div className="board-mode-menu" aria-label="Board interaction mode">
-        <button
-          type="button"
-          className={boardToolMode === 'edit' ? 'is-active' : ''}
-          aria-label="Edit mode"
-          title="Edit mode"
-          aria-pressed={boardToolMode === 'edit'}
-          onClick={() => {
-            cancelPanInertia()
-            setBoardToolMode('edit')
-          }}
-        >
-          <PointerIcon />
-        </button>
-        <button
-          type="button"
-          className={boardToolMode === 'select' ? 'is-active' : ''}
-          aria-label="Select mode"
-          title="Select mode"
-          aria-pressed={boardToolMode === 'select'}
-          onClick={() => {
-            cancelPanInertia()
-            setBoardToolMode('select')
-            setCreateMenu(null)
-          }}
-        >
-          <SelectIcon />
-        </button>
-        <button
-          type="button"
-          className={boardToolMode === 'pan' ? 'is-active' : ''}
-          aria-label="Pan mode"
-          title="Pan mode"
-          aria-pressed={boardToolMode === 'pan'}
-          onClick={() => {
-            cancelPanInertia()
-            setBoardToolMode('pan')
-            setCreateMenu(null)
-          }}
-        >
-          <PanIcon />
-        </button>
-      </div>
+      {isTouchLayout && (
+        <div className="board-mode-menu" aria-label="Board interaction mode">
+          <button
+            type="button"
+            className={boardToolMode === 'edit' ? 'is-active' : ''}
+            aria-label="Edit mode"
+            title="Edit mode"
+            aria-pressed={boardToolMode === 'edit'}
+            onClick={() => {
+              cancelPanInertia()
+              setBoardToolMode('edit')
+            }}
+          >
+            <PointerIcon />
+          </button>
+          <button
+            type="button"
+            className={boardToolMode === 'select' ? 'is-active' : ''}
+            aria-label="Select mode"
+            title="Select mode"
+            aria-pressed={boardToolMode === 'select'}
+            onClick={() => {
+              cancelPanInertia()
+              setBoardToolMode('select')
+              setCreateMenu(null)
+            }}
+          >
+            <SelectIcon />
+          </button>
+          <button
+            type="button"
+            className={boardToolMode === 'pan' ? 'is-active' : ''}
+            aria-label="Pan mode"
+            title="Pan mode"
+            aria-pressed={boardToolMode === 'pan'}
+            onClick={() => {
+              cancelPanInertia()
+              setBoardToolMode('pan')
+              setCreateMenu(null)
+            }}
+          >
+            <PanIcon />
+          </button>
+        </div>
+      )}
 
       <div className="toolbar" aria-label="Graph controls" style={{ justifyContent: 'flex-end' }}>
         <div
@@ -4845,6 +4936,18 @@ Content-Type: application/json
           )}
         </div>
         <div className="toolbar__group">
+          <button
+            type="button"
+            onClick={() => {
+              setShowSettings(false)
+              closeSearch()
+              setOnboardingStep(0)
+            }}
+            aria-label="Open board guide"
+            title="Open board guide"
+          >
+            <HelpIcon />
+          </button>
           <button
             ref={settingsButtonRef}
             type="button"
@@ -6414,6 +6517,16 @@ Content-Type: application/json
         </div>
       )}
 
+      {graphLoaded && onboardingStep >= 0 && (
+        <OnboardingCoach
+          surface={onboardingSurface}
+          step={onboardingStep}
+          onNext={onboardingNext}
+          onBack={onboardingBack}
+          onSkip={finishOnboarding}
+        />
+      )}
+
     </main>
   )
 }
@@ -7122,6 +7235,16 @@ function SearchIcon() {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="11" cy="11" r="7" />
       <path d="m20 20-3.5-3.5" />
+    </svg>
+  )
+}
+
+function HelpIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.75 9a2.5 2.5 0 0 1 4.54-1.43c.86 1.13.55 2.57-.56 3.31-.94.62-1.73 1.24-1.73 2.62" />
+      <path d="M12 17h.01" />
     </svg>
   )
 }
