@@ -503,6 +503,8 @@ const authCardStyle: CSSProperties = {
 const LINKEDIN_GUIDE_HINT_KEY = 'social-linkedin-guide-hint-seen-v1'
 const SEARCH_LINKEDIN_HINT_KEY = 'social-search-linkedin-hint-seen-v1'
 const CIRCLE_CREATION_DEFAULTS_KEY = 'hackathon-board:circle-creation-defaults:v1'
+const LINKEDIN_MOBILE_ARCHIVE_MESSAGE =
+  'LinkedIn archive requests do not work from a phone. Please request your archive from LinkedIn on a computer, then return here to import the ZIP.'
 type BoardToolMode = 'edit' | 'pan' | 'select'
 
 type CircleCreationDefaults = {
@@ -542,6 +544,10 @@ function markLocalFlag(key: string) {
   } catch {
     // ignore
   }
+}
+
+function isPhoneViewport(): boolean {
+  return window.matchMedia('(pointer: coarse)').matches && window.innerWidth <= 767
 }
 
 
@@ -4918,6 +4924,10 @@ Content-Type: application/json
                   onClick={() => {
                     markLocalFlag(LINKEDIN_GUIDE_HINT_KEY)
                     setHighlightLinkedInGuideHelp(false)
+                    if (isPhoneViewport()) {
+                      alert(LINKEDIN_MOBILE_ARCHIVE_MESSAGE)
+                      return
+                    }
                     setShowSettings(false)
                     setShowLinkedInGuide(true)
                   }}
@@ -7483,4 +7493,3 @@ function GlobalTooltip() {
 }
 
 export default App
-

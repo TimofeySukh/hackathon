@@ -85,7 +85,9 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   A whole drag or resize gesture is a single undo step. History is in-memory only (lost on
   reload); rename and style tweaks are excluded.
 - **Settings panel** (gear): LinkedIn ZIP import (+ sync guide), account sign-in/out,
-  Agent API key management (signed-in), graph import/export/clear.
+  Agent API key management (signed-in), graph import/export/clear. On phone-sized
+  touch viewports, the LinkedIn sync guide does not open; the app tells users that
+  LinkedIn archive requests must be made from a computer.
 - **Graph file actions**: export downloads JSON; import replaces the board and flushes
   immediately; clear resets to a fresh `You` circle after confirmation (both undoable).
 - **Persistence safety**: signed-in boards load only from the `user_graphs` blob.

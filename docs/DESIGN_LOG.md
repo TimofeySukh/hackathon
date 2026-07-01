@@ -17,6 +17,14 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-07-01 — LinkedIn archive guide is desktop-only
+
+- Decision: On phone-sized touch viewports, the Settings `?` for LinkedIn Data Import
+  shows a direct message instead of opening the step-by-step guide.
+- Why: LinkedIn archive requests are only reliably available from the desktop web
+  flow, so showing desktop instructions on a phone sends users into a path that cannot
+  complete there.
+
 ### 2026-07-01 — Azure Static Web Apps Free test target
 
 - Decision: Add an Azure Static Web Apps Free target named `datanode-test` with a manual
