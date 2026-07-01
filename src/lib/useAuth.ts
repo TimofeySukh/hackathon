@@ -142,6 +142,11 @@ function clearStoredAuthReturnHash() {
   }
 }
 
+export function cancelPendingBoardAuthReturn() {
+  sawAuthCallbackDuringPageLoad = false
+  clearStoredAuthReturnHash()
+}
+
 export function consumeAuthReturnHash() {
   const hash = readAuthReturnHash()
   sawAuthCallbackDuringPageLoad = false
@@ -291,14 +296,15 @@ export function useAuth() {
   const signInWithEmail = async (email: string, password: string) => {
     if (!supabase) return { error: 'Auth is not configured.' as string | null }
 
+    rememberBoardAuthReturn()
     const { error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
+      cancelPendingBoardAuthReturn()
       setAuthState((currentState) => ({ ...currentState, error: error.message }))
       return { error: error.message }
     }
 
-    rememberBoardAuthReturn()
     return { error: null }
   }
 
@@ -307,6 +313,7 @@ export function useAuth() {
       return { error: 'Auth is not configured.' as string | null, needsConfirmation: false, alreadyRegistered: false }
     }
 
+    rememberBoardAuthReturn()
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -316,6 +323,7 @@ export function useAuth() {
     })
 
     if (error) {
+      cancelPendingBoardAuthReturn()
       setAuthState((currentState) => ({ ...currentState, error: error.message }))
       return { error: error.message, needsConfirmation: false, alreadyRegistered: false }
     }
@@ -328,8 +336,8 @@ export function useAuth() {
     // When email confirmation is required, Supabase returns a user but no session.
     const needsConfirmation = Boolean(data.user && !data.session && !alreadyRegistered)
 
-    if (data.session) {
-      rememberBoardAuthReturn()
+    if (alreadyRegistered) {
+      cancelPendingBoardAuthReturn()
     }
 
     return { error: null, needsConfirmation, alreadyRegistered }

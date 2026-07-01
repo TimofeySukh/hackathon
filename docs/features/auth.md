@@ -29,6 +29,10 @@ password so a database user is created without forcing profile setup.
   (`code`, token hash parameters, recovery/error parameters) also resolve to the board
   route on the first app render while Supabase restores the session, avoiding a
   landing-page flash or a false signed-out prompt.
+- Email login stores the board return marker before calling Supabase so the auth-state
+  callback can consume it reliably. If the user manually navigates from `#board` back to
+  the clean domain or another public hash, stale board return markers are cleared and the
+  landing remains reachable while signed in.
 - After a successful password update, the dialog stays open in a final success state so the
   user sees that the password changed and the session is active.
 - New passwords require at least 8 characters, with no composition rule.

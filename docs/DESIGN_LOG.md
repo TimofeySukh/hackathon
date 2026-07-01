@@ -17,6 +17,15 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-07-01 — Clean domain stays public after board navigation
+
+- Decision: hash routing only uses a stored board auth-return marker during the first app
+  route resolution, and explicit navigation from `#board` to the clean domain or another
+  public hash clears stale markers.
+- Why: email sign-in could leave a stale `sdn.authReturnHash` if the auth-state callback
+  fired before the marker was written, causing a signed-in user who removed `#board` to be
+  routed back to the board instead of the landing page.
+
 ### 2026-06-30 — Phone landing uses compact stacked geometry
 
 - Decision: the landing page keeps the desktop screenshot/deck composition on wide

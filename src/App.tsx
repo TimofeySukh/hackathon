@@ -13,7 +13,7 @@ import googleIcon from './assets/brands/google.svg'
 import sdnLogo from './assets/sdn-logo.svg'
 
 zip.configure({ useWebWorkers: false })
-import { consumeAuthReturnHash, hasPendingBoardAuthReturn, useAuth } from './lib/useAuth'
+import { cancelPendingBoardAuthReturn, consumeAuthReturnHash, hasPendingBoardAuthReturn, useAuth } from './lib/useAuth'
 import LandingPage from './LandingPage'
 import ContactPage from './ContactPage'
 import PrivacyPage from './PrivacyPage'
@@ -563,22 +563,26 @@ function AuthPrivacyNotice({ onOpenPrivacy }: { onOpenPrivacy: () => void }) {
   )
 }
 
-function resolveViewModeFromLocation(): 'landing' | 'board' | 'docs' | 'contact' | 'privacy' {
+function resolveViewModeFromLocation(options: { includePendingAuthReturn?: boolean } = {}): 'landing' | 'board' | 'docs' | 'contact' | 'privacy' {
   const hash = window.location.hash
   if (hash === '#board') return 'board'
   if (hash === '#docs' || hash.startsWith('#docs/')) return 'docs'
   if (hash === '#contact') return 'contact'
   if (hash === '#privacy') return 'privacy'
-  if (hasPendingBoardAuthReturn()) return 'board'
+  if (options.includePendingAuthReturn && hasPendingBoardAuthReturn()) return 'board'
   return 'landing'
 }
 
 function App() {
-  const [viewMode, setViewMode] = useState<'landing' | 'board' | 'docs' | 'contact' | 'privacy'>(resolveViewModeFromLocation);
+  const [viewMode, setViewMode] = useState<'landing' | 'board' | 'docs' | 'contact' | 'privacy'>(() =>
+    resolveViewModeFromLocation({ includePendingAuthReturn: true })
+  );
 
   useEffect(() => {
     const handleHashChange = () => {
-      setViewMode(resolveViewModeFromLocation());
+      const nextViewMode = resolveViewModeFromLocation()
+      if (nextViewMode !== 'board') cancelPendingBoardAuthReturn()
+      setViewMode(nextViewMode);
     };
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
