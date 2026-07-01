@@ -85,6 +85,32 @@ rediscover, write it here.
 - Why: The section repeated hero/onboarding messaging without adding narrative momentum;
   the scattered deck cards felt like filler between How it works and the interactive demo.
 
+### 2026-07-01 — LinkedIn archive guide is desktop-only
+
+- Decision: On phone-sized touch viewports, the Settings `?` for LinkedIn Data Import
+  shows a direct message instead of opening the step-by-step guide.
+- Why: LinkedIn archive requests are only reliably available from the desktop web
+  flow, so showing desktop instructions on a phone sends users into a path that cannot
+  complete there.
+
+### 2026-07-01 — Azure Static Web Apps Free test target
+
+- Decision: Add an Azure Static Web Apps Free target named `datanode-test` with a manual
+  GitHub Actions deploy instead of Azure-created automatic source integration.
+- Why: The frontend is a static Vite app backed by Supabase, so Azure Static Web Apps can
+  test Azure hosting without adding paid compute, a database, or automatic deploys on every
+  push.
+- Details: The Azure target uses `public/staticwebapp.config.json` for SPA fallback and
+  security headers because the nginx config used by the home server and DigitalOcean
+  container does not apply on Azure Static Web Apps.
+
+### 2026-07-01 — DigitalOcean test app has an explicit shutdown workflow
+
+- Decision: Add a manual GitHub Actions workflow that deletes the DigitalOcean App
+  Platform test app by repository variable app id.
+- Why: The test app was useful for validation, but the project should have an auditable
+  one-command path to stop App Platform billing before trying another host.
+
 ### 2026-07-01 — Documentation realignment for AI readability
 
 - Decision: Added `docs/AI_CONTEXT.md` as the canonical, code-aligned product summary for

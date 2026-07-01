@@ -1237,3 +1237,28 @@
     transform: translateX(0) scale(1);
   }
 }
+
+/* --- Tooltips --- */
+.m3-tooltip {
+  background: var(--md-on-surface, #1a1c1e);
+  color: var(--md-surface, #f8f9fc);
+  padding: 6px 10px;
+  border-radius: var(--md-r-xs, 4px);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  box-shadow: var(--md-elev-1);
+  pointer-events: none;
+  opacity: 0;
+  scale: 0.95;
+  animation: m3-tooltip-appear var(--md-dur-short, 0.12s) var(--md-ease-standard, ease-out) forwards;
+}
+
+@keyframes m3-tooltip-appear {
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+

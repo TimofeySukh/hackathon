@@ -525,6 +525,8 @@ const ONBOARDING_LINKEDIN_EXAMPLES = [
   },
 ] as const
 const CIRCLE_CREATION_DEFAULTS_KEY = 'hackathon-board:circle-creation-defaults:v1'
+const LINKEDIN_MOBILE_ARCHIVE_MESSAGE =
+  'LinkedIn archive requests do not work from a phone. Please request your archive from LinkedIn on a computer, then return here to import the ZIP.'
 type BoardToolMode = 'edit' | 'pan' | 'select'
 
 type CircleCreationDefaults = {
@@ -578,6 +580,10 @@ function consumeSessionFlag(key: string): boolean {
 
 function isTouchBoardLayout(): boolean {
   return window.matchMedia('(hover: none), (pointer: coarse), (max-width: 720px)').matches
+}
+
+function isPhoneViewport(): boolean {
+  return window.matchMedia('(pointer: coarse)').matches && window.innerWidth <= 767
 }
 
 
@@ -4894,6 +4900,7 @@ Content-Type: application/json
             </div>
           </div>
         )}
+        <GlobalTooltip />
       </div>
     )
   }
@@ -4962,6 +4969,8 @@ Content-Type: application/json
             type="button"
             className={boardToolMode === 'edit' ? 'is-active' : ''}
             aria-label="Edit mode"
+            data-tooltip="Edit mode"
+            data-tooltip-position="right"
             title="Edit mode"
             aria-pressed={boardToolMode === 'edit'}
             onClick={() => {
@@ -4976,6 +4985,8 @@ Content-Type: application/json
             type="button"
             className={boardToolMode === 'select' ? 'is-active' : ''}
             aria-label="Select mode"
+            data-tooltip="Select mode"
+            data-tooltip-position="right"
             title="Select mode"
             aria-pressed={boardToolMode === 'select'}
             onClick={() => {
@@ -4991,6 +5002,8 @@ Content-Type: application/json
             type="button"
             className={boardToolMode === 'pan' ? 'is-active' : ''}
             aria-label="Pan mode"
+            data-tooltip="Pan mode"
+            data-tooltip-position="right"
             title="Pan mode"
             aria-pressed={boardToolMode === 'pan'}
             onClick={() => {
@@ -5015,6 +5028,8 @@ Content-Type: application/json
             type="button"
             className="search-box__toggle"
             aria-label="Search"
+            data-tooltip="Search"
+            data-tooltip-position="bottom"
             onClick={() => {
               if (searchOpen) {
                 closeSearch()
@@ -5218,6 +5233,8 @@ Content-Type: application/json
               setShowSettings(!showSettings)
             }}
             aria-label="Settings"
+            data-tooltip="Settings"
+            data-tooltip-position="bottom"
             style={{
               background: showSettings ? 'var(--md-secondary-container)' : 'transparent',
               color: showSettings ? 'var(--md-on-secondary-container)' : 'var(--md-on-surface-variant)',
@@ -5250,8 +5267,15 @@ Content-Type: application/json
                   type="button"
                   className="linkedin-guide-help attention-badge-wrap"
                   aria-label="How to sync your LinkedIn"
-                  title="How to sync your LinkedIn"
-                  onClick={openLinkedInGuide}
+                  data-tooltip="How to sync your LinkedIn"
+                  data-tooltip-position="bottom"
+                  onClick={() => {
+                    if (isPhoneViewport()) {
+                      alert(LINKEDIN_MOBILE_ARCHIVE_MESSAGE)
+                      return
+                    }
+                    openLinkedInGuide()
+                  }}
                 >
                   ?
                   {highlightLinkedInGuideHelp && (
@@ -5699,12 +5723,14 @@ Content-Type: application/json
                               '--palette-color': selectedCircleColors.border,
                             } as React.CSSProperties}
                             onClick={() => setShowCircleStylePanel(!showCircleStylePanel)}
-                            title="Customize circle"
+                            data-tooltip="Customize circle"
+                            data-tooltip-position="top"
                             aria-label="Customize circle"
                           >
                             <PaletteIcon />
                           </button>
                         </div>
+
                         <div className={`circle-style-popover ${showCircleStylePanel ? 'is-open' : ''}`}>
                           <div className="circle-style-theme-tabs">
                             <SelectionIndicator
@@ -5801,6 +5827,7 @@ Content-Type: application/json
                             />
                           </div>
                         </div>
+
                       </div>
                     </div>
                   )
@@ -5910,7 +5937,6 @@ Content-Type: application/json
 
             {selectedPerson && (
               <>
-
 
                 {/* Visual Settings Row: Select Circle + Avatar Photo Upload */}
                 {(() => {
@@ -6043,7 +6069,8 @@ Content-Type: application/json
                                 e.stopPropagation()
                                 deletePersonNote(selectedPerson.id, note.id)
                               }}
-                              title="Delete note"
+                              data-tooltip="Delete note"
+                              data-tooltip-position="top"
                             >
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                                 <polyline points="3 6 5 6 21 6" />
@@ -6105,7 +6132,8 @@ Content-Type: application/json
                             setIsAddingNote(false)
                             setNewNoteBody('')
                           }}
-                          title="Discard"
+                          data-tooltip="Discard"
+                          data-tooltip-position="top"
                         >
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                             <line x1="18" y1="6" x2="6" y2="18" />
@@ -6150,7 +6178,8 @@ Content-Type: application/json
                           type="button"
                           className="connection-item__delete"
                           onClick={() => deletePersonLink(selectedPerson.id, link.id)}
-                          title="Delete connection"
+                          data-tooltip="Delete connection"
+                          data-tooltip-position="top"
                         >
                           <CloseIcon />
                         </button>
@@ -6786,6 +6815,7 @@ Content-Type: application/json
         />
       )}
 
+      <GlobalTooltip />
     </main>
   )
 }
@@ -7744,6 +7774,95 @@ function getResizeCursor(point: { x: number; y: number }, circle: { x: number; y
   if (deg >= 202.5 && deg < 247.5) return 'nwse-resize'
   if (deg >= 247.5 && deg < 292.5) return 'ns-resize'
   return 'nesw-resize'
+}
+
+interface TooltipData {
+  text: string
+  rect: DOMRect
+  position: 'top' | 'bottom' | 'left' | 'right'
+}
+
+function GlobalTooltip() {
+  const [tooltip, setTooltip] = useState<TooltipData | null>(null)
+
+  useEffect(() => {
+    const handleOver = (e: Event) => {
+      const target = (e.target as HTMLElement).closest('[data-tooltip]')
+      if (!target) return
+      
+      const text = target.getAttribute('data-tooltip')
+      if (!text) return
+      
+      const rect = target.getBoundingClientRect()
+      const position = (target.getAttribute('data-tooltip-position') || 'top') as TooltipData['position']
+      
+      setTooltip({ text, rect, position })
+    }
+
+    const handleOut = (e: Event) => {
+      const target = (e.target as HTMLElement).closest('[data-tooltip]')
+      if (!target) return
+      setTooltip(null)
+    }
+
+    document.addEventListener('mouseover', handleOver, { passive: true })
+    document.addEventListener('mouseout', handleOut, { passive: true })
+    document.addEventListener('focusin', handleOver, { passive: true })
+    document.addEventListener('focusout', handleOut, { passive: true })
+
+    return () => {
+      document.removeEventListener('mouseover', handleOver)
+      document.removeEventListener('mouseout', handleOut)
+      document.removeEventListener('focusin', handleOver)
+      document.removeEventListener('focusout', handleOut)
+    }
+  }, [])
+
+  if (!tooltip) return null
+
+  const { text, rect, position } = tooltip
+
+  let top = 0
+  let left = 0
+  const margin = 8
+
+  if (position === 'top') {
+    left = rect.left + rect.width / 2
+    top = rect.top - margin
+  } else if (position === 'bottom') {
+    left = rect.left + rect.width / 2
+    top = rect.bottom + margin
+  } else if (position === 'left') {
+    left = rect.left - margin
+    top = rect.top + rect.height / 2
+  } else if (position === 'right') {
+    left = rect.right + margin
+    top = rect.top + rect.height / 2
+  }
+
+  const transform = position === 'top'
+    ? 'translate(-50%, -100%)'
+    : position === 'bottom'
+    ? 'translate(-50%, 0)'
+    : position === 'left'
+    ? 'translate(-100%, -50%)'
+    : 'translate(0, -50%)'
+
+  return (
+    <div
+      className="m3-tooltip"
+      style={{
+        position: 'fixed',
+        top,
+        left,
+        transform,
+        zIndex: 99999,
+        pointerEvents: 'none',
+      }}
+    >
+      {text}
+    </div>
+  )
 }
 
 export default App

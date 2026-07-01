@@ -1,0 +1,35 @@
+name: Shutdown DigitalOcean test app
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: datanode-digitalocean-test
+  cancel-in-progress: false
+
+jobs:
+  shutdown:
+    name: Delete DigitalOcean test app
+    runs-on: ubuntu-latest
+    env:
+      DIGITALOCEAN_APP_ID: ${{ vars.DIGITALOCEAN_DATANODE_TEST_APP_ID }}
+
+    steps:
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Delete app
+        run: |
+          set -Eeuo pipefail
+
+          if [[ -z "${DIGITALOCEAN_APP_ID}" ]]; then
+            echo "::error::Missing DIGITALOCEAN_DATANODE_TEST_APP_ID repository variable"
+            exit 1
+          fi
+
+          doctl apps delete "${DIGITALOCEAN_APP_ID}" --force
