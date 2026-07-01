@@ -346,6 +346,92 @@ tail -n 100 ~/.local/share/social-datanode-live-autodeploy/cron.log
 gh run list --workflow deploy-social-datanode-live.yml --limit 5
 ```
 
+## DigitalOcean Test Deploy
+
+`test.social.datanode.live` is prepared as a parallel DigitalOcean App Platform target.
+It does not replace the home-server `social.datanode.live` deployment and it does not
+deploy automatically on push.
+
+Files:
+
+- `.github/workflows/deploy-datanode-digitalocean-test.yml`
+- `.do/datanode-test.yaml.template`
+- `deploy/digitalocean-app-platform/Dockerfile`
+
+What it does:
+
+- deploys only from a manual GitHub Actions `workflow_dispatch`
+- builds a single App Platform service from the public Git repository
+- uses the smallest fixed shared container, `apps-s-1vcpu-0.5gb`
+- reuses the production nginx config so security headers, cache behavior, and SPA fallback
+  match the home-server deployment
+- keeps Supabase as the backend; no DigitalOcean managed database is provisioned
+- keeps `social.datanode.live` on the existing home-server promotion path until DNS and
+  Supabase/Google auth settings are intentionally switched
+
+Required GitHub repository secret:
+
+```text
+DIGITALOCEAN_ACCESS_TOKEN
+```
+
+Required GitHub repository variables:
+
+```text
+DATANODE_TEST_DOMAIN=test.social.datanode.live
+VITE_SUPABASE_URL=<production Supabase URL>
+VITE_SUPABASE_PUBLISHABLE_KEY=<production Supabase publishable key>
+```
+
+After the first successful create, store the printed DigitalOcean app id as:
+
+```text
+DIGITALOCEAN_DATANODE_TEST_APP_ID=<app-id>
+```
+
+First deploy:
+
+```bash
+gh workflow run deploy-datanode-digitalocean-test.yml \
+  --ref main \
+  -f branch=main \
+  -f create_app=true
+```
+
+Later test deploys:
+
+```bash
+gh workflow run deploy-datanode-digitalocean-test.yml \
+  --ref main \
+  -f branch=main
+```
+
+DNS:
+
+1. In DigitalOcean App Platform, inspect the app's domain status and default ingress.
+2. In Cloudflare, create `test.social.datanode.live` as a CNAME to the DigitalOcean
+   target shown for the app domain.
+3. Keep `social.datanode.live` unchanged until the DigitalOcean app has been validated.
+
+Auth configuration required before sign-in works on the test domain:
+
+- Supabase Auth URL Configuration: add `https://test.social.datanode.live` to the
+  additional redirect URLs. Supabase requires redirect destinations to match the allow
+  list.
+- Google OAuth Web Client: add `https://test.social.datanode.live` to Authorized
+  JavaScript origins. The Supabase Google provider callback URL remains the Supabase
+  callback URL from the dashboard.
+
+To make DigitalOcean the default production path later:
+
+1. Add `social.datanode.live` to the DigitalOcean app spec domains.
+2. Add `https://social.datanode.live` to Supabase Auth and Google OAuth settings if it is
+   not already present.
+3. Move the Cloudflare DNS record for `social.datanode.live` from the existing
+   cloudflared tunnel target to the DigitalOcean App Platform target.
+4. Keep the home-server cron disabled only after the DigitalOcean domain is live and
+   verified.
+
 Vite listens on all network interfaces in this repository, so it prints both a local URL and a network URL in the terminal. Open either URL in a browser.
 
 For other devices on the same local network, open the printed network URL, for example:

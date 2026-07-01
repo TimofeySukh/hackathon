@@ -26,6 +26,17 @@ rediscover, write it here.
   fired before the marker was written, causing a signed-in user who removed `#board` to be
   routed back to the board instead of the landing page.
 
+### 2026-07-01 — Parallel DigitalOcean test deployment
+
+- Decision: Add a manual DigitalOcean App Platform deployment path for
+  `test.social.datanode.live` while keeping `social.datanode.live` on the existing
+  home-server promotion flow.
+- Why: The project needs a stable hosted target to validate DigitalOcean without
+  immediately changing the production DNS path.
+- Details: The DigitalOcean target uses one fixed `apps-s-1vcpu-0.5gb` service container
+  and reuses the existing nginx config so CSP, cache headers, and SPA fallback match the
+  current server deployment. Supabase remains the only backend/database provider.
+
 ### 2026-06-30 — Phone landing uses compact stacked geometry
 
 - Decision: the landing page keeps the desktop screenshot/deck composition on wide

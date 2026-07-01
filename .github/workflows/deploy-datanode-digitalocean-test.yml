@@ -1,0 +1,115 @@
+name: Deploy test.social.datanode.live to DigitalOcean
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Git branch for DigitalOcean App Platform to build
+        required: true
+        default: main
+      app_id:
+        description: Existing DigitalOcean App ID. Defaults to repository variable DIGITALOCEAN_DATANODE_TEST_APP_ID.
+        required: false
+        default: ""
+      create_app:
+        description: Create the DigitalOcean app when no app_id is available
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: datanode-digitalocean-test
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy DigitalOcean test app
+    runs-on: ubuntu-latest
+    env:
+      DATANODE_TEST_DOMAIN: ${{ vars.DATANODE_TEST_DOMAIN || 'test.social.datanode.live' }}
+      DEPLOY_BRANCH: ${{ inputs.branch }}
+      DIGITALOCEAN_APP_ID: ${{ inputs.app_id || vars.DIGITALOCEAN_DATANODE_TEST_APP_ID }}
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Render DigitalOcean app spec
+        run: |
+          set -Eeuo pipefail
+
+          required_vars=(
+            DATANODE_TEST_DOMAIN
+            DEPLOY_BRANCH
+            VITE_SUPABASE_URL
+            VITE_SUPABASE_PUBLISHABLE_KEY
+          )
+
+          for var_name in "${required_vars[@]}"; do
+            if [[ -z "${!var_name}" ]]; then
+              echo "::error::Missing required variable ${var_name}"
+              exit 1
+            fi
+          done
+
+          node <<'NODE'
+          const fs = require('node:fs')
+
+          const replacements = {
+            __DATANODE_TEST_DOMAIN__: process.env.DATANODE_TEST_DOMAIN,
+            __DEPLOY_BRANCH__: process.env.DEPLOY_BRANCH,
+            __VITE_SUPABASE_URL__: process.env.VITE_SUPABASE_URL,
+            __VITE_SUPABASE_PUBLISHABLE_KEY__: process.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          }
+
+          let spec = fs.readFileSync('.do/datanode-test.yaml.template', 'utf8')
+          for (const [placeholder, value] of Object.entries(replacements)) {
+            spec = spec.replaceAll(placeholder, JSON.stringify(value))
+          }
+          fs.writeFileSync('.do/datanode-test.rendered.yaml', spec)
+          NODE
+
+      - name: Validate and estimate app spec
+        run: |
+          set -Eeuo pipefail
+          doctl apps spec validate .do/datanode-test.rendered.yaml
+          if [[ -n "${DIGITALOCEAN_APP_ID}" ]]; then
+            doctl apps propose --app "${DIGITALOCEAN_APP_ID}" --spec .do/datanode-test.rendered.yaml
+          else
+            doctl apps propose --spec .do/datanode-test.rendered.yaml
+          fi
+
+      - name: Create or update app
+        run: |
+          set -Eeuo pipefail
+
+          if [[ -n "${DIGITALOCEAN_APP_ID}" ]]; then
+            doctl apps update "${DIGITALOCEAN_APP_ID}" \
+              --spec .do/datanode-test.rendered.yaml \
+              --update-sources \
+              --wait \
+              --format ID,DefaultIngress,Updated
+            exit 0
+          fi
+
+          if [[ "${{ inputs.create_app }}" != "true" ]]; then
+            echo "::error::Set create_app=true for the first deployment, or provide app_id / DIGITALOCEAN_DATANODE_TEST_APP_ID for updates."
+            exit 1
+          fi
+
+          doctl apps create \
+            --spec .do/datanode-test.rendered.yaml \
+            --update-sources \
+            --wait \
+            --format ID,DefaultIngress,Created

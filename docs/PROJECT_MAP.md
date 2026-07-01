@@ -68,6 +68,12 @@ Completed tasks can remain listed here when they explain repository history. Liv
 - `scripts/test-ui-import-persistence.mjs`: local Playwright import persistence check with a mock Supabase graph API; verifies ZIP import, graph JSON import, and reload without touching production.
 - `scripts/datanode-cli.mjs`: local CLI client for the agent graph API.
 - `scripts/datanode-mcp.mjs`: stdio MCP server for AI agents, backed by the graph API.
+- `.github/workflows/deploy-datanode-digitalocean-test.yml`: manual DigitalOcean App
+  Platform workflow for the parallel `test.social.datanode.live` deployment.
+- `.do/datanode-test.yaml.template`: DigitalOcean App Platform spec template rendered by
+  the test deploy workflow.
+- `deploy/digitalocean-app-platform/`: container build used by the DigitalOcean test
+  deployment.
 - `src/main.tsx`: React entry point.
 - `src/App.tsx`: React shell + interaction host for the board (chrome, panels, pointer interaction, persisted-graph wiring, paint loop). Delegates canvas logic to `src/lib/board/`.
 - `src/lib/board/`: framework-free board engine — `types`, `constants`, `colors`, `geometry`, `layout` (containment/collision), `render` (spatial index, hit-test, Canvas 2D draw layer).
