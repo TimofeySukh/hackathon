@@ -52,13 +52,44 @@ function hasSupabaseAuthCallbackParams() {
 }
 
 function clearUrlAuthReturnHash() {
-  if (!window.location.search.includes(AUTH_RETURN_SEARCH_PARAM)) return
-
   const url = new URL(window.location.href)
-  url.searchParams.delete(AUTH_RETURN_SEARCH_PARAM)
-  const query = url.searchParams.toString()
-  const cleanUrl = `${url.pathname}${query ? `?${query}` : ''}${url.hash}`
-  window.history.replaceState(window.history.state, '', cleanUrl)
+  let changed = false
+
+  if (url.searchParams.has(AUTH_RETURN_SEARCH_PARAM)) {
+    url.searchParams.delete(AUTH_RETURN_SEARCH_PARAM)
+    changed = true
+  }
+
+  for (const param of AUTH_CALLBACK_PARAMS) {
+    if (url.searchParams.has(param)) {
+      url.searchParams.delete(param)
+      changed = true
+    }
+  }
+
+  let hashChanged = false
+  let hash = url.hash
+  if (hash.startsWith('#')) {
+    const hashParams = new URLSearchParams(hash.slice(1))
+    let hasAnyCallback = false
+    for (const param of AUTH_CALLBACK_PARAMS) {
+      if (hashParams.has(param)) {
+        hashParams.delete(param)
+        hasAnyCallback = true
+      }
+    }
+    if (hasAnyCallback) {
+      const remainingHash = hashParams.toString()
+      hash = remainingHash ? `#${remainingHash}` : ''
+      hashChanged = true
+    }
+  }
+
+  if (changed || hashChanged) {
+    const query = url.searchParams.toString()
+    const cleanUrl = `${url.pathname}${query ? `?${query}` : ''}${hashChanged ? hash : url.hash}`
+    window.history.replaceState(window.history.state, '', cleanUrl)
+  }
 }
 
 function getStoredAuthReturnHash(storage: Storage) {
