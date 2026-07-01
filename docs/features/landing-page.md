@@ -41,6 +41,9 @@ Header requirements:
 - It should follow the clear structure of the Linear reference.
 - It should not become a huge black banner.
 - It should not dominate the first screen.
+- Clicking the Social Datanode logo on the landing page returns to the landing home
+  (`#` / empty hash). It must not unexpectedly open the board; the board CTA owns that
+  action.
 - `Contact` opens a separate contact screen at `#contact`.
 - On phone widths, the header uses two compact rows: logo plus auth action on the first
   row, Docs/Contact centered below. Header contents must never overflow horizontally.
@@ -68,6 +71,7 @@ Required elements:
 2. A real product screenshot of the board with the inspector open.
 3. A short headline, lead line, and three deck-style slogans beside the screenshot.
 4. A single primary **Open board** button.
+5. A short non-clickable reassurance line and factual trust chips on desktop.
 
 Do not bring back the stepped-path ribbon as the main hero element.
 
@@ -79,6 +83,15 @@ perform any navigation; the button owns the hero CTA.
 The hero copy must clearly introduce the user problem and the product answer:
 people often keep relationship context in their head or in flat spreadsheets, while
 Social Datanode turns people, notes, groups, and links into a visual board.
+
+Current hero positioning:
+
+- Headline: direct problem framing (`Stop managing people from memory and spreadsheets`).
+- Lead: describes the product as a private visual board for people, notes, groups, and links.
+- CTA note: explains that visitors can try first and sign in later for private sync.
+- Desktop trust chips are factual only: no-account trial, private sync when signed in, and real
+  board preview. On phone widths, these chips are removed from the hero because the same trust
+  information appears in the trust strip below.
 
 ## Copy
 
@@ -94,6 +107,9 @@ new promises that were not requested.
 Use a direct problem/solution structure near the top of the page. The problem is
 that relationship knowledge is scattered across memory and non-visual tables. The
 solution is a spatial interface for managing people, notes, groups, and links.
+
+The landing narrative should use user actions and concrete product nouns before abstract
+feature labels. Prefer verbs such as map, remember, import, search, attach, group, and sync.
 
 ## Interactive Section
 
@@ -114,6 +130,10 @@ the real board graph.
 
 The UI should resemble the real board inspector/menu style closely enough that
 it feels like the product, not a separate marketing illustration.
+
+The demo starts with a realistic local-only example (`Maya Chen`, `OpenAI`, one note, and one
+LinkedIn link) so visitors understand the value before interacting. The reset button restores
+that sample state; it does not delete real data.
 
 ## Below-the-fold Sections
 
@@ -139,6 +159,9 @@ Do not add a generic multi-column feature grid to the main landing page.
 On phone widths, cards lose their scattered/translated geometry and stack in one clean
 column. The mobile page must not rely on desktop rotations, negative margins, or hover
 expansion that can push content outside the viewport.
+
+The mobile hero uses a cropped product preview strip to keep the first screen focused and to
+leave a visible hint of the next section.
 
 ## Docs
 

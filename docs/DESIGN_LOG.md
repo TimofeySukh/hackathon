@@ -17,6 +17,27 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-07-01 — Product-led landing narrative refresh
+
+- Decision: Reworked the landing page from a loose visual pitch into a direct
+  product-led decision path: problem-first hero, one primary board CTA, compact
+  deck cards using concrete user actions, factual desktop trust chips, a clearer
+  problem/answer section, and a prefilled local-only inspector demo.
+- Why: The previous landing looked polished but made visitors infer the product
+  value. The new structure explains that Social Datanode is a private visual board
+  for people, notes, groups, and links before asking the visitor to open the board.
+- Decision: Landing-page logo clicks now return to the landing home instead of
+  opening the board. The board remains accessible through the explicit **Open board**
+  CTA and authenticated app action.
+- Why: A logo on a product landing page is expected to be a home/reset affordance;
+  using it as an app-launch CTA created surprise navigation and weakened the single
+  primary action model.
+- Decision: The mobile hero hides the desktop trust chips and crops the product
+  screenshot into a preview strip.
+- Why: Phone viewports need the headline, CTA, and product preview to fit tightly
+  while still leaving a visible hint of the next section. The duplicated trust
+  facts remain available in the trust strip below.
+
 ### 2026-07-01 — Clean domain stays public after board navigation
 
 - Decision: hash routing only uses a stored board auth-return marker during the first app

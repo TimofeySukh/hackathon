@@ -4,68 +4,98 @@ import productBoardInspector from './assets/landing/product-board-inspector.png'
 
 const HOW_IT_WORKS_STEPS = [
   {
-    title: 'Start from You',
-    body: 'Open the board with a single central circle and grow outward from there.',
+    title: 'Start with one person',
+    body: 'Open a blank board, keep yourself at the center, and add the first person you need to remember.',
   },
   {
-    title: 'Drag to create',
-    body: 'Double-tap to add people or drag from a circle center to connect new zones.',
+    title: 'Put context where it belongs',
+    body: 'Drop people into circles, attach notes and links, and keep the relationship visible instead of buried in rows.',
   },
   {
-    title: 'Organize in place',
-    body: 'Add notes, links, and circle groups while the graph stays visual and readable.',
+    title: 'Let the map grow with you',
+    body: 'Pan, zoom, resize, and connect circles as your network turns into a working memory system.',
   },
 ] as const
 
 const PROBLEM_SOLUTION_CARDS = [
   {
-    label: 'The problem',
-    title: 'Relationship context lives in your head',
-    body: 'People remember who knows whom, where they met, and what matters - until the network gets too large. Spreadsheets can store rows, but they hide the shape of the network.',
+    label: 'Before',
+    title: 'Your network is stored in the wrong shape',
+    body: 'Names sit in spreadsheets, meeting details sit in memory, and introductions lose their surrounding context. The data exists, but the relationship is invisible.',
   },
   {
-    label: 'The solution',
-    title: 'A visual place to manage people',
-    body: 'Social Datanode gives every person, note, link, and group a place on a board, so you can organize relationships spatially instead of flattening them into a table.',
+    label: 'After',
+    title: 'Every person has a place on the board',
+    body: 'Social Datanode turns people, notes, groups, and links into a spatial graph, so the structure of your network stays visible while you work.',
   },
 ] as const
 
 const TRUST_ITEMS = [
-  'Try without signing in',
-  'Anonymous edits stay in your browser',
-  'Sign in to sync a private graph',
-  'No collaboration or shared boards yet',
+  {
+    title: 'Try first',
+    body: 'Open the board without an account and test the workflow immediately.',
+  },
+  {
+    title: 'Local by default',
+    body: 'Anonymous edits stay in this browser until you decide to sign in.',
+  },
+  {
+    title: 'Private sync',
+    body: 'Signed-in boards sync to your own private graph.',
+  },
+  {
+    title: 'Clear limits',
+    body: 'No shared boards or multiplayer collaboration yet.',
+  },
 ] as const
 
 const CORE_CAPABILITIES = [
   {
-    label: 'Visual graph',
-    description: 'Map people and circles on an infinite board you can pan and zoom.',
+    label: 'Map the network',
+    description: 'Place people inside circles, connect zones, and zoom from a close note to the whole graph.',
   },
   {
-    label: 'Rich contacts',
-    description: 'Keep notes, links, and photos on each person without leaving the graph.',
+    label: 'Remember the details',
+    description: 'Store notes, links, and photos directly on the person they describe.',
   },
   {
-    label: 'LinkedIn import',
-    description: 'Bring exported connections onto the board in organized circle zones.',
+    label: 'Import the raw list',
+    description: 'Turn a LinkedIn Connections.csv export into organized people on the board.',
   },
   {
-    label: 'Private workspace',
-    description: 'Try anonymously in your browser or sign in to sync your own graph.',
+    label: 'Work privately',
+    description: 'Use a browser-local board anonymously, or sign in when you want private sync.',
   },
   {
-    label: 'Agent access',
-    description: 'Connect AI tools and scripts when you need them. Details are in Docs.',
+    label: 'Let agents help',
+    description: 'Use the documented API, CLI, and MCP access when you want scripts or AI tools to read and update the graph.',
     docsLink: true,
   },
 ] as const
 
 const LINKEDIN_POINTS = [
-  'Import a LinkedIn Connections.csv ZIP to the board',
-  'Contacts pack into circle zones automatically',
-  'Enrich one profile at a time when you need more detail',
+  'Request your LinkedIn archive and upload the Connections.csv ZIP',
+  'Companies become readable circle zones instead of one long table',
+  'Open a person, add notes, and enrich one profile when the detail matters',
 ] as const
+
+const HERO_CARDS = [
+  'Use circles for companies, communities, projects, and relationship groups',
+  'Keep notes, links, and photos attached to the person they describe',
+  'Search, import, and let agents work with the same private graph',
+] as const
+
+const HERO_TRUST_ITEMS = ['No account needed to try', 'Private sync when signed in', 'Real board preview'] as const
+
+const DEMO_CARDS = [
+  'Edit the person name the same way you would in the real inspector.',
+  'Move the person into a circle so context stays spatial, not just textual.',
+  'Add the note or link you would otherwise forget after the meeting.',
+] as const
+
+const DEFAULT_DEMO_CONNECTIONS = [
+  { id: 'demo-linkedin', label: 'LinkedIn Profile', url: 'https://linkedin.com/in/example', service: 'linkedin' as const },
+]
 
 interface LandingPageProps {
   onLogin: () => void
@@ -75,16 +105,21 @@ interface LandingPageProps {
 
 export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: LandingPageProps) {
   // Interactive Inspector Simulator local state
-  const [demoName, setDemoName] = useState('New person 1')
-  const [demoZone, setDemoZone] = useState<'Anthropic' | 'Google' | 'OpenAI' | null>(null)
+  const [demoName, setDemoName] = useState('Maya Chen')
+  const [demoZone, setDemoZone] = useState<'Anthropic' | 'Google' | 'OpenAI' | null>('OpenAI')
   const [demoAvatar, setDemoAvatar] = useState<string | null>(null)
-  const [demoNotes, setDemoNotes] = useState<string[]>([])
+  const [demoNotes, setDemoNotes] = useState<string[]>(['Met at the AI founders dinner. Interested in private relationship mapping.'])
   const [newNoteText, setNewNoteText] = useState('')
-  const [demoConnections, setDemoConnections] = useState<Array<{ id: string; label: string; url: string; service: 'linkedin' | 'telegram' | 'website' }>>([])
+  const [demoConnections, setDemoConnections] = useState<Array<{ id: string; label: string; url: string; service: 'linkedin' | 'telegram' | 'website' }>>(DEFAULT_DEMO_CONNECTIONS)
   const [demoConnectionInput, setDemoConnectionInput] = useState('')
   const [isFavorite, setIsFavorite] = useState(false)
   const [showDemoDropdown, setShowDemoDropdown] = useState(false)
   const [isAddingDemoNote, setIsAddingDemoNote] = useState(false)
+
+  const handleHome = (e: MouseEvent) => {
+    e.preventDefault()
+    window.location.hash = ''
+  }
 
   const handleLaunchApp = (e: MouseEvent) => {
     e.preventDefault()
@@ -151,11 +186,11 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
   }
 
   const handleResetDemo = () => {
-    setDemoName('New person 1')
-    setDemoZone(null)
+    setDemoName('Maya Chen')
+    setDemoZone('OpenAI')
     setDemoAvatar('initials')
-    setDemoNotes([])
-    setDemoConnections([])
+    setDemoNotes(['Met at the AI founders dinner. Interested in private relationship mapping.'])
+    setDemoConnections(DEFAULT_DEMO_CONNECTIONS)
     setIsFavorite(false)
     setShowDemoDropdown(false)
     setIsAddingDemoNote(false)
@@ -167,7 +202,7 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
       {/* Header & Sticky Glass Navigation */}
       <header className="landing-header">
         <nav className="landing-nav">
-          <a href="#" className="landing-logo" onClick={handleLaunchApp}>
+          <a href="#" className="landing-logo" onClick={handleHome}>
             <img className="landing-logo-mark" src={sdnLogo} alt="" aria-hidden="true" />
             <span className="landing-logo-text">Social Datanode</span>
           </a>
@@ -208,19 +243,29 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
         <section id="board-preview" className="landing-section landing-hero-section">
           <div className="board-preview-layout">
             <div className="board-preview-copy">
-              <span className="demo-eyebrow">Social Datanode</span>
-              <h1 className="demo-title">Turn relationship memory into a visual board</h1>
+              <span className="demo-eyebrow">Private relationship board</span>
+              <h1 className="demo-title">Stop managing people from memory and spreadsheets</h1>
               <p className="section-lead">
-                Most people keep their network in their head or in flat spreadsheets. Social Datanode makes that context visible with people, notes, groups, and links on one canvas.
+                Social Datanode gives every person, note, group, and link a visible place on one board, so your network becomes something you can inspect, organize, and use.
               </p>
               <div className="lp-deck lp-deck--compact">
-                <div className="lp-deck-card lp-deck-card--tilt-1">Stop losing context after meetings and introductions</div>
-                <div className="lp-deck-card lp-deck-card--tilt-2">Replace flat contact rows with visible circles and relationships</div>
-                <div className="lp-deck-card lp-deck-card--tilt-3">Keep notes and links next to the people they belong to</div>
+                {HERO_CARDS.map((card, index) => (
+                  <div key={card} className={`lp-deck-card lp-deck-card--tilt-${(index % 3) + 1}`}>
+                    {card}
+                  </div>
+                ))}
               </div>
-              <button type="button" className="lp-btn lp-btn-filled landing-hero-cta" onClick={handleLaunchApp}>
-                Open board
-              </button>
+              <div className="landing-hero-actions">
+                <button type="button" className="lp-btn lp-btn-filled landing-hero-cta" onClick={handleLaunchApp}>
+                  Open board
+                </button>
+                <p className="landing-hero-note">Try it now. Sign in later only if you want private sync.</p>
+              </div>
+              <div className="landing-hero-proof" aria-label="Product trust facts">
+                {HERO_TRUST_ITEMS.map((item) => (
+                  <span key={item}>{item}</span>
+                ))}
+              </div>
             </div>
             <figure className="board-preview-frame" aria-label="Product preview">
               <img
@@ -234,8 +279,8 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
 
         <section className="landing-section problem-solution-section" aria-labelledby="problem-solution-title">
           <div className="section-header problem-solution-header">
-            <span className="demo-eyebrow">Problem and solution</span>
-            <h2 id="problem-solution-title" className="section-title">From scattered memory to a readable map</h2>
+            <span className="demo-eyebrow">Problem and answer</span>
+            <h2 id="problem-solution-title" className="section-title">Relationships are not a table</h2>
           </div>
           <div className="problem-solution-grid">
             {PROBLEM_SOLUTION_CARDS.map((card, index) => (
@@ -255,7 +300,7 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
         <section className="landing-section how-it-works-section">
           <div className="section-header">
             <span className="demo-eyebrow">How it works</span>
-            <h2 className="section-title">Three gestures to get started</h2>
+            <h2 className="section-title">Build a useful map in minutes</h2>
           </div>
           <div className="how-it-works-grid">
             {HOW_IT_WORKS_STEPS.map((step, index) => (
@@ -273,10 +318,11 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
           <div className="trust-strip">
             {TRUST_ITEMS.map((item, index) => (
               <div
-                key={item}
+                key={item.title}
                 className={`trust-strip-card lp-deck-card lp-deck-card--tilt-${(index % 3) + 1}`}
               >
-                {item}
+                <span className="trust-strip-card__title">{item.title}</span>
+                <span className="trust-strip-card__body">{item.body}</span>
               </div>
             ))}
           </div>
@@ -286,17 +332,24 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
         <section id="product-demo" className="landing-section interactive-demo-section">
           <div className="demo-container">
             <div className="demo-info-col">
-              <span className="demo-eyebrow">Interactive Demo</span>
-              <h2 className="demo-title">Organize your connections</h2>
+              <span className="demo-eyebrow">Interactive demo</span>
+              <h2 className="demo-title">Try the inspector before opening the board</h2>
+              <p className="section-lead">
+                This is the smallest unit of the product: one person, one circle, one memory worth keeping.
+              </p>
               <div className="demo-notes-deck">
-                <div className="demo-deck-card">Make notes on people to remember who they are and where you met them</div>
-                <div className="demo-deck-card">Group people into circle zones to make sorting easier later</div>
-                <div className="demo-deck-card">Add people to favorites so you never lose them in the crowd</div>
+                {DEMO_CARDS.map((card) => (
+                  <div key={card} className="demo-deck-card">{card}</div>
+                ))}
               </div>
             </div>
 
             {/* Simulated Inspector Card */}
             <div className="demo-inspector-card">
+              <div className="demo-inspector-kicker">
+                <span>Demo inspector</span>
+                <span>Local state only</span>
+              </div>
               <div className="demo-inspector-header">
                 <input
                   type="text"
@@ -548,7 +601,7 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
                 className="demo-delete-person-btn"
                 onClick={handleResetDemo}
               >
-                Delete person
+                Reset demo
               </button>
             </div>
           </div>
@@ -557,8 +610,8 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
         {/* Core Capabilities */}
         <section className="landing-section features-section" style={{ overflow: 'visible' }}>
           <div className="section-header">
-            <span className="demo-eyebrow">Core Capabilities</span>
-            <h2 className="section-title">Built for your network first</h2>
+            <span className="demo-eyebrow">Core capabilities</span>
+            <h2 className="section-title">What the board lets you do</h2>
           </div>
 
           <div className="capabilities-scatter-board">
@@ -597,9 +650,9 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
           <div className="linkedin-layout">
             <div className="linkedin-copy">
               <span className="demo-eyebrow">LinkedIn import</span>
-              <h2 className="demo-title">Bring contacts onto the board</h2>
+              <h2 className="demo-title">Start with the contacts you already have</h2>
               <p className="section-lead">
-                Upload your exported connections and let the board pack them into readable circle zones.
+                A flat export is enough to get momentum. Import the list, then use the board to decide what deserves real context.
               </p>
             </div>
             <div className="lp-deck">
@@ -617,7 +670,7 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
       {/* Footer */}
       <footer className="landing-footer">
         <div className="footer-content">
-          <a href="#" className="footer-logo" onClick={handleLaunchApp}>
+          <a href="#" className="footer-logo" onClick={handleHome}>
             <img className="footer-logo-mark" src={sdnLogo} alt="" aria-hidden="true" />
             <span className="footer-logo-text">Social Datanode</span>
           </a>
