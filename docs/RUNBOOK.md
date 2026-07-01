@@ -346,6 +346,7 @@ deploy automatically on push.
 Files:
 
 - `.github/workflows/deploy-datanode-digitalocean-test.yml`
+- `.github/workflows/shutdown-datanode-digitalocean-test.yml`
 - `.do/datanode-test.yaml.template`
 - `deploy/digitalocean-app-platform/Dockerfile`
 
@@ -395,6 +396,12 @@ Later test deploys:
 gh workflow run deploy-datanode-digitalocean-test.yml \
   --ref main \
   -f branch=main
+```
+
+Shutdown the DigitalOcean test app so App Platform billing stops:
+
+```bash
+gh workflow run shutdown-datanode-digitalocean-test.yml --ref main
 ```
 
 DNS:

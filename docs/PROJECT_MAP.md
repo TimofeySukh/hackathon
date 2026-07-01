@@ -73,6 +73,7 @@ theme toggle, stress-test slider panel, floating anonymous sign-in banner.
 
 - `.github/workflows/deploy-social-datanode-live.yml` — production promotion to `production` branch.
 - `.github/workflows/deploy-datanode-digitalocean-test.yml` — manual DigitalOcean test deploy.
+- `.github/workflows/shutdown-datanode-digitalocean-test.yml` — manual DigitalOcean test app deletion.
 - `deploy/social-datanode-live/`, `deploy/digitalocean-app-platform/`.
 
 ## Ownership

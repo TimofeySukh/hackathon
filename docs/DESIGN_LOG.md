@@ -17,6 +17,13 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-07-01 — DigitalOcean test app has an explicit shutdown workflow
+
+- Decision: Add a manual GitHub Actions workflow that deletes the DigitalOcean App
+  Platform test app by repository variable app id.
+- Why: The test app was useful for validation, but the project should have an auditable
+  one-command path to stop App Platform billing before trying another host.
+
 ### 2026-07-01 — Documentation realignment for AI readability
 
 - Decision: Added `docs/AI_CONTEXT.md` as the canonical, code-aligned product summary for

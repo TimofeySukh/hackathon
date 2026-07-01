@@ -12,7 +12,7 @@ For a concise product summary see [`AI_CONTEXT.md`](AI_CONTEXT.md).
 | `src/` | Application source. |
 | `supabase/` | Migrations and Edge Functions. |
 | `scripts/` | CLI, MCP, load tests, local LinkedIn agent search. |
-| `deploy/` | Production and DigitalOcean deploy assets. |
+| `deploy/` | Production and optional cloud test deploy assets. |
 | `.agents/skills/` | Project-scoped agent skills (Supabase). |
 | `index.html` | Vite HTML entry. |
 | `package.json` | Dependencies and npm scripts. |
