@@ -3092,6 +3092,16 @@ function App() {
     const surface = surfaceRef.current
     if (!surface) return
 
+    function wheelDeltaY(event: WheelEvent) {
+      if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+        return event.deltaY * 16
+      }
+      if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+        return event.deltaY * window.innerHeight
+      }
+      return event.deltaY
+    }
+
     function handleWheel(event: WheelEvent) {
       event.preventDefault()
       const activeSurface = surfaceRef.current
@@ -3106,21 +3116,17 @@ function App() {
         y: (pointer.y - currentCamera.y) / currentCamera.scale,
       }
 
-      if (event.ctrlKey) {
-        const zoomIntensity = 0.015
-        const nextScale = clamp(currentCamera.scale * Math.exp(-event.deltaY * zoomIntensity), MIN_SCALE, MAX_SCALE)
-        driveCameraRef.current({
-          scale: nextScale,
-          x: pointer.x - before.x * nextScale,
-          y: pointer.y - before.y * nextScale,
-        })
-      } else {
-        driveCameraRef.current({
-          ...currentCamera,
-          x: currentCamera.x - event.deltaX,
-          y: currentCamera.y - event.deltaY,
-        })
-      }
+      const zoomIntensity = event.ctrlKey ? 0.015 : 0.002
+      const nextScale = clamp(
+        currentCamera.scale * Math.exp(-wheelDeltaY(event) * zoomIntensity),
+        MIN_SCALE,
+        MAX_SCALE,
+      )
+      driveCameraRef.current({
+        scale: nextScale,
+        x: pointer.x - before.x * nextScale,
+        y: pointer.y - before.y * nextScale,
+      })
       completeOnboardingAction('navigate')
     }
 
@@ -4540,8 +4546,8 @@ function App() {
   }
 
   // Auth gate rendered as an OVERLAY (not an early return) so the board JSX always
-  // mounts — its mount-time effects (e.g. the native wheel listener for trackpad
-  // pinch-zoom / two-finger pan) need surfaceRef to exist on first commit. When
+  // mounts — its mount-time effects (e.g. the native wheel listener for cursor-centered
+  // zoom) need surfaceRef to exist on first commit. When
   // Supabase isn't configured we just never show the overlay (local dev mode).
   // Signed-out visitors are no longer gated behind a sign-in wall: the only
   // blocking overlay left is the brief "loading your board" state for a user

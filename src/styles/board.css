@@ -4,6 +4,7 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
+  overscroll-behavior: none;
   /* Resting cursor is the plain arrow. The hand (grabbing) and pointer states are
      driven from JS based on the actual gesture / what's under the pointer. */
   cursor: default;
