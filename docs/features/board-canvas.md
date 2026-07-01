@@ -14,11 +14,16 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   on touch/mobile layouts and switches **Edit**, **Select** (marquee), and **Pan**. Pan
   mode makes one-finger drag move the canvas; releasing a pan gesture can continue with
   short inertial scrolling.
-- **Move**: drag a person to reposition inside its owning circle; nearby people in the
-  same circle are pushed aside instead of overlapping. Drag a circle center or body to move
-  the whole circle and everything it contains. Live pointer frames never run the global
-  collision solver, but they do refit parent circles in-place when the dragged person or
-  nested circle crosses the current parent boundary and when it moves back inward. On small
+- **Move**: drag a person to reposition it or move it between circles. A person
+  joins a circle only when its full avatar fits inside the circle boundary; it
+  leaves when any edge crosses outside. Free-floating people (no circle) can be
+  dragged into a circle the same way. Dragging picks the innermost fully
+  containing circle when zones nest. Nearby people in the same circle are pushed
+  aside instead of overlapping. Drag a circle center or body to move the whole
+  circle and everything it contains. Live pointer frames never run the global
+  collision solver; they resolve the dragged person's circle membership first,
+  then refit affected circles so pulling someone out detaches them instead of
+  expanding the old zone. On small
   boards, the final drop still runs containment/collision cleanup; on large boards, final
   cleanup is skipped so one interaction cannot reflow or freeze a dense import. While a
   person or circle is pressed, the grabbed root immediately scales up into a held press

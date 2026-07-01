@@ -483,6 +483,62 @@ function clampPersonInsideCircle(person: PersonNode, circle: CircleNode) {
   }
 }
 
+export function isPersonFullyInsideCircle(
+  person: { x: number; y: number },
+  circle: CircleNode,
+): boolean {
+  const distance = Math.hypot(person.x - circle.x, person.y - circle.y)
+  return distance + PERSON_CONTAINMENT_RADIUS <= circle.radius
+}
+
+export function resolvePersonCircleMembership(
+  person: { x: number; y: number },
+  circles: CircleNode[],
+): string {
+  const innermost = circles
+    .filter((circle) => isPersonFullyInsideCircle(person, circle))
+    .sort((a, b) => a.radius - b.radius)[0]
+  return innermost?.id ?? ''
+}
+
+function refitCirclesFromPendingInPlace(index: BoardIndex, pending: Set<string>): void {
+  while (pending.size > 0) {
+    const circleId = pending.values().next().value as string
+    pending.delete(circleId)
+
+    const circle = index.circlesById.get(circleId)
+    if (!circle) continue
+
+    const requiredRadius = getRequiredCircleRadiusFromIndex(index, circle)
+    if (requiredRadius !== circle.radius) {
+      circle.radius = requiredRadius
+      if (circle.parentId) pending.add(circle.parentId)
+    }
+  }
+}
+
+export function syncDraggedPersonMembershipInPlace(
+  index: BoardIndex,
+  draggedPersonIds: Set<string>,
+): void {
+  const affectedCircles = new Set<string>()
+
+  for (const personId of draggedPersonIds) {
+    const person = index.peopleById.get(personId)
+    if (!person) continue
+
+    const previousCircleId = person.circleId
+    const nextCircleId = resolvePersonCircleMembership(person, index.circles)
+    if (nextCircleId === previousCircleId) continue
+
+    if (previousCircleId) affectedCircles.add(previousCircleId)
+    person.circleId = nextCircleId
+    if (nextCircleId) affectedCircles.add(nextCircleId)
+  }
+
+  refitCirclesFromPendingInPlace(index, affectedCircles)
+}
+
 function getRequiredCircleRadius(
   circle: CircleNode,
   circles: CircleNode[],
@@ -545,19 +601,7 @@ function refitContainingCirclesForLiveDragInPlace(
     if (circle?.parentId && !movedCircleIds.has(circle.parentId)) pending.add(circle.parentId)
   }
 
-  while (pending.size > 0) {
-    const circleId = pending.values().next().value as string
-    pending.delete(circleId)
-
-    const circle = index.circlesById.get(circleId)
-    if (!circle) continue
-
-    const requiredRadius = getRequiredCircleRadiusFromIndex(index, circle)
-    if (requiredRadius !== circle.radius) {
-      circle.radius = requiredRadius
-      if (circle.parentId) pending.add(circle.parentId)
-    }
-  }
+  refitCirclesFromPendingInPlace(index, pending)
 }
 
 export function getDescendantCircleIds(circles: CircleNode[], circleId: string) {
@@ -637,6 +681,7 @@ export function movePersonInPlace(
     }
   }
 
+  syncDraggedPersonMembershipInPlace(index, draggedIds)
   refitContainingCirclesForLiveDragInPlace(index, draggedIds, new Set(circleIds))
 
   // 3. Pre-group people by circleId to resolve collisions inside circles

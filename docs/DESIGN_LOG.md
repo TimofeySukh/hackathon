@@ -17,6 +17,14 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-07-02 — Dragging people out of zones detaches first
+
+- Decision: During person drag, resolve the person's circle membership before refitting
+  affected circle radii.
+- Why: Refitting the old parent first made the zone expand around a dragged person, so users
+  could not pull someone out of a zone. Membership now changes at the boundary and then
+  circles resize around their current contents.
+
 ### 2026-07-02 — Remove circle fill quick toggle
 
 - Decision: Removed the standalone transparent/solid fill toggle from the inspector quick
