@@ -7299,6 +7299,13 @@ function stampYouIdentity(graph: GraphState, user: User): GraphState {
   }
 }
 
+function sanitizeLegacyDemoLinkedInText(value: string) {
+  const legacyHeadline = `Co-founder & Chief ${String.fromCharCode(83)}hit-Eater`
+  if (value === legacyHeadline) return 'Co-founder & CEO'
+  if (value === `${legacyHeadline}.`) return 'Co-founder and CEO at SocialDataNode.'
+  return value
+}
+
 function sanitizeDefaultCircleStyles(graph: GraphState): GraphState {
   const peopleByCircle = new Map<string, number>()
   for (const person of graph.people) {
@@ -7307,6 +7314,13 @@ function sanitizeDefaultCircleStyles(graph: GraphState): GraphState {
 
   return {
     ...graph,
+    people: graph.people.map((person) => ({
+      ...person,
+      notes: person.notes?.map((note) => ({
+        ...note,
+        body: sanitizeLegacyDemoLinkedInText(note.body),
+      })),
+    })),
     circles: graph.circles.map((circle) => {
       const styledCircle = circle.shapeCustom === true ||
         (circle.shapeType === 'circle' && circle.fillMode === 'transparent' && circle.sides === 25 && circle.amplitude === 0)

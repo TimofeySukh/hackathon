@@ -77,8 +77,8 @@ export function getCachedLinkedInProfile(url: string): LinkedInProfileEnrichment
       name: 'Timofey Sukhov',
       company: 'SocialDataNode',
       companyLogoUrl: '/socialdatanode_logo.jpeg',
-      headline: 'Co-founder & Chief Shit-Eater',
-      description: "Co-founder & Chief Shit-Eater.",
+      headline: 'Co-founder & CEO',
+      description: 'Co-founder and CEO at SocialDataNode.',
       avatarUrl: '/timofey_avatar.jpeg',
       source: 'cache'
     }
