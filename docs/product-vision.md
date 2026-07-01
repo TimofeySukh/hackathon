@@ -1,5 +1,7 @@
 # Product Vision
 
+See [`AI_CONTEXT.md`](AI_CONTEXT.md) for what is implemented today versus aspirational direction below.
+
 ## Current Product Idea
 
 The product starts as a clean infinite board for social networking graphs.
@@ -23,18 +25,17 @@ Users should be able to open the page and immediately:
 1. start from a central node
 2. drag out a connection from any node
 3. release the cursor to create a new connected node
-4. move across the board with a trackpad, mouse drag, or mouse wheel
-5. switch between dark and light visual modes
-6. optionally sign in with Google to claim a personal board space
-7. save people, notes, tags, and connections to a private personal graph
+4. move across the board with a trackpad, mouse drag, or mouse wheel (edit mode or dedicated pan mode on mobile)
+5. optionally sign in with Google or email to claim a personal board space
 
-## Visual Goal
+6. save people, notes, tags, and connections to a private personal graph
 
-The dark theme should feel deep, green-black, and slightly futuristic, similar to the provided reference.
+## Visual Goal (target vs today)
 
-The light theme should keep the same product identity while becoming brighter, cleaner, and easier to use in daylight conditions.
+**Target:** deep green-black dark theme and a brighter light theme, both with a visible dot grid.
 
-The board background should include visible point markers at regular intervals, similar to spatial references on tools like Miro.
+**Today:** the shipped UI uses Material 3 **light** tokens across chrome and board (`src/styles/theme.css`).
+A user-facing theme toggle is not implemented yet. The board still uses a dotted grid background.
 
 The graph layer should feel compact and readable, with node growth happening through a direct drag gesture rather than extra UI chrome.
 

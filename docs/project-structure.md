@@ -1,110 +1,113 @@
 # Project Structure
 
+For a concise product summary see [`AI_CONTEXT.md`](AI_CONTEXT.md).
+
 ## Root Overview
 
-### `AGENTS.md`
+| Path | Role |
+|------|------|
+| `AGENTS.md` | Short agent entrypoint; points to `docs/`. |
+| `README.md` | Top-level overview and local dev quick start. |
+| `docs/` | Product and repository knowledge (source of truth). |
+| `src/` | Application source. |
+| `supabase/` | Migrations and Edge Functions. |
+| `scripts/` | CLI, MCP, load tests, local LinkedIn agent search. |
+| `deploy/` | Production and DigitalOcean deploy assets. |
+| `.agents/skills/` | Project-scoped agent skills (Supabase). |
+| `index.html` | Vite HTML entry. |
+| `package.json` | Dependencies and npm scripts. |
 
-Project workflow rules and documentation update order.
+## Source: `src/`
 
-### `README.md`
+### Entry and pages
 
-Top-level project overview, local setup instructions, and links to deeper documentation.
+- `main.tsx` — mounts `App`.
+- `App.tsx` — hash router views, board shell, inspector, settings, graph state, paint loop,
+  LinkedIn import, search, auth dialog, agent settings overlay.
+- `LandingPage.tsx` — marketing landing (`#`).
+- `DocsPage.tsx` — developer documentation (`#docs`) — API, CLI, MCP setup.
+- `ContactPage.tsx` — team contact (`#contact`).
+- `PrivacyPage.tsx` — privacy policy (`#privacy`).
 
-### `.agents/skills/`
+### `src/lib/board/` (framework-free board engine)
 
-Project-scoped agent skills. The current installed skills provide Supabase workflow guidance and Supabase Postgres best practices for agents working in this repository.
+| File | Role |
+|------|------|
+| `types.ts` | Board domain and interaction types. |
+| `constants.ts` | Camera limits, collision tuning, tones, link services. |
+| `colors.ts` | Tone resolution and color helpers. |
+| `geometry.ts` | Node shape paths. |
+| `layout.ts` | Containment, collision, `createFreshGraph`, import packing. |
+| `render.ts` | Spatial index, hit-test, Canvas 2D draw layer. |
 
-### `docs/`
+### `src/lib/` (shared logic)
 
-Detailed product and structure documentation.
+| File | Role |
+|------|------|
+| `supabase.ts` | Browser Supabase client from Vite env vars. |
+| `useAuth.ts` | Session, Google/email auth, recovery, sign-out. |
+| `graphPersistence.ts` | Load/save graph blob; Realtime; revision conflicts. |
+| `agentApi.ts` | Agent token CRUD via graph API. |
+| `agentBoardContext.ts` | Agent-facing board context helpers. |
+| `linkedinEnrichment.ts` | Single-profile enrichment Edge Function client. |
+| `smartSearch.ts` | Client for smart search API. |
+| `search/graphSearch.ts` | Local deterministic graph search/ranking. |
+| `tagPalette.ts` | Shared tag color palette. |
+| `stressTest.ts` | Dev-only synthetic graph harness (`STRESS_TEST_ENABLED` in App). |
 
-### `scripts/`
+### `src/components/`
 
-Local verification utilities. The current scripts cover `user_graphs` payload load checks and browser responsiveness during large LinkedIn ZIP imports.
-
-### `index.html`
-
-The main HTML entry point used by Vite.
-
-### `package.json`
-
-Project metadata, scripts, and dependencies.
-
-### `skills-lock.json`
-
-Lockfile for project-scoped agent skills installed under `.agents/skills/`.
-
-### `supabase/migrations/`
-
-Supabase database migrations for the current `user_graphs` blob storage model and row-level security policies.
-
-### `supabase/functions/`
-
-Supabase Edge Functions. The active function is `enrich-linkedin-profile`, which calls the configured profile provider for signed-in manual one-profile LinkedIn imports.
-
-### `src/`
-
-Application source code.
-
-## Source Structure
-
-### `src/main.tsx`
-
-The React entry point. It mounts the app into the root DOM node.
-
-### `src/App.tsx`
-
-The React shell and interaction host for the board. It is large but delegates the heavy canvas work to `src/lib/board/`. App.tsx owns:
-
-- chrome and panels: toolbar, brand, board search, settings panel, LinkedIn sync guide, create menu, and the selected-item inspector
-- graph state and persistence wiring: signed-in users load/save `user_graphs.graph`; anonymous users load/save `localStorage`
-- all pointer interaction: pan/zoom, dragging, marquee selection, resizing, connector drag, and merge-into-subset
-- camera state and the cursor model
-- the imperative paint loop that drives `drawBoardLayer`
-- LinkedIn ZIP / single-profile import flows and undo history
-
-### `src/lib/board/`
-
-Pure, framework-free board engine extracted from App.tsx.
-
-- `types.ts` — shared board domain + interaction types.
-- `constants.ts` — camera limits, hit-test sizes, collision/layout tuning, Material tones, color presets, and link-service options.
-- `colors.ts` — tone resolution and color conversion helpers.
-- `geometry.ts` — node-shape path building and geometry helpers.
-- `layout.ts` — containment fitting, collision relaxation, circle resize, `makeCircle`, `createFreshGraph`, and subtree helpers.
-- `render.ts` — spatial index, pointer hit-testing, and the full Canvas 2D draw layer.
-
-### `src/lib/`
-
-Shared helpers and active Supabase integration.
-
-- `supabase.ts` creates the browser Supabase client from Vite environment variables.
-- `useAuth.ts` owns session loading, Google OAuth sign-in, email/password auth, confirmation resend, password recovery, and sign-out.
-- `graphPersistence.ts` owns the current graph blob storage path (`loadGraph`/`saveGraph` for signed-in users, `loadLocalGraph`/`saveLocalGraph` for anonymous browser sessions).
-- `linkedinEnrichment.ts` calls the LinkedIn profile enrichment Edge Function for single-profile imports.
-- `tagPalette.ts` holds the shared tag color palette.
-- `stressTest.ts` is the dev-only performance harness that generates large synthetic graphs.
+- `M3Slider.tsx` — Material 3 slider (incl. wavy variant).
+- `SelectionIndicator.tsx` — sliding pill / shape-morph selection motion.
+- `TiltContainer.tsx` — landing card tilt effect.
 
 ### `src/styles/`
 
-`src/index.css` is an ordered list of `@import`s; the actual rules live in logical partials under `src/styles/` (`base`, `theme`, `chrome`, `board`, `inspector`, `inspector-fields`, `panels`, `widgets`). The import order in `index.css` is the cascade order.
+`index.css` imports partials in cascade order: `base`, `theme`, `chrome`, `board`,
+`inspector`, `inspector-fields`, `panels`, `widgets`, `landing`, `docs`, `privacy`, …
 
-### `scripts/test-database-load.mjs`
+## Supabase
 
-Synthetic persistence load test for the current `user_graphs.graph` blob model. It is dry-run by default and can only write to staging-like Supabase environments after explicit opt-in with `HACKATHON_ALLOW_DATABASE_LOAD_TEST=true`; it refuses the `.env.production` Supabase URL.
+### `supabase/migrations/`
 
-### `scripts/test-ui-import-responsiveness.mjs`
+- `user_graphs` JSONB blob per user, RLS keyed to `auth.uid()`.
+- Optimistic concurrency (`revision`).
+- `agent_tokens` (hashed).
+- Realtime publication on `user_graphs`.
 
-Playwright-based browser responsiveness check for large LinkedIn ZIP imports. It starts or targets a local Vite server, uploads a generated `Connections.csv` ZIP through the real UI, and fails when measured event-loop lag exceeds the threshold.
+### `supabase/functions/`
 
-Supabase browser configuration reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`. The older `VITE_SUPABASE_ANON_KEY` variable remains supported for compatibility.
+| Function | Role |
+|----------|------|
+| `graph-api/` | User/agent graph API: meta, search, smart search, CRUD, operations batch. |
+| `enrich-linkedin-profile/` | Authenticated single-profile LinkedIn enrichment. |
 
-## Current Technical Shape
+## Scripts
 
-- React for state and rendering
-- Vite for development and builds
-- TypeScript for maintainability
-- Supabase Auth for Google and email/password sign-in
-- `user_graphs.graph` JSONB blob for signed-in board persistence
-- `localStorage` for signed-out board persistence
-- one Supabase Edge Function for server-side LinkedIn profile enrichment
+| Script | Role |
+|--------|------|
+| `datanode-cli.mjs` | CLI client for graph API. |
+| `datanode-mcp.mjs` | Stdio MCP server for agents. |
+| `linkedin-agent-search.mjs` | Local read-only JSONL search (not hosted). |
+| `test-database-load.mjs` | Synthetic `user_graphs` payload load test (dry-run default). |
+| `test-ui-import-responsiveness.mjs` | Playwright LinkedIn ZIP lag check. |
+| `test-ui-import-persistence.mjs` | Mock-auth import persistence E2E. |
+
+## Environment variables (browser)
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY` (preferred) or `VITE_SUPABASE_ANON_KEY`
+
+Optional local-only:
+
+- `VITE_LINKEDIN_ENRICHMENT_TEST_SECRET` — enrichment test bypass (never production).
+
+Edge Function secrets (Supabase dashboard / CLI): `SUPABASE_SERVICE_ROLE_KEY`,
+`LINKEDIN_ENRICHMENT_API_KEY`, `AI_SEARCH_API_KEY`, … — see [`RUNBOOK.md`](RUNBOOK.md).
+
+## Technical stack
+
+- React + TypeScript + Vite
+- Canvas 2D board renderer
+- Supabase Auth + Postgres JSONB + Edge Functions + Realtime
+- npm; lockfile via `package-lock.json`

@@ -38,18 +38,17 @@ file as a token or recipe.
 - Buttons (incl. interactive shape morph / button groups): https://m3.material.io/components/buttons/overview
 - Color roles: https://m3.material.io/styles/color/roles
 
-## Current Status (be honest about the gap)
+## Current Status
 
-The migration to Material 3 is in progress, not finished.
+The migration to Material 3 is **largely complete** for chrome and board-adjacent UI (toolbar,
+settings, inspector, auth dialog, landing). The board canvas uses Material 3 tonal accents
+(`MATERIAL_TONES` in `src/lib/board/constants.ts`).
 
-- The **board canvas** already uses a Material 3 tonal palette for circles and people
-  (`MATERIAL_TONES` in `src/App.tsx`). This part is close to target.
-- The **chrome** around the canvas (toolbar, settings panel, stress panel, help panel,
-  create menu, inspector, forms) is **not** Material 3 yet. It uses heavy font weights
-  (760–900), hard `1.5px` borders, ad-hoc grays, and deep shadows.
+Ongoing work: keep canvas-rendered labels/shadows aligned with tokens as the renderer evolves;
+extract reusable pieces from `App.tsx` into `src/components/` as the shell grows.
 
-Rule of thumb: **new UI ships Material 3 from day one.** Old chrome is migrated panel by
-panel toward the recipes below. Do not copy the old chrome style into new code.
+Rule: **new UI ships Material 3 from day one.** Do not reintroduce pre-M3 patterns (heavy
+760–900 font weights, hard `1.5px` borders, raw hex grays).
 
 ---
 

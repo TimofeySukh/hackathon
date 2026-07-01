@@ -17,6 +17,16 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-07-01 — Documentation realignment for AI readability
+
+- Decision: Added `docs/AI_CONTEXT.md` as the canonical, code-aligned product summary for
+  humans and AI agents. Updated `RUNBOOK`, `PROJECT_MAP`, `project-structure`, `README`,
+  core architecture/vision docs, and feature docs to remove stale references (demo seed,
+  demo mode, theme toggle, stress panel, floating sign-in banner, missing `presentation.md`).
+- Why: Multiple docs contradicted the codebase and each other, causing agents to describe
+  removed features and miss current behavior (blank board, tool modes, Settings badge, etc.).
+- Rule: When docs disagree, trust the code and update `AI_CONTEXT.md` plus the conflicting doc.
+
 ### 2026-07-01 — Product-led landing narrative refresh
 
 - Decision: Reworked the landing page from a loose visual pitch into a direct
@@ -942,7 +952,7 @@ rediscover, write it here.
 - Why: Manual profile-link import belongs directly in Search, and the hint appears exactly
   when the user first opens that control.
 
-## 2026-06-27 — Hybrid natural-language smart search
+### 2026-06-27 — Hybrid natural-language smart search
 
 - Decision: Smart search uses NeuralDeep (`https://api.neuraldeep.ru/v1`) with model
   `qwen3.6-35b-a3b-noreason` only to parse queries into structured filters; ranking stays
@@ -952,7 +962,7 @@ rediscover, write it here.
   keeps latency and cost low while hierarchy (company circles, nested subsets) handles
   scoped queries like "people at Acme".
 
-## 2026-06-27 — Agent search with visible steps and note reading
+### 2026-06-27 — Agent search with visible steps and note reading
 
 - Decision: Replace single intent-parse with multi-pass agent search: analyze query,
   collect note-backed candidates, LLM match, optional semantic retry, suggestions on miss.
@@ -960,7 +970,7 @@ rediscover, write it here.
 - Why: Users expect LLM search to read notes and try harder than substring match; one-shot
   JSON filters could not connect "my girlfriend" to "i love her".
 
-## 2026-06-28 — Local LinkedIn JSONL retrieval for agents
+### 2026-06-28 — Local LinkedIn JSONL retrieval for agents
 
 - Decision: Add `scripts/linkedin-agent-search.mjs`, a read-only grep-like search over
   compact LinkedIn `people-for-llm.jsonl` exports with exact ids, field filters, paging,
@@ -969,7 +979,7 @@ rediscover, write it here.
 - Why: Full LinkedIn graph exports can exceed 1M tokens. Agents need deterministic local
   retrieval that returns large groups in compact chunks before involving an LLM.
 
-## 2026-06-30 — Unified drag lift for board nodes
+### 2026-06-30 — Unified drag lift for board nodes
 
 - Decision: Dragging a person or circle now uses a transient canvas lift scale instead of
   resizing individual visual parts. Circle drags treat the circle as the lifted root; its
@@ -986,7 +996,7 @@ rediscover, write it here.
   the same press feedback as body clicks, while actual resize movement releases that press
   scale so the live radius is not visually over-inflated.
 
-## 2026-06-30 — Mobile board navigation and dense-render LOD
+### 2026-06-30 — Mobile board navigation and dense-render LOD
 
 - Decision: Added a vertical top-left board mode switch with edit and pan modes. Pan mode
   makes one-finger/touch dragging move the canvas instead of selecting nodes, while keeping
@@ -1005,7 +1015,7 @@ rediscover, write it here.
   recomputing every avatar sprite, dashed circle outline, membership curve, and connection
   hit candidate.
 
-## 2026-07-01 — Safer circle deletion
+### 2026-07-01 — Safer circle deletion
 
 - Decision: Circles can no longer be deleted with Backspace/Delete. The inspector's
   **Delete circle** button is the only UI path, and it shows a confirmation dialog first.

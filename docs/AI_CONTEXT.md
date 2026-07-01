@@ -1,0 +1,201 @@
+# AI Context — Social Datanode
+
+**Read this file first.** It is the canonical, code-aligned summary for humans and AI agents.
+When other docs disagree with this file or with the code, trust the code and update the
+conflicting doc.
+
+Last verified against the repository: 2026-07-01.
+
+---
+
+## Product in one paragraph
+
+**Social Datanode** is a single-page web app for building a private visual map of people,
+relationships, notes, and links. The main surface is an infinite **board** with a central
+`You` circle, nested **circles** (groups/companies/regions), and **people** placed inside
+circles. Users pan/zoom the canvas, create nodes by gesture, inspect selection in a side
+panel, import LinkedIn archives, and optionally sign in so the graph syncs through Supabase.
+Remote **agents** (CLI / MCP) can read and write the same graph through a revision-checked
+**graph API** using revocable tokens.
+
+---
+
+## Routes (hash router)
+
+| Hash | Screen | Component |
+|------|--------|-----------|
+| *(empty)* / `#` | Landing (marketing) | `LandingPage.tsx` |
+| `#board` | Interactive board | `App.tsx` board shell |
+| `#docs` / `#docs/...` | Developer docs (API/CLI/MCP) | `DocsPage.tsx` |
+| `#contact` | Team contact | `ContactPage.tsx` |
+| `#privacy` | Privacy policy | `PrivacyPage.tsx` |
+
+Rules:
+
+- Signed-in users are **not** auto-redirected away from landing/docs/contact/privacy.
+- Auth callbacks land on the clean origin (no hash). A stored return marker opens `#board`
+  after the session restores.
+- Logo on the landing page returns home; **Open board** is the primary CTA to `#board`.
+
+---
+
+## Board data model (`GraphState`)
+
+Stored as one JSON blob per signed-in user in `user_graphs.graph` (Postgres JSONB).
+
+```ts
+{
+  circles: CircleNode[]   // includes root id 'you'
+  people: PersonNode[]
+  connections: Connection[]  // person↔person and circle↔circle authored links
+}
+```
+
+Important fields:
+
+- **CircleNode**: `id`, `name`, `label` (center icon text), `x`, `y`, `radius`, `parentId`,
+  `connectedTo`, tone/color/shape fields (`shapeType`, `sides`, `amplitude`, `shapeCustom`, …).
+- **PersonNode**: `id`, `name`, `x`, `y`, `circleId` (empty string = free-floating),
+  `notes[]`, `connections[]` (typed links), `avatarUrl`, `favorite`, shape fields.
+- **No hidden `role` field** — headlines from LinkedIn import become notes titled
+  `Headline` / `Profile`.
+
+Fresh graph: **one** `You` circle at the center. There is **no demo seed** (no preloaded EU,
+Denmark, Pandora, etc.).
+
+---
+
+## Persistence
+
+| Session | Storage | Path |
+|---------|---------|------|
+| Anonymous | `localStorage` | Browser-only graph JSON |
+| Signed-in | Supabase `user_graphs` | Revision-checked writes |
+
+Signed-in save path:
+
+1. Primary: `graph-api` Edge Function (optimistic concurrency via `revision`).
+2. Fallback: direct PostgREST RLS write when the function fails with a non-conflict error.
+3. Realtime: Supabase Realtime on `user_graphs` syncs external edits (other tabs, CLI, MCP).
+
+Safety invariants:
+
+- Never autosave a blank fresh graph over missing server data on load.
+- Stale writers get `409 Conflict` and must reload.
+- Agent tokens are hashed at rest; callers never pass `user_id`.
+
+---
+
+## Board interaction (current)
+
+**Tool modes** (top-left vertical menu):
+
+- **Edit** — default: drag nodes, create, connect, resize.
+- **Select** — marquee multi-select (right-click drag also works in edit).
+- **Pan** — one-finger/touch drag moves the camera; pinch zoom still works.
+
+**Create**:
+
+- Right-click a circle → create menu (add person / add circle).
+- Double-tap empty space → person at tap point (joins circle only if inside one).
+- Drag from circle center → connection or create menu on empty space.
+
+**Delete**:
+
+- People and connections: Backspace/Delete.
+- Circles: **only** via inspector **Delete circle** + confirmation (not keyboard).
+
+**Other**:
+
+- Undo: Ctrl/Cmd+Z (structural actions only; in-memory, lost on reload).
+- Settings (gear): LinkedIn ZIP import, account sign-in/out, Agent API keys, graph
+  import/export/clear.
+- Search (toolbar): local ranked search; signed-in natural-language **smart search** via AI;
+  paste LinkedIn profile URL to import one person.
+- Anonymous users see a red `!` badge on the Settings gear (not a floating banner).
+
+**Removed — do not document as current**:
+
+- Demo mode (presentation mode that hid chrome).
+- Demo seed graph (EU/Denmark/Russia/Pandora preset regions).
+- Settings toggles for demo mode, global circle shape/fill, label visibility, stress-test
+  slider, in-page help panel, global theme switch (app uses Material 3 light tokens).
+- Floating anonymous "sign in to save" banner (replaced by Settings badge + sign-in block).
+
+---
+
+## Backend (Supabase)
+
+| Edge Function | Purpose |
+|---------------|---------|
+| `graph-api` | Auth (session or agent token), graph CRUD, search, smart search, operations batch |
+| `enrich-linkedin-profile` | Server-side single-profile LinkedIn enrichment (API key in secrets) |
+
+Migrations: `supabase/migrations/` — `user_graphs`, RLS, revisions, agent tokens, Realtime.
+
+Local tools (not part of the hosted product):
+
+- `scripts/datanode-cli.mjs` — CLI against graph API.
+- `scripts/datanode-mcp.mjs` — stdio MCP server.
+- `scripts/linkedin-agent-search.mjs` — read-only local JSONL grep for large exports.
+
+---
+
+## Code map (where logic lives)
+
+| Area | Location |
+|------|----------|
+| App shell, routing, inspector, settings, persistence wiring | `src/App.tsx` (~7k lines; extraction ongoing) |
+| Board engine (geometry, layout, render, hit-test) | `src/lib/board/` |
+| Graph load/save, Realtime, revision conflicts | `src/lib/graphPersistence.ts` |
+| Auth hook | `src/lib/useAuth.ts` |
+| Agent token UI API | `src/lib/agentApi.ts` |
+| Local + smart search | `src/lib/search/`, `src/lib/smartSearch.ts` |
+| LinkedIn enrichment client | `src/lib/linkedinEnrichment.ts` |
+| Landing / docs / contact / privacy | `src/LandingPage.tsx`, `DocsPage.tsx`, … |
+| Shared UI components | `src/components/` (`M3Slider`, `SelectionIndicator`, …) |
+| Styles (Material 3 tokens) | `src/styles/` via `src/index.css` imports |
+
+Public **developer** documentation (API schemas, MCP setup) lives in `src/DocsPage.tsx` on
+the website — separate from this `docs/` product knowledge base.
+
+---
+
+## Documentation map
+
+| Doc | Use when |
+|-----|----------|
+| **This file** | Need accurate product summary fast |
+| [`PROJECT_MAP.md`](PROJECT_MAP.md) | Repo inventory, important files, active work links |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | Boundaries, invariants, integration points |
+| [`RUNBOOK.md`](RUNBOOK.md) | Commands, env vars, deploy, verification steps |
+| [`product-vision.md`](product-vision.md) | Product principles and intentional scope limits |
+| [`project-structure.md`](project-structure.md) | File-by-file structure |
+| [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) | Material 3 tokens and UI recipes |
+| [`features/README.md`](features/README.md) | Per-feature behavior and design |
+| [`DESIGN_LOG.md`](DESIGN_LOG.md) | Why past decisions were made (append-only) |
+| [`AGENT_BEST_PRACTICES.md`](AGENT_BEST_PRACTICES.md) | MCP/API agent rules |
+
+Feature docs to read for specifics:
+
+- Board: [`features/board-canvas.md`](features/board-canvas.md)
+- Auth: [`features/auth.md`](features/auth.md)
+- Search: [`features/board-search.md`](features/board-search.md), [`features/smart-search.md`](features/smart-search.md)
+- Agent API: [`features/agent-api.md`](features/agent-api.md)
+- Realtime: [`features/realtime-sync.md`](features/realtime-sync.md)
+- Landing: [`features/landing-page.md`](features/landing-page.md)
+
+---
+
+## Maintenance rule for agents
+
+When you change behavior, structure, or commands:
+
+1. Update the relevant feature doc under `docs/features/`.
+2. Update this file if the change affects the canonical summary.
+3. Update `RUNBOOK.md` if commands or verification steps change.
+4. Append durable decisions to `DESIGN_LOG.md`.
+5. Update `src/DocsPage.tsx` only for **developer-facing** API/CLI/MCP changes.
+
+Do **not** resurrect removed features (demo seed, demo mode, theme toggle) in docs unless
+re-implementing them in code.

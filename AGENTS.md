@@ -4,6 +4,7 @@ This repo follows the harness guidance in `docs/`.
 
 ## Start Here
 
+- [**AI context (read first)**](docs/AI_CONTEXT.md) — canonical, code-aligned product summary
 - [Project map](docs/PROJECT_MAP.md)
 - [Runbook](docs/RUNBOOK.md)
 - [Architecture](docs/ARCHITECTURE.md)
@@ -14,7 +15,8 @@ This repo follows the harness guidance in `docs/`.
 ## Rules
 
 - Keep all application user-facing text, comments, documentation, and codebase elements in English. Chat responses to the user can be in the user's preferred language.
-- Treat `docs/` as the source of truth for project knowledge.
+- Treat `docs/` as the source of truth for project knowledge. Start with `docs/AI_CONTEXT.md`
+  when you need an accurate overview; update it when canonical behavior changes.
 - Update the relevant doc when behavior, structure, or commands change.
 - When modifying API endpoints, CLI commands, or MCP tools, always update the public developer documentation in `src/DocsPage.tsx` to keep the website docs synchronized.
 - Maintain strict functional parity across all interfaces: when updating or adding API endpoints in `supabase/functions/graph-api/index.ts`, ensure that equivalent commands are added to the CLI (`scripts/datanode-cli.mjs`) and tools to the MCP server (`scripts/datanode-mcp.mjs`) immediately.

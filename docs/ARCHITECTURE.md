@@ -1,78 +1,71 @@
 # Architecture
 
+For a concise product summary see [`AI_CONTEXT.md`](AI_CONTEXT.md).
+
 ## Current Boundaries
 
-The repository currently has a single-screen frontend prototype architecture.
+The repository is a single-page application with a hash-based view router and one primary
+interactive surface (the board).
 
 Runtime boundaries:
 
-- React owns the visible graph prototype state and rendering.
+- React owns application state, chrome, panels, inspector, and the imperative board paint loop.
+- `src/lib/board/` owns framework-free canvas geometry, layout, rendering, and hit-testing.
 - Vite owns local development and production bundling.
-- CSS owns the visual board surface, graph styling, panel styling, and responsive layout.
-- The browser owns in-memory graph state for the current session.
-- Supabase owns Google authentication, email/password authentication, password recovery,
-  user-owned graph records, graph revisions, and hashed agent tokens.
-- Supabase Edge Functions own server-side LinkedIn profile enrichment calls and the
-  agent graph API.
-- Linear owns task state, status, ownership, priority, and blockers.
-- `docs/` owns durable product and repository knowledge.
+- CSS (`src/styles/`) owns Material 3 tokens and chrome/board styling.
+- Supabase owns Google/email auth, `user_graphs` blob storage, revisions, Realtime, and
+  hashed agent tokens.
+- Supabase Edge Functions own LinkedIn profile enrichment and the agent graph API.
+- Linear owns task state; `docs/` owns durable product and repository knowledge.
 
-The board is a live product, not a local-only demo. Signed-in users load and
-autosave their graph through Supabase; anonymous visitors get an editable board
-persisted to `localStorage`. The brand-new board starts blank (a single `You`
-circle) — there is no demo seed.
+The board is a live product. Signed-in users load and autosave through Supabase with
+revision checks and Realtime sync. Anonymous visitors edit a board persisted to
+`localStorage`. A brand-new board is blank: a single `You` circle — **no demo seed**.
 
 ## Current Frontend Shape
 
 - `src/main.tsx` mounts the React app.
-- `src/App.tsx` is the React shell and interaction host: chrome/panels, pointer
-  interaction (pan/zoom, drag, marquee selection, group drag, resize, merge),
-  camera + cursor state, the persisted-graph wiring, and the imperative paint
-  loop. The heavy canvas logic is delegated to `src/lib/board/`.
-- `src/lib/board/` is the framework-free board engine: `types.ts`, `constants.ts`,
-  `colors.ts`, `geometry.ts`, `layout.ts` (containment/collision), and
-  `render.ts` (spatial index, hit-testing, the Canvas 2D draw layer).
-- `src/lib/graphPersistence.ts` loads and saves signed-in graph changes through the
-  `graph-api` Edge Function as the primary revision-checked server path. Browser
-  session saves can fall back to direct Supabase RLS writes when the function layer
-  returns a non-conflict failure. Anonymous sessions use `localStorage`.
-- `src/lib/agentApi.ts` calls the `graph-api` Edge Function for agent token
-  management from the Settings panel.
-- `src/lib/supabase.ts` creates the browser Supabase client from Vite environment variables.
-- `src/lib/useAuth.ts` owns session loading, Google sign-in, email/password sign-in,
-  registration, confirmation resend, password recovery, and sign-out.
-- `supabase/functions/enrich-linkedin-profile/index.ts` authenticates the caller, calls the configured profile provider for one manually pasted LinkedIn profile URL, and returns normalized profile fields.
-- `supabase/functions/graph-api/index.ts` authenticates user sessions or revocable
-  agent tokens, resolves the owner user id from the credential, and exposes graph
-  search/write methods for API, CLI, and MCP clients.
-- `src/index.css` contains the visible circle graph prototype styling, including the grid board, creation menu, toolbar, and inspector.
+- `src/App.tsx` is the shell and interaction host: hash routing (landing, board, docs,
+  contact, privacy), chrome/panels, pointer interaction, camera, persisted-graph wiring,
+  and the paint loop. Heavy canvas logic lives in `src/lib/board/`.
+- `src/LandingPage.tsx`, `DocsPage.tsx`, `ContactPage.tsx`, `PrivacyPage.tsx` — public routes.
+- `src/lib/board/` — types, constants, colors, geometry, layout, render (spatial index,
+  hit-testing, Canvas 2D).
+- `src/lib/graphPersistence.ts` — signed-in saves via `graph-api` first, RLS fallback,
+  Realtime subscription, revision conflicts.
+- `src/lib/agentApi.ts` — agent token management from Settings.
+- `src/lib/useAuth.ts` — session and auth flows.
+- `src/lib/smartSearch.ts`, `src/lib/search/graphSearch.ts` — smart and local search.
+- `supabase/functions/enrich-linkedin-profile/` — authenticated single-profile enrichment.
+- `supabase/functions/graph-api/` — session or agent-token graph API for browser, CLI, MCP.
+- `src/index.css` + `src/styles/` — Material 3 chrome and board styling.
 
-The board's hot visual path is rendered on a single Canvas 2D layer: circle fills and labels, center controls, people avatars and labels, curved links, selected handles, hover states, and the draft connector. React still owns the surrounding chrome, menus, inspector, and persisted graph state. Pointer events land on the board surface and use canvas hit testing against a lightweight spatial grid instead of DOM/SVG nodes.
+The board hot path is Canvas 2D: circles, people, labels, edges, handles, draft connector.
+React owns surrounding UI. Pointer events use canvas hit-testing against a spatial grid.
 
 ## Current Product Boundaries
 
 Current scope:
 
-- central `You` circle, connected external circles, nested subset circles, and
-  people inside circles and subsets
-- a create menu for adding a person, nested subset circle, or connected circle
-- circle/person selection, plus right-click marquee multi-selection
-- dragging people and circles (incl. group dragging of a mixed selection)
-- circle resizing, automatic containment fit / shrink-back through nested chains
-- merge selected people and zones into a new subset
-- pan, cursor-centered wheel/pinch zoom, and a "zones only" far-zoom view
-- Google and email/password sign-in; per-user graph persistence in Supabase with
-  debounced autosave
-- anonymous editing persisted to `localStorage`
-- LinkedIn import (Connections.csv ZIP + single-profile enrichment)
-- per-person notes, tags, and connections stored inside the graph blob
-- local board search
-- revocable agent tokens, graph API access, a local CLI, and a stdio MCP server
+- central `You` circle, connected external circles, nested subset circles, people
+- create menu, double-tap create, connector drag-to-create
+- edit / select (marquee) / pan tool modes
+- selection, dragging, group drag, resize, merge-into-subset
+- pan, cursor-centered wheel/pinch zoom, zones-only far zoom, inertial pan on mobile
+- Google and email/password auth; revision-checked Supabase autosave + Realtime sync
+- anonymous `localStorage` editing
+- LinkedIn ZIP import and signed-in single-profile enrichment
+- per-person notes, tags, connections inside the graph blob
+- board search and signed-in smart search
+- landing, docs, contact, privacy pages
+- revocable agent tokens, graph API, CLI, stdio MCP server
 
-Out of scope (still not built):
+Out of scope (not built):
 
 - real-time multiplayer / presence
 - drawing tools and sticky notes
+- demo mode and demo seed graphs
+- global light/dark theme toggle (Material 3 light tokens only today)
 
 ## Invariants
 

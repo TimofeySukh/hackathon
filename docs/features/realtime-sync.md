@@ -2,33 +2,31 @@
 
 ## Purpose
 
-Ensures that the web application's board canvas stays synchronized in real-time when changes are made externally (e.g., via the CLI, API, or an MCP agent) without requiring the user to reload the page or forcing the app to poll Supabase.
+Keeps the board canvas synchronized when the graph changes externally (another browser tab,
+CLI, MCP agent, or API client) without polling or manual reload — while protecting unsaved
+local edits.
 
 ## Behavior
 
-- When the database is updated externally, the web app automatically receives a database change event.
-- When the current browser tab receives the Realtime event for a save it already has in flight, the event is accepted as the save acknowledgement instead of being treated as an external edit.
-- **No Unsaved Local Changes**: The web app automatically updates the canvas to reflect the new state immediately and seamlessly.
-- **Unsaved Local Changes Exist**: To prevent overwriting the user's unsaved changes, the app displays a banner notifying the user that the board has changed elsewhere and pauses autosaving until the user reloads the page.
+- Signed-in clients subscribe to Postgres changes on the current user's `user_graphs` row.
+- When the **same tab** receives a Realtime `UPDATE` for a save it already has in flight,
+  the event is treated as acknowledgement (revision refresh), not an external conflict.
+- **No unsaved local changes:** the canvas updates to the remote graph immediately.
+- **Unsaved local changes exist:** a warning banner appears, autosave pauses, and the user
+  must reload to reconcile (optimistic concurrency).
 
 ## Design
 
-- Uses a warning banner at the top of the viewport when a conflict occurs.
-- The banner fits the Material 3 styling using the `error-container` background role and the `on-error-container` text color role.
-- Shows a prominent button for the user to "Reload Page" to resolve the conflict.
+- Warning banner at top of viewport: `--md-error-container` / `--md-on-error-container`.
+- Prominent **Reload Page** button resolves conflicts.
 
 ## Code
 
-- **Database Changes**: Subscribes to the `user_graphs` table in Postgres using the `supabase_realtime` publication.
-  - Migration file: [20260624130017_enable_realtime_for_user_graphs.sql](file:///Users/velizard/Projects/hackathon/supabase/migrations/20260624130017_enable_realtime_for_user_graphs.sql)
-- **Frontend listener**: A `useEffect` in [App.tsx](file:///Users/velizard/Projects/hackathon/src/App.tsx) creates a Supabase Realtime subscription.
-- **State & Refs**:
-  - `graphRef`: Holds the current `graph` state to prevent re-binding the listener when graph state changes.
-  - `loadedGraphRevisionRef`: Holds the currently loaded revision for optimistic concurrency and stale event filtering.
-  - `loadedGraphSnapshotRef`: Stores the last loaded/saved graph state.
-  - `pendingSaveGraphRef` / `pendingSaveSnapshotRef`: Track a local save request while it is in flight, so the matching Realtime `UPDATE` can refresh the saved revision without showing a false external-conflict warning.
-- **Utilities**:
-  - `isGraphStateEqual` and `deepEqual`: Semantic comparison functions in `src/App.tsx` used to determine whether the user has unsaved modifications.
+- **Migration:** [`../../supabase/migrations/20260624130017_enable_realtime_for_user_graphs.sql`](../../supabase/migrations/20260624130017_enable_realtime_for_user_graphs.sql)
+- **Frontend:** Realtime subscription in [`../../src/App.tsx`](../../src/App.tsx) and helpers in
+  [`../../src/lib/graphPersistence.ts`](../../src/lib/graphPersistence.ts)
+- **Key refs:** `graphRef`, `loadedGraphRevisionRef`, `loadedGraphSnapshotRef`,
+  `pendingSaveGraphRef`, `pendingSaveSnapshotRef`, `isGraphStateEqual`
 
 ## Open questions / TODO
 

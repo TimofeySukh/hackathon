@@ -38,17 +38,10 @@ Connections feature, not in notes.
 ## Code
 
 - **Main files**:
-  - [App.tsx](file:///Users/velizard/Projects/hackathon/src/App.tsx) (inline rendering under `.trello-list` container)
-  - [index.css](file:///Users/velizard/Projects/hackathon/src/index.css) (Trello-style CSS layouts)
-- **Key functions / components**:
-  - `addPersonNote`
-  - `updatePersonNote`
-  - `deletePersonNote`
-- **Related state**:
-  - `newNoteBody` (current input content)
-  - `isAddingNote` (composer toggle)
-  - `editingNoteId` (active inline editor tracking)
-  - The inspector selection key resets transient note state on person/circle/connection changes.
+  - [`../../src/App.tsx`](../../src/App.tsx) (inline rendering under `.trello-list`)
+  - [`../../src/styles/inspector-fields.css`](../../src/styles/inspector-fields.css)
+- **Key functions**: `addPersonNote`, `updatePersonNote`, `deletePersonNote`
+- **Related state**: `newNoteBody`, `isAddingNote`, `editingNoteId`; selection key resets drafts.
 
 ## Open questions / TODO
 

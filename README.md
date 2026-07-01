@@ -1,29 +1,21 @@
-# Hackathon Board
+# Hackathon Board (Social Datanode)
 
 A social circle graph app built with React, Vite, TypeScript, and Supabase.
 
+**Canonical docs:** start at [`docs/AI_CONTEXT.md`](docs/AI_CONTEXT.md) for an accurate,
+AI-readable product summary.
+
 ## Current Experience
 
-- A central `You` circle as the source of the relationship map
-- Larger connected circles around the center for groups such as friends, market, and Pandora
-- Nested subset circles inside a parent circle, including a product-team subset inside Pandora
-- People placed either directly inside a circle or inside a nested subset
-- Curved visual links from circle centers to connected circles and people
-- Right-click a circle to open the create menu with two actions: add person or add circle
-- Double-tap anywhere to create a person at that exact point; it joins a circle only if tapped inside one, otherwise it stays free-floating
-- People are endpoints; only circle centers can create new outgoing branches
-- Drag people to reposition them inside their owning circle
-- Drag any circle center, including `You`, to move that circle and all contained people and subset circles together
-- Resize circles by grabbing and dragging the circle edge
-- Parent circles automatically expand or shrink back toward their minimum size as contained objects move
-- The visible help panel explains the prototype controls on the page
-- Select circles or people to inspect and rename them
-- Undo the last structural change (create, delete, move, resize, connect, merge) with Ctrl/Cmd+Z
-- Add three demo people to the selected circle from the inspector
-- Drag non-root circle centers to reposition circles
-- Pan the board by dragging empty space and zoom with the mouse wheel or toolbar
-- Google and email/password auth with per-user graph persistence in Supabase
-- Signed-out editing persisted to this browser's `localStorage`
+- Hash routes: landing, board (`#board`), developer docs, contact, privacy
+- Blank board: central `You` circle only (no preset demo regions)
+- Nested circles and people with curved relationship links
+- Pan/zoom; edit, select (marquee), and pan tool modes
+- Create people/circles via context menu, double-tap, connector drag
+- Inspector: name, notes, connections, circle styling, safe circle delete
+- Settings: LinkedIn ZIP import, sign-in/out, Agent API keys, graph import/export/clear
+- Search: local + signed-in smart search; paste LinkedIn profile URL to import
+- Google and email/password auth; Supabase sync when signed in; `localStorage` when anonymous
 
 ## Local Development
 
@@ -34,9 +26,10 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open the local or network Vite URL in your browser. Supabase variables are required for auth, synced boards, and server-side LinkedIn profile enrichment. Without them, the app still supports signed-out local editing.
+Open the local or network Vite URL. Supabase variables are required for auth, synced boards,
+and server-side LinkedIn profile enrichment. Without them, signed-out local editing still works.
 
-Recommended local env format:
+Recommended local env:
 
 ```bash
 VITE_SUPABASE_URL=https://lxnrpdeahoglgiocowsh.supabase.co
@@ -44,45 +37,24 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_l_x_y5rxdhL8Sd1ZE3QXag_lOCtr_M9
 VITE_SUPABASE_ANON_KEY=
 ```
 
-`VITE_SUPABASE_ANON_KEY` can stay empty when the publishable key is used.
-
-## Teammate Setup
-
-Everything needed for a teammate is already in the repository:
-
-- application code
-- the Supabase migration
-- `.env.example`
-- project documentation
-
-The Google OAuth client secret is not needed in the app. It stays in the Supabase Dashboard.
-
-Teammates only need to:
-
-1. Pull the latest `main` and install dependencies with `npm ci`.
-2. Create `.env.local` from `.env.example`.
-3. Fill in `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`.
-4. Run `npm run dev`.
-5. Open the local Vite URL shown in the terminal, or the network URL from another device on the same LAN.
-
-If Vite starts on a different local port such as `5173`, `5174`, or `5175`, or the app is opened through a LAN IP such as `http://10.29.0.117:5173`, that exact origin must be added to the Supabase Auth redirect allow list and to Google Cloud Authorized JavaScript origins.
-For multi-device login, deploy the frontend on one stable server origin and add that exact origin to both configurations.
-
 ## Available Scripts
 
-- `npm run dev` starts the development server on all local network interfaces.
-- `npm run build` creates a production build.
-- `npm run preview` previews the production build on all local network interfaces.
-- `npm run lint` runs ESLint.
-
-## Product Direction
-
-This version is intentionally focused on social graph building rather than generic whiteboarding.
-
-The goal is to make relationship mapping feel clean, compact, and pleasant to grow directly from each node.
+- `npm run dev` — development server (all network interfaces)
+- `npm run build` — production build
+- `npm run preview` — preview production build
+- `npm run lint` — ESLint
+- `npm run test:load` — import load checks (see [`docs/RUNBOOK.md`](docs/RUNBOOK.md))
 
 ## Documentation
 
-- Project rules: [AGENTS.md](./AGENTS.md)
-- Product direction: [docs/product-vision.md](./docs/product-vision.md)
-- Project structure: [docs/project-structure.md](./docs/project-structure.md)
+- **AI / onboarding:** [`docs/AI_CONTEXT.md`](docs/AI_CONTEXT.md)
+- Agent rules: [`AGENTS.md`](AGENTS.md)
+- Product direction: [`docs/product-vision.md`](docs/product-vision.md)
+- Structure: [`docs/project-structure.md`](docs/project-structure.md)
+- Features: [`docs/features/README.md`](docs/features/README.md)
+- Runbook: [`docs/RUNBOOK.md`](docs/RUNBOOK.md)
+
+## Product Direction
+
+Relationship mapping on a clean visual board — not a generic whiteboard. See
+[`docs/product-vision.md`](docs/product-vision.md) for principles and intentional limits.

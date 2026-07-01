@@ -7,10 +7,9 @@ Provides a compact links menu for person nodes inside the inspector. Connections
 ## Behavior
 
 - Imported LinkedIn profile URLs from `Connections.csv` are saved as LinkedIn connections on the imported person.
-- LinkedIn profile URLs pasted into board search can also create one person directly.
-  Signed-in manual imports use server-side profile enrichment when available, otherwise they
-  derive the name from the URL slug and place the person under `Unknown Company` for
-  later cleanup.
+- LinkedIn profile URLs pasted into board search create one person when enrichment succeeds.
+  If server-side enrichment explicitly fails, the UI shows an error and does not create a
+  fallback person (see [`board-search.md`](board-search.md)).
 - Profile descriptions are saved as a regular note titled "Profile"; the
   LinkedIn profile URL is still saved as a LinkedIn connection.
 - Users can add any custom URL, social profile, handle, or phone number from the person inspector.
@@ -29,15 +28,10 @@ Provides a compact links menu for person nodes inside the inspector. Connections
 ## Code
 
 - Main files:
-  - [App.tsx](/Users/velizard/Projects/hackathon/src/App.tsx)
-  - [index.css](/Users/velizard/Projects/hackathon/src/index.css)
-- Key functions:
-  - `inferLinkService`
-  - `normalizeLinkInput`
-  - `addPersonLink`
-  - `deletePersonLink`
-  - `handleSaveNewLink`
+  - [`../../src/App.tsx`](../../src/App.tsx)
+  - [`../../src/styles/inspector-fields.css`](../../src/styles/inspector-fields.css)
+- Key functions: `inferLinkService`, `normalizeLinkInput`, `addPersonLink`, `deletePersonLink`, `handleSaveNewLink`
 
 ## Open questions / TODO
 
-- Brand SVG icons can replace the current text badges once an icon set is added.
+- Brand SVG icons replace text badges where applicable (see `ConnectionServiceIcon` in App).

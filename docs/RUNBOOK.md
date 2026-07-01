@@ -2,38 +2,29 @@
 
 ## Status
 
-The repository contains a React, Vite, and TypeScript social graph board app.
+The repository contains **Social Datanode** — a React, Vite, and TypeScript social graph
+board app backed by Supabase. For an AI-friendly canonical summary, read
+[`AI_CONTEXT.md`](AI_CONTEXT.md) first.
 
-Current visible prototype behavior:
+Current product behavior (code-aligned):
 
-- opens a full-window relationship circle graph
-- starts with `You` as the central source circle
-- includes seeded connected region circles for EU, Denmark, Russia, and Other
-- includes nested country/company circles such as Sweden, France, Pandora, Avito, Yandex, US / Canada, and Japan
-- draws curved links from circle centers to circles and people
-- includes settings controls for demo mode, circle labels, person names, global circle shape, and global circle fill style
-- demo mode hides the app chrome and leaves the canvas plus the settings button while still allowing selection, deletion, visible connector handles, link creation, and drag-to-empty create menus for people, subset circles, and connected circles
-- includes a people load panel with a 0-10,000 generated-person slider, optional people edges, and live FPS
-- creates a person or a circle from a circle context menu (containment auto-detected for circles)
-- supports double-tap anywhere to create a person at the tapped point, joining a circle only when tapped inside one and otherwise staying free-floating
-- keeps people as endpoints and circle centers as the only branch-creation sources
-- selects and renames circles or people in the inspector
-- undoes the last structural change (create, delete, move, resize, connect, merge, change-circle, favorite, add/delete note, import) with Ctrl/Cmd+Z, one step per drag gesture
-- adds three demo people to the selected circle
-- drags people directly
-- drags any circle center, including `You`
-- moves a dragged circle together with contained people and subset circles
-- resizes circles by grabbing and dragging the circle edge
-- expands parent circles automatically when contained people or subset circles cross the current boundary
-- shrinks auto-expanded circles back toward their minimum size when contained objects move inward
-- propagates containment fitting up nested circle chains
-- shows in-page instructions for the prototype controls
-- pans by dragging empty board space
-- zooms toward the cursor with the mouse wheel and through the toolbar
-- stores signed-in board data in Supabase `user_graphs.graph`
-- stores signed-out board data in this browser's `localStorage`
-- supports LinkedIn ZIP import and signed-in manual LinkedIn profile enrichment
-There is no multiplayer or drawing toolset yet.
+- Hash routes: landing (`#`), board (`#board`), developer docs (`#docs`), contact
+  (`#contact`), privacy (`#privacy`).
+- Board opens on a **blank graph**: one central `You` circle only (no demo seed).
+- Canvas 2D board with circles, people, curved links, pan/zoom, edit/select/pan tool modes.
+- Create via circle context menu, double-tap, and connector drag-to-empty.
+- Inspector for rename, notes, connections, circle styling, delete (circles require
+  confirmation in the inspector).
+- Settings: LinkedIn ZIP import (+ sync guide), account sign-in/out, Agent API keys, graph
+  import/export/clear. Anonymous users see a `!` badge on the gear.
+- Toolbar search: local ranked search, signed-in smart search, LinkedIn profile URL import.
+- Signed-in persistence: Supabase `user_graphs.graph` with revision-checked saves and
+  Realtime sync. Anonymous: `localStorage`.
+- Agent access: revocable tokens, `graph-api` Edge Function, CLI, MCP server.
+- No multiplayer, drawing tools, or sticky notes.
+
+Out of scope (not built): real-time collaboration/presence, whiteboard drawing, demo mode,
+global theme toggle, stress-test UI panel.
 
 ## Local Setup
 
@@ -662,32 +653,23 @@ Manual verification:
 5. Scroll on a trackpad and confirm the board pans without triggering zoom.
 6. Use the mouse wheel and confirm zoom centers around the cursor.
 7. Confirm the zoom indicator in the bottom-right updates smoothly.
-8. Toggle the theme.
-9. Reload the page and confirm the selected theme is preserved.
-10. Open the sign-in dialog and confirm Google, email sign-in, create account, forgot password, and resend confirmation controls fit on desktop and mobile widths.
-11. Sign in with Google and confirm the account state appears.
-12. Create an account with only email and password, confirm the confirmation notice appears, and confirm resend confirmation does not clear the local board.
-13. Request a password reset and confirm the UI shows a generic success message.
-14. Open a Supabase password recovery link and confirm the app shows the new-password state.
-15. Confirm the signed-in account gets a root node at `0,0`.
-16. Drag out from a node to create a new connected person and confirm it persists after reload.
-17. Drag a non-root person to a new position, confirm connected lines follow it, then reload and confirm the coordinates persist.
-18. Click a person near a viewport edge and confirm the board pans enough to keep the inspector visible, and that the inspector opens at a consistent size regardless of the current zoom.
-19. Start trackpad panning on the board, pass over the inspector, and confirm panning continues; then start a trackpad gesture on the inspector and confirm it does not begin board panning.
-20. Confirm the inspector opens as a compact panel with only a large name field, the tag picker, notes, and the delete-person action.
-21. Type `#` inside the inspector name field, confirm the tag dropdown opens, choose a tag with ArrowUp/ArrowDown plus Enter, and verify the applied tag is removed from the saved name text.
-22. Use the tag chip or `+ add tag` ghost button to open the inspector tag dropdown, create a new tag from the same field, delete an unused tag with the `x` confirmation flow, and confirm the single selected tag persists after reload.
-23. Open the top-bar tag menu, toggle a tag color palette from its swatch, change the color, and confirm the selected person inspector still shows the chosen tag with a visible color accent after the picker closes.
-24. Create a new person, confirm the inspector opens automatically, confirm an empty person focuses the name field, then fill the note capture textarea and save a new note both with `Cmd/Ctrl + Enter` and by blurring the textarea.
-25. Create a note by typing into the `Create new note` field, confirm saved notes start collapsed by default, expand one with the chevron, press Enter in the title to open the body, delete a note from the icon button, reload, and confirm note changes persist.
-26. Start a new unsaved note and a new unsaved connection on one person, click empty canvas, then open another person and confirm the note composer, note editor, connection input, and service picker all start clean.
-27. Create a connection between two existing people, confirm reload preserves it, then click the widened line target and confirm `Delete connection` or Backspace removes it.
-28. Open the top-left Tags menu, create enough tags to overflow the panel, scroll to the lower tags, adjust a lower tag color, and confirm the palette remains reachable.
-29. Open the top-left Tags menu, create a tag, adjust its color, toggle one tag off with the visibility checkbox, and confirm both tagged nodes and their connections disappear. Use `Select all` and `Clear all` to confirm bulk visibility controls work.
-30. Open the search layer and verify that typing a person name, role, or circle name returns local matches.
-31. Click a search result and verify the board recenters on that person or circle and opens the inspector.
-32. Paste a LinkedIn profile URL into search while signed in and verify manual profile import creates or enriches a person.
-33. Sign out and confirm the anonymous board state returns.
+8. Open the sign-in dialog and confirm Google, email sign-in, create account, forgot password, and resend confirmation controls fit on desktop and mobile widths.
+9. Sign in with Google and confirm the account state appears in Settings.
+10. Create an account with only email and password, confirm the confirmation notice appears, and confirm resend confirmation does not clear the local board.
+11. Request a password reset and confirm the UI shows a generic success message.
+12. Open a Supabase password recovery link and confirm the app shows the new-password state.
+13. Confirm the signed-in account loads or creates a root `You` circle.
+14. Drag out from a node to create a new connected person and confirm it persists after reload.
+15. Drag a non-root person to a new position, confirm connected lines follow it, then reload and confirm the coordinates persist.
+16. Click a person near a viewport edge and confirm the board pans enough to keep the inspector visible.
+17. Confirm the inspector shows name, notes, connections, and delete actions for a person.
+18. Save a note with `Cmd/Ctrl + Enter` and confirm it persists after reload.
+19. Switch inspector selection and confirm unsaved note/connection drafts reset.
+20. Create a connection between two people, reload, then delete it with Backspace or the inspector.
+21. Open search and verify name/circle matches; click a result and confirm camera fly + inspector.
+22. Paste a LinkedIn profile URL into search while signed in and verify import/enrichment.
+23. Switch board tool modes (edit / select / pan) and confirm pan mode moves the canvas on one-finger drag (mobile or touch).
+24. Sign out and confirm anonymous editing still works with local persistence.
 
 Supabase verification:
 
@@ -711,11 +693,8 @@ Supabase verification:
 
 ## Current Priorities
 
-1. Keep the demo path stable.
-2. Finalize the project idea and scope in Linear.
-3. Collect all links and access paths the team needs.
-4. Define presentation and demo roles.
-5. Prepare the final presentation deck.
+See the Linear [Hackathon](https://linear.app/velizard/project/hackathon-fc67889adc0d) project
+for live task ownership and status. Durable technical direction lives in `docs/`.
 
 ## What To Do When Code Changes
 

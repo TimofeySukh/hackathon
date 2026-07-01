@@ -10,9 +10,9 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
 
 - **Pan / zoom**: drag empty space to pan in edit mode; mouse wheel, trackpad pinch,
   or two-finger touch pan/zoom the board (`MIN_SCALE`/`MAX_SCALE` clamp). The vertical
-  mode switch in the top-left can be changed to pan mode, where a one-finger drag always
-  moves the canvas instead of selecting or dragging a person/circle. Releasing a moved pan
-  gesture continues with short inertial scrolling before settling.
+  **tool mode** menu (top-left) switches **Edit**, **Select** (marquee), and **Pan**.
+  Pan mode makes one-finger drag move the canvas; releasing a pan gesture can continue
+  with short inertial scrolling.
 - **Move**: drag a person to reposition inside its owning circle; nearby people in the
   same circle are pushed aside instead of overlapping. Drag a circle center or body to move
   the whole circle and everything it contains. Live pointer frames never run the global
@@ -82,39 +82,21 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   can still be deleted with Backspace/Delete.
 - **Undo**: Ctrl/Cmd+Z reverts the last graph-mutating action — create, delete, move,
   resize, connect, merge, change-circle, favorite, add/delete note, and LinkedIn import.
-  A whole drag or resize gesture is a single undo step, and the shortcut is ignored while
-  typing in a field so it never fights an input's native undo. History is in-memory only
-  (lost on reload) and structural; rename and style tweaks are intentionally excluded so
-  undo stays at meaningful boundaries.
-- **Demo mode**: the Settings panel includes a demo mode switch. When enabled, chrome,
-  stress controls, help text, and the inspector disappear; only the board canvas and
-  settings button remain. People and circles can still be moved, and circle edges can
-  still be resized. People and connections can still be selected on the canvas and deleted
-  with Backspace/Delete. Circles cannot be deleted from the keyboard; use the inspector's
-  **Delete circle** button instead. Connector handles stay visible. Dragging a circle/person connector to
-  an existing node creates a link; dragging to empty space opens the create menu so users
-  can add a person or a circle without leaving demo mode.
-- **Graph file actions**: the bottom of Settings includes graph import, export, and
-  clear actions. Export downloads the current board as a JSON file. Import accepts a
-  board graph JSON with `circles`, `people`, and `connections` arrays, then replaces the
-  current board, immediately flushes the replacement to the active storage backend, and
-  keeps the action undoable. Clear resets the board to a fresh single `You` circle after
-  confirmation and is also undoable.
+  A whole drag or resize gesture is a single undo step. History is in-memory only (lost on
+  reload); rename and style tweaks are excluded.
+- **Settings panel** (gear): LinkedIn ZIP import (+ sync guide), account sign-in/out,
+  Agent API key management (signed-in), graph import/export/clear.
+- **Graph file actions**: export downloads JSON; import replaces the board and flushes
+  immediately; clear resets to a fresh `You` circle after confirmation (both undoable).
 - **Persistence safety**: signed-in boards load only from the `user_graphs` blob.
   A brand-new empty graph is not immediately autosaved on load, so a temporary
   backend/schema mismatch cannot overwrite an existing board with a single `You` circle.
-- **Labels**: Settings includes separate toggles for circle labels and person names.
-  Circle-center icon text scales with the world transform like people avatars; labels use
-  the same screen-readable label treatment as person names.
-- **Seed icons**: default country and region circles use geographic icons or flags in
-  their center handles. Company circles may still use short text initials.
+- **Labels**: circle and person labels render on the canvas when zoom permits; center icon
+  text scales with the world transform.
 - **Circle design**: newly loaded and newly created circles default to transparent clean
-  circles. Selecting a circle shows quick color swatches, the fill toggle, avatar upload,
-  and the Wavyness/Edges sliders directly in the compact quick card. The palette popover
-  is only for detailed color/brightness controls. Fill and shape changes apply only to
-  the selected circle; new circles keep the clean transparent default.
-- **Favorite**: a person can be starred; favorited people get a thicker neon-yellow
-  outline on the canvas.
+  circles. Per-circle fill, waviness, edges, and color are edited in the inspector quick
+  card and palette popover.
+- **Favorite**: favorited people show a thicker neon-yellow outline on the canvas.
 - **Avatar fallback**: remote person avatar URLs render initials until the image loads,
   and keep initials if the image fails, so imported profiles never draw as empty chips.
 - **Collision rules**: people repel other people in their owning circle and the center
@@ -130,9 +112,8 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
 This is the most Material-3-aligned part of the app today; keep it that way.
 
 - **Color**: circles and people use the categorical accent palette
-  (`MATERIAL_TONES` in `src/App.tsx`) — see the accent table in
-  [`../DESIGN_SYSTEM.md`](../DESIGN_SYSTEM.md#1-color-tonal-roles). Text on a fill uses
-  that tone's on-container value.
+  (`MATERIAL_TONES` in `src/lib/board/constants.ts`) — see the accent table in
+  [`../DESIGN_SYSTEM.md`](../DESIGN_SYSTEM.md#1-color-tonal-roles).
 - **Shapes**: nodes render as `wavy` (flower), soft `polygon`, or `circle` via
   `getNodePath`. Circle Wavyness maps to amplitude; Edges maps to side count, with 25
   edges treated as a clean circle. New circles and unmarked legacy circle styles load as
@@ -154,27 +135,16 @@ This is the most Material-3-aligned part of the app today; keep it that way.
 
 ## Code
 
-- Main file: `src/App.tsx` (single-file prototype; ~3.1k lines).
-- Styles: `src/index.css` (canvas + chrome).
+- Main file: `src/App.tsx` (board shell + interaction host; component extraction ongoing).
+- Board engine: `src/lib/board/` (`types`, `constants`, `geometry`, `layout`, `render`).
+- Styles: `src/styles/board.css`, `src/styles/chrome.css`, … via `src/index.css`.
 - Key pieces:
-  - `MATERIAL_TONES`, `TONE_LABELS` — the accent palette.
-  - `getNodePath` — wavy/polygon/circle shape generation.
-  - `createBoardIndex`, `queryPeople`, `queryCircles` — the spatial grid used for
-    viewport rendering and hit testing.
-  - `BOARD_INTERACTION_LAYOUT_LIMIT` — the node-count guard that keeps ordinary
-    drag/resize/create/delete interactions from running the global O(n²) layout on dense
-    boards.
-  - `drawBoardLayer` — Canvas 2D renderer for circles, people, labels, edges, selected
-    handles, and the draft connector. Clean circles use native `Path2D.arc`; sampled
-    outline paths are reserved for wavy/polygon/morph states. The renderer accepts a
-    performance mode for live camera frames, plus viewport overrides for the expanded
-    pan/zoom bitmap cache.
-  - `hitTestBoard` plus `handleSurfacePointerDown/Move/Up` — canvas interaction model
-    for selecting, dragging, resizing, connecting, and context menus.
-  - create-menu rendering; inspector `<aside className="inspector">`.
+  - `createFreshGraph`, `ensureContainment`, `packedCircleRadius`, `packCirclesInRings` — layout/import.
+  - `createBoardIndex`, `hitTestBoard`, `drawBoardLayer` — spatial index, interaction, render.
+  - `BOARD_INTERACTION_LAYOUT_LIMIT`, `IMPORT_LAYOUT_LIMIT` — dense-board guards.
+  - Inspector `<aside className="inspector">`, create menu, board mode menu.
 
 ## Open questions / TODO
 
-- Windows laptops reportedly cannot add new nodes (needs reproduction details, including browser, input device, and gesture/button behaviors).
-- The single-file `App.tsx` mixes many concerns; component extraction would make the
-  Material 3 chrome migration cleaner but is not required for it.
+- Windows laptops reportedly cannot add new nodes (needs reproduction: browser, input device, gestures).
+- Continue extracting subcomponents from `App.tsx` without changing board behavior.

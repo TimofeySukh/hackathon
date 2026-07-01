@@ -8,8 +8,10 @@ password so a database user is created without forcing profile setup.
 
 ## Behavior
 
-- Signed-out visitors can keep editing locally and open the auth dialog from the local-save
-  hint.
+- Signed-out visitors can edit locally. They are nudged to sign in via a red `!` badge on
+  the Settings gear and a **Sign in** block inside Settings (no floating banner).
+- Sign-in also opens from the landing header (**Log in** / **Sign up**) and opens the same
+  auth dialog as the board.
 - The dialog supports Google sign-in, email sign-in, email/password registration, password
   reset request, and password update from a Supabase recovery link.
 - Email registration requires only an email and a password. Email confirmation is still
@@ -27,14 +29,10 @@ password so a database user is created without forcing profile setup.
 - Login attempts include a `sdn_auth_return=board` callback URL parameter and mirror that
   return target in `localStorage` and `sessionStorage`. Supabase callback signatures
   (`code`, token hash parameters, recovery/error parameters) also resolve to the board
-  route on the first app render while Supabase restores the session, avoiding a
-  landing-page flash or a false signed-out prompt.
-- Email login stores the board return marker before calling Supabase so the auth-state
-  callback can consume it reliably. If the user manually navigates from `#board` back to
-  the clean domain or another public hash, stale board return markers are cleared and the
-  landing remains reachable while signed in.
-- After a successful password update, the dialog stays open in a final success state so the
-  user sees that the password changed and the session is active.
+  route on the first app render while Supabase restores the session.
+- Email login stores the board return marker before calling Supabase. Navigating from
+  `#board` back to the clean domain clears stale board return markers.
+- After a successful password update, the dialog stays open in a final success state.
 - New passwords require at least 8 characters, with no composition rule.
 
 ## Design
@@ -43,22 +41,18 @@ password so a database user is created without forcing profile setup.
   [`../DESIGN_SYSTEM.md`](../DESIGN_SYSTEM.md).
 - The desktop dialog uses `--md-surface-container-low`, `--md-r-xl`, and `--md-elev-3`.
 - On narrow screens the dialog sits at the bottom of the viewport like a compact sheet.
-- Inputs use the app's rounded tonal shell pattern, matching the search menu and existing
-  composer fields: no border, no bottom rule, and a soft primary focus halo.
+- Inputs use the app's rounded tonal shell pattern (no border, no bottom rule).
 - Notices use `--md-secondary-container`; errors use `--md-error`.
-- The form keeps password-manager friendly `autocomplete` attributes for email,
-  current password, and new password.
 
 ## Code
 
 - Main file(s): `src/App.tsx`, `src/lib/useAuth.ts`, `src/styles/panels.css`.
-- Key functions / components: `useAuth`, `handleEmailAuthSubmit`,
+- Key functions / components: `useAuth`, `openSignInModal`, `handleEmailAuthSubmit`,
   `handleResendConfirmation`, auth dialog JSX in `App`.
-- Related state / hooks: `emailAuthMode`, `emailAuthBusy`, `emailAuthNotice`,
+- Related state: `showSignInModal`, `emailAuthMode`, `emailAuthBusy`, `emailAuthNotice`,
   `emailAuthError`, `isPasswordRecovery`.
 
 ## Open questions / TODO
 
-- Supabase confirmation and recovery email templates are still configured in the Supabase
-  Dashboard. Customize those templates and the sender domain there for a fully branded
-  email experience.
+- Supabase confirmation and recovery email templates are configured in the Supabase
+  Dashboard. Customize templates and sender domain for a fully branded email experience.
