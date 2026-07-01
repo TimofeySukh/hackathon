@@ -21,8 +21,8 @@ rediscover, write it here.
 
 - Decision: Reworked the landing page from a loose visual pitch into a direct
   product-led decision path: problem-first hero, one primary board CTA, compact
-  deck cards using concrete user actions, factual desktop trust chips, a clearer
-  problem/answer section, and a prefilled local-only inspector demo.
+  deck cards using concrete user actions, a clearer problem/answer section, a
+  prefilled local-only inspector demo, and a final bottom CTA.
 - Why: The previous landing looked polished but made visitors infer the product
   value. The new structure explains that Social Datanode is a private visual board
   for people, notes, groups, and links before asking the visitor to open the board.
@@ -32,11 +32,11 @@ rediscover, write it here.
 - Why: A logo on a product landing page is expected to be a home/reset affordance;
   using it as an app-launch CTA created surprise navigation and weakened the single
   primary action model.
-- Decision: The mobile hero hides the desktop trust chips and crops the product
-  screenshot into a preview strip.
-- Why: Phone viewports need the headline, CTA, and product preview to fit tightly
-  while still leaving a visible hint of the next section. The duplicated trust
-  facts remain available in the trust strip below.
+- Decision: Removed duplicate trust chips from the hero, moved the desktop product
+  screenshot slightly lower, and kept a cropped product preview strip on phones.
+- Why: The trust chips made the CTA area feel cramped and repeated the trust strip
+  below. The screenshot offset gives the hero more air while the bottom CTA gives
+  long-page readers a clear action after the story.
 
 ### 2026-07-01 — Clean domain stays public after board navigation
 

@@ -85,8 +85,6 @@ const HERO_CARDS = [
   'Search, import, and let agents work with the same private graph',
 ] as const
 
-const HERO_TRUST_ITEMS = ['No account needed to try', 'Private sync when signed in', 'Real board preview'] as const
-
 const DEMO_CARDS = [
   'Edit the person name the same way you would in the real inspector.',
   'Move the person into a circle so context stays spatial, not just textual.',
@@ -260,11 +258,6 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
                   Open board
                 </button>
                 <p className="landing-hero-note">Try it now. Sign in later only if you want private sync.</p>
-              </div>
-              <div className="landing-hero-proof" aria-label="Product trust facts">
-                {HERO_TRUST_ITEMS.map((item) => (
-                  <span key={item}>{item}</span>
-                ))}
               </div>
             </div>
             <figure className="board-preview-frame" aria-label="Product preview">
@@ -663,6 +656,17 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
               ))}
             </div>
           </div>
+        </section>
+
+        <section className="landing-section final-cta-section" aria-labelledby="final-cta-title">
+          <span className="demo-eyebrow">Ready when you are</span>
+          <h2 id="final-cta-title" className="section-title">Open the board and place the first person</h2>
+          <p className="section-lead">
+            Start anonymously in this browser. Sign in later if the map becomes something you want to keep in sync.
+          </p>
+          <button type="button" className="lp-btn lp-btn-filled final-cta-button" onClick={handleLaunchApp}>
+            Open board
+          </button>
         </section>
 
       </main>

@@ -71,7 +71,7 @@ Required elements:
 2. A real product screenshot of the board with the inspector open.
 3. A short headline, lead line, and three deck-style slogans beside the screenshot.
 4. A single primary **Open board** button.
-5. A short non-clickable reassurance line and factual trust chips on desktop.
+5. A short non-clickable reassurance line under the CTA.
 
 Do not bring back the stepped-path ribbon as the main hero element.
 
@@ -89,9 +89,8 @@ Current hero positioning:
 - Headline: direct problem framing (`Stop managing people from memory and spreadsheets`).
 - Lead: describes the product as a private visual board for people, notes, groups, and links.
 - CTA note: explains that visitors can try first and sign in later for private sync.
-- Desktop trust chips are factual only: no-account trial, private sync when signed in, and real
-  board preview. On phone widths, these chips are removed from the hero because the same trust
-  information appears in the trust strip below.
+- The desktop product screenshot sits slightly lower than the text stack so the hero does not
+  feel cramped around the CTA area.
 
 ## Copy
 
@@ -148,8 +147,10 @@ After the hero, the landing page includes:
 4. **Interactive demo** — inspector simulator (see above).
 5. **Core Capabilities** — five human-readable scatter cards; the agent card links to Docs.
 6. **LinkedIn import** — deck cards describing the import flow.
+7. **Final CTA** — a quiet centered `Open board` section before the footer.
 
-The hero is the only primary board CTA: an **Open board** button beside the non-clickable product screenshot.
+The hero owns the first and most important board CTA. A second **Open board** CTA is allowed
+near the bottom after the product story has been explained.
 
 Deck cards across these sections share the white rounded-card, slight rotation,
 and hover straightening behavior from the hero slogan stack.
@@ -161,7 +162,8 @@ column. The mobile page must not rely on desktop rotations, negative margins, or
 expansion that can push content outside the viewport.
 
 The mobile hero uses a cropped product preview strip to keep the first screen focused and to
-leave a visible hint of the next section.
+leave a visible hint of the next section. The hero does not include duplicate trust chips;
+those facts belong in the trust strip below.
 
 ## Docs
 
