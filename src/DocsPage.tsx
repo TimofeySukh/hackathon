@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback, type MouseEvent } from 'react'
 import sdnLogo from './assets/sdn-logo.svg'
 
 type Article = {
@@ -1763,7 +1763,7 @@ ${pinnedCmd}`}</code>
   }, [searchTokens, matchesSearch])
 
   useEffect(() => {
-    const handlePointerDown = (event: MouseEvent) => {
+    const handlePointerDown = (event: globalThis.MouseEvent) => {
       if (!searchRef.current?.contains(event.target as Node)) {
         setSearchOpen(false)
       }
@@ -1771,6 +1771,11 @@ ${pinnedCmd}`}</code>
     document.addEventListener('mousedown', handlePointerDown)
     return () => document.removeEventListener('mousedown', handlePointerDown)
   }, [])
+
+  const handleGoHome = (event: MouseEvent) => {
+    event.preventDefault()
+    window.location.hash = ''
+  }
 
   return (
     <div className={`app-shell docs-container ${mobileNavOpen ? 'docs-nav-open' : ''}`}>
@@ -1794,10 +1799,10 @@ ${pinnedCmd}`}</code>
       )}
 
       <header className="docs-header">
-        <div className="docs-brand">
+        <a href="#" className="docs-brand" onClick={handleGoHome} aria-label="Back to Social Datanode home">
           <img src={sdnLogo} alt="" aria-hidden="true" />
-          <h1>Developer Docs</h1>
-        </div>
+          <span className="docs-brand-title">Developer Docs</span>
+        </a>
         <div className="docs-controls">
           <button
             type="button"
@@ -1871,13 +1876,6 @@ ${pinnedCmd}`}</code>
               </div>
             )}
           </div>
-          <button
-            type="button"
-            className="docs-back-btn"
-            onClick={() => { window.location.hash = '' }}
-          >
-            Back
-          </button>
         </div>
       </header>
 
