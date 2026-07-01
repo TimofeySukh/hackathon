@@ -189,6 +189,25 @@ Example hover: `background: color-mix(in srgb, var(--md-on-surface) 8%, transpar
 
 ---
 
+## 5a. Layout anchoring
+
+UI elements must be positioned from the layout grid, not by visual accident. In a card,
+panel, menu, or coach mark, every control must have a stable relationship to nearby text,
+edges, and sibling controls:
+
+- Top and bottom internal spacing must be intentionally paired. If a footer button sits
+  below body text, the gap above that button and the bottom padding below it must be
+  specified together, not left to unrelated margins.
+- Absolutely positioned controls such as close buttons, badges, and completion checks must
+  either reserve space in the content grid or replace the control in the same position. Do
+  not let icons overlap, float between rows, or depend on text length to avoid collisions.
+- Repeated footer layouts must use explicit alignment: `align-items`, fixed control
+  heights, and defined row gaps. Do not rely on default line-height or button intrinsic
+  size to determine vertical position.
+- When a state swaps one affordance for another, keep the same anchor point. For example,
+  a completion check that replaces a close icon should render in the close icon's slot,
+  not as a new independent element elsewhere in the card.
+
 ## 5b. Motion
 
 Interactions must give feedback, not flip state instantly. Material 3 uses short,

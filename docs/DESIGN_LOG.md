@@ -1063,3 +1063,12 @@ rediscover, write it here.
 - Why: Users cannot immediately import a LinkedIn archive. They first need to learn that
   Search can add one profile link, and that the archive flow starts in Settings via the
   highlighted `?` guide.
+
+### 2026-07-02 — Layout anchoring for floating UI
+
+- Decision: Added a design-system rule that card, panel, menu, and coach-mark controls must
+  be positioned from explicit layout anchors: paired top/bottom spacing, fixed control
+  heights, defined row gaps, and same-slot affordance swaps.
+- Why: Floating controls that are merely close to the right place read as sloppy. Onboarding
+  buttons in particular must keep equal vertical rhythm relative to body text and card
+  edges, instead of drifting toward one side.
