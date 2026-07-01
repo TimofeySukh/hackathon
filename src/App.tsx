@@ -504,6 +504,8 @@ const authCardStyle: CSSProperties = {
 }
 
 const LINKEDIN_GUIDE_HINT_KEY = 'social-linkedin-guide-hint-seen-v1'
+const PERSON_DOUBLE_TAP_MS = 350
+const PERSON_DOUBLE_TAP_DISTANCE = 28
 const SEARCH_LINKEDIN_HINT_KEY = 'social-search-linkedin-hint-seen-v1'
 const BOARD_ONBOARDING_STORAGE_KEY = 'social-board-onboarding-done-v2'
 const BOARD_ONBOARDING_FORCE_KEY = 'social-board-onboarding-open-v2'
@@ -1148,6 +1150,9 @@ function App() {
   const pressedNodeIdsRef = useRef<Set<string>>(new Set())
   const liftedNodeIdsRef = useRef<Set<string>>(new Set())
   const suppressDoubleClickUntilRef = useRef(0)
+  const lastPersonTapRef = useRef<{ personId: string; time: number; x: number; y: number } | null>(null)
+  const inspectorNameInputRef = useRef<HTMLInputElement>(null)
+  const pendingInspectorNameFocusPersonIdRef = useRef<string | null>(null)
   const handleExitNodesRef = useRef<Map<string, CircleNode | PersonNode>>(new Map())
   const prevSelectionRef = useRef<SelectedItem>(null)
   const ringCircleIdRef = useRef<string | null>(null)
@@ -1161,7 +1166,12 @@ function App() {
   const [selectedItem, setSelectedItem] = useState<SelectedItem>(null)
   const [renderedInspectorItem, setRenderedInspectorItem] = useState<SelectedItem>(null)
   const [isInspectorOpen, setIsInspectorOpen] = useState(false)
+  const isInspectorOpenRef = useRef(false)
   const inspectorCloseTimeoutRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    isInspectorOpenRef.current = isInspectorOpen
+  }, [isInspectorOpen])
 
   useEffect(() => {
     if (selectedItem) {
@@ -1169,7 +1179,15 @@ function App() {
         window.clearTimeout(inspectorCloseTimeoutRef.current)
         inspectorCloseTimeoutRef.current = null
       }
+
+      const stayOpen = isInspectorOpenRef.current && renderedInspectorItem !== null
       setRenderedInspectorItem(selectedItem)
+
+      if (stayOpen) {
+        setIsInspectorOpen(true)
+        return
+      }
+
       setIsInspectorOpen(false)
       const openFrame = window.requestAnimationFrame(() => {
         window.requestAnimationFrame(() => setIsInspectorOpen(true))
@@ -1188,6 +1206,44 @@ function App() {
       }
     }
   }, [selectedItem])
+
+  function requestInspectorNameFocus(personId: string) {
+    pendingInspectorNameFocusPersonIdRef.current = personId
+    if (
+      renderedInspectorItem?.type === 'person' &&
+      renderedInspectorItem.id === personId &&
+      isInspectorOpen
+    ) {
+      pendingInspectorNameFocusPersonIdRef.current = null
+      window.requestAnimationFrame(() => {
+        const input = inspectorNameInputRef.current
+        if (!input) return
+        input.focus({ preventScroll: true })
+        input.select()
+      })
+    }
+  }
+
+  useEffect(() => {
+    const pendingPersonId = pendingInspectorNameFocusPersonIdRef.current
+    if (!pendingPersonId) return
+    if (renderedInspectorItem?.type !== 'person' || renderedInspectorItem.id !== pendingPersonId) {
+      if (renderedInspectorItem?.type === 'person' && renderedInspectorItem.id !== pendingPersonId) {
+        pendingInspectorNameFocusPersonIdRef.current = null
+      }
+      return
+    }
+    if (!isInspectorOpen) return
+
+    pendingInspectorNameFocusPersonIdRef.current = null
+    const input = inspectorNameInputRef.current
+    if (!input) return
+    const frame = window.requestAnimationFrame(() => {
+      input.focus({ preventScroll: true })
+      input.select()
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [renderedInspectorItem, isInspectorOpen])
 
   function selectionShowsHandles(item: SelectedItem | null) {
     if (!item) return false
@@ -1360,7 +1416,6 @@ function App() {
     setShowLinkedInGuide(true)
   }
 
-
   const [showAgentSettings, setShowAgentSettings] = useState(false)
   const [showLinkedInGuide, setShowLinkedInGuide] = useState(false)
   const showCircleLabels = true
@@ -1424,10 +1479,16 @@ function App() {
   }
 
   function selectItem(item: SelectedItem) {
-    const isSameSelection = selectedItem?.type === item?.type && selectedItem?.id === item?.id
-    if (!isSameSelection) {
-      resetInspectorDraftState()
-    }
+    const isSameSelection =
+      selectedItem?.type === item?.type &&
+      selectedItem?.id === item?.id &&
+      (item?.type !== 'circle' ||
+        selectedItem?.type !== 'circle' ||
+        selectedItem.showHandles === item.showHandles)
+
+    if (isSameSelection) return
+
+    resetInspectorDraftState()
     setShowCircleStylePanel(false)
     setSelectedItem(item)
   }
@@ -3746,9 +3807,7 @@ function App() {
       ...(activeMovePerson?.liftIds ?? []),
     ]
 
-    const movingPersonId = activeMovePerson ? activeMovePerson.personId : null
     const movingCircleId = activeMoveCircle ? activeMoveCircle.circleId : null
-    const selectedOrigins = activeMovePerson ? activeMovePerson.selectedOrigins : null
     const disconnectedCircleIds = activeMoveCircle ? activeMoveCircle.disconnectedCircleIds : null
     const wasRightClickDrag = isRightClickDragRef.current
 
@@ -3783,50 +3842,34 @@ function App() {
         }),
         people: graph.people.map((p) => {
           const indexP = boardIndexRef.current.peopleById.get(p.id)
-          return indexP ? { ...p, x: indexP.x, y: indexP.y } : p
+          return indexP ? { ...p, x: indexP.x, y: indexP.y, circleId: indexP.circleId } : p
         }),
       }
       setGraph(() => {
         let next = nextResolved
-        if (wasRightClickDrag) {
-          if (movingPersonId) {
-            const draggedIds = selectedOrigins ? Object.keys(selectedOrigins) : [movingPersonId]
-            let nextPeople = next.people
-            for (const pid of draggedIds) {
-              const person = nextPeople.find((p) => p.id === pid)
-              if (person) {
-                const innermost = next.circles
-                  .filter((c) => Math.hypot(person.x - c.x, person.y - c.y) <= c.radius)
-                  .sort((a, b) => a.radius - b.radius)[0]
-                const nextCircleId = innermost ? innermost.id : ''
-                nextPeople = nextPeople.map((p) => p.id === pid ? { ...p, circleId: nextCircleId } : p)
+        if (wasRightClickDrag && movingCircleId) {
+          const draggedCircleIds = disconnectedCircleIds || [movingCircleId]
+          let nextCircles = next.circles
+          for (const cid of draggedCircleIds) {
+            const circlesById = new Map(nextCircles.map((c) => [c.id, c]))
+            const isDescendant = (childId: string, parentId: string): boolean => {
+              let curr: string | null = childId
+              while (curr) {
+                if (curr === parentId) return true
+                curr = circlesById.get(curr)?.parentId ?? null
               }
+              return false
             }
-            next = { ...next, people: nextPeople }
-          } else if (movingCircleId) {
-            const draggedCircleIds = disconnectedCircleIds || [movingCircleId]
-            let nextCircles = next.circles
-            for (const cid of draggedCircleIds) {
-              const circlesById = new Map(nextCircles.map((c) => [c.id, c]))
-              const isDescendant = (childId: string, parentId: string): boolean => {
-                let curr: string | null = childId
-                while (curr) {
-                  if (curr === parentId) return true
-                  curr = circlesById.get(curr)?.parentId ?? null
-                }
-                return false
-              }
-              const circle = nextCircles.find((c) => c.id === cid)
-              if (circle) {
-                const innermost = nextCircles
-                  .filter((c) => c.id !== cid && !isDescendant(c.id, cid) && Math.hypot(circle.x - c.x, circle.y - c.y) <= c.radius)
-                  .sort((a, b) => a.radius - b.radius)[0]
-                const nextParentId = innermost ? innermost.id : null
-                nextCircles = nextCircles.map((c) => c.id === cid ? { ...c, parentId: nextParentId } : c)
-              }
+            const circle = nextCircles.find((c) => c.id === cid)
+            if (circle) {
+              const innermost = nextCircles
+                .filter((c) => c.id !== cid && !isDescendant(c.id, cid) && Math.hypot(circle.x - c.x, circle.y - c.y) <= c.radius)
+                .sort((a, b) => a.radius - b.radius)[0]
+              const nextParentId = innermost ? innermost.id : null
+              nextCircles = nextCircles.map((c) => c.id === cid ? { ...c, parentId: nextParentId } : c)
             }
-            next = { ...next, circles: nextCircles }
           }
+          next = { ...next, circles: nextCircles }
         }
         return settleInteractionGraph(next)
       })
@@ -3836,7 +3879,15 @@ function App() {
 
     if (pendingSelectRef.current) {
       if (boardToolMode !== 'select') {
-        selectItem(pendingSelectRef.current)
+        const pendingSelection = pendingSelectRef.current
+        const selectionChanged =
+          pendingSelection.type !== selectedItem?.type ||
+          pendingSelection.id !== selectedItem?.id ||
+          (pendingSelection.type === 'circle' &&
+            selectedItem?.type === 'circle' &&
+            pendingSelection.showHandles !== selectedItem.showHandles)
+
+        selectItem(pendingSelection)
 
         const dragDistance = activeMovePerson
           ? Math.hypot(event.clientX - activeMovePerson.startX, event.clientY - activeMovePerson.startY)
@@ -3847,14 +3898,35 @@ function App() {
               : 0
 
         if (dragDistance < 25) {
-          if (pendingSelectRef.current.type === 'person') {
-            const person = graph.people.find((p) => p.id === pendingSelectRef.current!.id)
+          if (pendingSelection.type === 'person') {
+            const person = graph.people.find((p) => p.id === pendingSelection.id)
             if (person) {
-              focusCameraOnWorld(person.x, person.y, cameraRef.current.scale)
+              const now = Date.now()
+              const lastTap = lastPersonTapRef.current
+              const isDoubleTap =
+                lastTap?.personId === person.id &&
+                now - lastTap.time <= PERSON_DOUBLE_TAP_MS &&
+                Math.hypot(event.clientX - lastTap.x, event.clientY - lastTap.y) <= PERSON_DOUBLE_TAP_DISTANCE
+
+              if (isDoubleTap) {
+                lastPersonTapRef.current = null
+                requestInspectorNameFocus(person.id)
+              } else {
+                lastPersonTapRef.current = {
+                  personId: person.id,
+                  time: now,
+                  x: event.clientX,
+                  y: event.clientY,
+                }
+              }
+
+              if (selectionChanged) {
+                focusCameraOnWorld(person.x, person.y, cameraRef.current.scale)
+              }
             }
-          } else if (pendingSelectRef.current.type === 'circle') {
-            const circle = graph.circles.find((c) => c.id === pendingSelectRef.current!.id)
-            if (circle) {
+          } else if (pendingSelection.type === 'circle') {
+            const circle = graph.circles.find((c) => c.id === pendingSelection.id)
+            if (circle && selectionChanged) {
               focusCameraOnWorld(circle.x, circle.y, cameraRef.current.scale)
             }
           }
@@ -4141,12 +4213,21 @@ function App() {
       y: event.clientY,
     }, hoveredCircleEdgeIdRef.current)
 
+    if (hit?.type === 'person') {
+      event.preventDefault()
+      setSelectedPeopleIds([])
+      setSelectedCircleIds([])
+      selectItem({ type: 'person', id: hit.person.id })
+      focusCameraOnWorld(hit.person.x, hit.person.y, cameraRef.current.scale)
+      lastPersonTapRef.current = null
+      requestInspectorNameFocus(hit.person.id)
+      return
+    }
+
     // An empty-space tap yields no owning circle (''), so the person stays put.
     let circleId = ''
     if (hit && (hit.type === 'circle-body' || hit.type === 'circle-center' || hit.type === 'circle-edge')) {
       circleId = hit.circle.id
-    } else if (hit && hit.type === 'person') {
-      circleId = hit.person.circleId ?? ''
     }
 
     const world = screenToWorld({ x: event.clientX, y: event.clientY })
@@ -4844,7 +4925,20 @@ Content-Type: application/json
           </button>
         </div>
       )}
-      {isTouchLayout && (
+      <div className="board-left-rail" aria-label="Board navigation">
+        <a
+          href="#"
+          className="board-home-button"
+          onClick={(event) => {
+            event.preventDefault()
+            window.location.hash = ''
+          }}
+          aria-label="Back to home"
+          title="Back to home"
+        >
+          <img src={sdnLogo} alt="" aria-hidden="true" />
+        </a>
+        {isTouchLayout && (
         <div className="board-mode-menu" aria-label="Board interaction mode">
           <button
             type="button"
@@ -4891,9 +4985,10 @@ Content-Type: application/json
             <PanIcon />
           </button>
         </div>
-      )}
+        )}
+      </div>
 
-      <div className="toolbar" aria-label="Graph controls" style={{ justifyContent: 'flex-end' }}>
+      <div className="toolbar" aria-label="Graph controls">
         <div
           ref={searchPanelRef}
           className={`search-box ${searchOpen ? 'is-open' : ''} ${isAiSearchActive ? 'is-ai-search' : ''}`}
@@ -5098,6 +5193,7 @@ Content-Type: application/json
           <button
             ref={settingsButtonRef}
             type="button"
+            className="attention-badge-wrap"
             onClick={() => {
               if (!showSettings) closeSearch()
               if (!showSettings) completeOnboardingAction('settings')
@@ -5107,31 +5203,11 @@ Content-Type: application/json
             style={{
               background: showSettings ? 'var(--md-secondary-container)' : 'transparent',
               color: showSettings ? 'var(--md-on-secondary-container)' : 'var(--md-on-surface-variant)',
-              position: 'relative',
             }}
           >
             <SettingsIcon />
-            {auth.status === 'anonymous' && (
-              <span
-                style={{
-                  position: 'absolute',
-                  top: '4px',
-                  right: '4px',
-                  width: '14px',
-                  height: '14px',
-                  borderRadius: '50%',
-                  backgroundColor: 'var(--md-error, #ba1a1a)',
-                  color: '#ffffff',
-                  fontSize: '10px',
-                  fontWeight: 'bold',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  border: '1.5px solid var(--md-surface-container, #ecedf2)',
-                  lineHeight: 1,
-                }}
-                aria-hidden="true"
-              >
+            {auth.status === 'anonymous' && highlightLinkedInGuideHelp && (
+              <span className="attention-badge attention-badge--toolbar" aria-hidden="true">
                 !
               </span>
             )}
@@ -5154,12 +5230,17 @@ Content-Type: application/json
                 </label>
                 <button
                   type="button"
-                  className={`linkedin-guide-help ${highlightLinkedInGuideHelp ? 'is-attention' : ''}`}
+                  className="linkedin-guide-help attention-badge-wrap"
                   aria-label="How to sync your LinkedIn"
                   title="How to sync your LinkedIn"
                   onClick={openLinkedInGuide}
                 >
                   ?
+                  {highlightLinkedInGuideHelp && (
+                    <span className="attention-badge attention-badge--compact" aria-hidden="true">
+                      !
+                    </span>
+                  )}
                 </button>
               </div>
               <button
@@ -5458,15 +5539,106 @@ Content-Type: application/json
       >
 
             {renderedInspectorItem.type !== 'connection' ? (
-              <input
-                className="inspector__name-input"
-                value={selectedCircle?.name ?? selectedPerson?.name ?? ''}
-                onChange={(event) => renameSelected(event.target.value)}
-                aria-label="Selected item name"
-              />
+              <div className="inspector-header">
+                {selectedPerson && (
+                  <div className="m3-avatar-picker-container">
+                    <label className="m3-avatar-picker" title="Upload person photo">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="m3-file-input-hidden"
+                        onChange={(e) => handleImageUpload(e, (base64) => updatePersonStyle(selectedPerson.id, { imageUrl: base64 }))}
+                      />
+                      {selectedPerson.imageUrl ? (
+                        <img src={selectedPerson.imageUrl} alt="Person avatar" />
+                      ) : (
+                        <svg className="m3-avatar-picker-default-icon" viewBox="0 0 24 24">
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                          <circle cx="12" cy="7" r="4" />
+                        </svg>
+                      )}
+                      <div className="m3-avatar-picker-overlay">
+                        <UploadIcon />
+                      </div>
+                    </label>
+                  </div>
+                )}
+                {selectedCircle && (
+                  <div className="m3-avatar-picker-container">
+                    <label className="m3-avatar-picker" title="Upload circle photo">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="m3-file-input-hidden"
+                        onChange={(e) => handleImageUpload(e, (base64) => updateCircleStyle(selectedCircle.id, { imageUrl: base64 }))}
+                      />
+                      {selectedCircle.imageUrl ? (
+                        <img src={selectedCircle.imageUrl} alt="Circle avatar" />
+                      ) : (
+                        <svg className="m3-avatar-picker-default-icon" viewBox="0 0 24 24">
+                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                          <circle cx="8.5" cy="8.5" r="1.5" />
+                          <polyline points="21 15 16 10 5 21" />
+                        </svg>
+                      )}
+                      <div className="m3-avatar-picker-overlay">
+                        <UploadIcon />
+                      </div>
+                    </label>
+                  </div>
+                )}
+                <input
+                  ref={inspectorNameInputRef}
+                  className="inspector__name-input"
+                  value={selectedCircle?.name ?? selectedPerson?.name ?? ''}
+                  onChange={(event) => renameSelected(event.target.value)}
+                  aria-label="Selected item name"
+                />
+                <div className="inspector-header-actions">
+                  {selectedPerson && (
+                    <button
+                      type="button"
+                      className={`star-favorite-btn-inline ${selectedPerson.isFavorite ? 'is-active' : ''}`}
+                      onClick={() => togglePersonFavorite(selectedPerson.id)}
+                      title={selectedPerson.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                    >
+                      <svg viewBox="0 0 24 24">
+                        <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                      </svg>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="inspector-close-btn"
+                    onClick={() => {
+                      setSelectedPeopleIds([])
+                      setSelectedCircleIds([])
+                      selectItem(null)
+                    }}
+                    title="Close details"
+                  >
+                    <CloseIcon />
+                  </button>
+                </div>
+              </div>
             ) : (
-              <div style={{ fontSize: '15px', fontWeight: 500, padding: '4px 0 12px 0', borderBottom: '1px solid color-mix(in srgb, var(--md-on-surface) 8%, transparent)', marginBottom: '8px' }}>
-                Relationship Link
+              <div className="inspector-header">
+                <div style={{ fontSize: '15px', fontWeight: 500, padding: '4px 0', flex: 1 }}>
+                  Relationship Link
+                </div>
+                <button
+                  type="button"
+                  className="inspector-close-btn"
+                  onClick={() => {
+                    setSelectedPeopleIds([])
+                    setSelectedCircleIds([])
+                    selectItem(null)
+                  }}
+                  title="Close details"
+                  style={{ marginTop: '-4px' }}
+                >
+                  <CloseIcon />
+                </button>
               </div>
             )}
             
@@ -5610,29 +5782,6 @@ Content-Type: application/json
                             />
                           </div>
                         </div>
-
-                        <div className="m3-avatar-picker-container">
-                          <label className="m3-avatar-picker" title="Upload circle photo">
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="m3-file-input-hidden"
-                              onChange={(e) => handleImageUpload(e, (base64) => updateCircleStyle(selectedCircle.id, { imageUrl: base64 }))}
-                            />
-                            {selectedCircle.imageUrl ? (
-                              <img src={selectedCircle.imageUrl} alt="Circle avatar" />
-                            ) : (
-                              <svg className="m3-avatar-picker-default-icon" viewBox="0 0 24 24">
-                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                                <circle cx="8.5" cy="8.5" r="1.5" />
-                                <polyline points="21 15 16 10 5 21" />
-                              </svg>
-                            )}
-                            <div className="m3-avatar-picker-overlay">
-                              <UploadIcon />
-                            </div>
-                          </label>
-                        </div>
                       </div>
                     </div>
                   )
@@ -5742,19 +5891,7 @@ Content-Type: application/json
 
             {selectedPerson && (
               <>
-                {/* Favorite Star Button at top-right of inspector */}
-                <button
-                  type="button"
-                  className={`star-favorite-btn ${selectedPerson.isFavorite ? 'is-active' : ''}`}
-                  onClick={() => togglePersonFavorite(selectedPerson.id)}
-                  title={selectedPerson.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-                >
-                  <svg viewBox="0 0 24 24">
-                    <path
-                      d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
-                    />
-                  </svg>
-                </button>
+
 
                 {/* Visual Settings Row: Select Circle + Avatar Photo Upload */}
                 {(() => {
@@ -5832,28 +5969,6 @@ Content-Type: application/json
                            )}
                          </div>
                        </div>
-
-                      <div className="m3-avatar-picker-container">
-                        <label className="m3-avatar-picker" title="Upload person photo">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="m3-file-input-hidden"
-                            onChange={(e) => handleImageUpload(e, (base64) => updatePersonStyle(selectedPerson.id, { imageUrl: base64 }))}
-                          />
-                          {selectedPerson.imageUrl ? (
-                            <img src={selectedPerson.imageUrl} alt="Person avatar" />
-                          ) : (
-                            <svg className="m3-avatar-picker-default-icon" viewBox="0 0 24 24">
-                              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                              <circle cx="12" cy="7" r="4" />
-                            </svg>
-                          )}
-                          <div className="m3-avatar-picker-overlay">
-                            <UploadIcon />
-                          </div>
-                        </label>
-                      </div>
                     </div>
                   );
                 })()}

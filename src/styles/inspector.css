@@ -363,3 +363,105 @@
     overflow-y: auto;
   }
 }
+
+/* Inspector Header Layout */
+.inspector-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 12px;
+  box-sizing: border-box;
+}
+
+.inspector-header .m3-avatar-picker-container {
+  flex-shrink: 0;
+}
+
+.inspector-header .m3-avatar-picker {
+  width: 40px;
+  height: 40px;
+}
+
+.inspector-header .inspector__name-input {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+  padding: 6px 8px; /* Override large right padding since favorite/close are separate */
+}
+
+.inspector-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.inspector-close-btn,
+.star-favorite-btn-inline {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: var(--md-r-full);
+  background: transparent;
+  border: 1.5px solid var(--md-outline-variant);
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  outline: none;
+  box-sizing: border-box;
+  padding: 0;
+  transition:
+    background-color var(--md-dur-short) var(--md-ease-standard),
+    border-color var(--md-dur-short) var(--md-ease-standard),
+    transform var(--md-dur-short) var(--md-ease-spring),
+    color var(--md-dur-short) var(--md-ease-standard);
+}
+
+.inspector-close-btn:hover,
+.star-favorite-btn-inline:hover {
+  background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+  border-color: var(--md-outline);
+}
+
+.inspector-close-btn:active,
+.star-favorite-btn-inline:active {
+  transform: scale(0.9);
+}
+
+.inspector-close-btn svg,
+.star-favorite-btn-inline svg {
+  width: 18px;
+  height: 18px;
+}
+
+.inspector-close-btn svg {
+  stroke: currentColor;
+  stroke-width: 2.5;
+  fill: none;
+}
+
+.star-favorite-btn-inline svg path {
+  fill: none;
+  stroke: var(--md-on-surface-variant);
+  stroke-width: 2;
+  transition: fill var(--md-dur-short) var(--md-ease-standard), stroke var(--md-dur-short) var(--md-ease-standard);
+}
+
+/* Active favorite state */
+.star-favorite-btn-inline.is-active {
+  background-color: var(--md-primary);
+  border-color: var(--md-primary);
+  color: var(--md-on-primary);
+}
+
+.star-favorite-btn-inline.is-active svg path {
+  fill: var(--md-on-primary);
+  stroke: var(--md-on-primary);
+}
+
+.star-favorite-btn-inline.is-active:hover {
+  background-color: color-mix(in srgb, var(--md-on-primary) 8%, var(--md-primary));
+  border-color: color-mix(in srgb, var(--md-on-primary) 8%, var(--md-primary));
+}
+
