@@ -5514,26 +5514,6 @@ Content-Type: application/json
                             <PaletteIcon />
                           </button>
                         </div>
-                        {(() => {
-                          const isTransparent = (selectedCircle.fillMode ?? circleFillMode) === 'transparent';
-                          const buttonBg = isTransparent ? selectedCircleColors.fill : selectedCircleColors.centerBg;
-                          const buttonBorderColor = isTransparent ? 'var(--md-outline-variant)' : selectedCircleColors.centerBg;
-                          return (
-                            <button
-                              type="button"
-                              className={`circle-fill-toggle ${isTransparent ? 'is-transparent' : 'is-solid'}`}
-                              style={{
-                                backgroundColor: buttonBg,
-                                borderColor: buttonBorderColor,
-                              }}
-                              onClick={() => updateCircleStyleAndCreationDefaults(selectedCircle.id, { fillMode: isTransparent ? 'solid' : 'transparent' })}
-                              title={isTransparent ? 'Switch to solid fill' : 'Switch to transparent fill'}
-                              aria-label={isTransparent ? 'Switch to solid fill' : 'Switch to transparent fill'}
-                            >
-                              <TransparencyIcon />
-                            </button>
-                          );
-                        })()}
                         <div className={`circle-style-popover ${showCircleStylePanel ? 'is-open' : ''}`}>
                           <div className="circle-style-theme-tabs">
                             <SelectionIndicator
@@ -7573,60 +7553,6 @@ function PaletteIcon() {
       <circle cx="8.5" cy="7.5" r=".5" />
       <circle cx="6.5" cy="12.5" r=".5" />
       <path d="M12 3a9 9 0 0 0 0 18h1.6a2.4 2.4 0 0 0 1.7-4.1l-.4-.4a1.2 1.2 0 0 1 .8-2h1.8A3.5 3.5 0 0 0 21 11c0-4.4-4-8-9-8Z" />
-    </svg>
-  )
-}
-
-function TransparencyIcon() {
-  return (
-    <svg
-      className="eraser-icon"
-      viewBox="0 0 12 10"
-      aria-hidden="true"
-    >
-      <path
-        d="M4.94975 9.19239C4.55922 9.58291 3.92606 9.58291 3.53553 9.19239L0.707108 6.36396C0.316583 5.97344 0.316583 5.34027 0.707108 4.94975L4.94975 0.707108C5.34027 0.316584 5.97344 0.316584 6.36396 0.707108L9.19239 3.53553C9.58291 3.92606 9.58291 4.55922 9.19239 4.94975L4.94975 9.19239Z"
-        fill="#595959"
-      />
-      <path
-        d="M10 6L9.2758 7.30357C9.10958 7.60275 9.14445 7.97335 9.36356 8.23627C9.69477 8.63373 10.3052 8.63373 10.6364 8.23627C10.8555 7.97335 10.8904 7.60275 10.7242 7.30357L10 6Z"
-        fill="#1F1F1F"
-        stroke="#1F1F1F"
-      />
-      <mask
-        id="mask0_5_7"
-        style={{ maskType: 'alpha' }}
-        maskUnits="userSpaceOnUse"
-        x="0"
-        y="0"
-        width="10"
-        height="10"
-      >
-        <path
-          d="M4.94975 9.19239C4.55922 9.58291 3.92606 9.58291 3.53553 9.19239L0.707108 6.36396C0.316583 5.97344 0.316583 5.34027 0.707108 4.94975L4.94975 0.707108C5.34027 0.316584 5.97344 0.316584 6.36396 0.707108L9.19239 3.53553C9.58291 3.92606 9.58291 4.55922 9.19239 4.94975L4.94975 9.19239Z"
-          fill="#595959"
-        />
-      </mask>
-      <g mask="url(#mask0_5_7)">
-        <g filter="url(#filter0_f_5_7)">
-          <rect y="6" width="9" height="5" fill="black" />
-        </g>
-      </g>
-      <defs>
-        <filter
-          id="filter0_f_5_7"
-          x="-4"
-          y="2"
-          width="17"
-          height="13"
-          filterUnits="userSpaceOnUse"
-          colorInterpolationFilters="sRGB"
-        >
-          <feFlood floodOpacity={0} result="BackgroundImageFix" />
-          <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
-          <feGaussianBlur stdDeviation="2" result="effect1_foregroundBlur_5_7" />
-        </filter>
-      </defs>
     </svg>
   )
 }

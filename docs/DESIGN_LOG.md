@@ -17,6 +17,13 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-07-02 — Remove circle fill quick toggle
+
+- Decision: Removed the standalone transparent/solid fill toggle from the inspector quick
+  color row. Fill mode remains available in the palette popover.
+- Why: The extra icon button duplicated the popover control and made the quick color row
+  visually noisy.
+
 ### 2026-07-02 — Color swatches stay round when selected
 
 - Decision: Replaced the selected color swatch shape-morph with a compact primary-color

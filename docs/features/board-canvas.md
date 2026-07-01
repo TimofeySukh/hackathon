@@ -105,8 +105,8 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
 - **Labels**: circle and person labels render on the canvas when zoom permits; center icon
   text scales with the world transform.
 - **Circle design**: newly loaded and newly created circles default to transparent clean
-  circles. Per-circle fill, waviness, edges, and color are edited in the inspector quick
-  card and palette popover.
+  circles. Quick colors sit directly in the inspector; fill, custom color, waviness, and
+  edges are edited in the palette popover.
 - **Favorite**: favorited people show a thicker neon-yellow outline on the canvas.
 - **Avatar fallback**: remote person avatar URLs render initials until the image loads,
   and keep initials if the image fails, so imported profiles never draw as empty chips.
