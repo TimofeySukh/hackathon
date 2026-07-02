@@ -2,12 +2,10 @@ import { Fragment, type MouseEvent } from 'react'
 import sdnLogo from './assets/sdn-logo.svg'
 import productBoardInspector from './assets/landing/product-board-inspector.png'
 
-const BOARD_ONBOARDING_FORCE_KEY = 'social-board-onboarding-open-v3'
-
 const HOW_IT_WORKS_STEPS = [
   {
-    title: 'Learn the controls first',
-    body: 'Open the board with a short guide for zooming, moving, creating circles, and selecting an area.',
+    title: 'Start on your real board',
+    body: 'Open the board directly. Lightweight hints point out panning, creating circles, and selecting an area as you work.',
   },
   {
     title: 'Start with one person',
@@ -81,11 +79,6 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
 
   const handleLaunchApp = (e: MouseEvent) => {
     e.preventDefault()
-    try {
-      window.sessionStorage.setItem(BOARD_ONBOARDING_FORCE_KEY, '1')
-    } catch {
-      // ignore
-    }
     window.location.hash = '#board'
   }
 
@@ -163,9 +156,9 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
               </div>
               <div className="landing-hero-actions">
                 <button type="button" className="lp-btn lp-btn-filled landing-hero-cta" onClick={handleLaunchApp}>
-                  Open guided board
+                  Open board
                 </button>
-                <p className="landing-hero-note">The first board opens with a short control guide. Sign in later only if you want private sync.</p>
+                <p className="landing-hero-note">Start on your own board with lightweight hints. Sign in later only if you want private sync.</p>
               </div>
             </div>
             <figure className="board-preview-frame" aria-label="Product preview">
@@ -270,10 +263,10 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
           <span className="demo-eyebrow">Ready when you are</span>
           <h2 id="final-cta-title" className="section-title">Open the board and place the first person</h2>
           <p className="section-lead">
-            Start anonymously in this browser with the guide on screen. Sign in later if the map becomes something you want to keep in sync.
+            Start anonymously in this browser with progressive hints on screen. Sign in later if the map becomes something you want to keep in sync.
           </p>
           <button type="button" className="lp-btn lp-btn-filled final-cta-button" onClick={handleLaunchApp}>
-            Open guided board
+            Open board
           </button>
         </section>
       </main>

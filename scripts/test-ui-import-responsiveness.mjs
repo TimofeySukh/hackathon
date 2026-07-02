@@ -139,7 +139,16 @@ async function main() {
 
     await page.addInitScript(() => {
       window.localStorage.clear()
-      window.localStorage.setItem('social-board-onboarding-done-v3', '1')
+      window.localStorage.setItem('social-board-progressive-hints-done-v1', JSON.stringify([
+        'pan',
+        'create-person',
+        'create-circle',
+        'select-area',
+        'search',
+        'linkedin-profile',
+        'settings',
+        'linkedin-archive',
+      ]))
     })
 
     await page.goto(`${server.url}/#board`, { waitUntil: 'networkidle' })
