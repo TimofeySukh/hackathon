@@ -5943,6 +5943,23 @@ Content-Type: application/json
                               />
                             )
                           })}
+                          {CIRCLE_COLOR_PRESETS.slice(0, 8).map((color) => {
+                            const id = `quick-preset:${color.toLowerCase()}`
+                            return (
+                              <button
+                                key={color}
+                                type="button"
+                                data-ind-key={id}
+                                className={`quick-circle-color ${selectedCircle.customColor?.toLowerCase() === color.toLowerCase() ? 'is-selected' : ''} ${pressingSwatchId === id ? 'is-pressing' : ''} ${returningSwatchId === id ? 'is-returning' : ''}`}
+                                style={{ backgroundColor: color }}
+                                onPointerDown={() => handleSwatchPointerDown(id, () => animateCircleColor(selectedCircle.id, { customColor: color }))}
+                                onPointerUp={() => handleSwatchPointerUp(id)}
+                                onPointerLeave={() => handleSwatchPointerUp(id)}
+                                onPointerCancel={() => handleSwatchPointerUp(id)}
+                                aria-label={`Set quick color ${color}`}
+                              />
+                            )
+                          })}
                           <button
                             type="button"
                             className={`quick-circle-color quick-circle-color--more ${selectedCircle.customColor ? 'is-selected is-custom-color' : ''} ${showCircleStylePanel ? 'is-open' : ''}`}
@@ -6448,7 +6465,7 @@ Content-Type: application/json
                       }}
                     />
                     <button type="button" onClick={() => handleSaveNewLink(selectedPerson.id)}>
-                      Save
+                      Add
                     </button>
                   </div>
                   {showLinkServicePicker && (

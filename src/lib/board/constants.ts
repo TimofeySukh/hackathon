@@ -88,9 +88,10 @@ export function randomCircleTone(): CircleTone {
   return CIRCLE_TONES[Math.floor(Math.random() * CIRCLE_TONES.length)]
 }
 
-// The picker shows the first 8 of these as presets. They are deliberately
-// distinct from the five quick-swatch tones (blue/red/green/amber/violet) so the
-// presets add reach instead of repeating colors already one tap away.
+// The quick circle menu and picker show the first 8 of these as presets. They
+// are deliberately distinct from the five tone swatches (blue/red/green/amber/
+// violet) so the presets add reach instead of repeating colors already one tap
+// away.
 export const CIRCLE_COLOR_PRESETS = [
   '#00897B', // teal
   '#00838F', // cyan

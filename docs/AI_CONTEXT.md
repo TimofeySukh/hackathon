@@ -112,8 +112,8 @@ Safety invariants:
   lookup, Search-based LinkedIn profile import, Settings, and the LinkedIn archive sync
   guide.
 - Guide steps show a blue completed state with a checkmark for one second after the
-  matching action is performed, then auto-advance; the visible button skips a step
-  manually.
+  matching action is performed, then auto-advance; the visible `Next` button advances a
+  step manually.
 - Landing page board CTAs force-open the guide for that launch.
 - For signed-out/local users, the board toolbar Help button reopens the guide. Signed-in
   users do not see this toolbar Help button.

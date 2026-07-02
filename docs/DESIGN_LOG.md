@@ -17,6 +17,16 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-07-02 — Quick circle colors and connection add copy
+
+- Decision: The compact circle menu now exposes the five saved tone swatches plus the
+  first eight custom color presets directly, wrapping as needed instead of leaving empty
+  card space.
+- Decision: The connection composer action is labelled `Add`, matching the notes
+  composer and the action it performs.
+- Why: The compact circle menu had room for more useful direct choices, and `Save` read
+  like editing existing data rather than adding a new connection.
+
 ### 2026-07-02 — Mobile onboarding and inspector action polish
 
 - Decision: The onboarding coach primary action now says `Next` until the final `Done`
@@ -603,8 +613,8 @@ rediscover, write it here.
   caret. Note text bumped to on-scale 14px (body-medium); the card stays `--md-r-md`.
 - **Local rule — notes/connections menu uses rectangular buttons, not pills.** Within the
   inspector notes + connections composer, the action buttons (`.trello-list__composer-add-btn`
-  "Save note", `.trello-list__composer-cancel-btn` discard, `.trello-list__add-btn` new note,
-  and `.connection-composer button` Save) are `--md-r-sm` (8px) to match the rounded-rectangle
+  "Add", `.trello-list__composer-cancel-btn` discard, `.trello-list__add-btn` new note,
+  and `.connection-composer button` Add) are `--md-r-sm` (8px) to match the rounded-rectangle
   fields in the same dense panel. This is a deliberate deviation from the global "buttons are
   pills" rule, scoped to this menu only, for shape consistency with the fields next to them.
 - Audit pass: fixed the color-select dropdown (`.custom-select-dropdown`) from hardcoded
