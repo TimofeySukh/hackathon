@@ -677,6 +677,10 @@ input[type="range"]::-webkit-slider-thumb:active {
   min-width: 0;
 }
 
+.inspector-visual-row--person {
+  align-items: stretch;
+}
+
 .inspector-field--circle-select {
   flex: 1 1 auto;
   min-width: 0;

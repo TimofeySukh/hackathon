@@ -36,8 +36,8 @@ creating people and circles, moving/resizing zones, selecting an area, adding a 
     selection.
   - Mobile explains the top-left modes: Edit, Select, and Pan, plus two-finger pinch zoom.
 - Each step turns into a blue completed state with a checkmark for one second when the
-  matching action is performed, then auto-advances. The visible `Skip` button is only a
-  manual bypass for users who already know that control.
+  matching action is performed, then auto-advances. The primary `Next` button manually
+  advances one step; dismissing the guide still happens through the close button.
 - The Search flow is split into two steps: first choose a demo person already on the board,
   then add someone with a LinkedIn profile link. Empty Search shows demo people on the
   first step and Timofey Sukhov / Velizar Seleznev LinkedIn examples on the second.
@@ -59,7 +59,7 @@ creating people and circles, moving/resizing zones, selecting an area, adding a 
   `ResizeObserver` in `App.tsx` sets `--onboarding-dock-offset` from the measured panel
   height. The Settings step uses a top sheet when no bottom panel is open so the gear
   icon stays visible.
-- The guide uses local progress dots, a dismiss button, and `Back` / `Skip` / `Done`
+- The guide uses local progress dots, a dismiss button, and `Back` / `Next` / `Done`
   actions. It does not block board interaction outside the card.
 
 ## Code

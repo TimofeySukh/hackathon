@@ -1910,25 +1910,6 @@ function App() {
     selectItem(null)
   }
 
-  function togglePersonFavorite(personId: string) {
-    const person = graph.people.find((p) => p.id === personId)
-    const becomingFavorite = !person?.isFavorite
-    pushHistory()
-    setGraph((current) => ({
-      ...current,
-      people: current.people.map((p) =>
-        p.id === personId ? { ...p, isFavorite: !p.isFavorite } : p
-      ),
-    }))
-    if (becomingFavorite) {
-      startBoardAnim(`favorite-in:${personId}`, 540)
-    } else {
-      startBoardAnim(`favorite-out:${personId}`, 360)
-    }
-  }
-  // Reference to bypass noUnusedLocals error while favorite UI is commented out
-  void togglePersonFavorite;
-
   function addPersonNote(personId: string, title: string, body: string) {
     pushHistory()
     setGraph((current) => ({
@@ -2632,8 +2613,9 @@ function App() {
     }
 
     const updateDock = () => {
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight
       const dockCandidates: HTMLElement[] = []
-      if (isInspectorOpen && inspectorPanelRef.current) {
+      if ((isInspectorOpen || selectedItem) && inspectorPanelRef.current) {
         dockCandidates.push(inspectorPanelRef.current)
       }
       if (createMenu && createMenuRef.current) {
@@ -2646,7 +2628,7 @@ function App() {
         dockCandidates.push(mergePromptRef.current)
       }
 
-      let nearestTop = window.innerHeight
+      let nearestTop = viewportHeight
       for (const element of dockCandidates) {
         const rect = element.getBoundingClientRect()
         if (rect.height > 8 && rect.width > 8) {
@@ -2654,8 +2636,8 @@ function App() {
         }
       }
 
-      if (nearestTop < window.innerHeight - 1) {
-        const bottomOffset = window.innerHeight - nearestTop + ONBOARDING_DOCK_GAP_PX
+      if (nearestTop < viewportHeight - 1) {
+        const bottomOffset = viewportHeight - nearestTop + ONBOARDING_DOCK_GAP_PX
         const maxHeight = Math.max(
           140,
           nearestTop - ONBOARDING_TOP_CHROME_CLEARANCE_PX - ONBOARDING_DOCK_GAP_PX,
@@ -2672,6 +2654,8 @@ function App() {
     }
 
     updateDock()
+    const dockFrame = window.requestAnimationFrame(updateDock)
+    const dockSettleTimer = window.setTimeout(updateDock, 260)
     const resizeObserver = new ResizeObserver(updateDock)
     for (const element of [
       inspectorPanelRef.current,
@@ -2682,10 +2666,17 @@ function App() {
       if (element) resizeObserver.observe(element)
     }
 
+    const visualViewport = window.visualViewport
     window.addEventListener('resize', updateDock)
+    visualViewport?.addEventListener('resize', updateDock)
+    visualViewport?.addEventListener('scroll', updateDock)
     return () => {
+      window.cancelAnimationFrame(dockFrame)
+      window.clearTimeout(dockSettleTimer)
       resizeObserver.disconnect()
       window.removeEventListener('resize', updateDock)
+      visualViewport?.removeEventListener('resize', updateDock)
+      visualViewport?.removeEventListener('scroll', updateDock)
       shell.style.removeProperty('--onboarding-dock-offset')
       shell.style.removeProperty('--onboarding-coach-max-height')
       setOnboardingDocked(false)
@@ -2699,6 +2690,7 @@ function App() {
     selectedPeopleIds.length,
     selectedCircleIds.length,
     renderedInspectorItem,
+    selectedItem,
   ])
 
   const sortedCircles = useMemo(() => {
@@ -3189,6 +3181,23 @@ function App() {
     boardAnimsRef.current.set(key, { start: -1, duration, morph })
     if (boardAnimRafRef.current == null) {
       boardAnimRafRef.current = window.requestAnimationFrame(tickBoardAnims)
+    }
+  }
+
+  function togglePersonFavorite(personId: string) {
+    const person = graph.people.find((p) => p.id === personId)
+    const becomingFavorite = !person?.isFavorite
+    pushHistory()
+    setGraph((current) => ({
+      ...current,
+      people: current.people.map((p) =>
+        p.id === personId ? { ...p, isFavorite: !p.isFavorite } : p
+      ),
+    }))
+    if (becomingFavorite) {
+      startBoardAnim(`favorite-in:${personId}`, 540)
+    } else {
+      startBoardAnim(`favorite-out:${personId}`, 360)
     }
   }
 
@@ -5869,20 +5878,6 @@ Content-Type: application/json
                   aria-label="Selected item name"
                 />
                 <div className="inspector-header-actions">
-                  {/* Hide favorite star button for now (keep code as requested)
-                  {selectedPerson && (
-                    <button
-                      type="button"
-                      className={`star-favorite-btn-inline ${selectedPerson.isFavorite ? 'is-active' : ''}`}
-                      onClick={() => togglePersonFavorite(selectedPerson.id)}
-                      title={selectedPerson.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-                    >
-                      <svg viewBox="0 0 24 24">
-                        <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
-                      </svg>
-                    </button>
-                  )}
-                  */}
                   <button
                     type="button"
                     className="inspector-close-btn"
@@ -6179,7 +6174,7 @@ Content-Type: application/json
                   const personCircle = circlesById.get(selectedPerson.circleId)
                   const toneColors = personCircle ? getCircleColors(personCircle) : null
                   return (
-                    <div className="inspector-visual-row">
+                    <div className="inspector-visual-row inspector-visual-row--person">
                       <div className="inspector-field inspector-field--circle-select">
                         <div className="custom-select-wrap">
                            <button
@@ -6250,6 +6245,17 @@ Content-Type: application/json
                            )}
                          </div>
                        </div>
+                      <button
+                        type="button"
+                        className={`star-favorite-btn-inline star-favorite-btn-inline--row ${selectedPerson.isFavorite ? 'is-active' : ''}`}
+                        onClick={() => togglePersonFavorite(selectedPerson.id)}
+                        title={selectedPerson.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                        aria-label={selectedPerson.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                      >
+                        <svg viewBox="0 0 24 24">
+                          <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                        </svg>
+                      </button>
                     </div>
                   );
                 })()}
@@ -6359,7 +6365,7 @@ Content-Type: application/json
                           className="trello-list__composer-add-btn"
                           onClick={() => handleSaveNewNote(selectedPerson.id)}
                         >
-                          Save note
+                          Add
                         </button>
                         <button
                           type="button"

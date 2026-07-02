@@ -59,7 +59,7 @@ export function OnboardingCoach({ surface, step, completed, onNext, onBack, onSk
             </button>
           )}
           <button type="button" className="onboarding-coach__primary" onClick={onNext} disabled={completed}>
-            {isLast ? 'Done' : 'Skip'}
+            {isLast ? 'Done' : 'Next'}
           </button>
         </div>
       </div>

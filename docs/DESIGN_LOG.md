@@ -17,6 +17,18 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-07-02 — Mobile onboarding and inspector action polish
+
+- Decision: The onboarding coach primary action now says `Next` until the final `Done`
+  step; the close button remains the all-guide dismiss affordance.
+- Decision: On touch layouts, the coach has a CSS fallback that lifts it above an open
+  inspector even before JS dock measurements settle, and the circle customizer clamps its
+  height to the visible viewport so advanced controls scroll instead of being clipped.
+- Decision: The person inspector surfaces Favorite as a same-height action next to the
+  circle dropdown, and the note composer action is labelled `Add`.
+- Why: `Skip` read as skipping the whole guide, the favorite control needed parity with
+  the circle selector row, and bottom overlays should not cover each other on phones.
+
 ### 2026-07-02 — Onboarding cancels on authentication and skips auto-open
 
 - Decision: Authenticated users will not have the onboarding guide automatically launch. If an anonymous user signs in while onboarding is active, the guide is immediately cancelled, the demo data is discarded, and the authenticated graph is loaded.

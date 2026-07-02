@@ -201,6 +201,7 @@
 .inspector.is-open {
   opacity: 1;
   transform: none;
+  will-change: auto;
   pointer-events: auto;
 }
 
@@ -426,6 +427,12 @@
     color var(--md-dur-short) var(--md-ease-standard);
 }
 
+.star-favorite-btn-inline--row {
+  width: var(--inspector-control-height, 40px);
+  height: var(--inspector-control-height, 40px);
+  flex: 0 0 var(--inspector-control-height, 40px);
+}
+
 .inspector-close-btn:hover,
 .star-favorite-btn-inline:hover {
   background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
@@ -472,4 +479,3 @@
   background-color: color-mix(in srgb, var(--md-on-primary) 8%, var(--md-primary));
   border-color: color-mix(in srgb, var(--md-on-primary) 8%, var(--md-primary));
 }
-
