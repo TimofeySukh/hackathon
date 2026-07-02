@@ -5000,13 +5000,6 @@ Content-Type: application/json
           </button>
         </div>
         )}
-        {graphLoaded && !isTouchLayout && (
-          <ProgressiveHints
-            surface={onboardingSurface}
-            hints={visibleOnboardingHints}
-            completingHintIds={completingHintIds}
-          />
-        )}
       </div>
 
       <div className="toolbar" aria-label="Graph controls">
@@ -5221,6 +5214,14 @@ Content-Type: application/json
           </button>
         </div>
       </div>
+
+      {graphLoaded && !isTouchLayout && (
+        <ProgressiveHints
+          surface={onboardingSurface}
+          hints={visibleOnboardingHints}
+          completingHintIds={completingHintIds}
+        />
+      )}
 
       {graphLoaded && isTouchLayout && (
         <ProgressiveHints

@@ -17,7 +17,7 @@ archive sync guide.
 - Hint completion is stored locally under `social-board-progressive-hints-done-v1`.
 - Triggered hints flash in the Material 3 primary color for about 850ms, then are marked
   complete and removed from the list.
-- Desktop shows up to five unfinished hints in a narrow column under the left board rail.
+- Desktop shows up to five unfinished hints in a narrow column in the bottom-left corner.
 - Touch/mobile layouts show only the next unfinished hint as a compact row below the top
   toolbar. The desktop hint column is not reused on phones.
 - The toolbar Help button for signed-out/local users resets the completed hint list so
@@ -35,7 +35,7 @@ archive sync guide.
 
 - Progressive hints are not cards, modals, sheets, or a slideshow. They have no dots,
   Skip, Done, or Back controls.
-- Desktop hints sit under the left rail so they do not cover Search, Settings, or the
+- Desktop hints sit in the bottom-left corner so they do not cover Search, Settings, or the
   inspector.
 - Mobile shows one hint because the left rail, toolbar, and bottom panels already compete
   for space.
