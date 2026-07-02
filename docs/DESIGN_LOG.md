@@ -17,6 +17,25 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-07-02 — Board chrome uses shared size tokens
+
+- Decision: Board floating chrome now shares `--board-chrome-*` tokens for outer shell
+  size, inner icon size, padding, and radius. Expanded mobile search also uses shared
+  toolbar inset tokens so it stays clear of the left rail and trailing toolbar buttons.
+- Why: The onboarding demo relies on Search and the left rail being usable together on
+  small screens. Shared sizing prevents the board toolbar from drifting into several
+  almost-matching pill sizes.
+
+### 2026-07-02 — Onboarding uses temporary landing-demo graph
+
+- Decision: Opening onboarding now swaps the visible board to a non-persisted demo graph
+  matching the landing screenshot: OpenAI, Anthropic, Google, and named people with role
+  notes plus profile connections. Finishing or dismissing onboarding restores the user's
+  previous graph and shows a success notice that demo data was removed.
+- Why: The guide teaches controls better when users can inspect realistic people,
+  companies, notes, and connections. Keeping the graph temporary preserves the clean-board
+  product rule and avoids resurrecting the old demo seed as real saved state.
+
 ### 2026-07-02 — Dragging people out of zones detaches first
 
 - Decision: During person drag, resolve the person's circle membership before refitting

@@ -21,14 +21,14 @@ const DESKTOP_ONBOARDING_STEPS: OnboardingStep[] = [
   {
     trigger: 'navigate',
     eyebrow: 'Board basics',
-    title: 'Move around the map',
-    body: 'Drag empty space to pan. Use the mouse wheel, trackpad scroll, or trackpad pinch to zoom in and out.',
+    title: 'Explore the demo map',
+    body: 'This temporary board shows OpenAI, Anthropic, and Google. Drag empty space to pan, then zoom with the mouse wheel, trackpad scroll, or trackpad pinch.',
   },
   {
     trigger: 'create-person',
     eyebrow: 'Create',
-    title: 'Add a person with a double-click',
-    body: 'Double-click empty space on the board to drop a person at that point.',
+    title: 'Add a person to the demo',
+    body: 'Double-click empty space near the demo companies to drop a temporary person at that point.',
   },
   {
     trigger: 'create-circle',
@@ -40,7 +40,7 @@ const DESKTOP_ONBOARDING_STEPS: OnboardingStep[] = [
     trigger: 'organize',
     eyebrow: 'Organize',
     title: 'Move and resize zones',
-    body: 'Drag a person or circle to move it. Drag a circle edge to resize the zone around the people inside it.',
+    body: 'Drag a demo person or company circle to move it. Drag a circle edge to resize the zone around the people inside it.',
   },
   {
     trigger: 'select',
@@ -51,8 +51,8 @@ const DESKTOP_ONBOARDING_STEPS: OnboardingStep[] = [
   {
     trigger: 'search-import',
     eyebrow: 'Search',
-    title: 'Add someone from LinkedIn',
-    body: 'Open Search and choose one of the LinkedIn examples. A profile link can add a real person to the board.',
+    title: 'Find a demo person',
+    body: 'Open Search and choose a demo profile. The inspector shows that each person can carry a note and a connection.',
   },
   {
     trigger: 'settings',
@@ -64,7 +64,7 @@ const DESKTOP_ONBOARDING_STEPS: OnboardingStep[] = [
     trigger: 'linkedin-guide',
     eyebrow: 'LinkedIn archive',
     title: 'Find the sync guide',
-    body: 'Inside Settings, click the question mark next to LinkedIn Data Import to see how to request and upload your archive.',
+    body: 'Inside Settings, click the question mark next to LinkedIn Data Import. When you finish, the demo data is removed and your real board is restored.',
   },
 ]
 
@@ -78,14 +78,14 @@ const MOBILE_ONBOARDING_STEPS: OnboardingStep[] = [
   {
     trigger: 'navigate',
     eyebrow: 'Move and zoom',
-    title: 'Pan and zoom with touch',
-    body: 'Switch to Pan for one-finger panning. Pinch with two fingers anywhere on the board to zoom in and out.',
+    title: 'Explore the demo map',
+    body: 'This temporary board shows OpenAI, Anthropic, and Google. Switch to Pan for one-finger panning, then pinch with two fingers to zoom.',
   },
   {
     trigger: 'create-person',
     eyebrow: 'Create',
-    title: 'Add a person with a double-tap',
-    body: 'In Edit mode, double-tap empty space on the board to drop a person at that point.',
+    title: 'Add a person to the demo',
+    body: 'In Edit mode, double-tap empty space near the demo companies to drop a temporary person at that point.',
   },
   {
     trigger: 'create-circle',
@@ -102,8 +102,8 @@ const MOBILE_ONBOARDING_STEPS: OnboardingStep[] = [
   {
     trigger: 'search-import',
     eyebrow: 'Search',
-    title: 'Add someone from LinkedIn',
-    body: 'Open Search and choose one of the LinkedIn examples. A profile link can add a real person to the board.',
+    title: 'Find a demo person',
+    body: 'Open Search and choose a demo profile. The inspector shows that each person can carry a note and a connection.',
   },
   {
     trigger: 'settings',
@@ -115,7 +115,7 @@ const MOBILE_ONBOARDING_STEPS: OnboardingStep[] = [
     trigger: 'linkedin-guide',
     eyebrow: 'LinkedIn archive',
     title: 'Find the sync guide',
-    body: 'Inside Settings, tap the question mark next to LinkedIn Data Import to see how to request and upload your archive.',
+    body: 'Inside Settings, tap the question mark next to LinkedIn Data Import. When you finish, the demo data is removed and your real board is restored.',
   },
 ]
 

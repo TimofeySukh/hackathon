@@ -153,6 +153,11 @@ Use only these radii. No more 6/7/9px one-offs.
 - Buttons are **pill-shaped** (`--md-r-full`) in Material 3.
 - Cards, menus, and panels default to `--md-r-md` (12px).
 - The inspector side sheet uses `--md-r-lg` or `--md-r-xl`.
+- Board floating chrome (home, mode menu, search shell, toolbar group) uses shared
+  tokens on `.app-shell`: `--board-chrome-size` (48px), `--board-chrome-radius`
+  (`--md-r-full` — pills and circles), and `--board-chrome-inner` (40px) for icon
+  buttons inside each shell. Same tokens on mobile and desktop; do not use fixed px
+  radii on board toolbar shells.
 
 ---
 

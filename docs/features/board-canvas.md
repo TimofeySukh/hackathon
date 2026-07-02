@@ -93,11 +93,14 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
 - **Area select**: on desktop, right-drag empty space to draw a marquee selection box.
   On touch/mobile, switch to Select mode and drag across the board.
 - **Onboarding guide**: first board visit opens a short board guide; landing CTAs
-  force-open it for that launch, and the toolbar Help button reopens it. Steps show a
-  blue checkmark completion state for one second after the matching action, then
-  auto-advance, while `Skip` manually advances. The Search step exposes two built-in
-  LinkedIn profile examples, and the archive guide is taught through Settings gear -> `?`.
-  The mobile copy explains Edit / Select / Pan modes.
+  force-open it for that launch, and the toolbar Help button reopens it. While open, the
+  board shows a temporary, non-persisted demo graph matching the landing screenshot
+  (OpenAI, Anthropic, Google, and named people with notes/connections). Steps show a blue
+  checkmark completion state for one second after the matching action, then auto-advance,
+  while `Skip` manually advances. The Search step exposes built-in demo people, and the
+  archive guide is taught through Settings gear -> `?`. Finishing the guide restores the
+  user's previous graph and shows a success notice that the demo data was removed. The
+  mobile copy explains Edit / Select / Pan modes.
 - **Home control**: a compact logo button in the top-left returns to the landing page
   (`#`). On touch/mobile layouts it sits above the Edit / Select / Pan mode menu in a
   vertical left rail so both controls stay reachable without overlapping the search
@@ -167,6 +170,7 @@ This is the most Material-3-aligned part of the app today; keep it that way.
   - `createBoardIndex`, `hitTestBoard`, `drawBoardLayer` — spatial index, interaction, render.
   - `BOARD_INTERACTION_LAYOUT_LIMIT`, `IMPORT_LAYOUT_LIMIT` — dense-board guards.
   - Inspector `<aside className="inspector">`, create menu, board mode menu.
+  - `createOnboardingDemoGraph` — temporary onboarding-only graph.
 
 ## Open questions / TODO
 

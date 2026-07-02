@@ -103,18 +103,23 @@ Safety invariants:
 
 **Onboarding**:
 
-- First board visit opens a short guide explaining pan/zoom, creating a person by
-  double-click/double-tap, creating a circle from a center drag, moving/resizing, area
-  selection, Search-based LinkedIn profile import, Settings, and the LinkedIn archive
-  sync guide.
+- First board visit opens a short guide on a temporary demo graph matching the landing
+  screenshot: `You` plus OpenAI, Anthropic, and Google circles with named people, role
+  notes, and profile connections. The real saved/local graph is restored when onboarding
+  ends.
+- The guide explains pan/zoom, creating a person by double-click/double-tap, creating a
+  circle from a center drag, moving/resizing, area selection, Search-based demo person
+  lookup, Settings, and the LinkedIn archive sync guide.
 - Guide steps show a blue completed state with a checkmark for one second after the
   matching action is performed, then auto-advance; the visible button skips a step
   manually.
 - Landing page board CTAs force-open the guide for that launch.
 - The board toolbar Help button reopens the guide.
 - Mobile guide copy explicitly explains Edit / Select / Pan modes.
-- During the Search import step, opening empty Search shows two built-in LinkedIn profile
-  examples (Timofey Sukhov and Velizar Seleznev) so users can learn the link-import path.
+- During the Search step, opening empty Search shows built-in demo people from the
+  temporary graph so users can inspect a person with notes and a connection.
+- Completing or dismissing the guide shows a success notice and removes the temporary
+  demo data.
 
 **Create**:
 

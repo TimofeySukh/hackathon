@@ -349,10 +349,10 @@
     width: min(292px, calc(100vw - 28px));
   }
 
-  /* Let the open search field use the full row left of the settings button, and
-     keep the settings/sign-in panel inside the viewport on narrow screens. */
+  /* Keep expanded search between the left rail and the trailing toolbar buttons. */
   .search-box.is-open {
-    max-width: none;
+    width: min(360px, calc(100vw - var(--board-left-rail-inset) - var(--board-toolbar-trailing-inset)));
+    max-width: min(360px, calc(100vw - var(--board-left-rail-inset) - var(--board-toolbar-trailing-inset)));
   }
 
   .settings-panel {

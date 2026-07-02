@@ -1133,6 +1133,25 @@
   transform: none;
 }
 
+.onboarding-success {
+  position: fixed;
+  z-index: 96;
+  left: 50%;
+  bottom: 24px;
+  width: min(520px, calc(100vw - 32px));
+  padding: 16px 22px;
+  border-radius: var(--md-r-lg);
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+  box-shadow: var(--md-elev-2);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: center;
+  transform: translateX(-50%);
+  animation: onboardingCoachIn var(--md-dur-medium) var(--md-ease-decelerate);
+}
+
 @media (max-width: 720px), (hover: none), (pointer: coarse) {
   .onboarding-coach {
     left: 12px;
@@ -1140,6 +1159,16 @@
     bottom: 12px;
     width: auto;
     padding: 20px;
+    border-radius: var(--md-r-xl);
+    transform: none;
+    animation-name: onboardingCoachMobileIn;
+  }
+
+  .onboarding-success {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    width: auto;
     border-radius: var(--md-r-xl);
     transform: none;
     animation-name: onboardingCoachMobileIn;
@@ -1261,4 +1290,3 @@
     scale: 1;
   }
 }
-

@@ -28,6 +28,7 @@ import { mapSmartSearchResults, shouldUseSmartSearch, smartSearchGraph, type Age
 import { OnboardingCoach } from './Onboarding'
 import { getOnboardingSteps, type OnboardingSurface } from './onboardingSteps'
 import type { OnboardingAction } from './onboardingSteps'
+import { createOnboardingDemoGraph } from './lib/onboardingDemoGraph'
 import { SelectionIndicator } from './components/SelectionIndicator'
 import { M3Slider } from './components/M3Slider'
 // STRESS TEST — dev-only performance harness. See src/lib/stressTest.ts.
@@ -510,18 +511,21 @@ const SEARCH_LINKEDIN_HINT_KEY = 'social-search-linkedin-hint-seen-v1'
 const BOARD_ONBOARDING_STORAGE_KEY = 'social-board-onboarding-done-v3'
 const BOARD_ONBOARDING_FORCE_KEY = 'social-board-onboarding-open-v3'
 const ONBOARDING_COMPLETE_DELAY_MS = 1000
-const ONBOARDING_LINKEDIN_EXAMPLES = [
+const ONBOARDING_DEMO_SEARCH_EXAMPLES = [
   {
-    name: 'Timofey Sukhov',
+    name: 'Sam Altman',
     role: 'CEO',
-    url: 'https://www.linkedin.com/in/timofey-sukhov-775b38404/',
-    avatarUrl: '/timofey_avatar.jpeg',
+    personId: 'demo-openai-sam-altman',
   },
   {
-    name: 'Velizar Seleznev',
-    role: 'CTO',
-    url: 'https://www.linkedin.com/in/velizar-seleznev/',
-    avatarUrl: '/velizar_avatar.jpeg',
+    name: 'Dario Amodei',
+    role: 'CEO',
+    personId: 'demo-anthropic-dario-amodei',
+  },
+  {
+    name: 'Sundar Pichai',
+    role: 'CEO',
+    personId: 'demo-google-sundar-pichai',
   },
 ] as const
 const CIRCLE_CREATION_DEFAULTS_KEY = 'hackathon-board:circle-creation-defaults:v1'
@@ -661,6 +665,9 @@ function App() {
   const loadedGraphRevisionRef = useRef<number | null>(null)
   const pendingSaveGraphRef = useRef<GraphState | null>(null)
   const pendingSaveSnapshotRef = useRef<string | null>(null)
+  const onboardingDemoActiveRef = useRef(false)
+  const onboardingRestoreGraphRef = useRef<GraphState | null>(null)
+  const onboardingNoticeTimerRef = useRef<number | null>(null)
   const [saveEpoch, bumpSaveEpoch] = useState(0)
   const graphChannelId = useId()
   const pendingConnectorRef = useRef<DragConnector | null>(null)
@@ -862,6 +869,7 @@ function App() {
   // The board stays hidden until then so the demo seed never flashes or gets saved.
   const [graphLoaded, setGraphLoaded] = useState(false)
   const [graphLoadError, setGraphLoadError] = useState<string | null>(null)
+  const [onboardingCompletionNotice, setOnboardingCompletionNotice] = useState<string | null>(null)
   // Bumped when an avatar image finishes decoding, to force a board repaint.
   const [imageEpoch, setImageEpoch] = useState(0)
 
@@ -1022,6 +1030,7 @@ function App() {
 
   // Debounced autosave: a flood of drags or a bulk import collapses into one write.
   useEffect(() => {
+    if (onboardingDemoActiveRef.current) return
     if (!graphLoaded || auth.status !== 'authenticated' || !userId) return
     if (loadedGraphSourceRef.current === 'error') return
     if (loadedGraphSourceRef.current === 'local') return
@@ -1091,6 +1100,7 @@ function App() {
 
   // Debounced local autosave for signed-out visitors.
   useEffect(() => {
+    if (onboardingDemoActiveRef.current) return
     if (!graphLoaded || !isLocalMode) return
     const timer = window.setTimeout(() => {
       saveLocalGraph(graph)
@@ -1316,21 +1326,12 @@ function App() {
   }, [onboardingStep, completedOnboardingStep])
 
   useEffect(() => {
-    if (onboardingDecidedRef.current) return
-    if (!graphLoaded || auth.status === 'loading') return
-    onboardingDecidedRef.current = true
-    const forced = consumeSessionFlag(BOARD_ONBOARDING_FORCE_KEY)
-    if (forced || !hasLocalFlag(BOARD_ONBOARDING_STORAGE_KEY)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      onboardingStepRef.current = 0
-      setOnboardingStep(0)
-    }
-  }, [auth.status, graphLoaded])
-
-  useEffect(() => {
     return () => {
       if (onboardingAdvanceTimerRef.current !== null) {
         window.clearTimeout(onboardingAdvanceTimerRef.current)
+      }
+      if (onboardingNoticeTimerRef.current !== null) {
+        window.clearTimeout(onboardingNoticeTimerRef.current)
       }
     }
   }, [])
@@ -1341,6 +1342,61 @@ function App() {
     onboardingAdvanceTimerRef.current = null
   }
 
+  function showOnboardingCompletionNotice() {
+    setOnboardingCompletionNotice('You successfully completed onboarding. Demo data has been removed.')
+    if (onboardingNoticeTimerRef.current !== null) {
+      window.clearTimeout(onboardingNoticeTimerRef.current)
+    }
+    onboardingNoticeTimerRef.current = window.setTimeout(() => {
+      onboardingNoticeTimerRef.current = null
+      setOnboardingCompletionNotice(null)
+    }, 4200)
+  }
+
+  function startOnboardingDemo() {
+    if (onboardingDemoActiveRef.current) return
+    onboardingDemoActiveRef.current = true
+    onboardingRestoreGraphRef.current = graphRef.current
+    setCreateMenu(null)
+    setSelectedItem(null)
+    setSelectedPeopleIds([])
+    setSelectedCircleIds([])
+    setOnboardingCompletionNotice(null)
+    const demoGraph = createOnboardingDemoGraph()
+    setGraph(demoGraph)
+    const nextCamera = { x: window.innerWidth / 2, y: window.innerHeight / 2, scale: 0.78 }
+    cameraRef.current = nextCamera
+    setCamera(nextCamera)
+  }
+
+  function restoreAfterOnboardingDemo() {
+    const restoreGraph = onboardingRestoreGraphRef.current
+    onboardingDemoActiveRef.current = false
+    onboardingRestoreGraphRef.current = null
+    setCreateMenu(null)
+    setSelectedItem(null)
+    setSelectedPeopleIds([])
+    setSelectedCircleIds([])
+    if (restoreGraph) {
+      setGraph(restoreGraph)
+    }
+    showOnboardingCompletionNotice()
+  }
+
+  useEffect(() => {
+    if (onboardingDecidedRef.current) return
+    if (!graphLoaded || auth.status === 'loading') return
+    onboardingDecidedRef.current = true
+    const forced = consumeSessionFlag(BOARD_ONBOARDING_FORCE_KEY)
+    if (!forced && hasLocalFlag(BOARD_ONBOARDING_STORAGE_KEY)) return
+    const frame = window.requestAnimationFrame(() => {
+      startOnboardingDemo()
+      onboardingStepRef.current = 0
+      setOnboardingStep(0)
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [auth.status, graphLoaded])
+
   function finishOnboarding() {
     clearOnboardingAdvanceTimer()
     markLocalFlag(BOARD_ONBOARDING_STORAGE_KEY)
@@ -1348,6 +1404,7 @@ function App() {
     completedOnboardingStepRef.current = null
     setCompletedOnboardingStep(null)
     setOnboardingStep(-1)
+    restoreAfterOnboardingDemo()
   }
 
   function onboardingNext() {
@@ -1356,7 +1413,10 @@ function App() {
     if (step < 0) return
     const next = step + 1
     const nextStep = next >= onboardingSteps.length ? -1 : next
-    if (nextStep < 0) markLocalFlag(BOARD_ONBOARDING_STORAGE_KEY)
+    if (nextStep < 0) {
+      markLocalFlag(BOARD_ONBOARDING_STORAGE_KEY)
+      restoreAfterOnboardingDemo()
+    }
     onboardingStepRef.current = nextStep
     completedOnboardingStepRef.current = null
     setCompletedOnboardingStep(null)
@@ -1381,19 +1441,19 @@ function App() {
     setCompletedOnboardingStep(stepIndex)
     onboardingAdvanceTimerRef.current = window.setTimeout(() => {
       onboardingAdvanceTimerRef.current = null
+      if (onboardingStepRef.current !== stepIndex) return
       completedOnboardingStepRef.current = null
       setCompletedOnboardingStep(null)
-      setOnboardingStep((step) => {
-        if (step !== stepIndex) return step
-        const next = step + 1
-        if (next >= onboardingSteps.length) {
-          markLocalFlag(BOARD_ONBOARDING_STORAGE_KEY)
-          onboardingStepRef.current = -1
-          return -1
-        }
-        onboardingStepRef.current = next
-        return next
-      })
+      const next = stepIndex + 1
+      if (next >= onboardingSteps.length) {
+        markLocalFlag(BOARD_ONBOARDING_STORAGE_KEY)
+        onboardingStepRef.current = -1
+        setOnboardingStep(-1)
+        restoreAfterOnboardingDemo()
+        return
+      }
+      onboardingStepRef.current = next
+      setOnboardingStep(next)
     }, ONBOARDING_COMPLETE_DELAY_MS)
   }
 
@@ -1605,11 +1665,17 @@ function App() {
     }
   }
 
-  function handleOnboardingLinkedInExample(url: string) {
-    setSearchQuery(url)
+  function handleOnboardingDemoSearchExample(personId: string) {
     setShowSearchLinkedInHint(false)
-    setActiveSearchIndex(0)
-    void handleImportLinkedInProfileFromSearch(url)
+    const person = graph.people.find((item) => item.id === personId)
+    if (!person) return
+    handleSelectSearchResult({
+      kind: 'person',
+      id: person.id,
+      name: person.name,
+      sub: 'Demo profile',
+      initials: person.avatar,
+    })
   }
 
   function handleSelectSearchResult(result: SearchResult) {
@@ -1630,6 +1696,7 @@ function App() {
       const scale = Math.max(0.25, Math.min(1.6, (0.55 * minDim) / (2 * circle.radius)))
       focusCameraOnWorld(circle.x, circle.y, scale)
     }
+    completeOnboardingAction('search-import')
     closeSearch()
   }
 
@@ -2500,6 +2567,7 @@ function App() {
     onboardingStep >= 0 &&
     completedOnboardingStep === null &&
     onboardingSteps[onboardingStep]?.trigger === 'search-import'
+
   const sortedCircles = useMemo(() => {
     function getDepth(circleId: string | null): number {
       let depth = 0
@@ -4935,7 +5003,7 @@ Content-Type: application/json
   }
 
   return (
-    <main className={`app-shell ${searchOpen ? 'is-search-open' : ''} ${showSettings ? 'is-settings-open' : ''} ${selectedItem ? 'is-inspector-open' : ''} ${boardToolMode === 'pan' ? 'is-pan-mode' : ''}`}>
+    <main className={`app-shell ${searchOpen ? 'is-search-open' : ''} ${showSettings ? 'is-settings-open' : ''} ${selectedItem ? 'is-inspector-open' : ''} ${boardToolMode === 'pan' ? 'is-pan-mode' : ''} ${onboardingStep >= 0 ? 'is-onboarding-active' : ''}`}>
       {graphLoadError && (
         <div style={{
           position: 'absolute',
@@ -5127,21 +5195,22 @@ Content-Type: application/json
             </div>
           )}
           {searchOpen && searchQuery.trim() === '' && isOnboardingSearchImportStep && (
-            <div className="search-onboarding-links" role="listbox" aria-label="LinkedIn examples">
-              <span className="search-onboarding-links__title">Try a LinkedIn profile</span>
-              {ONBOARDING_LINKEDIN_EXAMPLES.map((profile) => (
+            <div className="search-onboarding-links" role="listbox" aria-label="Demo people">
+              <span className="search-onboarding-links__title">Try a demo person</span>
+              {ONBOARDING_DEMO_SEARCH_EXAMPLES.map((profile) => (
                 <button
-                  key={profile.url}
+                  key={profile.personId}
                   type="button"
                   role="option"
                   className="search-onboarding-links__item"
-                  disabled={isImportingLinkedInProfile}
-                  onClick={() => handleOnboardingLinkedInExample(profile.url)}
+                  onClick={() => handleOnboardingDemoSearchExample(profile.personId)}
                 >
-                  <img src={profile.avatarUrl} alt="" />
+                  <span className="search-onboarding-links__avatar" aria-hidden="true">
+                    {profile.name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2)}
+                  </span>
                   <span>
                     <span className="search-onboarding-links__name">{profile.name}</span>
-                    <span className="search-onboarding-links__sub">{profile.role} - LinkedIn profile</span>
+                    <span className="search-onboarding-links__sub">{profile.role} - demo profile</span>
                   </span>
                 </button>
               ))}
@@ -5241,6 +5310,8 @@ Content-Type: application/json
             onClick={() => {
               setShowSettings(false)
               closeSearch()
+              startOnboardingDemo()
+              onboardingStepRef.current = 0
               setOnboardingStep(0)
             }}
             aria-label="Open board guide"
@@ -6838,6 +6909,12 @@ Content-Type: application/json
           onBack={onboardingBack}
           onSkip={finishOnboarding}
         />
+      )}
+
+      {graphLoaded && onboardingCompletionNotice && (
+        <div className="onboarding-success" role="status" aria-live="polite">
+          {onboardingCompletionNotice}
+        </div>
       )}
 
       <GlobalTooltip />

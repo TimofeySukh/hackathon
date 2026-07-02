@@ -13,6 +13,10 @@
   pointer-events: none;
 }
 
+.app-shell.is-search-open .board-left-rail {
+  z-index: 101;
+}
+
 .board-left-rail {
   position: absolute;
   z-index: 11;
@@ -26,10 +30,10 @@
 .board-home-button {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: var(--board-chrome-size);
+  height: var(--board-chrome-size);
   border: none;
-  border-radius: var(--md-r-full);
+  border-radius: var(--board-chrome-radius);
   background: var(--md-surface-container);
   box-shadow: var(--md-elev-2);
   color: var(--md-on-surface);
@@ -65,10 +69,11 @@
   top: auto;
   left: auto;
   display: inline-grid;
-  gap: 4px;
-  padding: 4px;
+  gap: var(--board-chrome-pad);
+  width: var(--board-chrome-size);
+  padding: var(--board-chrome-pad);
   border: none;
-  border-radius: var(--md-r-full);
+  border-radius: var(--board-chrome-radius);
   background: var(--md-surface-container);
   box-shadow: var(--md-elev-2);
   pointer-events: auto;
@@ -76,8 +81,8 @@
 
 .board-mode-menu button {
   display: grid;
-  width: 40px;
-  height: 40px;
+  width: var(--board-chrome-inner);
+  height: var(--board-chrome-inner);
   place-items: center;
   border-radius: var(--md-r-full);
   background: transparent;
@@ -132,8 +137,8 @@
   align-items: center;
   gap: 10px;
   min-width: 0;
-  height: 48px;
-  border-radius: var(--md-r-full);
+  height: var(--board-chrome-size);
+  border-radius: var(--board-chrome-radius);
   padding: 8px 16px 8px 8px;
   color: var(--md-on-surface);
   font-size: 14px;
@@ -152,10 +157,10 @@
 .toolbar__group {
   display: inline-flex;
   align-items: center;
-  height: 48px;
-  gap: 4px;
-  border-radius: var(--md-r-full);
-  padding: 4px;
+  height: var(--board-chrome-size);
+  gap: var(--board-chrome-pad);
+  border-radius: var(--board-chrome-radius);
+  padding: var(--board-chrome-pad);
   pointer-events: auto;
 }
 
@@ -163,8 +168,8 @@
   display: grid;
   place-items: center;
   cursor: pointer;
-  width: 40px;
-  height: 40px;
+  width: var(--board-chrome-inner);
+  height: var(--board-chrome-inner);
   border-radius: var(--md-r-full);
   background: transparent;
   color: var(--md-on-surface-variant);
