@@ -9,18 +9,23 @@ type DemoPerson = {
   x: number
   y: number
   note: string
-}
-
-function profileSearchLink(name: string, company: string): PersonLink {
-  return {
-    id: `link-demo-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
-    service: 'website',
-    label: 'Profile',
-    url: `https://www.google.com/search?q=${encodeURIComponent(`${name} ${company}`)}`,
+  link: {
+    service: PersonLink['service']
+    label: string
+    url: string
   }
 }
 
-function demoPerson(person: DemoPerson, company: string): PersonNode {
+function demoProfileLink(person: DemoPerson): PersonLink {
+  return {
+    id: `link-demo-${person.id}`,
+    service: person.link.service,
+    label: person.link.label,
+    url: person.link.url,
+  }
+}
+
+function demoPerson(person: DemoPerson): PersonNode {
   return {
     id: person.id,
     name: person.name,
@@ -38,7 +43,7 @@ function demoPerson(person: DemoPerson, company: string): PersonNode {
         body: person.note,
       },
     ],
-    links: [profileSearchLink(person.name, company)],
+    links: [demoProfileLink(person)],
   }
 }
 
@@ -59,7 +64,8 @@ export function createOnboardingDemoGraph(): GraphState {
       x: -455,
       y: -358,
       note: 'Co-founder and former Chief Scientist at OpenAI; helped lead research behind major frontier model work.',
-    }, 'OpenAI'),
+      link: { service: 'x', label: 'X', url: 'https://x.com/ilyasut' },
+    }),
     demoPerson({
       id: 'demo-openai-jakub-pachocki',
       name: 'Jakub Pachocki',
@@ -68,7 +74,8 @@ export function createOnboardingDemoGraph(): GraphState {
       x: -585,
       y: -288,
       note: 'Chief Scientist at OpenAI; leads core research direction after years on OpenAI research teams.',
-    }, 'OpenAI'),
+      link: { service: 'linkedin', label: 'LinkedIn', url: 'https://www.linkedin.com/in/jakub-pachocki' },
+    }),
     demoPerson({
       id: 'demo-openai-greg-brockman',
       name: 'Greg Brockman',
@@ -77,7 +84,8 @@ export function createOnboardingDemoGraph(): GraphState {
       x: -545,
       y: -165,
       note: 'Co-founder and President at OpenAI; focuses on product, engineering, and company execution.',
-    }, 'OpenAI'),
+      link: { service: 'x', label: 'X', url: 'https://x.com/gdb' },
+    }),
     demoPerson({
       id: 'demo-openai-wojciech-zaremba',
       name: 'Wojciech Zaremba',
@@ -86,7 +94,8 @@ export function createOnboardingDemoGraph(): GraphState {
       x: -345,
       y: -174,
       note: 'Co-founder at OpenAI; researcher known for robotics, reinforcement learning, and model training work.',
-    }, 'OpenAI'),
+      link: { service: 'x', label: 'X', url: 'https://x.com/woj_zaremba' },
+    }),
     demoPerson({
       id: 'demo-openai-sam-altman',
       name: 'Sam Altman',
@@ -95,7 +104,8 @@ export function createOnboardingDemoGraph(): GraphState {
       x: -302,
       y: -248,
       note: 'Co-founder and CEO at OpenAI; leads the company strategy, partnerships, and product direction.',
-    }, 'OpenAI'),
+      link: { service: 'x', label: 'X', url: 'https://x.com/sama' },
+    }),
     demoPerson({
       id: 'demo-anthropic-jared-kaplan',
       name: 'Jared Kaplan',
@@ -104,7 +114,8 @@ export function createOnboardingDemoGraph(): GraphState {
       x: 422,
       y: -260,
       note: 'Co-founder at Anthropic; researcher known for scaling-law work and model development.',
-    }, 'Anthropic'),
+      link: { service: 'linkedin', label: 'LinkedIn', url: 'https://www.linkedin.com/in/jared-kaplan-645843213' },
+    }),
     demoPerson({
       id: 'demo-anthropic-tom-brown',
       name: 'Tom Brown',
@@ -113,7 +124,8 @@ export function createOnboardingDemoGraph(): GraphState {
       x: 315,
       y: -182,
       note: 'Co-founder at Anthropic; works on compute strategy and helped author influential language-model research.',
-    }, 'Anthropic'),
+      link: { service: 'linkedin', label: 'LinkedIn', url: 'https://www.linkedin.com/in/nottombrown' },
+    }),
     demoPerson({
       id: 'demo-anthropic-dario-amodei',
       name: 'Dario Amodei',
@@ -122,7 +134,8 @@ export function createOnboardingDemoGraph(): GraphState {
       x: 548,
       y: -192,
       note: 'Co-founder and CEO at Anthropic; leads the company and its AI safety-focused model strategy.',
-    }, 'Anthropic'),
+      link: { service: 'linkedin', label: 'LinkedIn', url: 'https://www.linkedin.com/in/dario-amodei-3934934' },
+    }),
     demoPerson({
       id: 'demo-anthropic-daniela-amodei',
       name: 'Daniela Amodei',
@@ -131,7 +144,8 @@ export function createOnboardingDemoGraph(): GraphState {
       x: 338,
       y: -58,
       note: 'Co-founder and President at Anthropic; leads company operations and go-to-market execution.',
-    }, 'Anthropic'),
+      link: { service: 'linkedin', label: 'LinkedIn', url: 'https://www.linkedin.com/in/daniela-amodei-790bb22a' },
+    }),
     demoPerson({
       id: 'demo-anthropic-jack-clark',
       name: 'Jack Clark',
@@ -140,7 +154,8 @@ export function createOnboardingDemoGraph(): GraphState {
       x: 515,
       y: -70,
       note: 'Co-founder at Anthropic; works on policy, communications, and the wider AI governance conversation.',
-    }, 'Anthropic'),
+      link: { service: 'linkedin', label: 'LinkedIn', url: 'https://www.linkedin.com/in/jack-clark-5a320317' },
+    }),
     demoPerson({
       id: 'demo-google-sergey-brin',
       name: 'Sergey Brin',
@@ -149,7 +164,8 @@ export function createOnboardingDemoGraph(): GraphState {
       x: -295,
       y: 178,
       note: 'Google co-founder; remains an Alphabet board member and major shareholder while advising technical work.',
-    }, 'Google'),
+      link: { service: 'website', label: 'Forbes profile', url: 'https://www.forbes.com/profile/sergey-brin/' },
+    }),
     demoPerson({
       id: 'demo-google-demis-hassabis',
       name: 'Demis Hassabis',
@@ -158,7 +174,8 @@ export function createOnboardingDemoGraph(): GraphState {
       x: -438,
       y: 250,
       note: 'Co-founder and CEO of Google DeepMind; leads frontier AI research and model development.',
-    }, 'Google'),
+      link: { service: 'x', label: 'X', url: 'https://x.com/demishassabis' },
+    }),
     demoPerson({
       id: 'demo-google-larry-page',
       name: 'Larry Page',
@@ -167,7 +184,8 @@ export function createOnboardingDemoGraph(): GraphState {
       x: -380,
       y: 372,
       note: 'Google co-founder; remains an Alphabet board member and major shareholder after stepping back from daily management.',
-    }, 'Google'),
+      link: { service: 'linkedin', label: 'LinkedIn', url: 'https://www.linkedin.com/in/larrypage' },
+    }),
     demoPerson({
       id: 'demo-google-jeff-dean',
       name: 'Jeff Dean',
@@ -176,7 +194,8 @@ export function createOnboardingDemoGraph(): GraphState {
       x: -230,
       y: 370,
       note: 'Google Chief Scientist; guides technical direction across AI, systems, and research teams.',
-    }, 'Google'),
+      link: { service: 'website', label: 'Google Research', url: 'https://research.google/people/jeff/' },
+    }),
     demoPerson({
       id: 'demo-google-sundar-pichai',
       name: 'Sundar Pichai',
@@ -185,7 +204,8 @@ export function createOnboardingDemoGraph(): GraphState {
       x: -158,
       y: 258,
       note: 'CEO of Google and Alphabet; leads the company, product strategy, and AI investment priorities.',
-    }, 'Google'),
+      link: { service: 'x', label: 'X', url: 'https://x.com/sundarpichai' },
+    }),
   ]
 
   return {

@@ -109,7 +109,8 @@ Safety invariants:
   ends.
 - The guide explains pan/zoom, creating a person by double-click/double-tap, creating a
   circle from a center drag, moving/resizing, area selection, Search-based demo person
-  lookup, Settings, and the LinkedIn archive sync guide.
+  lookup, Search-based LinkedIn profile import, Settings, and the LinkedIn archive sync
+  guide.
 - Guide steps show a blue completed state with a checkmark for one second after the
   matching action is performed, then auto-advance; the visible button skips a step
   manually.
@@ -117,8 +118,9 @@ Safety invariants:
 - For signed-out/local users, the board toolbar Help button reopens the guide. Signed-in
   users do not see this toolbar Help button.
 - Mobile guide copy explicitly explains Edit / Select / Pan modes.
-- During the Search step, opening empty Search shows built-in demo people from the
-  temporary graph so users can inspect a person with notes and a connection.
+- During the Search demo step, opening empty Search shows built-in demo people from the
+  temporary graph. The next step teaches LinkedIn profile link import with Timofey Sukhov
+  and Velizar Seleznev examples.
 - Completing or dismissing the guide shows a success notice and removes the temporary
   demo data.
 

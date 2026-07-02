@@ -511,21 +511,20 @@ const SEARCH_LINKEDIN_HINT_KEY = 'social-search-linkedin-hint-seen-v1'
 const BOARD_ONBOARDING_STORAGE_KEY = 'social-board-onboarding-done-v3'
 const BOARD_ONBOARDING_FORCE_KEY = 'social-board-onboarding-open-v3'
 const ONBOARDING_COMPLETE_DELAY_MS = 1000
-const ONBOARDING_DEMO_SEARCH_EXAMPLES = [
+const ONBOARDING_DOCK_GAP_PX = 12
+const ONBOARDING_TOP_CHROME_CLEARANCE_PX = 72
+const ONBOARDING_LINKEDIN_SEARCH_EXAMPLES = [
   {
-    name: 'Sam Altman',
+    name: 'Timofey Sukhov',
     role: 'CEO',
-    personId: 'demo-openai-sam-altman',
+    profileUrl: 'https://www.linkedin.com/in/timofey-sukhov-775b38404/',
+    avatarUrl: '/timofey_avatar.jpeg',
   },
   {
-    name: 'Dario Amodei',
-    role: 'CEO',
-    personId: 'demo-anthropic-dario-amodei',
-  },
-  {
-    name: 'Sundar Pichai',
-    role: 'CEO',
-    personId: 'demo-google-sundar-pichai',
+    name: 'Velizar Seleznev',
+    role: 'CTO',
+    profileUrl: 'https://www.linkedin.com/in/velizar-seleznev/',
+    avatarUrl: '/velizar_avatar.jpeg',
   },
 ] as const
 const CIRCLE_CREATION_DEFAULTS_KEY = 'hackathon-board:circle-creation-defaults:v1'
@@ -1301,6 +1300,12 @@ function App() {
   const completedOnboardingStepRef = useRef(completedOnboardingStep)
   const onboardingDecidedRef = useRef(false)
   const onboardingAdvanceTimerRef = useRef<number | null>(null)
+  const appShellRef = useRef<HTMLElement>(null)
+  const inspectorPanelRef = useRef<HTMLElement>(null)
+  const createMenuRef = useRef<HTMLDivElement>(null)
+  const mergePromptRef = useRef<HTMLDivElement>(null)
+  const circleStylePopoverRef = useRef<HTMLDivElement>(null)
+  const [onboardingDocked, setOnboardingDocked] = useState(false)
   const [highlightLinkedInGuideHelp, setHighlightLinkedInGuideHelp] = useState(
     () => !hasLocalFlag(LINKEDIN_GUIDE_HINT_KEY),
   )
@@ -1325,6 +1330,13 @@ function App() {
     onboardingStepRef.current = onboardingStep
     completedOnboardingStepRef.current = completedOnboardingStep
   }, [onboardingStep, completedOnboardingStep])
+
+  useEffect(() => {
+    if (onboardingStep < 0 || !isTouchLayout) return
+    if (onboardingSteps[onboardingStep]?.trigger === 'linkedin-guide') {
+      setShowSettings(true)
+    }
+  }, [onboardingStep, onboardingSteps, isTouchLayout])
 
   useEffect(() => {
     return () => {
@@ -1481,6 +1493,31 @@ function App() {
     setHighlightLinkedInGuideHelp(false)
     setShowSettings(false)
     setShowLinkedInGuide(true)
+  }
+
+  function handleLinkedInGuideHelpClick() {
+    if (isPhoneViewport()) {
+      const step = onboardingStepRef.current
+      const currentTrigger = step >= 0 ? onboardingSteps[step]?.trigger : null
+      if (currentTrigger === 'linkedin-guide') {
+        completeOnboardingStep(step)
+        markLocalFlag(LINKEDIN_GUIDE_HINT_KEY)
+        setHighlightLinkedInGuideHelp(false)
+        return
+      }
+      if (
+        currentTrigger === 'settings' &&
+        onboardingSteps[step + 1]?.trigger === 'linkedin-guide'
+      ) {
+        completeOnboardingStep(step + 1)
+        markLocalFlag(LINKEDIN_GUIDE_HINT_KEY)
+        setHighlightLinkedInGuideHelp(false)
+        return
+      }
+      alert(LINKEDIN_MOBILE_ARCHIVE_MESSAGE)
+      return
+    }
+    openLinkedInGuide()
   }
 
   const [showAgentSettings, setShowAgentSettings] = useState(false)
@@ -1640,7 +1677,7 @@ function App() {
       selectItem({ type: 'person', id: existingPerson.id })
       focusCameraOnWorld(existingPerson.x, existingPerson.y, 1.5)
       closeSearch()
-      completeOnboardingAction('search-import')
+      completeOnboardingAction('linkedin-import')
       return
     }
     setIsImportingLinkedInProfile(true)
@@ -1656,7 +1693,7 @@ function App() {
       selectItem({ type: 'person', id: next.person.id })
       focusCameraOnWorld(next.person.x, next.person.y, 1.5)
       closeSearch()
-      completeOnboardingAction('search-import')
+      completeOnboardingAction('linkedin-import')
     } catch (err) {
       console.error(err)
       const errorMessage = getErrorMessage(err)
@@ -1666,17 +1703,10 @@ function App() {
     }
   }
 
-  function handleOnboardingDemoSearchExample(personId: string) {
+  function handleOnboardingLinkedInSearchExample(profileUrl: string) {
     setShowSearchLinkedInHint(false)
-    const person = graph.people.find((item) => item.id === personId)
-    if (!person) return
-    handleSelectSearchResult({
-      kind: 'person',
-      id: person.id,
-      name: person.name,
-      sub: 'Demo profile',
-      initials: person.avatar,
-    })
+    setSearchQuery(profileUrl)
+    void handleImportLinkedInProfileFromSearch(profileUrl)
   }
 
   function handleSelectSearchResult(result: SearchResult) {
@@ -2568,6 +2598,91 @@ function App() {
     onboardingStep >= 0 &&
     completedOnboardingStep === null &&
     onboardingSteps[onboardingStep]?.trigger === 'search-import'
+  const isOnboardingLinkedInImportStep =
+    onboardingStep >= 0 &&
+    completedOnboardingStep === null &&
+    onboardingSteps[onboardingStep]?.trigger === 'linkedin-import'
+  const isOnboardingActiveSearchStep = isOnboardingSearchImportStep || isOnboardingLinkedInImportStep
+  const activeOnboardingTrigger =
+    onboardingStep >= 0 ? onboardingSteps[onboardingStep]?.trigger ?? null : null
+  const isOnboardingSettingsStep = activeOnboardingTrigger === 'settings'
+
+  useLayoutEffect(() => {
+    const shell = appShellRef.current
+    if (!shell || onboardingStep < 0 || !isTouchLayout) {
+      setOnboardingDocked(false)
+      return
+    }
+
+    const updateDock = () => {
+      const dockCandidates: HTMLElement[] = []
+      if (isInspectorOpen && inspectorPanelRef.current) {
+        dockCandidates.push(inspectorPanelRef.current)
+      }
+      if (createMenu && createMenuRef.current) {
+        dockCandidates.push(createMenuRef.current)
+      }
+      if (showCircleStylePanel && circleStylePopoverRef.current) {
+        dockCandidates.push(circleStylePopoverRef.current)
+      }
+      if ((selectedPeopleIds.length + selectedCircleIds.length) >= 2 && mergePromptRef.current) {
+        dockCandidates.push(mergePromptRef.current)
+      }
+
+      let nearestTop = window.innerHeight
+      for (const element of dockCandidates) {
+        const rect = element.getBoundingClientRect()
+        if (rect.height > 8 && rect.width > 8) {
+          nearestTop = Math.min(nearestTop, rect.top)
+        }
+      }
+
+      if (nearestTop < window.innerHeight - 1) {
+        const bottomOffset = window.innerHeight - nearestTop + ONBOARDING_DOCK_GAP_PX
+        const maxHeight = Math.max(
+          140,
+          nearestTop - ONBOARDING_TOP_CHROME_CLEARANCE_PX - ONBOARDING_DOCK_GAP_PX,
+        )
+        shell.style.setProperty('--onboarding-dock-offset', `${bottomOffset}px`)
+        shell.style.setProperty('--onboarding-coach-max-height', `${maxHeight}px`)
+        setOnboardingDocked(true)
+        return
+      }
+
+      shell.style.removeProperty('--onboarding-dock-offset')
+      shell.style.removeProperty('--onboarding-coach-max-height')
+      setOnboardingDocked(false)
+    }
+
+    updateDock()
+    const resizeObserver = new ResizeObserver(updateDock)
+    for (const element of [
+      inspectorPanelRef.current,
+      createMenuRef.current,
+      circleStylePopoverRef.current,
+      mergePromptRef.current,
+    ]) {
+      if (element) resizeObserver.observe(element)
+    }
+
+    window.addEventListener('resize', updateDock)
+    return () => {
+      resizeObserver.disconnect()
+      window.removeEventListener('resize', updateDock)
+      shell.style.removeProperty('--onboarding-dock-offset')
+      shell.style.removeProperty('--onboarding-coach-max-height')
+      setOnboardingDocked(false)
+    }
+  }, [
+    onboardingStep,
+    isTouchLayout,
+    isInspectorOpen,
+    createMenu,
+    showCircleStylePanel,
+    selectedPeopleIds.length,
+    selectedCircleIds.length,
+    renderedInspectorItem,
+  ])
 
   const sortedCircles = useMemo(() => {
     function getDepth(circleId: string | null): number {
@@ -5004,7 +5119,10 @@ Content-Type: application/json
   }
 
   return (
-    <main className={`app-shell ${searchOpen ? 'is-search-open' : ''} ${showSettings ? 'is-settings-open' : ''} ${selectedItem ? 'is-inspector-open' : ''} ${boardToolMode === 'pan' ? 'is-pan-mode' : ''} ${onboardingStep >= 0 ? 'is-onboarding-active' : ''}`}>
+    <main
+      ref={appShellRef}
+      className={`app-shell ${searchOpen ? 'is-search-open' : ''} ${showSettings ? 'is-settings-open' : ''} ${selectedItem ? 'is-inspector-open' : ''} ${boardToolMode === 'pan' ? 'is-pan-mode' : ''} ${onboardingStep >= 0 ? 'is-onboarding-active' : ''} ${onboardingDocked ? 'is-onboarding-docked' : ''} ${isOnboardingSettingsStep ? 'is-onboarding-settings-step' : ''}`}
+    >
       {graphLoadError && (
         <div style={{
           position: 'absolute',
@@ -5190,28 +5308,32 @@ Content-Type: application/json
               )}
             </>
           )}
-          {searchOpen && searchQuery.trim() === '' && showSearchLinkedInHint && !isOnboardingSearchImportStep && (
+          {searchOpen && searchQuery.trim() === '' && showSearchLinkedInHint && !isOnboardingActiveSearchStep && (
             <div className="search-linkedin-hint" role="note">
               Paste a LinkedIn profile link here to add that person to your board.
             </div>
           )}
-          {searchOpen && searchQuery.trim() === '' && isOnboardingSearchImportStep && (
-            <div className="search-onboarding-links" role="listbox" aria-label="Demo people">
-              <span className="search-onboarding-links__title">Try a demo person</span>
-              {ONBOARDING_DEMO_SEARCH_EXAMPLES.map((profile) => (
+          {searchOpen && searchQuery.trim() === '' && isOnboardingLinkedInImportStep && (
+            <div className="search-onboarding-links" role="listbox" aria-label="LinkedIn profile examples">
+              <span className="search-onboarding-links__title">Try a LinkedIn profile</span>
+              {ONBOARDING_LINKEDIN_SEARCH_EXAMPLES.map((profile) => (
                 <button
-                  key={profile.personId}
+                  key={profile.profileUrl}
                   type="button"
                   role="option"
                   className="search-onboarding-links__item"
-                  onClick={() => handleOnboardingDemoSearchExample(profile.personId)}
+                  disabled={isImportingLinkedInProfile}
+                  onClick={() => handleOnboardingLinkedInSearchExample(profile.profileUrl)}
                 >
-                  <span className="search-onboarding-links__avatar" aria-hidden="true">
-                    {profile.name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2)}
-                  </span>
+                  <img
+                    className="search-onboarding-links__avatar search-onboarding-links__avatar--photo"
+                    src={profile.avatarUrl}
+                    alt=""
+                    aria-hidden="true"
+                  />
                   <span>
                     <span className="search-onboarding-links__name">{profile.name}</span>
-                    <span className="search-onboarding-links__sub">{profile.role} - demo profile</span>
+                    <span className="search-onboarding-links__sub">{profile.role} · LinkedIn profile</span>
                   </span>
                 </button>
               ))}
@@ -5368,13 +5490,7 @@ Content-Type: application/json
                   aria-label="How to sync your LinkedIn"
                   data-tooltip="How to sync your LinkedIn"
                   data-tooltip-position="bottom"
-                  onClick={() => {
-                    if (isPhoneViewport()) {
-                      alert(LINKEDIN_MOBILE_ARCHIVE_MESSAGE)
-                      return
-                    }
-                    openLinkedInGuide()
-                  }}
+                  onClick={handleLinkedInGuideHelpClick}
                 >
                   ?
                   {highlightLinkedInGuideHelp && (
@@ -5627,7 +5743,7 @@ Content-Type: application/json
       </div>
 
       {createMenu ? (
-        <div className="create-menu" style={menuPosition(createMenu)}>
+        <div ref={createMenuRef} className="create-menu onboarding-dock-anchor" style={menuPosition(createMenu)}>
           <button type="button" onClick={createPerson}>
             <PersonIcon />
             <span>Add person</span>
@@ -5640,7 +5756,7 @@ Content-Type: application/json
       ) : null}
 
       {(selectedPeopleIds.length + selectedCircleIds.length) >= 2 && (
-        <div className="merge-prompt-panel">
+        <div ref={mergePromptRef} className="merge-prompt-panel onboarding-dock-anchor">
           <span className="merge-prompt-text">
             Selected{' '}
             <strong>
@@ -5673,8 +5789,9 @@ Content-Type: application/json
 
       {renderedInspectorItem && (
       <aside
+        ref={inspectorPanelRef}
         key={`${renderedInspectorItem.type}:${renderedInspectorItem.id}`}
-        className={`inspector ${isInspectorOpen ? 'is-open' : ''}`}
+        className={`inspector onboarding-dock-anchor ${isInspectorOpen ? 'is-open' : ''}`}
         aria-label="Selection details"
       >
 
@@ -5830,7 +5947,10 @@ Content-Type: application/json
                           </button>
                         </div>
 
-                        <div className={`circle-style-popover ${showCircleStylePanel ? 'is-open' : ''}`}>
+                        <div
+                          ref={circleStylePopoverRef}
+                          className={`circle-style-popover onboarding-dock-anchor ${showCircleStylePanel ? 'is-open' : ''}`}
+                        >
                           <div className="circle-style-theme-tabs">
                             <SelectionIndicator
                               variant="pill"

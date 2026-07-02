@@ -967,7 +967,9 @@
   pointer-events: auto;
   transition:
     background-color var(--md-dur-medium) var(--md-ease-standard),
-    box-shadow var(--md-dur-medium) var(--md-ease-standard);
+    box-shadow var(--md-dur-medium) var(--md-ease-standard),
+    bottom var(--md-dur-medium) var(--md-ease-standard),
+    max-height var(--md-dur-medium) var(--md-ease-standard);
 }
 
 .onboarding-coach.is-complete {
@@ -1025,6 +1027,14 @@
 .onboarding-coach__heading {
   display: grid;
   padding-right: 28px;
+}
+
+.onboarding-coach__mobile-notice {
+  margin: 0;
+  color: var(--md-error);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
 }
 
 .onboarding-coach__eyebrow {
@@ -1178,6 +1188,32 @@
     from {
       opacity: 0;
       transform: translateY(14px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  /* Dock above inspector / create menu / circle editor — height comes from JS. */
+  .app-shell.is-onboarding-active.is-onboarding-docked .onboarding-coach {
+    bottom: var(--onboarding-dock-offset, 12px);
+    max-height: var(--onboarding-coach-max-height, 240px);
+    overflow-y: auto;
+    z-index: 1300;
+  }
+
+  /* Settings step with no bottom panel: keep the coach near the top-right gear. */
+  .app-shell.is-onboarding-active.is-onboarding-settings-step:not(.is-onboarding-docked) .onboarding-coach {
+    top: calc(max(16px, env(safe-area-inset-top, 0px)) + var(--board-chrome-size, 48px) + 8px);
+    bottom: auto;
+    animation-name: onboardingCoachMobileTopIn;
+  }
+
+  @keyframes onboardingCoachMobileTopIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px) scale(0.98);
     }
     to {
       opacity: 1;

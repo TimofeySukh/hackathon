@@ -6,8 +6,8 @@ Help new users understand the board controls before they start building a graph.
 guide temporarily replaces the visible board with a demo graph matching the landing
 screenshot, so users learn against meaningful data before returning to their real board.
 It focuses on the actions that were least discoverable in user testing: zooming, panning,
-creating people and circles, moving/resizing zones, selecting an area, finding a person
-from Search, opening Settings, and finding the LinkedIn archive sync guide.
+creating people and circles, moving/resizing zones, selecting an area, adding a LinkedIn
+  profile from Search, opening Settings, and finding the LinkedIn archive sync guide.
 
 ## Behavior
 
@@ -36,15 +36,15 @@ from Search, opening Settings, and finding the LinkedIn archive sync guide.
 - Each step turns into a blue completed state with a checkmark for one second when the
   matching action is performed, then auto-advances. The visible `Skip` button is only a
   manual bypass for users who already know that control.
-- The Search step shows built-in demo people in an empty Search dropdown during
-  onboarding, then completes after the user chooses one and the profile opens in the
-  inspector.
+- The Search flow is split into two steps: first choose a demo person already on the board,
+  then add someone with a LinkedIn profile link. Empty Search shows demo people on the
+  first step and Timofey Sukhov / Velizar Seleznev LinkedIn examples on the second.
 - The archive-import education is split into two explicit actions: open Settings with the
-  gear, then click the `?` next to LinkedIn Data Import.
+  gear, then click the `?` next to LinkedIn Data Import. On mobile the final step shows a
+  red notice that LinkedIn archive requests require a computer; users finish with `Done`
+  instead of opening the desktop-only sync guide.
 - Action triggers are `mode`, `navigate`, `create-person`, `create-circle`, `organize`,
-  `select`, `search-import`, `settings`, and `linkedin-guide`. The `search-import`
-  trigger is retained for compatibility but now means choosing a demo person during
-  onboarding.
+  `select`, `search-import`, `linkedin-import`, `settings`, and `linkedin-guide`.
 - The create flow is split into two verified steps: double-click/double-tap empty space to
   add a person, then drag from a circle center to empty space and choose Add circle.
 
@@ -52,7 +52,11 @@ from Search, opening Settings, and finding the LinkedIn archive sync guide.
 
 - The guide is a compact Material 3 floating coach card on desktop.
 - On touch/mobile it behaves like a bottom sheet so it stays clear of the top toolbar and
-  mode buttons.
+  mode buttons. When a bottom panel is open during onboarding (inspector, create menu,
+  circle style editor, merge prompt), the coach repositions directly above that panel;
+  `ResizeObserver` in `App.tsx` sets `--onboarding-dock-offset` from the measured panel
+  height. The Settings step uses a top sheet when no bottom panel is open so the gear
+  icon stays visible.
 - The guide uses local progress dots, a dismiss button, and `Back` / `Skip` / `Done`
   actions. It does not block board interaction outside the card.
 

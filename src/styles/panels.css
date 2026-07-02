@@ -451,6 +451,12 @@
   font-weight: 500;
 }
 
+.search-onboarding-links__avatar--photo {
+  display: block;
+  object-fit: cover;
+  background: var(--md-surface-container-high);
+}
+
 .search-onboarding-links__name,
 .search-onboarding-links__sub {
   display: block;

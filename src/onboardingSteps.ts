@@ -7,6 +7,7 @@ export type OnboardingAction =
   | 'organize'
   | 'select'
   | 'search-import'
+  | 'linkedin-import'
   | 'settings'
   | 'linkedin-guide'
 
@@ -15,6 +16,8 @@ export type OnboardingStep = {
   eyebrow: string
   title: string
   body: string
+  /** Shown at the top of the coach on mobile when the step cannot fully run on a phone. */
+  mobileNotice?: string
 }
 
 const DESKTOP_ONBOARDING_STEPS: OnboardingStep[] = [
@@ -52,7 +55,13 @@ const DESKTOP_ONBOARDING_STEPS: OnboardingStep[] = [
     trigger: 'search-import',
     eyebrow: 'Search',
     title: 'Find a demo person',
-    body: 'Open Search and choose a demo profile. The inspector shows that each person can carry a note and a connection.',
+    body: 'Open Search and choose someone already on the demo board. The inspector shows that each person can carry a note and a connection.',
+  },
+  {
+    trigger: 'linkedin-import',
+    eyebrow: 'Search',
+    title: 'Add someone from LinkedIn',
+    body: 'You can also use Search to add people with a LinkedIn profile link. Choose one of the examples or paste a URL.',
   },
   {
     trigger: 'settings',
@@ -103,7 +112,13 @@ const MOBILE_ONBOARDING_STEPS: OnboardingStep[] = [
     trigger: 'search-import',
     eyebrow: 'Search',
     title: 'Find a demo person',
-    body: 'Open Search and choose a demo profile. The inspector shows that each person can carry a note and a connection.',
+    body: 'Open Search and choose someone already on the demo board. The inspector shows that each person can carry a note and a connection.',
+  },
+  {
+    trigger: 'linkedin-import',
+    eyebrow: 'Search',
+    title: 'Add someone from LinkedIn',
+    body: 'You can also use Search to add people with a LinkedIn profile link. Choose one of the examples or paste a URL.',
   },
   {
     trigger: 'settings',
@@ -115,7 +130,9 @@ const MOBILE_ONBOARDING_STEPS: OnboardingStep[] = [
     trigger: 'linkedin-guide',
     eyebrow: 'LinkedIn archive',
     title: 'Find the sync guide',
-    body: 'Inside Settings, tap the question mark next to LinkedIn Data Import. When you finish, the demo data is removed and your real board is restored.',
+    mobileNotice:
+      'Sorry — LinkedIn only lets you request a data archive from a computer. Do that on desktop, then come back here to import the ZIP.',
+    body: 'On a computer, open Settings and tap the question mark next to LinkedIn Data Import for step-by-step instructions. Tap Done below to finish onboarding and restore your real board.',
   },
 ]
 

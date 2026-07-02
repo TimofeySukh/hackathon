@@ -31,6 +31,11 @@ export function OnboardingCoach({ surface, step, completed, onNext, onBack, onSk
       >
         {completed ? '✓' : 'x'}
       </button>
+      {surface === 'mobile' && current.mobileNotice ? (
+        <p className="onboarding-coach__mobile-notice" role="note">
+          {current.mobileNotice}
+        </p>
+      ) : null}
       <div className="onboarding-coach__heading">
         <span>
           <span className="onboarding-coach__eyebrow">{current.eyebrow}</span>
