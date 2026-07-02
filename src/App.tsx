@@ -3092,14 +3092,22 @@ function App() {
     const surface = surfaceRef.current
     if (!surface) return
 
-    function wheelDeltaY(event: WheelEvent) {
+    function wheelDelta(event: WheelEvent, axis: 'x' | 'y') {
+      const delta = axis === 'x' ? event.deltaX : event.deltaY
       if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
-        return event.deltaY * 16
+        return delta * 16
       }
       if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
-        return event.deltaY * window.innerHeight
+        return delta * (axis === 'x' ? window.innerWidth : window.innerHeight)
       }
-      return event.deltaY
+      return delta
+    }
+
+    function isTrackpadScroll(event: WheelEvent) {
+      if (event.ctrlKey) return false
+      if (event.deltaMode !== WheelEvent.DOM_DELTA_PIXEL) return false
+      if (Math.abs(event.deltaX) > 0) return true
+      return Math.abs(event.deltaY) < 50 || !Number.isInteger(event.deltaY)
     }
 
     function handleWheel(event: WheelEvent) {
@@ -3111,6 +3119,17 @@ function App() {
 
       const pointer = { x: event.clientX - rect.left, y: event.clientY - rect.top }
       const currentCamera = cameraRef.current
+      cancelPanInertia()
+      if (isTrackpadScroll(event)) {
+        driveCameraRef.current({
+          ...currentCamera,
+          x: currentCamera.x - wheelDelta(event, 'x'),
+          y: currentCamera.y - wheelDelta(event, 'y'),
+        })
+        completeOnboardingAction('navigate')
+        return
+      }
+
       const before = {
         x: (pointer.x - currentCamera.x) / currentCamera.scale,
         y: (pointer.y - currentCamera.y) / currentCamera.scale,
@@ -3118,7 +3137,7 @@ function App() {
 
       const zoomIntensity = event.ctrlKey ? 0.015 : 0.002
       const nextScale = clamp(
-        currentCamera.scale * Math.exp(-wheelDeltaY(event) * zoomIntensity),
+        currentCamera.scale * Math.exp(-wheelDelta(event, 'y') * zoomIntensity),
         MIN_SCALE,
         MAX_SCALE,
       )

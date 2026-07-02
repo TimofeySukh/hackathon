@@ -1176,3 +1176,10 @@ rediscover, write it here.
 - Why: Floating controls that are merely close to the right place read as sloppy. Onboarding
   buttons in particular must keep equal vertical rhythm relative to body text and card
   edges, instead of drifting toward one side.
+
+### 2026-07-02 — Separate mouse wheel and trackpad board navigation
+
+- Decision: Desktop wheel input is split by device intent: mouse wheels zoom the board,
+  trackpad scroll pans the board, and trackpad pinch keeps zooming around the pointer.
+- Why: Trackpad users expect two-dimensional scroll gestures to move across an infinite
+  canvas, while mouse users expect the physical wheel to control zoom level.

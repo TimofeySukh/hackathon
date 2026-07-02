@@ -8,12 +8,12 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
 
 ## Behavior
 
-- **Pan / zoom**: on desktop, drag empty space to pan and use mouse wheel, trackpad
-  scroll, or trackpad pinch to zoom (`MIN_SCALE`/`MAX_SCALE` clamp). On touch/mobile,
-  pinch with two fingers to zoom. The vertical **tool mode** menu (top-left) is shown only
-  on touch/mobile layouts and switches **Edit**, **Select** (marquee), and **Pan**. Pan
-  mode makes one-finger drag move the canvas; releasing a pan gesture can continue with
-  short inertial scrolling.
+- **Pan / zoom**: on desktop, drag empty space to pan, use the mouse wheel to zoom,
+  trackpad scroll to pan, and trackpad pinch to zoom (`MIN_SCALE`/`MAX_SCALE` clamp). On
+  touch/mobile, pinch with two fingers to zoom. The vertical **tool mode** menu (top-left)
+  is shown only on touch/mobile layouts and switches **Edit**, **Select** (marquee), and
+  **Pan**. Pan mode makes one-finger drag move the canvas; releasing a pan gesture can
+  continue with short inertial scrolling.
 - **Move**: drag a person to reposition it or move it between circles. A person
   joins a circle only when its full avatar fits inside the circle boundary; it
   leaves when any edge crosses outside. Free-floating people (no circle) can be

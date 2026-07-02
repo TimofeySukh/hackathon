@@ -97,8 +97,9 @@ Safety invariants:
 - **Edit** — default: drag nodes, create, connect, resize.
 - **Select** — marquee multi-select.
 - **Pan** — one-finger/touch drag moves the camera; pinch zoom still works.
-- Desktop does not show the mode menu: drag empty space to pan, wheel/trackpad to zoom,
-  right-drag to marquee select, and right-click a circle to open create actions.
+- Desktop does not show the mode menu: drag empty space to pan, mouse wheel to zoom,
+  trackpad scroll to pan, trackpad pinch to zoom, right-drag to marquee select, and
+  right-click a circle to open create actions.
 
 **Onboarding**:
 
