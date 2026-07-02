@@ -23,6 +23,7 @@
   top: max(16px, env(safe-area-inset-top, 0px));
   left: max(16px, env(safe-area-inset-left, 0px));
   display: grid;
+  justify-items: center;
   gap: 8px;
   pointer-events: none;
 }
@@ -68,7 +69,9 @@
   position: relative;
   top: auto;
   left: auto;
-  display: inline-grid;
+  display: grid;
+  grid-template-columns: 1fr;
+  justify-items: center;
   gap: var(--board-chrome-pad);
   width: var(--board-chrome-size);
   padding: var(--board-chrome-pad);

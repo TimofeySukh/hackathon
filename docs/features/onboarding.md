@@ -16,6 +16,8 @@ creating people and circles, moving/resizing zones, selecting an area, adding a 
   has seen it before.
 - A Help button in the board toolbar reopens the guide for signed-out/local users.
   Signed-in users do not see this toolbar Help button.
+- The guide does not auto-open for signed-in users (unless explicitly forced via a landing page CTA).
+- If an anonymous user signs in while onboarding is active, the onboarding guide is immediately cancelled, the temporary demo data is discarded, and the authenticated user's real board is loaded.
 - Completion is stored locally under `social-board-onboarding-done-v3`.
 - While the guide is open, the app shows a temporary, non-persisted graph with `You`,
   OpenAI, Anthropic, and Google circles. The people match the landing screenshot:

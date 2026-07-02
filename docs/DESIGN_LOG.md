@@ -17,6 +17,11 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-07-02 — Onboarding cancels on authentication and skips auto-open
+
+- Decision: Authenticated users will not have the onboarding guide automatically launch. If an anonymous user signs in while onboarding is active, the guide is immediately cancelled, the demo data is discarded, and the authenticated graph is loaded.
+- Why: Logged-in users should not be interrupted by onboarding guide overlays. The demo graph state and coaching cards should be cleanly disposed when transitioning to the signed-in workspace.
+
 ### 2026-07-02 — Board chrome uses shared size tokens
 
 - Decision: Board floating chrome now shares `--board-chrome-*` tokens for outer shell

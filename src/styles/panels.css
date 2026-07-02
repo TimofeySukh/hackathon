@@ -268,6 +268,13 @@
   padding-right: 8px;
 }
 
+@media (max-width: 720px) {
+  .search-box.is-open {
+    width: min(360px, calc(100vw - var(--board-left-rail-inset) - var(--board-toolbar-trailing-inset)));
+    max-width: min(360px, calc(100vw - var(--board-left-rail-inset) - var(--board-toolbar-trailing-inset)));
+  }
+}
+
 .search-box__toggle {
   flex: 0 0 auto;
   display: grid;

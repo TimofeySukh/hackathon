@@ -1397,10 +1397,27 @@ function App() {
   }
 
   useEffect(() => {
+    if (auth.status === 'authenticated') {
+      onboardingDecidedRef.current = true
+      clearOnboardingAdvanceTimer()
+      onboardingStepRef.current = -1
+      completedOnboardingStepRef.current = null
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCompletedOnboardingStep(null)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setOnboardingStep(-1)
+      onboardingDemoActiveRef.current = false
+      onboardingRestoreGraphRef.current = null
+      setOnboardingCompletionNotice(null)
+    }
+  }, [auth.status])
+
+  useEffect(() => {
     if (onboardingDecidedRef.current) return
     if (!graphLoaded || auth.status === 'loading') return
     onboardingDecidedRef.current = true
     const forced = consumeSessionFlag(BOARD_ONBOARDING_FORCE_KEY)
+    if (auth.status === 'authenticated' && !forced) return
     if (!forced && hasLocalFlag(BOARD_ONBOARDING_STORAGE_KEY)) return
     const frame = window.requestAnimationFrame(() => {
       startOnboardingDemo()
