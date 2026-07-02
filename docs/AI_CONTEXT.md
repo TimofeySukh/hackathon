@@ -114,7 +114,8 @@ Safety invariants:
   matching action is performed, then auto-advance; the visible button skips a step
   manually.
 - Landing page board CTAs force-open the guide for that launch.
-- The board toolbar Help button reopens the guide.
+- For signed-out/local users, the board toolbar Help button reopens the guide. Signed-in
+  users do not see this toolbar Help button.
 - Mobile guide copy explicitly explains Edit / Select / Pan modes.
 - During the Search step, opening empty Search shows built-in demo people from the
   temporary graph so users can inspect a person with notes and a connection.

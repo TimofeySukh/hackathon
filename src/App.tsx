@@ -1294,6 +1294,7 @@ function App() {
   const [isTouchLayout, setIsTouchLayout] = useState(isTouchBoardLayout)
   const onboardingSurface: OnboardingSurface = isTouchLayout ? 'mobile' : 'desktop'
   const onboardingSteps = useMemo(() => getOnboardingSteps(onboardingSurface), [onboardingSurface])
+  const canOpenBoardGuideFromToolbar = auth.status === 'anonymous' || auth.status === 'unconfigured'
   const [onboardingStep, setOnboardingStep] = useState(-1)
   const [completedOnboardingStep, setCompletedOnboardingStep] = useState<number | null>(null)
   const onboardingStepRef = useRef(onboardingStep)
@@ -5305,20 +5306,22 @@ Content-Type: application/json
           )}
         </div>
         <div className="toolbar__group">
-          <button
-            type="button"
-            onClick={() => {
-              setShowSettings(false)
-              closeSearch()
-              startOnboardingDemo()
-              onboardingStepRef.current = 0
-              setOnboardingStep(0)
-            }}
-            aria-label="Open board guide"
-            title="Open board guide"
-          >
-            <HelpIcon />
-          </button>
+          {canOpenBoardGuideFromToolbar && (
+            <button
+              type="button"
+              onClick={() => {
+                setShowSettings(false)
+                closeSearch()
+                startOnboardingDemo()
+                onboardingStepRef.current = 0
+                setOnboardingStep(0)
+              }}
+              aria-label="Open board guide"
+              title="Open board guide"
+            >
+              <HelpIcon />
+            </button>
+          )}
           <button
             ref={settingsButtonRef}
             type="button"

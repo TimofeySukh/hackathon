@@ -14,7 +14,8 @@ from Search, opening Settings, and finding the LinkedIn archive sync guide.
 - The board opens a short guide the first time a browser visits `#board`.
 - Landing page board CTAs force-open the guide for that board launch, even if the browser
   has seen it before.
-- A Help button in the board toolbar reopens the guide at any time.
+- A Help button in the board toolbar reopens the guide for signed-out/local users.
+  Signed-in users do not see this toolbar Help button.
 - Completion is stored locally under `social-board-onboarding-done-v3`.
 - While the guide is open, the app shows a temporary, non-persisted graph with `You`,
   OpenAI, Anthropic, and Google circles. The people match the landing screenshot:

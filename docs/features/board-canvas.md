@@ -93,7 +93,8 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
 - **Area select**: on desktop, right-drag empty space to draw a marquee selection box.
   On touch/mobile, switch to Select mode and drag across the board.
 - **Onboarding guide**: first board visit opens a short board guide; landing CTAs
-  force-open it for that launch, and the toolbar Help button reopens it. While open, the
+  force-open it for that launch, and signed-out/local users can reopen it from the toolbar
+  Help button. Signed-in users do not see this toolbar Help button. While open, the
   board shows a temporary, non-persisted demo graph matching the landing screenshot
   (OpenAI, Anthropic, Google, and named people with notes/connections). Steps show a blue
   checkmark completion state for one second after the matching action, then auto-advance,
