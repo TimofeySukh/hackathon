@@ -243,9 +243,11 @@
 
 .quick-circle-colors {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 0;
+  width: 100%;
   min-width: 0;
   flex: 1 1 auto;
 }

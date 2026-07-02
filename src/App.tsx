@@ -5943,7 +5943,7 @@ Content-Type: application/json
                               />
                             )
                           })}
-                          {CIRCLE_COLOR_PRESETS.slice(0, 8).map((color) => {
+                          {CIRCLE_COLOR_PRESETS.slice(0, 3).map((color) => {
                             const id = `quick-preset:${color.toLowerCase()}`
                             return (
                               <button

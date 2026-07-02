@@ -19,9 +19,9 @@ rediscover, write it here.
 
 ### 2026-07-02 — Quick circle colors and connection add copy
 
-- Decision: The compact circle menu now exposes the five saved tone swatches plus the
-  first eight custom color presets directly, wrapping as needed instead of leaving empty
-  card space.
+- Decision: The compact circle menu now exposes the five saved tone swatches plus three
+  custom color presets and the palette button in one row, distributed across the full
+  card width.
 - Decision: The connection composer action is labelled `Add`, matching the notes
   composer and the action it performs.
 - Why: The compact circle menu had room for more useful direct choices, and `Save` read
