@@ -7493,7 +7493,11 @@ function parseLinkedInDate(value: string): number | null {
 }
 
 function dateKeyFromMs(value: number) {
-  return new Date(value).toISOString().slice(0, 10)
+  const d = new Date(value)
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
 }
 
 function normalizeNameKey(value: string) {
@@ -7746,7 +7750,7 @@ function buildEventContextByDate(rows: string[][], headers: LinkedInConnectionsH
   const twoDaysMs = 2 * 24 * 60 * 60 * 1000
 
   for (const [dateKey, count] of countsByDate) {
-    const connectedAt = Date.parse(`${dateKey}T00:00:00.000Z`)
+    const connectedAt = parseLinkedInDate(dateKey) ?? 0
     const nearbyEvent = mediaEvents
       .map((event) => {
         const eventDateKey = dateKeyFromMs(event.dateMs)
@@ -8129,7 +8133,7 @@ function filterPostsForConnections(posts: LinkedInArchivePostInput[], connection
     const postDate = post.date ? parseLinkedInDate(post.date) : null
     if (!postDate) return false
     return Array.from(connectedDates).some((dateKey) => {
-      const connectedAt = Date.parse(`${dateKey}T00:00:00.000Z`)
+      const connectedAt = parseLinkedInDate(dateKey) ?? 0
       const distance = connectedAt - postDate
       const sameDay = dateKeyFromMs(postDate) === dateKey
       return sameDay || (distance >= 0 && distance <= twoDaysMs)
