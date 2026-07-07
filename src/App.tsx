@@ -7748,7 +7748,7 @@ function buildEventContextByDate(rows: string[][], headers: LinkedInConnectionsH
   const deviation = Math.sqrt(variance)
   const spikeThreshold = Math.max(10, Math.ceil(mean + (deviation * 3)), 5)
   const twoDaysMs = 2 * 24 * 60 * 60 * 1000
-  const threeDaysMs = 3 * 24 * 60 * 60 * 1000
+  const fourDaysMs = 4 * 24 * 60 * 60 * 1000
 
   for (const [dateKey, count] of countsByDate) {
     const connectedAt = parseLinkedInDate(dateKey) ?? 0
@@ -7758,7 +7758,7 @@ function buildEventContextByDate(rows: string[][], headers: LinkedInConnectionsH
         const sameDay = eventDateKey === dateKey
         const distance = connectedAt - event.dateMs
         const sortDistance = sameDay ? 0 : Math.abs(distance)
-        const isValid = sameDay || (distance >= -threeDaysMs && distance <= twoDaysMs)
+        const isValid = sameDay || (distance >= -fourDaysMs && distance <= twoDaysMs)
         return { event, sortDistance, isValid }
       })
       .filter((candidate) => candidate.isValid)
@@ -8126,7 +8126,7 @@ function filterPostsForConnections(posts: LinkedInArchivePostInput[], connection
   if (connections.length === 0) return posts.slice(0, 20)
 
   const twoDaysMs = 2 * 24 * 60 * 60 * 1000
-  const threeDaysMs = 3 * 24 * 60 * 60 * 1000
+  const fourDaysMs = 4 * 24 * 60 * 60 * 1000
   const oneDayMs = 24 * 60 * 60 * 1000
 
   const selectedPosts = new Set<LinkedInArchivePostInput>()
@@ -8154,7 +8154,7 @@ function filterPostsForConnections(posts: LinkedInArchivePostInput[], connection
       const postDateStr = dateKeyFromMs(postDateMs)
       const sameDay = postDateStr === connectionDateStr
 
-      if (!sameDay && (distance < -threeDaysMs || distance > twoDaysMs)) {
+      if (!sameDay && (distance < -fourDaysMs || distance > twoDaysMs)) {
         continue
       }
 
@@ -8212,7 +8212,7 @@ function filterPostsForConnections(posts: LinkedInArchivePostInput[], connection
         const connectedAt = parseLinkedInDate(dateKey) ?? 0
         const distance = connectedAt - postDate
         const sameDay = dateKeyFromMs(postDate) === dateKey
-        return sameDay || (distance >= -threeDaysMs && distance <= twoDaysMs)
+        return sameDay || (distance >= -fourDaysMs && distance <= twoDaysMs)
       })
     }).slice(0, 30)
   }
