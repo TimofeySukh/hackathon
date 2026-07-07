@@ -93,8 +93,8 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
 - **Area select**: on desktop, right-drag empty space to draw a marquee selection box.
   On touch/mobile, switch to Select mode and drag across the board.
 - **Progressive hints**: the board opens directly on the user's real graph. Desktop shows
-  up to five quiet text hints in the bottom-left corner; touch/mobile shows one compact
-  hint below the toolbar. Completing the matching action flashes the hint blue for about
+  up to five quiet text hints under the left rail; touch/mobile shows one compact hint
+  below the toolbar. Completing the matching action flashes the hint blue for about
   850ms, then removes it. Landing CTAs do not force a guide. Signed-out/local users can
   reset the hints from the toolbar Help button; signed-in users do not see this button.
 - **Home control**: a compact logo button in the top-left returns to the landing page

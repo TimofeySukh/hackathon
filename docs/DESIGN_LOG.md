@@ -43,7 +43,7 @@ rediscover, write it here.
 
 - Decision: The board no longer opens a forced coach card or temporary demo graph. It
   opens directly on the user's real graph with progressive hints: up to five quiet text
-  hints in the desktop bottom-left corner and one compact hint below the mobile toolbar. A
+  hints under the desktop left rail and one compact hint below the mobile toolbar. A
   completed hint flashes in the primary color, then disappears and is stored under
   `social-board-progressive-hints-done-v1`.
 - Why: Control discovery should live in the board layout without blocking the canvas,

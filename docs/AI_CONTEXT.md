@@ -106,8 +106,7 @@ Safety invariants:
 - The board opens directly on the user's real saved/local graph. There is no forced
   first-run modal, no coach card, and no temporary demo graph.
 - Progressive hints are shown as small layout affordances: desktop shows up to five gray
-  text hints in the bottom-left corner; mobile shows one compact hint row below the
-  toolbar.
+  text hints under the left rail; mobile shows one compact hint row below the toolbar.
 - When the matching action happens, the hint flashes in the Material 3 primary color for
   about 850ms, then disappears and is stored locally under
   `social-board-progressive-hints-done-v1`.
