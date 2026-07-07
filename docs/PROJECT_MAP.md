@@ -17,7 +17,7 @@ Social Datanode is a live React + Vite + TypeScript product (not a local-only pr
 - Create menu, double-tap create, drag, marquee select, resize, merge-into-subset.
 - Google and email/password auth; per-user graph in Supabase (revision-checked autosave);
   anonymous editing in `localStorage`.
-- LinkedIn ZIP import + signed-in single-profile enrichment; board search + smart search.
+- LinkedIn ZIP import + signed-in single-profile/archive enrichment; board search + smart search.
 - Revocable agent tokens; graph API; CLI (`datanode-cli`); MCP server (`datanode-mcp`).
 - Landing page, developer docs page, contact, privacy policy (hash routes).
 - Material 3 design language for chrome and board-adjacent UI.
@@ -49,6 +49,7 @@ theme toggle, stress-test slider panel, floating anonymous sign-in banner.
 - `src/lib/agentApi.ts` — agent token management from Settings.
 - `src/lib/smartSearch.ts`, `src/lib/search/` — local and smart search.
 - `src/lib/linkedinEnrichment.ts` — client for profile enrichment Edge Function.
+- `src/lib/linkedinArchiveEnrichment.ts` — client for archive LLM enrichment Edge Function.
 - `src/components/` — shared M3 UI (`M3Slider`, `SelectionIndicator`, …).
 - `src/styles/` + `src/index.css` — Material 3 tokens and feature styles.
 
@@ -57,6 +58,7 @@ theme toggle, stress-test slider panel, floating anonymous sign-in banner.
 - `supabase/migrations/` — schema, RLS, revisions, agent tokens, Realtime.
 - `supabase/functions/graph-api/` — agent/user graph API.
 - `supabase/functions/enrich-linkedin-profile/` — LinkedIn profile enrichment.
+- `supabase/functions/enrich-linkedin-archive/` — LinkedIn archive LLM enrichment.
 - `scripts/datanode-cli.mjs`, `scripts/datanode-mcp.mjs` — CLI and MCP.
 - `scripts/linkedin-agent-search.mjs` — local read-only JSONL search for agents.
 - `scripts/test-database-load.mjs`, `scripts/test-ui-import-*.mjs` — import load tests.

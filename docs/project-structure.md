@@ -51,6 +51,7 @@ For a concise product summary see [`AI_CONTEXT.md`](AI_CONTEXT.md).
 | `agentApi.ts` | Agent token CRUD via graph API. |
 | `agentBoardContext.ts` | Agent-facing board context helpers. |
 | `linkedinEnrichment.ts` | Single-profile enrichment Edge Function client. |
+| `linkedinArchiveEnrichment.ts` | LinkedIn archive LLM enrichment Edge Function client. |
 | `smartSearch.ts` | Client for smart search API. |
 | `search/graphSearch.ts` | Local deterministic graph search/ranking. |
 | `tagPalette.ts` | Shared tag color palette. |
@@ -82,6 +83,7 @@ For a concise product summary see [`AI_CONTEXT.md`](AI_CONTEXT.md).
 |----------|------|
 | `graph-api/` | User/agent graph API: meta, search, smart search, CRUD, operations batch. |
 | `enrich-linkedin-profile/` | Authenticated single-profile LinkedIn enrichment. |
+| `enrich-linkedin-archive/` | Authenticated LinkedIn archive LLM enrichment; returns notes only. |
 
 ## Scripts
 
@@ -104,7 +106,8 @@ Optional local-only:
 - `VITE_LINKEDIN_ENRICHMENT_TEST_SECRET` — enrichment test bypass (never production).
 
 Edge Function secrets (Supabase dashboard / CLI): `SUPABASE_SERVICE_ROLE_KEY`,
-`LINKEDIN_ENRICHMENT_API_KEY`, `AI_SEARCH_API_KEY`, … — see [`RUNBOOK.md`](RUNBOOK.md).
+`LINKEDIN_ENRICHMENT_API_KEY`, `OPENROUTER_API_KEY`, `AI_SEARCH_API_KEY`, … — see
+[`RUNBOOK.md`](RUNBOOK.md).
 
 ## Technical stack
 

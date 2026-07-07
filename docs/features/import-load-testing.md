@@ -21,9 +21,11 @@ not thousands of per-contact database writes.
 - Deterministic context is stored only as regular person notes: `Professional Context`,
   `Shared Company Context`, `Event Context`, and `Trust Context`. Re-imports add missing
   context notes to existing imported people without duplicating the same `title + body`.
-- The import does not read or persist raw message or invitation text. `messages.csv`,
-  `guide_messages.csv`, and `Invitations.csv` are intentionally left out of this
-  non-LLM enrichment pass.
+- Signed-in imports can then call the `enrich-linkedin-archive` Edge Function in batches
+  for LLM notes from `messages.csv` / `guide_messages.csv`, `Invitations.csv`, and post
+  exports. Raw text is sent only for transient server-side processing; the graph persists
+  only returned notes such as `AI Relationship Summary`, `Origin Context`,
+  `AI Event Context`, `AI Professional Context`, and `Action Items`.
 - New LinkedIn company circles use a stable deterministic tone from the Material 3 circle
   palette instead of defaulting every imported company to blue. Existing company circles
   keep their current tone on re-import, except legacy default-blue LinkedIn company circles

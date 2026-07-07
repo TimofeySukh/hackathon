@@ -15,7 +15,7 @@ Runtime boundaries:
 - CSS (`src/styles/`) owns Material 3 tokens and chrome/board styling.
 - Supabase owns Google/email auth, `user_graphs` blob storage, revisions, Realtime, and
   hashed agent tokens.
-- Supabase Edge Functions own LinkedIn profile enrichment and the agent graph API.
+- Supabase Edge Functions own LinkedIn profile/archive enrichment and the agent graph API.
 - Linear owns task state; `docs/` owns durable product and repository knowledge.
 
 The board is a live product. Signed-in users load and autosave through Supabase with
@@ -37,6 +37,8 @@ revision checks and Realtime sync. Anonymous visitors edit a board persisted to
 - `src/lib/useAuth.ts` — session and auth flows.
 - `src/lib/smartSearch.ts`, `src/lib/search/graphSearch.ts` — smart and local search.
 - `supabase/functions/enrich-linkedin-profile/` — authenticated single-profile enrichment.
+- `supabase/functions/enrich-linkedin-archive/` — authenticated LinkedIn Part 1 LLM
+  enrichment that returns derived notes only.
 - `supabase/functions/graph-api/` — session or agent-token graph API for browser, CLI, MCP.
 - `src/index.css` + `src/styles/` — Material 3 chrome and board styling.
 
@@ -54,7 +56,7 @@ Current scope:
 - pan, cursor-centered wheel/pinch zoom, zones-only far zoom, inertial pan on mobile
 - Google and email/password auth; revision-checked Supabase autosave + Realtime sync
 - anonymous `localStorage` editing
-- LinkedIn ZIP import and signed-in single-profile enrichment
+- LinkedIn ZIP import and signed-in single-profile/archive enrichment
 - per-person notes, tags, connections inside the graph blob
 - board search and signed-in smart search
 - landing, docs, contact, privacy pages
@@ -84,6 +86,8 @@ Out of scope (not built):
   fresh graph; fallback or fail visibly before autosave.
 - Keep unsigned local graph data out of Supabase until the user signs in and an explicit migration path exists.
 - Keep LinkedIn enrichment provider API keys out of the browser and only inside Supabase Edge Function secrets.
+- Keep raw LinkedIn message and invitation export text out of persisted graph storage;
+  archive LLM enrichment may process excerpts transiently and persist only derived notes.
 - Keep the root person immutable in position and deletion semantics.
 - Keep Google OAuth and Supabase email redirect/origin configuration aligned with the real deployed frontend origins.
 

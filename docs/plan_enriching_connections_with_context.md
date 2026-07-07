@@ -6,11 +6,13 @@ The goal is to automatically categorize, tag, and summarize relationships withou
 
 Implementation alignment for Social Datanode:
 
-- First shipped pass is deterministic only. LLM summarization/parsing remains a later phase.
+- First shipped flow runs a deterministic pass first, then signed-in users get batched
+  server-side LLM enrichment through `enrich-linkedin-archive`.
 - Enrichment output is stored as regular person notes in the existing `user_graphs.graph`
   JSON blob, not as a separate database table or a new `PersonNode.enrichment` field.
-- Raw message and invitation text are not read or persisted. The first pass uses
-  `Connections.csv`, `Positions.csv`, `Rich_Media.csv`, and recommendation CSVs only.
+- Raw message and invitation text may be sent transiently to the Edge Function/OpenRouter
+  for summarization, but only returned notes are persisted. The database does not store raw
+  export text.
 - Agent API, CLI, and MCP surfaces are unchanged for this pass.
 
 ---

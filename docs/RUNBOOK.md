@@ -549,19 +549,32 @@ For hosted dashboard workflows, paste and run the migration SQL in the Supabase 
 
 This repository includes Supabase Edge Functions in `supabase/functions/`.
 
-Deploy the active Edge Function before testing signed-in manual LinkedIn profile import:
+Deploy the active Edge Functions before testing signed-in LinkedIn enrichment:
 
 ```bash
 supabase functions deploy enrich-linkedin-profile
+supabase functions deploy enrich-linkedin-archive
 ```
 
-`supabase/config.toml` sets LinkedIn enrichment to `verify_jwt = false` at the Supabase gateway because the function performs its own user-token validation with `supabase.auth.getUser()`. Do not remove the in-function authorization check.
+`supabase/config.toml` sets LinkedIn enrichment functions to `verify_jwt = false` at the Supabase gateway because each function performs its own user-token validation with `supabase.auth.getUser()`. Do not remove the in-function authorization check.
 
 Required LinkedIn enrichment secret:
 
 ```bash
 supabase secrets set LINKEDIN_ENRICHMENT_API_KEY=your-linkedin-enrichment-provider-api-key
 ```
+
+Required OpenRouter secrets for signed-in LinkedIn archive AI enrichment:
+
+```bash
+supabase secrets set OPENROUTER_API_KEY=your-openrouter-key
+supabase secrets set OPENROUTER_SMART_MODEL=openai/gpt-4o-mini
+supabase secrets set OPENROUTER_FAST_MODEL=deepseek/deepseek-chat-v3-0324
+```
+
+`OPENROUTER_SMART_MODEL` and `OPENROUTER_FAST_MODEL` are optional overrides. The archive
+enrichment function sends message, invitation, and post excerpts only for transient LLM
+processing and returns derived notes; raw archive text is not persisted in `user_graphs`.
 
 Required secrets for signed-in natural-language smart search (`POST /v1/search/smart`):
 
@@ -598,7 +611,7 @@ or `::1`, has the matching `x-linkedin-enrichment-test-secret` header, and the E
 Function has `LINKEDIN_ENRICHMENT_ALLOW_TEST_AUTH=true`. Production must leave these
 test variables unset so unauthenticated enrichment still fails.
 
-Manual one-profile LinkedIn search imports call the profile enrichment Edge Function. LinkedIn ZIP import stays local to the uploaded archive.
+Manual one-profile LinkedIn search imports call the profile enrichment Edge Function. LinkedIn ZIP import parses the core archive locally, then signed-in users can call `enrich-linkedin-archive` for server-side LLM context notes.
 
 The browser never calls the LinkedIn enrichment provider directly. It invokes the Edge Function, and that function authenticates the user, calls the provider with a server-side API key, and returns normalized profile data.
 

@@ -23,6 +23,13 @@ import type { AgentScope, AgentTokenRecord } from './lib/agentApi'
 import { isE2EFakeAuth, supabase } from './lib/supabase'
 import { GraphRevisionConflictError, loadGraphRecord, saveGraph, loadLocalGraph, saveLocalGraph } from './lib/graphPersistence'
 import { enrichLinkedInProfile } from './lib/linkedinEnrichment'
+import {
+  enrichLinkedInArchiveBatch,
+  type LinkedInArchiveConnectionInput,
+  type LinkedInArchiveInvitationInput,
+  type LinkedInArchiveMessageInput,
+  type LinkedInArchivePostInput,
+} from './lib/linkedinArchiveEnrichment'
 import { searchGraphByQuery } from './lib/search/graphSearch'
 import { mapSmartSearchResults, shouldUseSmartSearch, smartSearchGraph, type AgentSearchStep } from './lib/smartSearch'
 import { ProgressiveHints } from './Onboarding'
@@ -244,6 +251,13 @@ type LinkedInArchiveContext = {
   mediaEvents: LinkedInMediaEvent[]
   recommendedBy: Set<string>
   recommendedByMe: Set<string>
+}
+
+type LinkedInArchiveLlmContext = {
+  connections: LinkedInArchiveConnectionInput[]
+  messages: LinkedInArchiveMessageInput[]
+  invitations: LinkedInArchiveInvitationInput[]
+  posts: LinkedInArchivePostInput[]
 }
 
 type PanState = {
@@ -1684,12 +1698,18 @@ function App() {
         richMediaText,
         recommendationsReceivedText,
         recommendationsGivenText,
+        messagesText,
+        invitationsText,
+        sharesText,
       ] = await Promise.all([
         readZipTextEntry(connectionsEntry),
         readOptionalZipTextEntry(entries, 'Positions.csv'),
         readOptionalZipTextEntry(entries, 'Rich_Media.csv'),
         readOptionalZipTextEntry(entries, 'Recommendations_Received.csv'),
         readOptionalZipTextEntry(entries, 'Recommendations_Given.csv'),
+        readOptionalZipTextEntry(entries, 'guide_messages.csv').then((text) => text ?? readOptionalZipTextEntry(entries, 'messages.csv')),
+        readOptionalZipTextEntry(entries, 'Invitations.csv'),
+        readOptionalZipTextEntry(entries, 'Shares.csv'),
       ])
       await zipReader.close()
 
@@ -1703,8 +1723,20 @@ function App() {
       pushHistory()
       await persistGraphImmediately(result.graph)
 
+      const aiResult = auth.status === 'authenticated'
+        ? await enrichLinkedInArchiveGraph(result.graph, buildLinkedInArchiveLlmContext({
+            graph: result.graph,
+            connectionsText: csvText,
+            messagesText,
+            invitationsText,
+            postsText: sharesText ?? richMediaText,
+          }))
+        : { graph: result.graph, addedNotes: 0 }
+      if (aiResult.addedNotes > 0) await persistGraphImmediately(aiResult.graph)
+
       const enrichmentSummary = result.enrichedPeople > 0 ? ` Added context notes for ${result.enrichedPeople} people.` : ''
-      alert(`LinkedIn data imported successfully: ${result.importedPeople} people across ${result.importedCompanies} companies.${enrichmentSummary}`)
+      const aiSummary = aiResult.addedNotes > 0 ? ` Added ${aiResult.addedNotes} AI context notes.` : ''
+      alert(`LinkedIn data imported successfully: ${result.importedPeople} people across ${result.importedCompanies} companies.${enrichmentSummary}${aiSummary}`)
     } catch (err) {
       console.error(err)
       const errorMessage = getErrorMessage(err)
@@ -6962,7 +6994,7 @@ function parseLinkedInPositionsCsv(text: string | null): LinkedInUserPosition[] 
   if (rows.length < 2) return []
 
   const headerMap = createHeaderMap(rows[0])
-  return rows.slice(1).map((row) => {
+  return rows.slice(1).map((row): LinkedInUserPosition | null => {
     const company = readCsvField(row, headerMap, ['Company Name', 'Company'])
     if (!company) return null
     return {
@@ -7016,7 +7048,7 @@ function parseLinkedInRichMediaCsv(text: string | null): LinkedInMediaEvent[] {
   if (rows.length < 2) return []
 
   const headerMap = createHeaderMap(rows[0])
-  return rows.slice(1).map((row) => {
+  return rows.slice(1).map((row): LinkedInMediaEvent | null => {
     const dateMs = parseLinkedInDate(readCsvField(row, headerMap, ['Date/Time', 'Date', 'Created At']))
     const label = extractMediaEventLabel(readCsvField(row, headerMap, ['Media Description', 'Description', 'Commentary']))
     if (!dateMs || !label) return null
@@ -7215,6 +7247,205 @@ function buildDeterministicLinkedInNotes(input: {
   }
 
   return notes
+}
+
+function normalizeLinkedInMatchValue(value: string) {
+  return value.toLowerCase().replace(/\/$/, '').trim()
+}
+
+function textMentionsName(value: string, name: string) {
+  const normalizedValue = normalizeNameKey(value)
+  const normalizedName = normalizeNameKey(name)
+  return Boolean(normalizedName && normalizedValue.includes(normalizedName))
+}
+
+function parseLinkedInMessagesCsv(text: string | null): LinkedInArchiveMessageInput[] {
+  if (!text) return []
+  const rows = parseCSV(text)
+  if (rows.length < 2) return []
+  const headerMap = createHeaderMap(rows[0])
+
+  return rows.slice(1).map((row): LinkedInArchiveMessageInput | null => {
+    const content = readCsvField(row, headerMap, ['CONTENT', 'Message', 'Text'])
+    if (!content) return null
+    return {
+      conversationId: readCsvField(row, headerMap, ['CONVERSATION ID', 'Conversation ID']),
+      from: readCsvField(row, headerMap, ['FROM', 'From']),
+      senderProfileUrl: readCsvField(row, headerMap, ['SENDER PROFILE URL', 'Sender Profile URL']),
+      to: readCsvField(row, headerMap, ['TO', 'To']),
+      recipientProfileUrls: readCsvField(row, headerMap, ['RECIPIENT PROFILE URLS', 'Recipient Profile URLs']),
+      date: readCsvField(row, headerMap, ['DATE', 'Date']),
+      content,
+    }
+  }).filter((message): message is LinkedInArchiveMessageInput => message !== null)
+}
+
+function parseLinkedInInvitationsCsv(text: string | null): LinkedInArchiveInvitationInput[] {
+  if (!text) return []
+  const rows = parseCSV(text)
+  if (rows.length < 2) return []
+  const headerMap = createHeaderMap(rows[0])
+
+  return rows.slice(1).map((row): LinkedInArchiveInvitationInput | null => {
+    const message = readCsvField(row, headerMap, ['Message', 'MESSAGE'])
+    if (!message) return null
+    return {
+      from: readCsvField(row, headerMap, ['From', 'FROM']),
+      to: readCsvField(row, headerMap, ['To', 'TO']),
+      sentAt: readCsvField(row, headerMap, ['Sent At', 'SentAt', 'Date']),
+      message,
+    }
+  }).filter((invitation): invitation is LinkedInArchiveInvitationInput => invitation !== null)
+}
+
+function parseLinkedInPostsForLlm(text: string | null): LinkedInArchivePostInput[] {
+  if (!text) return []
+  const rows = parseCSV(text)
+  if (rows.length < 2) return []
+  const headerMap = createHeaderMap(rows[0])
+
+  return rows.slice(1).map((row): LinkedInArchivePostInput | null => {
+    const description = readCsvField(row, headerMap, [
+      'Media Description',
+      'ShareCommentary',
+      'Share Commentary',
+      'Commentary',
+      'Description',
+    ])
+    if (!description) return null
+    return {
+      date: readCsvField(row, headerMap, ['Date/Time', 'Date', 'Shared Date', 'Created At']),
+      description,
+    }
+  }).filter((post): post is LinkedInArchivePostInput => post !== null)
+}
+
+function buildLinkedInArchiveConnectionsForLlm(graph: GraphState, connectionsText: string): LinkedInArchiveConnectionInput[] {
+  const rows = parseCSV(connectionsText)
+  const headerIdx = findLinkedInConnectionsHeader(rows)
+  if (headerIdx === -1) return []
+
+  const headers = rows[headerIdx].map((cell) => cell.toLowerCase().replace(/\s+/g, ''))
+  const importHeaders: LinkedInConnectionsHeaders = {
+    firstNameIdx: headers.indexOf('firstname'),
+    lastNameIdx: headers.indexOf('lastname'),
+    companyIdx: headers.indexOf('company'),
+    positionIdx: headers.indexOf('position'),
+    urlIdx: headers.indexOf('url'),
+    emailIdx: headers.indexOf('emailaddress'),
+    connectedOnIdx: headers.indexOf('connectedon'),
+  }
+
+  const peopleById = new Map(graph.people.map((person) => [person.id, person]))
+  return rows.slice(headerIdx + 1).map((row): LinkedInArchiveConnectionInput | null => {
+    const firstName = row[importHeaders.firstNameIdx] || ''
+    const lastName = row[importHeaders.lastNameIdx] || ''
+    const name = `${firstName} ${lastName}`.trim()
+    if (!name) return null
+    const personId = `linkedin-person-${slugifyId(name)}`
+    if (!peopleById.has(personId)) return null
+    const profileUrl = importHeaders.urlIdx !== -1 ? row[importHeaders.urlIdx] || '' : ''
+    return {
+      personId,
+      name,
+      profileUrl: profileUrl ? normalizeLinkedInProfileUrl(profileUrl) ?? profileUrl : undefined,
+      company: importHeaders.companyIdx !== -1 ? row[importHeaders.companyIdx] || '' : '',
+      position: importHeaders.positionIdx !== -1 ? row[importHeaders.positionIdx] || '' : '',
+      connectedOn: importHeaders.connectedOnIdx !== -1 ? row[importHeaders.connectedOnIdx] || '' : '',
+    }
+  }).filter((connection): connection is LinkedInArchiveConnectionInput => connection !== null)
+}
+
+function buildLinkedInArchiveLlmContext(input: {
+  graph: GraphState
+  connectionsText: string
+  messagesText: string | null
+  invitationsText: string | null
+  postsText: string | null
+}): LinkedInArchiveLlmContext {
+  return {
+    connections: buildLinkedInArchiveConnectionsForLlm(input.graph, input.connectionsText),
+    messages: parseLinkedInMessagesCsv(input.messagesText),
+    invitations: parseLinkedInInvitationsCsv(input.invitationsText),
+    posts: parseLinkedInPostsForLlm(input.postsText),
+  }
+}
+
+function filterMessagesForConnections(messages: LinkedInArchiveMessageInput[], connections: LinkedInArchiveConnectionInput[]) {
+  const profileUrls = connections.map((connection) => connection.profileUrl).filter((url): url is string => Boolean(url)).map(normalizeLinkedInMatchValue)
+  return messages.filter((message) => {
+    const senderUrl = normalizeLinkedInMatchValue(message.senderProfileUrl ?? '')
+    const recipientUrls = normalizeLinkedInMatchValue(message.recipientProfileUrls ?? '')
+    if (profileUrls.some((url) => senderUrl === url || recipientUrls.includes(url))) return true
+    return connections.some((connection) =>
+      textMentionsName(`${message.from ?? ''} ${message.to ?? ''}`, connection.name)
+    )
+  }).slice(0, 80)
+}
+
+function filterInvitationsForConnections(invitations: LinkedInArchiveInvitationInput[], connections: LinkedInArchiveConnectionInput[]) {
+  return invitations.filter((invitation) =>
+    connections.some((connection) => textMentionsName(`${invitation.from ?? ''} ${invitation.to ?? ''}`, connection.name))
+  ).slice(0, 40)
+}
+
+function filterPostsForConnections(posts: LinkedInArchivePostInput[], connections: LinkedInArchiveConnectionInput[]) {
+  const connectedDates = new Set(connections.map((connection) => {
+    const parsed = connection.connectedOn ? parseLinkedInDate(connection.connectedOn) : null
+    return parsed ? dateKeyFromMs(parsed) : ''
+  }).filter(Boolean))
+  if (connectedDates.size === 0) return posts.slice(0, 20)
+
+  const twoDaysMs = 2 * 24 * 60 * 60 * 1000
+  return posts.filter((post) => {
+    const postDate = post.date ? parseLinkedInDate(post.date) : null
+    if (!postDate) return false
+    return Array.from(connectedDates).some((dateKey) => Math.abs(postDate - Date.parse(`${dateKey}T00:00:00.000Z`)) <= twoDaysMs)
+  }).slice(0, 30)
+}
+
+async function enrichLinkedInArchiveGraph(graph: GraphState, context: LinkedInArchiveLlmContext): Promise<{ graph: GraphState; addedNotes: number }> {
+  if (context.connections.length === 0) return { graph, addedNotes: 0 }
+  if (context.messages.length === 0 && context.invitations.length === 0 && context.posts.length === 0) {
+    return { graph, addedNotes: 0 }
+  }
+
+  let nextGraph = graph
+  let addedNotes = 0
+
+  for (let index = 0; index < context.connections.length; index += 8) {
+    const connections = context.connections.slice(index, index + 8)
+    const notes = await enrichLinkedInArchiveBatch({
+      connections,
+      messages: filterMessagesForConnections(context.messages, connections),
+      invitations: filterInvitationsForConnections(context.invitations, connections),
+      posts: filterPostsForConnections(context.posts, connections),
+    })
+
+    if (notes.length === 0) continue
+
+    const notesByPersonId = new Map<string, PersonNote[]>()
+    for (const note of notes) {
+      const existing = notesByPersonId.get(note.personId) ?? []
+      existing.push(makeLinkedInNote(note.title, note.body))
+      notesByPersonId.set(note.personId, existing)
+    }
+
+    nextGraph = {
+      ...nextGraph,
+      people: nextGraph.people.map((person) => {
+        const personNotes = notesByPersonId.get(person.id)
+        if (!personNotes) return person
+        const result = appendUniquePersonNotes(person, personNotes)
+        addedNotes += result.added
+        return result.person
+      }),
+    }
+
+    await yieldToBrowser()
+  }
+
+  return { graph: nextGraph, addedNotes }
 }
 
 async function buildLinkedInConnectionsGraph(

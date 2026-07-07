@@ -17,6 +17,16 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-07-07 — LinkedIn archive LLM enrichment stays server-side
+
+- Decision: Add `enrich-linkedin-archive`, a signed-in Supabase Edge Function that calls
+  OpenRouter for batched Part 1 archive enrichment. The browser parses the ZIP, sends only
+  relevant excerpts for the current batch, and persists only returned person notes.
+- Decision: Do not add graph API, CLI, or MCP surfaces for this pass; it is a browser import
+  helper, not a remote agent graph operation.
+- Why: OpenRouter keys must stay out of the browser, and raw LinkedIn messages/invitations
+  should not become database state. The graph remains the existing `user_graphs.graph` blob.
+
 ### 2026-07-07 — LinkedIn ZIP import adds deterministic context notes
 
 - Decision: LinkedIn ZIP import now reads optional Part 1 context files (`Positions.csv`,
