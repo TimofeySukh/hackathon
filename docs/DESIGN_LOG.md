@@ -17,6 +17,18 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-07-07 — LinkedIn ZIP import adds deterministic context notes
+
+- Decision: LinkedIn ZIP import now reads optional Part 1 context files (`Positions.csv`,
+  `Rich_Media.csv`, `Recommendations_Received.csv`, `Recommendations_Given.csv`) and stores
+  only derived context as regular person notes: professional classification, shared company
+  context, event-spike context, and recommendation-based trust context.
+- Decision: raw message and invitation text are not read or persisted in this non-LLM pass.
+  Re-imports add missing context notes to existing imported people without duplicating the
+  same note body.
+- Why: richer relationship context should improve search and inspection while keeping the
+  user's private communication exports out of the database.
+
 ### 2026-07-02 — Progressive hints replace forced board onboarding
 
 - Decision: The board no longer opens a forced coach card or temporary demo graph. It

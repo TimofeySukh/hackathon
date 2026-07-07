@@ -4,6 +4,15 @@ This document outlines the technical design, data flow, and implementation plan 
 
 The goal is to automatically categorize, tag, and summarize relationships without requiring the heavy, slow-to-generate Part 2 export.
 
+Implementation alignment for Social Datanode:
+
+- First shipped pass is deterministic only. LLM summarization/parsing remains a later phase.
+- Enrichment output is stored as regular person notes in the existing `user_graphs.graph`
+  JSON blob, not as a separate database table or a new `PersonNode.enrichment` field.
+- Raw message and invitation text are not read or persisted. The first pass uses
+  `Connections.csv`, `Positions.csv`, `Rich_Media.csv`, and recommendation CSVs only.
+- Agent API, CLI, and MCP surfaces are unchanged for this pass.
+
 ---
 
 ## 1. System Architecture & Data Flow

@@ -215,6 +215,7 @@ type LinkedInConnectionsImportResult = {
   graph: GraphState
   importedPeople: number
   importedCompanies: number
+  enrichedPeople: number
 }
 
 type LinkedInConnectionsHeaders = {
@@ -225,6 +226,24 @@ type LinkedInConnectionsHeaders = {
   urlIdx: number
   emailIdx: number
   connectedOnIdx: number
+}
+
+type LinkedInUserPosition = {
+  company: string
+  startedAt: number | null
+  finishedAt: number | null
+}
+
+type LinkedInMediaEvent = {
+  dateMs: number
+  label: string
+}
+
+type LinkedInArchiveContext = {
+  positions: LinkedInUserPosition[]
+  mediaEvents: LinkedInMediaEvent[]
+  recommendedBy: Set<string>
+  recommendedByMe: Set<string>
 }
 
 type PanState = {
@@ -1651,26 +1670,41 @@ function App() {
       const zipReader = new zip.ZipReader(new zip.BlobReader(file))
       const entries = await zipReader.getEntries()
 
-      const connectionsEntry = entries.find(
-        (e) => e.filename === 'Connections.csv' || e.filename.endsWith('/Connections.csv')
-      )
+      const connectionsEntry = findZipEntryByFileName(entries, 'Connections.csv')
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (!connectionsEntry || typeof (connectionsEntry as any).getData !== 'function') {
+      if (!connectionsEntry) {
         alert('Could not find Connections.csv inside the ZIP file.')
         await zipReader.close()
         return
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const csvText = await (connectionsEntry as any).getData(new zip.TextWriter())
+      const [
+        csvText,
+        positionsText,
+        richMediaText,
+        recommendationsReceivedText,
+        recommendationsGivenText,
+      ] = await Promise.all([
+        readZipTextEntry(connectionsEntry),
+        readOptionalZipTextEntry(entries, 'Positions.csv'),
+        readOptionalZipTextEntry(entries, 'Rich_Media.csv'),
+        readOptionalZipTextEntry(entries, 'Recommendations_Received.csv'),
+        readOptionalZipTextEntry(entries, 'Recommendations_Given.csv'),
+      ])
       await zipReader.close()
 
-      const result = await buildLinkedInConnectionsGraph(graph, csvText)
+      const archiveContext = buildLinkedInArchiveContext({
+        positionsText,
+        richMediaText,
+        recommendationsReceivedText,
+        recommendationsGivenText,
+      })
+      const result = await buildLinkedInConnectionsGraph(graph, csvText, archiveContext)
       pushHistory()
       await persistGraphImmediately(result.graph)
 
-      alert(`LinkedIn data imported successfully: ${result.importedPeople} people across ${result.importedCompanies} companies.`)
+      const enrichmentSummary = result.enrichedPeople > 0 ? ` Added context notes for ${result.enrichedPeople} people.` : ''
+      alert(`LinkedIn data imported successfully: ${result.importedPeople} people across ${result.importedCompanies} companies.${enrichmentSummary}`)
     } catch (err) {
       console.error(err)
       const errorMessage = getErrorMessage(err)
@@ -6793,6 +6827,30 @@ Content-Type: application/json
 // The canvas board engine (spatial index, hit-testing, rendering) lives in
 // lib/board/render.ts; App owns chrome/inspector/menu UI and calls into it.
 
+function findZipEntryByFileName(entries: zip.Entry[], fileName: string) {
+  return entries.find((entry) => entry.filename === fileName || entry.filename.endsWith(`/${fileName}`)) ?? null
+}
+
+function isZipTextEntry(entry: zip.Entry): entry is zip.Entry & { getData: (writer: unknown) => Promise<unknown> } {
+  return 'getData' in entry && typeof entry.getData === 'function'
+}
+
+async function readZipTextEntry(entry: zip.Entry): Promise<string> {
+  if (!isZipTextEntry(entry)) {
+    throw new Error(`Could not read ${entry.filename}.`)
+  }
+  const data = await entry.getData(new zip.TextWriter())
+  if (typeof data !== 'string') {
+    throw new Error(`Could not read ${entry.filename}.`)
+  }
+  return data
+}
+
+async function readOptionalZipTextEntry(entries: zip.Entry[], fileName: string): Promise<string | null> {
+  const entry = findZipEntryByFileName(entries, fileName)
+  return entry ? readZipTextEntry(entry) : null
+}
+
 function parseCSV(text: string): string[][] {
   const lines: string[][] = []
   let row: string[] = []
@@ -6850,9 +6908,319 @@ function findLinkedInConnectionsHeader(rows: string[][]) {
   return -1
 }
 
+function normalizeCsvHeader(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '')
+}
+
+function createHeaderMap(headerRow: string[]) {
+  return new Map(headerRow.map((header, index) => [normalizeCsvHeader(header), index]))
+}
+
+function readCsvField(row: string[], headerMap: Map<string, number>, names: string[]) {
+  for (const name of names) {
+    const index = headerMap.get(normalizeCsvHeader(name))
+    if (index !== undefined) return row[index]?.trim() ?? ''
+  }
+  return ''
+}
+
+function parseLinkedInDate(value: string): number | null {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+
+  const normalized = trimmed.replace(/\s+at\s+/i, ' ')
+  const parsed = Date.parse(normalized)
+  if (!Number.isNaN(parsed)) return parsed
+
+  const monthYear = trimmed.match(/^([A-Za-z]+)\s+(\d{4})$/)
+  if (monthYear) {
+    const parsedMonth = Date.parse(`${monthYear[1]} 1, ${monthYear[2]}`)
+    return Number.isNaN(parsedMonth) ? null : parsedMonth
+  }
+
+  const yearOnly = trimmed.match(/^\d{4}$/)
+  if (yearOnly) return Date.parse(`January 1, ${trimmed}`)
+
+  return null
+}
+
+function dateKeyFromMs(value: number) {
+  return new Date(value).toISOString().slice(0, 10)
+}
+
+function normalizeNameKey(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ')
+}
+
+function normalizeCompanyKey(value: string) {
+  return value.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ')
+}
+
+function parseLinkedInPositionsCsv(text: string | null): LinkedInUserPosition[] {
+  if (!text) return []
+  const rows = parseCSV(text)
+  if (rows.length < 2) return []
+
+  const headerMap = createHeaderMap(rows[0])
+  return rows.slice(1).map((row) => {
+    const company = readCsvField(row, headerMap, ['Company Name', 'Company'])
+    if (!company) return null
+    return {
+      company,
+      startedAt: parseLinkedInDate(readCsvField(row, headerMap, ['Started On', 'Start Date', 'From'])),
+      finishedAt: parseLinkedInDate(readCsvField(row, headerMap, ['Finished On', 'End Date', 'To'])),
+    }
+  }).filter((position): position is LinkedInUserPosition => position !== null)
+}
+
+const EVENT_STOP_WORDS = new Set([
+  'about',
+  'after',
+  'again',
+  'with',
+  'from',
+  'this',
+  'that',
+  'have',
+  'will',
+  'your',
+  'their',
+  'linkedin',
+  'today',
+  'event',
+  'photo',
+  'image',
+])
+
+function extractMediaEventLabel(description: string) {
+  const hashtags = Array.from(description.matchAll(/#([\p{L}\p{N}_-]+)/gu))
+    .map((match) => match[1])
+    .filter(Boolean)
+    .slice(0, 3)
+
+  if (hashtags.length > 0) return hashtags.join(', ')
+
+  const words = description
+    .replace(/https?:\/\/\S+/g, ' ')
+    .split(/[^\p{L}\p{N}]+/u)
+    .map((word) => word.trim())
+    .filter((word) => word.length >= 4 && !EVENT_STOP_WORDS.has(word.toLowerCase()))
+    .slice(0, 4)
+
+  return words.length > 0 ? words.join(' ') : ''
+}
+
+function parseLinkedInRichMediaCsv(text: string | null): LinkedInMediaEvent[] {
+  if (!text) return []
+  const rows = parseCSV(text)
+  if (rows.length < 2) return []
+
+  const headerMap = createHeaderMap(rows[0])
+  return rows.slice(1).map((row) => {
+    const dateMs = parseLinkedInDate(readCsvField(row, headerMap, ['Date/Time', 'Date', 'Created At']))
+    const label = extractMediaEventLabel(readCsvField(row, headerMap, ['Media Description', 'Description', 'Commentary']))
+    if (!dateMs || !label) return null
+    return { dateMs, label }
+  }).filter((event): event is LinkedInMediaEvent => event !== null)
+}
+
+function parseLinkedInRecommendationNames(text: string | null): Set<string> {
+  const names = new Set<string>()
+  if (!text) return names
+
+  const rows = parseCSV(text)
+  if (rows.length < 2) return names
+
+  const headerMap = createHeaderMap(rows[0])
+  for (const row of rows.slice(1)) {
+    const fullName = readCsvField(row, headerMap, ['Name', 'Full Name', 'From', 'To'])
+    const firstName = readCsvField(row, headerMap, ['First Name'])
+    const lastName = readCsvField(row, headerMap, ['Last Name'])
+    const name = fullName || `${firstName} ${lastName}`.trim()
+    if (name) names.add(normalizeNameKey(name))
+  }
+  return names
+}
+
+function buildLinkedInArchiveContext(input: {
+  positionsText: string | null
+  richMediaText: string | null
+  recommendationsReceivedText: string | null
+  recommendationsGivenText: string | null
+}): LinkedInArchiveContext {
+  return {
+    positions: parseLinkedInPositionsCsv(input.positionsText),
+    mediaEvents: parseLinkedInRichMediaCsv(input.richMediaText),
+    recommendedBy: parseLinkedInRecommendationNames(input.recommendationsReceivedText),
+    recommendedByMe: parseLinkedInRecommendationNames(input.recommendationsGivenText),
+  }
+}
+
+function createEmptyLinkedInArchiveContext(): LinkedInArchiveContext {
+  return {
+    positions: [],
+    mediaEvents: [],
+    recommendedBy: new Set(),
+    recommendedByMe: new Set(),
+  }
+}
+
+function classifyLinkedInSeniority(position: string) {
+  const value = position.toLowerCase()
+  if (/\b(founder|co-founder|ceo|cto|cfo|coo|cpo|cio|vp|vice president|partner|owner)\b/.test(value)) {
+    return 'LPR / C-Level'
+  }
+  if (/\b(head|director|manager|lead|principal|staff|coach)\b/.test(value)) {
+    return 'Management / Lead'
+  }
+  return 'Specialist'
+}
+
+function classifyLinkedInDomain(position: string) {
+  const value = position.toLowerCase()
+  if (/\b(engineer|developer|software|devops|data|architect|security|platform|backend|frontend|fullstack|ai|ml)\b/.test(value)) {
+    return 'Engineering'
+  }
+  if (/\b(product|program|project|scrum|agile|coach|delivery|pmo)\b/.test(value)) {
+    return 'Product / Agile'
+  }
+  if (/\b(hr|people|talent|recruit|recruiter|hiring|learning|culture)\b/.test(value)) {
+    return 'HR / Talent'
+  }
+  if (/\b(sales|marketing|growth|brand|community|business development|partnership)\b/.test(value)) {
+    return 'Sales / Marketing'
+  }
+  if (/\b(finance|accounting|investment|legal|operations|ops)\b/.test(value)) {
+    return 'Finance / Operations'
+  }
+  return 'Other'
+}
+
+function findSharedCompanyContext(company: string, connectedOn: string, positions: LinkedInUserPosition[]) {
+  const companyKey = normalizeCompanyKey(company)
+  if (!companyKey) return null
+
+  const connectedAt = parseLinkedInDate(connectedOn)
+  const match = positions.find((position) => normalizeCompanyKey(position.company) === companyKey)
+  if (!match) return null
+
+  const hasDateRange = match.startedAt !== null || match.finishedAt !== null
+  const wasDuringRole = connectedAt !== null &&
+    (match.startedAt === null || connectedAt >= match.startedAt) &&
+    (match.finishedAt === null || connectedAt <= match.finishedAt)
+
+  if (wasDuringRole) {
+    return `Shared company context: ${match.company}. This connection was added while your LinkedIn profile history included that company.`
+  }
+
+  if (hasDateRange) {
+    return `Shared company context: ${match.company} alumni or extended network.`
+  }
+
+  return `Shared company context: ${match.company}.`
+}
+
+function buildEventContextByDate(rows: string[][], headers: LinkedInConnectionsHeaders, mediaEvents: LinkedInMediaEvent[]) {
+  const eventByDate = new Map<string, string>()
+  if (headers.connectedOnIdx === -1 || mediaEvents.length === 0) return eventByDate
+
+  const countsByDate = new Map<string, number>()
+  for (const row of rows) {
+    const connectedAt = parseLinkedInDate(row[headers.connectedOnIdx] || '')
+    if (!connectedAt) continue
+    const key = dateKeyFromMs(connectedAt)
+    countsByDate.set(key, (countsByDate.get(key) ?? 0) + 1)
+  }
+
+  const counts = Array.from(countsByDate.values())
+  if (counts.length === 0) return eventByDate
+
+  const mean = counts.reduce((sum, count) => sum + count, 0) / counts.length
+  const variance = counts.reduce((sum, count) => sum + ((count - mean) ** 2), 0) / counts.length
+  const deviation = Math.sqrt(variance)
+  const spikeThreshold = Math.max(10, Math.ceil(mean + (deviation * 3)), 5)
+  const twoDaysMs = 2 * 24 * 60 * 60 * 1000
+
+  for (const [dateKey, count] of countsByDate) {
+    if (count < spikeThreshold) continue
+    const connectedAt = Date.parse(`${dateKey}T00:00:00.000Z`)
+    const nearbyEvent = mediaEvents.find((event) => Math.abs(event.dateMs - connectedAt) <= twoDaysMs)
+    if (!nearbyEvent) continue
+    eventByDate.set(dateKey, `Likely event context: ${nearbyEvent.label}. LinkedIn connections spiked around ${dateKey}.`)
+  }
+
+  return eventByDate
+}
+
+function makeLinkedInNote(title: string, body: string): PersonNote {
+  return {
+    id: `note-${slugifyId(title)}-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+    title,
+    body,
+  }
+}
+
+function appendUniquePersonNotes(person: PersonNode, notes: PersonNote[]) {
+  if (notes.length === 0) return { person, added: 0 }
+  const existingNotes = person.notes ? [...person.notes] : []
+  const existingKeys = new Set(existingNotes.map((note) => `${note.title}\n${note.body}`))
+  const nextNotes = [...existingNotes]
+  let added = 0
+
+  for (const note of notes) {
+    const key = `${note.title}\n${note.body}`
+    if (existingKeys.has(key)) continue
+    nextNotes.push(note)
+    existingKeys.add(key)
+    added += 1
+  }
+
+  return added > 0 ? { person: { ...person, notes: nextNotes }, added } : { person, added: 0 }
+}
+
+function buildDeterministicLinkedInNotes(input: {
+  name: string
+  company: string
+  position: string
+  connectedOn: string
+  context: LinkedInArchiveContext
+  eventContextByDate: Map<string, string>
+}) {
+  const notes: PersonNote[] = []
+
+  if (input.position) {
+    notes.push(makeLinkedInNote(
+      'Professional Context',
+      `Seniority: ${classifyLinkedInSeniority(input.position)}\nDomain: ${classifyLinkedInDomain(input.position)}`,
+    ))
+  }
+
+  const sharedCompanyContext = findSharedCompanyContext(input.company, input.connectedOn, input.context.positions)
+  if (sharedCompanyContext) {
+    notes.push(makeLinkedInNote('Shared Company Context', sharedCompanyContext))
+  }
+
+  const connectedAt = parseLinkedInDate(input.connectedOn)
+  const eventContext = connectedAt ? input.eventContextByDate.get(dateKeyFromMs(connectedAt)) : null
+  if (eventContext) {
+    notes.push(makeLinkedInNote('Event Context', eventContext))
+  }
+
+  const nameKey = normalizeNameKey(input.name)
+  if (input.context.recommendedBy.has(nameKey)) {
+    notes.push(makeLinkedInNote('Trust Context', 'Brand Advocate: this person recommended you on LinkedIn.'))
+  }
+  if (input.context.recommendedByMe.has(nameKey)) {
+    notes.push(makeLinkedInNote('Trust Context', 'Recommended by Me: you recommended this person on LinkedIn.'))
+  }
+
+  return notes
+}
+
 async function buildLinkedInConnectionsGraph(
   current: GraphState,
   csvText: string,
+  context: LinkedInArchiveContext = createEmptyLinkedInArchiveContext(),
 ): Promise<LinkedInConnectionsImportResult> {
   const rows = parseCSV(csvText)
   if (rows.length === 0) {
@@ -6879,6 +7247,7 @@ async function buildLinkedInConnectionsGraph(
   const dataRows = rows.slice(headerIdx + 1)
   const companyGroups = new Map<string, string[][]>()
   const requiredWidth = Math.max(importHeaders.firstNameIdx, importHeaders.lastNameIdx, importHeaders.companyIdx)
+  const eventContextByDate = buildEventContextByDate(dataRows, importHeaders, context.mediaEvents)
 
   for (let index = 0; index < dataRows.length; index += 1) {
     const row = dataRows[index]
@@ -6892,18 +7261,19 @@ async function buildLinkedInConnectionsGraph(
     }
   }
 
-  const nextCircles = current.circles.map((circle) => ({ ...circle }))
+  const nextCircles: CircleNode[] = current.circles.map((circle) => ({ ...circle }))
   for (const circle of nextCircles) {
     if (shouldRecolorLegacyLinkedInCompany(circle)) {
       circle.tone = toneForLinkedInCompany(circle.id)
     }
   }
-  const nextPeople = current.people.map((person) => ({
+  const nextPeople: PersonNode[] = current.people.map((person) => ({
     ...person,
     notes: person.notes ? person.notes.map((note) => ({ ...note })) : person.notes,
     links: person.links ? person.links.map((link) => ({ ...link })) : person.links,
   }))
   const existingPersonIds = new Set(nextPeople.map((person) => person.id))
+  const personIndexById = new Map(nextPeople.map((person, index) => [person.id, index]))
   const circlesById = new Map(nextCircles.map((circle) => [circle.id, circle]))
   const youCircle = circlesById.get('you')
   const youX = youCircle ? youCircle.x : 0
@@ -6914,6 +7284,7 @@ async function buildLinkedInConnectionsGraph(
   }
   let importedPeople = 0
   let importedCompanies = 0
+  let enrichedPeople = 0
 
   // Plan every company up front: its id, whether it already exists, and the radius
   // it needs to hold its members (sunflower-packed). New companies are then placed
@@ -6991,36 +7362,44 @@ async function buildLinkedInConnectionsGraph(
       if (!name) continue
 
       const personId = `linkedin-person-${slugifyId(name)}`
-      if (existingPersonIds.has(personId)) continue
-
       const position = importHeaders.positionIdx !== -1 ? memberRow[importHeaders.positionIdx] || '' : ''
       const url = importHeaders.urlIdx !== -1 ? memberRow[importHeaders.urlIdx] || '' : ''
       const email = importHeaders.emailIdx !== -1 ? memberRow[importHeaders.emailIdx] || '' : ''
       const connectedOn = importHeaders.connectedOnIdx !== -1 ? memberRow[importHeaders.connectedOnIdx] || '' : ''
+      const contextNotes = buildDeterministicLinkedInNotes({
+        name,
+        company: company.name,
+        position,
+        connectedOn,
+        context,
+        eventContextByDate,
+      })
+
+      if (existingPersonIds.has(personId)) {
+        const personIndex = personIndexById.get(personId)
+        if (personIndex !== undefined) {
+          const { person, added } = appendUniquePersonNotes(nextPeople[personIndex], contextNotes)
+          if (added > 0) {
+            nextPeople[personIndex] = person
+            enrichedPeople += 1
+          }
+        }
+        continue
+      }
+
       const offset = personPackOffset(slot)
       const notesList: PersonNote[] = []
 
       if (position) {
-        notesList.push({
-          id: `note-pos-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
-          title: 'Position',
-          body: position,
-        })
+        notesList.push(makeLinkedInNote('Position', position))
       }
       if (connectedOn) {
-        notesList.push({
-          id: `note-conn-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
-          title: 'Connected On',
-          body: connectedOn,
-        })
+        notesList.push(makeLinkedInNote('Connected On', connectedOn))
       }
       if (email) {
-        notesList.push({
-          id: `note-email-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
-          title: 'Email',
-          body: email,
-        })
+        notesList.push(makeLinkedInNote('Email', email))
       }
+      notesList.push(...contextNotes)
 
       const linksList: PersonLink[] = url
         ? [{
@@ -7046,7 +7425,9 @@ async function buildLinkedInConnectionsGraph(
       })
 
       existingPersonIds.add(personId)
+      personIndexById.set(personId, nextPeople.length - 1)
       importedPeople += 1
+      if (contextNotes.length > 0) enrichedPeople += 1
       slot += 1
 
       if (importedPeople > 0 && importedPeople % 250 === 0) {
@@ -7071,6 +7452,7 @@ async function buildLinkedInConnectionsGraph(
     graph: nextCircles.length + nextPeople.length > IMPORT_LAYOUT_LIMIT ? built : ensureContainment(built),
     importedPeople,
     importedCompanies,
+    enrichedPeople,
   }
 }
 

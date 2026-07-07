@@ -135,6 +135,9 @@ Safety invariants:
   import/export/clear.
 - Search (toolbar): local ranked search; signed-in natural-language **smart search** via AI;
   paste LinkedIn profile URL to import one person.
+- LinkedIn ZIP import reads `Connections.csv`, groups people by company, and, when present,
+  uses non-LLM Part 1 context files (`Positions.csv`, `Rich_Media.csv`, recommendations)
+  to add derived person notes. It does not read or persist raw message or invitation text.
 - Anonymous users see a red `!` badge on the Settings gear until they open the LinkedIn
   sync guide from the `?` helper inside Settings (not a floating banner).
 - The LinkedIn sync guide `?` inside Settings shows the same badge until the user opens

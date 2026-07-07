@@ -12,9 +12,18 @@ not thousands of per-contact database writes.
 
 ## Behavior
 
-- LinkedIn ZIP import reads `Connections.csv` from the uploaded archive.
+- LinkedIn ZIP import reads `Connections.csv` from the uploaded archive. When present, it
+  also reads Part 1 context files (`Positions.csv`, `Rich_Media.csv`,
+  `Recommendations_Received.csv`, `Recommendations_Given.csv`) to add deterministic
+  context notes.
 - The import groups people by company, creates missing company circles, and adds new
   people under those circles.
+- Deterministic context is stored only as regular person notes: `Professional Context`,
+  `Shared Company Context`, `Event Context`, and `Trust Context`. Re-imports add missing
+  context notes to existing imported people without duplicating the same `title + body`.
+- The import does not read or persist raw message or invitation text. `messages.csv`,
+  `guide_messages.csv`, and `Invitations.csv` are intentionally left out of this
+  non-LLM enrichment pass.
 - New LinkedIn company circles use a stable deterministic tone from the Material 3 circle
   palette instead of defaulting every imported company to blue. Existing company circles
   keep their current tone on re-import, except legacy default-blue LinkedIn company circles
