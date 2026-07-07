@@ -36,6 +36,11 @@ not thousands of per-contact database writes.
   exact matched `personIds` when the browser can resolve them from profile URLs, names, or
   profile slugs. Message context is capped per batch with a per-person balance so one long
   conversation cannot crowd out another matched person's correspondence.
+- When both `messages.csv` and `guide_messages.csv` exist, `messages.csv` is preferred and
+  any non-empty guide rows are appended. Header-only `guide_messages.csv` files must not
+  mask the real message export. Name fallback matching requires all meaningful name parts
+  to be present, preventing one shared first name or surname from assigning messages to the
+  wrong person.
 - New LinkedIn company circles use a stable deterministic tone from the Material 3 circle
   palette instead of defaulting every imported company to blue. Existing company circles
   keep their current tone on re-import, except legacy default-blue LinkedIn company circles

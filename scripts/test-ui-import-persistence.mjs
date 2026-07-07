@@ -293,6 +293,7 @@ async function buildLinkedInZip(args) {
   await zipWriter.add('Connections.csv', new TextReader(csv))
   await zipWriter.add('Shares.csv', new TextReader(buildSharesCsv()))
   await zipWriter.add('messages.csv', new TextReader(buildMessagesCsv()))
+  await zipWriter.add('guide_messages.csv', new TextReader('CONVERSATION ID,CONVERSATION TITLE,FROM,SENDER PROFILE URL,TO,RECIPIENT PROFILE URLS,DATE,SUBJECT,CONTENT,FOLDER\n'))
   const blob = await zipWriter.close()
   return Buffer.from(await blob.arrayBuffer())
 }

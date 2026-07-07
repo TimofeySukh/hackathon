@@ -24,8 +24,13 @@ rediscover, write it here.
 - Decision: Browser-side message and invitation matching attaches resolved `personIds`
   before calling `enrich-linkedin-archive`, and message caps are balanced per person so
   one long thread does not crowd out another connection's messages.
+- Decision: Prefer the real `messages.csv` export over header-only `guide_messages.csv`
+  and require all meaningful name parts for name fallback matching.
 - Why: Relationship summaries are a core product feature; making the model infer the
   matched person from batch-level message lists left long correspondence without notes.
+  Some LinkedIn exports include an empty guide message file beside the real message file,
+  and loose one-token name matching created false positives between people who shared a
+  first name or surname.
 
 ### 2026-07-07 — LinkedIn archive context starts automatically
 

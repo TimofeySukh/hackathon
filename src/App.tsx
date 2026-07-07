@@ -7222,6 +7222,23 @@ async function readOptionalZipTextEntry(entries: zip.Entry[], fileName: string):
   return entry ? readZipTextEntry(entry) : null
 }
 
+function serializeCsvCell(value: string) {
+  return /[",\n\r]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value
+}
+
+function mergeLinkedInMessageCsvTexts(primaryText: string | null, fallbackText: string | null) {
+  if (!primaryText?.trim()) return fallbackText
+  if (!fallbackText?.trim()) return primaryText
+
+  const primaryRows = parseCSV(primaryText)
+  const fallbackRows = parseCSV(fallbackText)
+  const primaryHasData = primaryRows.length > 1
+  const fallbackHasData = fallbackRows.length > 1
+  if (primaryHasData && fallbackHasData) return `${primaryText.trim()}\n${fallbackRows.slice(1).map((row) => row.map(serializeCsvCell).join(',')).join('\n')}`
+  if (primaryHasData) return primaryText
+  return fallbackText
+}
+
 async function readLinkedInArchiveZip(file: File): Promise<LinkedInArchiveZipTexts> {
   const zipReader = new zip.ZipReader(new zip.BlobReader(file))
   try {
@@ -7238,6 +7255,7 @@ async function readLinkedInArchiveZip(file: File): Promise<LinkedInArchiveZipTex
       recommendationsReceivedText,
       recommendationsGivenText,
       messagesText,
+      guideMessagesText,
       invitationsText,
       sharesText,
     ] = await Promise.all([
@@ -7246,7 +7264,8 @@ async function readLinkedInArchiveZip(file: File): Promise<LinkedInArchiveZipTex
       readOptionalZipTextEntry(entries, 'Rich_Media.csv'),
       readOptionalZipTextEntry(entries, 'Recommendations_Received.csv'),
       readOptionalZipTextEntry(entries, 'Recommendations_Given.csv'),
-      readOptionalZipTextEntry(entries, 'guide_messages.csv').then((text) => text ?? readOptionalZipTextEntry(entries, 'messages.csv')),
+      readOptionalZipTextEntry(entries, 'messages.csv'),
+      readOptionalZipTextEntry(entries, 'guide_messages.csv'),
       readOptionalZipTextEntry(entries, 'Invitations.csv'),
       readOptionalZipTextEntry(entries, 'Shares.csv'),
     ])
@@ -7257,7 +7276,7 @@ async function readLinkedInArchiveZip(file: File): Promise<LinkedInArchiveZipTex
       richMediaText,
       recommendationsReceivedText,
       recommendationsGivenText,
-      messagesText,
+      messagesText: mergeLinkedInMessageCsvTexts(messagesText, guideMessagesText),
       invitationsText,
       sharesText,
     }
@@ -7762,8 +7781,7 @@ function textMentionsNameLoosely(value: string, name: string) {
   const normalizedValue = normalizeNameKey(value)
   const parts = normalizeNameKey(name).split(' ').filter((part) => part.length >= 3)
   if (parts.length === 0) return false
-  if (parts.every((part) => normalizedValue.includes(part))) return true
-  return parts.length >= 2 && parts.some((part) => normalizedValue.includes(part))
+  return parts.every((part) => normalizedValue.includes(part))
 }
 
 function textMentionsLinkedInSlug(value: string, profileUrl?: string) {
