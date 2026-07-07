@@ -395,12 +395,12 @@ Specific rules:
 - Ignore personal life posts, generic marketing posts, reposts without event context, image descriptions with no event, and posts unrelated to networking.
 - Resolve relative dates only when the post date is provided; otherwise say "date unknown".
 - Correlate events to people only when:
-  1. the event/post date is on or up to two days before their Connected On date, OR
+  1. the event/post date is on, up to two days before, or up to three days after their Connected On date, OR
   2. the post explicitly mentions their name.
 - Output title "AI Event Context".
 - Body format: "Event: <clean event name>\\nDate: <YYYY-MM-DD or unknown>\\nContext: <why this person is linked>\\nHighlights: <1-2 durable highlights>".
 - If correlation is only date-spike based, start Context with "Likely".
-- Never correlate a person to an event/post that happened after their Connected On date unless the post explicitly mentions that person.
+- Never correlate a person to an event that happened after their Connected On date (though the post recap itself may be published up to three days after their Connected On date) unless the post explicitly mentions that person.
 - Do not attach an event to every connection unless the evidence supports the batch date correlation.`,
     user: {
       connections: compactConnections(input.connections),
