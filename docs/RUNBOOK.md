@@ -49,7 +49,7 @@ Required Vite variables:
 Recommended teammate setup:
 
 ```bash
-VITE_SUPABASE_URL=https://lxnrpdeahoglgiocowsh.supabase.co
+VITE_SUPABASE_URL=https://lycfoukfoesobeuumuad.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_l_x_y5rxdhL8Sd1ZE3QXag_lOCtr_M9
 VITE_SUPABASE_ANON_KEY=
 ```
@@ -292,7 +292,7 @@ Create the server-only build env file before the first production build:
 
 ```bash
 cat > ~/apps/social-datanode-live-autodeploy/deploy.env <<'EOF'
-VITE_SUPABASE_URL=https://lxnrpdeahoglgiocowsh.supabase.co
+VITE_SUPABASE_URL=https://lycfoukfoesobeuumuad.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=<publishable-key-from-supabase>
 VITE_SUPABASE_ANON_KEY=
 EOF
@@ -523,7 +523,7 @@ Teammate quick-start:
 3. Fill in `.env.local`:
 
    ```bash
-   VITE_SUPABASE_URL=https://lxnrpdeahoglgiocowsh.supabase.co
+   VITE_SUPABASE_URL=https://lycfoukfoesobeuumuad.supabase.co
    VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_l_x_y5rxdhL8Sd1ZE3QXag_lOCtr_M9
    VITE_SUPABASE_ANON_KEY=
    ```
@@ -647,7 +647,7 @@ Google Cloud OAuth setup:
 - Keep the Supabase callback as the Authorized redirect URI:
 
 ```text
-https://lxnrpdeahoglgiocowsh.supabase.co/auth/v1/callback
+https://lycfoukfoesobeuumuad.supabase.co/auth/v1/callback
 ```
 
 The Supabase Google provider also needs the Google OAuth Client ID and Client Secret before `Sign in with Google` can complete.

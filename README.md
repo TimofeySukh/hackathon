@@ -32,7 +32,7 @@ and server-side LinkedIn profile enrichment. Without them, signed-out local edit
 Recommended local env:
 
 ```bash
-VITE_SUPABASE_URL=https://lxnrpdeahoglgiocowsh.supabase.co
+VITE_SUPABASE_URL=https://lycfoukfoesobeuumuad.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_l_x_y5rxdhL8Sd1ZE3QXag_lOCtr_M9
 VITE_SUPABASE_ANON_KEY=
 ```
