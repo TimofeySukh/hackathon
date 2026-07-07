@@ -140,6 +140,25 @@ Large Language Models (LLMs) are used to extract structure and intent from unstr
     }
     ```
 
+### Task D: Event & Post Content Analyzer
+*   **Input:** Post description text from `Rich_Media.csv` (or `Shares.csv`) and the post publication date.
+*   **Prompt Goal:** Identify if the post describes a professional event (e.g., hackathon, conference, meetup, office visit). If so, extract the event's clean name, resolved event date (resolving relative dates like "yesterday" or "last weekend" based on the post date), key highlights, and names of any people mentioned along with their context.
+*   **Expected Output Format (JSON):**
+    ```json
+    {
+      "is_professional_event": true,
+      "event_name": "AI Meetup",
+      "event_date": "2026-07-06", // YYYY-MM-DD (resolved relative to post publication date)
+      "event_highlights": ["Sam Altman joined the panel discussion", "shared latest API updates"],
+      "mentioned_people": [
+        {
+          "name": "Ivan Ivanov",
+          "context": "Organized the meetup and panel discussion"
+        }
+      ]
+    }
+    ```
+
 ---
 
 ## 4. Deterministic Processing & Matching Engine
@@ -152,14 +171,14 @@ These modules run locally using deterministic code (SQL/JavaScript/Python) to li
     *   If `Connection.Company` matches `User.Position.CompanyName` AND the connection was added or active during the User's employment period, apply tag: `<CompanyName> Mafia` (e.g., `Avito Mafia`, `Yandex Alumni`).
 *   **Value:** Groups former and current teammates automatically.
 
-### Module 2: Time-Clustering & Event Correlation Engine
-*   **Logic:** Detects spike events where a high number of connections were added, and correlates them with the user's posts.
-*   **Algorithm:**
-    1.  Group `Connections.csv` by `Connected On` date.
-    2.  Identify dates where the count of new connections deviates significantly from the moving average (e.g., > 3 standard deviations, or a flat threshold like > 10 additions in 48 hours).
-    3.  Query `Rich_Media.csv` for posts published within a 2-day window of the detected spike.
-    4.  Extract hashtags and key nouns from the post description (e.g., `#RoyalHacks`, `workshop at IT-Universitetet`).
-    5.  **Output Proposal:** Suggest applying the event tag (e.g., `RoyalHacks`) to all connections added during that spike.
+### Module 2: AI-Driven Event & Relationship Correlation Engine
+*   **Logic:** Correlates connection spikes with LLM-extracted event details from posts, propagating highlights to group members, and linking mentioned people directly to their profiles.
+*   **Workflow:**
+    1.  **Post Parsing:** Analyze posts via the LLM (Task D) to create structured event entries (name, resolved date, highlights, mentions).
+    2.  **Spike Detection:** Scan `Connections.csv` to find dates with connection addition spikes (deviating from normal baseline).
+    3.  **Date Matching:** Correlate connections added on a specific date with the resolved *event date* from the post (within a 2-day window).
+    4.  **Group Enrichment:** Apply the event tag to all connections added on that date and append a note detailing the event highlights (e.g., *"Met at the AI Meetup on 2026-07-06. Note: Sam Altman joined the panel discussion"*).
+    5.  **Individual Mention Enrichment:** Find the graph node matching any person listed in `mentioned_people` and append their custom note (e.g., *"Organized the AI Meetup on 2026-07-06"*).
 
 ### Module 3: Trust & Advocate Classifier
 *   **Logic:** Matches names in recommendations with the connection list.
