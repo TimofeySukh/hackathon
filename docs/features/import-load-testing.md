@@ -21,9 +21,10 @@ not thousands of per-contact database writes.
 - Deterministic context is stored only as regular person notes: `Professional Context`,
   `Shared Company Context`, `Event Context`, and `Trust Context`. Re-imports add missing
   context notes to existing imported people without duplicating the same `title + body`.
-- `Event Context` is attached when a connection date is within two days of a LinkedIn
-  post date; large same-day connection spikes still produce stronger wording, but a spike
-  is no longer required.
+- `Event Context` is attached when a LinkedIn post date is on or up to two days before a
+  connection date; future posts/events are not attached to earlier connections. Large
+  same-day connection spikes still produce stronger wording, but a spike is no longer
+  required.
 - For signed-in users, the app automatically calls the `enrich-linkedin-archive` Edge
   Function after the ZIP import finishes. LLM notes are generated from `messages.csv` /
   `guide_messages.csv`, `Invitations.csv`, and post exports. The archive stays in memory

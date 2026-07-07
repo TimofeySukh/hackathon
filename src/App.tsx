@@ -7675,8 +7675,8 @@ function buildEventContextByDate(rows: string[][], headers: LinkedInConnectionsH
   for (const [dateKey, count] of countsByDate) {
     const connectedAt = Date.parse(`${dateKey}T00:00:00.000Z`)
     const nearbyEvent = mediaEvents
-      .map((event) => ({ event, distance: Math.abs(event.dateMs - connectedAt) }))
-      .filter((candidate) => candidate.distance <= twoDaysMs)
+      .map((event) => ({ event, distance: connectedAt - event.dateMs }))
+      .filter((candidate) => candidate.distance >= 0 && candidate.distance <= twoDaysMs)
       .sort((left, right) => left.distance - right.distance)[0]?.event
     if (!nearbyEvent) continue
     if (count >= spikeThreshold) {
@@ -7698,15 +7698,42 @@ function makeLinkedInNote(title: string, body: string): PersonNote {
   }
 }
 
+function normalizeEventKeyPart(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ')
+}
+
+function getLinkedInEventNoteKey(note: PersonNote) {
+  if (note.title !== 'Event Context' && note.title !== 'AI Event Context') return null
+
+  const dateMatch = note.body.match(/\b(?:Date|dated)\s*:?\s*(\d{4}-\d{2}-\d{2})\b/i)
+  const eventMatch = note.body.match(/\bEvent:\s*([^\n]+)/i)
+  if (eventMatch) {
+    const eventName = normalizeEventKeyPart(eventMatch[1])
+    return eventName ? `event:${dateMatch?.[1] ?? 'unknown'}:${eventName}` : null
+  }
+
+  const deterministicMatch = note.body.match(/^Likely event context:\s*([^.]+)\./i)
+  if (deterministicMatch) {
+    const eventName = normalizeEventKeyPart(deterministicMatch[1])
+    return eventName ? `event:${dateMatch?.[1] ?? 'unknown'}:${eventName}` : null
+  }
+
+  return null
+}
+
+function getPersonNoteDedupeKey(note: PersonNote) {
+  return getLinkedInEventNoteKey(note) ?? `${note.title}\n${note.body}`
+}
+
 function appendUniquePersonNotes(person: PersonNode, notes: PersonNote[]) {
   if (notes.length === 0) return { person, added: 0 }
   const existingNotes = person.notes ? [...person.notes] : []
-  const existingKeys = new Set(existingNotes.map((note) => `${note.title}\n${note.body}`))
+  const existingKeys = new Set(existingNotes.map(getPersonNoteDedupeKey))
   const nextNotes = [...existingNotes]
   let added = 0
 
   for (const note of notes) {
-    const key = `${note.title}\n${note.body}`
+    const key = getPersonNoteDedupeKey(note)
     if (existingKeys.has(key)) continue
     nextNotes.push(note)
     existingKeys.add(key)
@@ -7717,10 +7744,10 @@ function appendUniquePersonNotes(person: PersonNode, notes: PersonNote[]) {
 }
 
 function countNewNoteTitles(person: PersonNode, notes: PersonNote[]) {
-  const existingKeys = new Set((person.notes ?? []).map((note) => `${note.title}\n${note.body}`))
+  const existingKeys = new Set((person.notes ?? []).map(getPersonNoteDedupeKey))
   const counts: Record<string, number> = {}
   for (const note of notes) {
-    const key = `${note.title}\n${note.body}`
+    const key = getPersonNoteDedupeKey(note)
     if (existingKeys.has(key)) continue
     existingKeys.add(key)
     counts[note.title] = (counts[note.title] ?? 0) + 1
@@ -8009,7 +8036,11 @@ function filterPostsForConnections(posts: LinkedInArchivePostInput[], connection
   return posts.filter((post) => {
     const postDate = post.date ? parseLinkedInDate(post.date) : null
     if (!postDate) return false
-    return Array.from(connectedDates).some((dateKey) => Math.abs(postDate - Date.parse(`${dateKey}T00:00:00.000Z`)) <= twoDaysMs)
+    return Array.from(connectedDates).some((dateKey) => {
+      const connectedAt = Date.parse(`${dateKey}T00:00:00.000Z`)
+      const distance = connectedAt - postDate
+      return distance >= 0 && distance <= twoDaysMs
+    })
   }).slice(0, 30)
 }
 

@@ -95,7 +95,15 @@ function startMockGraphApi({ port }) {
       if (request.method === 'POST' && isLinkedInArchiveEnrichmentRoute) {
         const body = await readBody(request)
         state.enrichmentRequests.push(body)
-        jsonResponse(response, 200, { notes: [] })
+        jsonResponse(response, 200, {
+          notes: [
+            {
+              personId: 'linkedin-person-persist1-person1',
+              title: 'AI Event Context',
+              body: 'Event: RoyalHacks\nDate: 2026-06-14\nContext: Likely connected due to recent connection date.\nHighlights: Builders and AI engineers met.',
+            },
+          ],
+        })
         return
       }
 
@@ -261,6 +269,7 @@ function buildSharesCsv() {
   return [
     ['Date', 'Share Commentary'],
     ['2026-06-14', 'Great conversations at #RoyalHacks with builders, founders, and AI engineers.'],
+    ['2026-06-15', 'Future event recap from #FutureForum after these connections were already added.'],
   ].map((row) => row.map(csvCell).join(',')).join('\n')
 }
 
@@ -473,6 +482,7 @@ async function main() {
     })
     await waitForImportedPeople(mock, args.people)
     const enrichmentRequest = await waitForEnrichmentRequest(mock)
+    await new Promise((resolve) => setTimeout(resolve, 1000))
     const zipMessage = 'LinkedIn ZIP imported without blocking dialog'
 
     if (mock.state.graph?.people?.length !== args.people) {
@@ -483,6 +493,16 @@ async function main() {
     const eventContext = firstImportedPerson?.notes?.find((note) => note.title === 'Event Context')
     if (!eventContext?.body.includes('RoyalHacks')) {
       throw new Error(`ZIP import did not add deterministic event context from Shares.csv: ${JSON.stringify(firstImportedPerson?.notes ?? [])}.`)
+    }
+    const eventNotesAfterAi = firstImportedPerson?.notes?.filter((note) => note.title === 'Event Context' || note.title === 'AI Event Context') ?? []
+    if (eventNotesAfterAi.length !== 1) {
+      throw new Error(`ZIP import kept duplicate deterministic/AI notes for the same event: ${JSON.stringify(eventNotesAfterAi)}.`)
+    }
+    if (eventContext.body.includes('FutureForum')) {
+      throw new Error(`ZIP import attached a future event to an earlier connection: ${eventContext.body}.`)
+    }
+    if ((enrichmentRequest.posts ?? []).some((post) => String(post.description ?? '').includes('FutureForum'))) {
+      throw new Error(`Archive AI request included a future post for an earlier connection: ${JSON.stringify(enrichmentRequest.posts ?? [])}.`)
     }
     const thirdPersonMessage = enrichmentRequest.messages?.find((message) =>
       Array.isArray(message.personIds) && message.personIds.includes('linkedin-person-persist3-person3')

@@ -32,6 +32,17 @@ rediscover, write it here.
   and loose one-token name matching created false positives between people who shared a
   first name or surname.
 
+### 2026-07-07 — LinkedIn event context is past-only
+
+- Decision: Event matching only considers posts/events on the connection date or up to
+  two days before it. Future events are excluded unless a post explicitly names the person
+  in the LLM path.
+- Decision: Deterministic `Event Context` and returned `AI Event Context` are deduped by
+  canonical event date/name so the same event does not create two cards.
+- Why: A connection created before an event should not be attributed to that later event,
+  and deterministic plus AI event enrichment can otherwise produce duplicate notes for the
+  same relationship context.
+
 ### 2026-07-07 — LinkedIn archive context starts automatically
 
 - Decision: Signed-in ZIP imports now start `enrich-linkedin-archive` immediately after
