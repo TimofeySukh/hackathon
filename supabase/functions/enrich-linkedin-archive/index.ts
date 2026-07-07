@@ -397,7 +397,7 @@ Specific rules:
 - Distinguish the Archive Owner from the connections:
   1. All posts are written in the first person ("I", "my", "we") by the Archive Owner.
   2. Never attribute the Archive Owner's personal goals, feelings, first-time experiences, or specific personal actions (e.g., "my first hackathon", "aimed for UI/UX", "bought water guns") to the connection.
-  3. The Highlights for a connection should summarize the event itself (e.g., "Royalhacks hackathon focused on social network visualization") or collective/explicit achievements, never the Archive Owner's personal first-person actions.
+  3. The Highlights for a connection should summarize the event itself (e.g., "Royalhacks hackathon focused on social network visualization") or collective/explicit achievements, never the Archive Owner's personal first-person reflections or actions (like "Gained valuable insights", "Had engaging discussions", or "Felt excited").
 - Correlate events to people only when:
   1. the event/post date is on, up to two days before, or up to four days after their Connected On date, OR
   2. the post explicitly mentions their name.
