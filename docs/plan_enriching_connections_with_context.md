@@ -256,3 +256,45 @@ Enriching hundreds or thousands of profiles using LLM API calls takes time (due 
 3.  **Partial Data States:**
     *   Profiles that are not yet processed by the LLM should display a loading skeleton or a placeholder (e.g., *"Generating AI summary..."*) in their detail views, rather than failing or remaining empty.
 
+---
+
+## 7. API Routing & Model Tier Configuration (Smart vs. Fast)
+
+To support flexible and easily swappable API keys and models without hardcoding, the system abstracts the LLM Layer into two logical client pools: **Smart LLM** (highly capable, rate-limited/expensive) and **Fast LLM** (cheaper, higher throughput).
+
+### A. The Abstraction Layer
+The application code does not interact with specific providers (like OpenAI or Anthropic) directly. Instead, it interacts with two wrapper functions:
+*   `callSmartLLM(prompt, options)` -> Used for complex reasoning.
+*   `callFastLLM(prompt, options)` -> Used for simple extraction/parsing.
+
+### B. Configuration Schema (JSON / Environment Variables)
+All API keys, endpoints, and model identifiers are stored in a configuration file (or `.env` environment variables). Changing the keys or switching from Gemini to OpenAI only requires updating this config.
+
+```json
+{
+  "SMART_LLM_CONFIG": {
+    "provider": "anthropic", // anthropic, openai, gemini, openrouter
+    "apiKey": "YOUR_SMART_API_KEY",
+    "model": "claude-3-5-sonnet-latest",
+    "baseURL": "https://api.anthropic.com/v1"
+  },
+  "FAST_LLM_CONFIG": {
+    "provider": "openai",
+    "apiKey": "YOUR_FAST_API_KEY",
+    "model": "gpt-4o-mini",
+    "baseURL": "https://api.openai.com/v1"
+  }
+}
+```
+
+### C. Task Routing Registry
+Tasks are mapped to these configuration pools in a central routing map. If a model tier becomes cheaper or more capable, tasks can be re-routed by changing this registry:
+
+| Task ID | Task Name | Routed Client | Reason |
+| :--- | :--- | :--- | :--- |
+| **Task A** | Chat Transcript Summarizer | `SmartLLMClient` | Requires processing long dialogue context and subtle nuance. |
+| **Task D** | Event & Post Content Analyzer | `SmartLLMClient` | Requires extraction of dates, names, and custom highlights from unstructured posts. |
+| **Task B** | Invitation Note Parser | `FastLLMClient` | Requires quick, low-cost extraction from very short texts (1-3 sentences). |
+| **Task C** | Job Title Classifier | `FastLLMClient` | Simple mapping of a single job title string to category enums. |
+
+
