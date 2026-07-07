@@ -568,13 +568,13 @@ Required OpenRouter secrets for signed-in LinkedIn archive AI enrichment:
 
 ```bash
 supabase secrets set OPENROUTER_API_KEY=your-openrouter-key
-supabase secrets set OPENROUTER_SMART_MODEL=openai/gpt-4o-mini
-supabase secrets set OPENROUTER_FAST_MODEL=deepseek/deepseek-chat-v3-0324
+supabase secrets set OPENROUTER_MODEL=deepseek/deepseek-chat-v3-0324
 ```
 
-`OPENROUTER_SMART_MODEL` and `OPENROUTER_FAST_MODEL` are optional overrides. The archive
-enrichment function sends message, invitation, and post excerpts only for transient LLM
-processing and returns derived notes; raw archive text is not persisted in `user_graphs`.
+`OPENROUTER_MODEL` is optional; all archive enrichment tasks use the same DeepSeek model by
+default. The archive enrichment function sends message, invitation, and post excerpts only
+for transient LLM processing and returns derived notes; raw archive text is not persisted
+in `user_graphs`.
 
 Required secrets for signed-in natural-language smart search (`POST /v1/search/smart`):
 

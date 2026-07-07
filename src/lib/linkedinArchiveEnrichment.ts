@@ -10,6 +10,7 @@ export type LinkedInArchiveConnectionInput = {
 }
 
 export type LinkedInArchiveMessageInput = {
+  personIds?: string[]
   conversationId?: string
   from?: string
   senderProfileUrl?: string
@@ -21,6 +22,7 @@ export type LinkedInArchiveMessageInput = {
 }
 
 export type LinkedInArchiveInvitationInput = {
+  personIds?: string[]
   from?: string
   to?: string
   sentAt?: string

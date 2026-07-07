@@ -17,6 +17,16 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-07-07 — LinkedIn archive messages carry exact person ids
+
+- Decision: Archive AI enrichment now uses a single DeepSeek OpenRouter model for every
+  task, with no fast/flash tier.
+- Decision: Browser-side message and invitation matching attaches resolved `personIds`
+  before calling `enrich-linkedin-archive`, and message caps are balanced per person so
+  one long thread does not crowd out another connection's messages.
+- Why: Relationship summaries are a core product feature; making the model infer the
+  matched person from batch-level message lists left long correspondence without notes.
+
 ### 2026-07-07 — LinkedIn archive context starts automatically
 
 - Decision: Signed-in ZIP imports now start `enrich-linkedin-archive` immediately after

@@ -2,11 +2,10 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
-const DEFAULT_SMART_MODEL = 'deepseek/deepseek-chat-v3-0324'
-const DEFAULT_FAST_MODEL = 'deepseek/deepseek-chat-v3-0324'
+const DEFAULT_OPENROUTER_MODEL = 'deepseek/deepseek-chat-v3-0324'
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 const MAX_CONNECTIONS_PER_REQUEST = 12
-const MAX_TEXT_CHARS = 12000
+const MAX_TEXT_CHARS = 24000
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -24,6 +23,7 @@ type ConnectionInput = {
 }
 
 type MessageInput = {
+  personIds?: string[]
   conversationId?: string
   from?: string
   senderProfileUrl?: string
@@ -35,6 +35,7 @@ type MessageInput = {
 }
 
 type InvitationInput = {
+  personIds?: string[]
   from?: string
   to?: string
   sentAt?: string
@@ -135,6 +136,9 @@ function normalizeMessage(value: unknown): MessageInput | null {
   const content = pickString(record.content)
   if (!content) return null
   return {
+    personIds: Array.isArray(record.personIds)
+      ? record.personIds.map(pickString).filter((item): item is string => Boolean(item))
+      : undefined,
     conversationId: pickString(record.conversationId),
     from: pickString(record.from),
     senderProfileUrl: pickString(record.senderProfileUrl),
@@ -152,6 +156,9 @@ function normalizeInvitation(value: unknown): InvitationInput | null {
   const message = pickString(record.message)
   if (!message) return null
   return {
+    personIds: Array.isArray(record.personIds)
+      ? record.personIds.map(pickString).filter((item): item is string => Boolean(item))
+      : undefined,
     from: pickString(record.from),
     to: pickString(record.to),
     sentAt: pickString(record.sentAt),
@@ -183,7 +190,7 @@ function normalizeBody(value: unknown) {
   return {
     connections,
     messages: Array.isArray(record.messages)
-      ? record.messages.map(normalizeMessage).filter((item): item is MessageInput => item !== null).slice(0, 80)
+      ? record.messages.map(normalizeMessage).filter((item): item is MessageInput => item !== null).slice(0, 160)
       : [],
     invitations: Array.isArray(record.invitations)
       ? record.invitations.map(normalizeInvitation).filter((item): item is InvitationInput => item !== null).slice(0, 40)
@@ -199,8 +206,7 @@ function getOpenRouterConfig() {
   if (!apiKey) throw new Error('Missing required environment variable: OPENROUTER_API_KEY')
   return {
     apiKey,
-    smartModel: Deno.env.get('OPENROUTER_SMART_MODEL') ?? DEFAULT_SMART_MODEL,
-    fastModel: Deno.env.get('OPENROUTER_FAST_MODEL') ?? DEFAULT_FAST_MODEL,
+    model: Deno.env.get('OPENROUTER_MODEL') ?? DEFAULT_OPENROUTER_MODEL,
   }
 }
 
@@ -248,19 +254,15 @@ Global rules:
 - Each note body must be under 120 words.
 - Prefer one high-signal note over several weak notes.`
 
-type LlmTier = 'smart' | 'fast'
-
 async function callOpenRouterJson(input: {
-  tier: LlmTier
   system: string
   user: unknown
   maxTokens?: number
 }): Promise<unknown | null> {
   const config = getOpenRouterConfig()
 
-  const model = input.tier === 'smart' ? config.smartModel : config.fastModel
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 30000)
+  const timeout = setTimeout(() => controller.abort(), 45000)
 
   try {
     const response = await fetch(OPENROUTER_URL, {
@@ -273,7 +275,7 @@ async function callOpenRouterJson(input: {
         'X-OpenRouter-Title': 'Social Datanode',
       },
       body: JSON.stringify({
-        model,
+        model: config.model,
         temperature: 0.1,
         max_tokens: input.maxTokens ?? 1400,
         messages: [
@@ -299,7 +301,6 @@ async function callOpenRouterJson(input: {
 }
 
 async function callTaskForNotes(input: {
-  tier: LlmTier
   system: string
   user: unknown
   allowedPersonIds: Set<string>
@@ -324,13 +325,13 @@ async function runInvitationParser(input: ReturnType<typeof normalizeBody>, allo
   if (input.invitations.length === 0) return []
 
   return callTaskForNotes({
-    tier: 'fast',
     allowedPersonIds,
     system: `Task B: Invitation Note Parser for Social Datanode.
 
 ${OUTPUT_CONTRACT}
 
 Specific rules:
+- Invitations may include personIds. Treat those as the authoritative mapping from invitation to connection.
 - Infer origin context only from short invitation notes and sender/recipient names.
 - Ignore greetings, signatures, generic networking text, sales spam, and empty courtesy phrases.
 - Extract concrete origins only: event name, company/team, shared project, referral, role relation, hiring/recruiting context, speaker/audience context.
@@ -349,13 +350,13 @@ async function runChatTranscriptSummarizer(input: ReturnType<typeof normalizeBod
   if (input.messages.length === 0) return []
 
   return callTaskForNotes({
-    tier: 'smart',
     allowedPersonIds,
     system: `Task A: Chat Transcript Summarizer for Social Datanode.
 
 ${OUTPUT_CONTRACT}
 
 Specific rules:
+- Each message may include personIds. Treat those as the authoritative mapping from message to connection.
 - Summarize only relationship context that helps the user remember who the person is and why they matter.
 - Ignore boilerplate, scheduling noise, auto-replies, greetings, signatures, repeated "thanks", and unrelated platform noise.
 - Do not quote raw messages. Paraphrase the durable context.
@@ -370,7 +371,7 @@ Specific rules:
       connections: compactConnections(input.connections),
       messages: input.messages,
     },
-    maxTokens: 1800,
+    maxTokens: 2600,
   })
 }
 
@@ -378,7 +379,6 @@ async function runEventPostAnalyzer(input: ReturnType<typeof normalizeBody>, all
   if (input.posts.length === 0) return []
 
   return callTaskForNotes({
-    tier: 'smart',
     allowedPersonIds,
     system: `Task D: Event & Post Content Analyzer for Social Datanode.
 

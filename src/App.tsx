@@ -7916,31 +7916,68 @@ function buildLinkedInArchiveLlmContext(input: {
   }
 }
 
+function limitArchiveContextByPerson<T extends { personIds?: string[] }>(items: T[], maxItems: number, maxPerPerson: number) {
+  const selected: T[] = []
+  const selectedKeys = new Set<string>()
+  const countByPerson = new Map<string, number>()
+
+  for (const item of items) {
+    if (selected.length >= maxItems) break
+    const personIds = item.personIds ?? []
+    if (personIds.length === 0) continue
+    if (personIds.every((personId) => (countByPerson.get(personId) ?? 0) >= maxPerPerson)) continue
+    const key = JSON.stringify(item)
+    if (selectedKeys.has(key)) continue
+    selected.push(item)
+    selectedKeys.add(key)
+    for (const personId of personIds) {
+      countByPerson.set(personId, (countByPerson.get(personId) ?? 0) + 1)
+    }
+  }
+
+  if (selected.length >= maxItems) return selected
+
+  for (const item of items) {
+    if (selected.length >= maxItems) break
+    const key = JSON.stringify(item)
+    if (selectedKeys.has(key)) continue
+    selected.push(item)
+    selectedKeys.add(key)
+  }
+
+  return selected
+}
+
 function filterMessagesForConnections(messages: LinkedInArchiveMessageInput[], connections: LinkedInArchiveConnectionInput[]) {
   const profileUrls = connections.map((connection) => connection.profileUrl).filter((url): url is string => Boolean(url)).map(normalizeLinkedInMatchValue)
-  return messages.filter((message) => {
+  const matched = messages.map((message): LinkedInArchiveMessageInput | null => {
     const senderUrl = normalizeLinkedInMatchValue(message.senderProfileUrl ?? '')
     const recipientUrls = normalizeLinkedInMatchValue(message.recipientProfileUrls ?? '')
-    if (profileUrls.some((url) => senderUrl === url || recipientUrls.includes(url))) return true
+    const directProfileMatch = profileUrls.some((url) => senderUrl === url || recipientUrls.includes(url))
     const participantText = `${message.from ?? ''} ${message.to ?? ''} ${message.participants ?? ''} ${message.senderProfileUrl ?? ''} ${message.recipientProfileUrls ?? ''}`
     const matchText = participantText.trim() ? participantText : message.content
-    return connections.some((connection) =>
-      textMentionsName(matchText, connection.name) ||
-      textMentionsNameLoosely(matchText, connection.name) ||
-      textMentionsLinkedInSlug(matchText, connection.profileUrl)
-    )
-  }).slice(0, 80)
+    const personIds = connections.filter((connection) => {
+      const normalizedProfileUrl = connection.profileUrl ? normalizeLinkedInMatchValue(connection.profileUrl) : ''
+      return (directProfileMatch && normalizedProfileUrl && (senderUrl === normalizedProfileUrl || recipientUrls.includes(normalizedProfileUrl))) ||
+        textMentionsName(matchText, connection.name) ||
+        textMentionsNameLoosely(matchText, connection.name) ||
+        textMentionsLinkedInSlug(matchText, connection.profileUrl)
+    }).map((connection) => connection.personId)
+    return personIds.length > 0 ? { ...message, personIds } : null
+  }).filter((message): message is LinkedInArchiveMessageInput => message !== null)
+  return limitArchiveContextByPerson(matched, 160, 80)
 }
 
 function filterInvitationsForConnections(invitations: LinkedInArchiveInvitationInput[], connections: LinkedInArchiveConnectionInput[]) {
-  return invitations.filter((invitation) =>
-    connections.some((connection) => {
-      const invitationText = `${invitation.from ?? ''} ${invitation.to ?? ''} ${invitation.message ?? ''}`
-      return textMentionsName(invitationText, connection.name) ||
+  return invitations.map((invitation): LinkedInArchiveInvitationInput | null => {
+    const invitationText = `${invitation.from ?? ''} ${invitation.to ?? ''} ${invitation.message ?? ''}`
+    const personIds = connections.filter((connection) =>
+      textMentionsName(invitationText, connection.name) ||
         textMentionsNameLoosely(invitationText, connection.name) ||
         textMentionsLinkedInSlug(invitationText, connection.profileUrl)
-    })
-  ).slice(0, 40)
+    ).map((connection) => connection.personId)
+    return personIds.length > 0 ? { ...invitation, personIds } : null
+  }).filter((invitation): invitation is LinkedInArchiveInvitationInput => invitation !== null).slice(0, 40)
 }
 
 function filterPostsForConnections(posts: LinkedInArchivePostInput[], connections: LinkedInArchiveConnectionInput[]) {

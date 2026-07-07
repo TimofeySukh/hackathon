@@ -263,43 +263,30 @@ Enriching hundreds or thousands of profiles using LLM API calls takes time (due 
 
 ---
 
-## 7. API Routing & Model Tier Configuration (Smart vs. Fast)
+## 7. API Routing & Model Configuration
 
-To support flexible and easily swappable API keys and models without hardcoding, the system abstracts the LLM Layer into two logical client pools: **Smart LLM** (highly capable, rate-limited/expensive) and **Fast LLM** (cheaper, higher throughput).
+To support flexible and easily swappable API keys and models without hardcoding, the system keeps the LLM provider and model in environment configuration. Archive enrichment uses one high-quality DeepSeek model for all extraction tasks.
 
 ### A. The Abstraction Layer
-The application code does not interact with specific providers (like OpenAI or Anthropic) directly. Instead, it interacts with two wrapper functions:
-*   `callSmartLLM(prompt, options)` -> Used for complex reasoning.
-*   `callFastLLM(prompt, options)` -> Used for simple extraction/parsing.
+The application code does not interact with specific providers (like OpenAI or Anthropic) directly. Instead, it calls the server-side archive enrichment Edge Function, which calls OpenRouter with the configured model.
 
 ### B. Configuration Schema (JSON / Environment Variables)
-All API keys, endpoints, and model identifiers are stored in a configuration file (or `.env` environment variables). This setup uses **DeepSeek** as the single provider, sharing one API key but routing to two different models to optimize speed, cost, and rate-limits.
+All API keys, endpoints, and model identifiers are stored in environment variables. This setup uses **DeepSeek** through OpenRouter for every archive enrichment task.
 
 ```json
 {
-  "SMART_LLM_CONFIG": {
-    "provider": "deepseek",
-    "apiKey": "YOUR_DEEPSEEK_API_KEY",
-    "model": "deepseek-v4-pro",
-    "baseURL": "https://api.deepseek.com/v1"
-  },
-  "FAST_LLM_CONFIG": {
-    "provider": "deepseek",
-    "apiKey": "YOUR_DEEPSEEK_API_KEY", // Shared key
-    "model": "deepseek-v4-flash",
-    "baseURL": "https://api.deepseek.com/v1"
-  }
+  "OPENROUTER_API_KEY": "YOUR_OPENROUTER_API_KEY",
+  "OPENROUTER_MODEL": "deepseek/deepseek-chat-v3-0324"
 }
 ```
 
 
 ### C. Task Routing Registry
-Tasks are mapped to these configuration pools in a central routing map. If a model tier becomes cheaper or more capable, tasks can be re-routed by changing this registry:
+All archive enrichment tasks use the same configured model so short invitations and long message summaries get the same reasoning quality:
 
-| Task ID | Task Name | Routed Client | Reason |
-| :--- | :--- | :--- | :--- |
-| **Task A** | Chat Transcript Summarizer | `SmartLLMClient` | Requires processing long dialogue context and subtle nuance. |
-| **Task D** | Event & Post Content Analyzer | `SmartLLMClient` | Requires extraction of dates, names, and custom highlights from unstructured posts. |
-| **Task B** | Invitation Note Parser | `FastLLMClient` | Requires quick, low-cost extraction from very short texts (1-3 sentences). |
-| **Task C** | Job Title Classifier | `FastLLMClient` | Simple mapping of a single job title string to category enums. |
-
+| Task ID | Task Name | Model |
+| :--- | :--- | :--- |
+| **Task A** | Chat Transcript Summarizer | `OPENROUTER_MODEL` |
+| **Task D** | Event & Post Content Analyzer | `OPENROUTER_MODEL` |
+| **Task B** | Invitation Note Parser | `OPENROUTER_MODEL` |
+| **Task C** | Job Title Classifier | Deterministic import code |

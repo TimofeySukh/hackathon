@@ -72,6 +72,7 @@ function startMockGraphApi({ port }) {
     failGraphReads: 0,
     failGraphWrites: 0,
     graphConflictIncludesRevision: true,
+    enrichmentRequests: [],
   }
 
   const server = http.createServer(async (request, response) => {
@@ -92,7 +93,8 @@ function startMockGraphApi({ port }) {
       }
 
       if (request.method === 'POST' && isLinkedInArchiveEnrichmentRoute) {
-        await readBody(request)
+        const body = await readBody(request)
+        state.enrichmentRequests.push(body)
         jsonResponse(response, 200, { notes: [] })
         return
       }
@@ -262,11 +264,35 @@ function buildSharesCsv() {
   ].map((row) => row.map(csvCell).join(',')).join('\n')
 }
 
+function buildMessagesCsv() {
+  const rows = [
+    ['CONVERSATION ID', 'FROM', 'TO', 'DATE', 'CONTENT'],
+  ]
+  for (let index = 0; index < 200; index += 1) {
+    rows.push([
+      'conversation-1',
+      'Persist1 Person1',
+      'Me',
+      '2026-06-14',
+      `Long thread message ${index + 1} about product discovery and follow-up.`,
+    ])
+  }
+  rows.push([
+    'conversation-3',
+    'Persist3 Person3',
+    'Me',
+    '2026-06-15',
+    'We discussed the roadmap, implementation details, and a concrete follow-up meeting.',
+  ])
+  return rows.map((row) => row.map(csvCell).join(',')).join('\n')
+}
+
 async function buildLinkedInZip(args) {
   const csv = buildConnectionsCsv(args)
   const zipWriter = new ZipWriter(new BlobWriter('application/zip'))
   await zipWriter.add('Connections.csv', new TextReader(csv))
   await zipWriter.add('Shares.csv', new TextReader(buildSharesCsv()))
+  await zipWriter.add('messages.csv', new TextReader(buildMessagesCsv()))
   const blob = await zipWriter.close()
   return Buffer.from(await blob.arrayBuffer())
 }
@@ -404,6 +430,15 @@ async function waitForImportedPeople(mock, expectedPeople) {
   throw new Error(`Timed out waiting for ${expectedPeople} imported people; got ${mock.state.graph?.people?.length ?? 0}.`)
 }
 
+async function waitForEnrichmentRequest(mock) {
+  const startedAt = Date.now()
+  while (Date.now() - startedAt < 60000) {
+    if (mock.state.enrichmentRequests.length > 0) return mock.state.enrichmentRequests[0]
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+  throw new Error('Timed out waiting for LinkedIn archive enrichment request.')
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2))
   if (!Number.isInteger(args.people) || args.people <= 0) throw new Error('--people must be a positive integer.')
@@ -436,6 +471,7 @@ async function main() {
       buffer: zipBuffer,
     })
     await waitForImportedPeople(mock, args.people)
+    const enrichmentRequest = await waitForEnrichmentRequest(mock)
     const zipMessage = 'LinkedIn ZIP imported without blocking dialog'
 
     if (mock.state.graph?.people?.length !== args.people) {
@@ -446,6 +482,12 @@ async function main() {
     const eventContext = firstImportedPerson?.notes?.find((note) => note.title === 'Event Context')
     if (!eventContext?.body.includes('RoyalHacks')) {
       throw new Error(`ZIP import did not add deterministic event context from Shares.csv: ${JSON.stringify(firstImportedPerson?.notes ?? [])}.`)
+    }
+    const thirdPersonMessage = enrichmentRequest.messages?.find((message) =>
+      Array.isArray(message.personIds) && message.personIds.includes('linkedin-person-persist3-person3')
+    )
+    if (!thirdPersonMessage) {
+      throw new Error(`Archive AI request did not preserve matched personIds for later long-thread messages: ${JSON.stringify(enrichmentRequest.messages ?? [])}.`)
     }
 
     const importedCompanyTones = new Set(

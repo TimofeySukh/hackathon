@@ -32,6 +32,10 @@ not thousands of per-contact database writes.
   `Origin Context`, `AI Event Context`, and `Action Items`. Professional title
   classification stays in the deterministic import notes so AI context progress reflects
   relationship-oriented context.
+- Message and invitation excerpts sent to the archive enrichment Edge Function include
+  exact matched `personIds` when the browser can resolve them from profile URLs, names, or
+  profile slugs. Message context is capped per batch with a per-person balance so one long
+  conversation cannot crowd out another matched person's correspondence.
 - New LinkedIn company circles use a stable deterministic tone from the Material 3 circle
   palette instead of defaulting every imported company to blue. Existing company circles
   keep their current tone on re-import, except legacy default-blue LinkedIn company circles
