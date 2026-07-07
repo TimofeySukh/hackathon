@@ -15,6 +15,7 @@ export type LinkedInArchiveMessageInput = {
   senderProfileUrl?: string
   to?: string
   recipientProfileUrls?: string
+  participants?: string
   date?: string
   content: string
 }

@@ -14,25 +14,24 @@ not thousands of per-contact database writes.
 
 - LinkedIn ZIP import reads `Connections.csv` from the uploaded archive. When present, it
   also reads Part 1 context files (`Positions.csv`, `Rich_Media.csv`,
-  `Recommendations_Received.csv`, `Recommendations_Given.csv`) to add deterministic
-  context notes.
+  `Shares.csv`, `Recommendations_Received.csv`, `Recommendations_Given.csv`) to add
+  deterministic context notes.
 - The import groups people by company, creates missing company circles, and adds new
   people under those circles.
 - Deterministic context is stored only as regular person notes: `Professional Context`,
   `Shared Company Context`, `Event Context`, and `Trust Context`. Re-imports add missing
   context notes to existing imported people without duplicating the same `title + body`.
-- Signed-in users can then press **Add AI context from ZIP** to call the
-  `enrich-linkedin-archive` Edge Function in batches for LLM notes from `messages.csv` /
-  `guide_messages.csv`, `Invitations.csv`, and post exports. After a ZIP import, the
-  archive stays in memory for that tab so the user does not have to pick the same ZIP
-  again. Raw text is sent only for transient server-side processing; the graph persists
-  only returned notes such as `AI Relationship Summary`, `Origin Context`,
-  `AI Event Context`, and `Action Items`. Professional title classification stays in the
-  deterministic import notes so AI context progress reflects relationship-oriented context.
-- Settings also exposes **Add AI context from ZIP** for signed-in users who already
-  imported contacts and want to enrich the existing graph later. If no archive is still in
-  memory (for example after reload), the action asks for the ZIP once. The control shows a
-  batch progress bar while AI context is being analyzed and saved.
+- `Event Context` is attached when a connection date is within two days of a LinkedIn
+  post date; large same-day connection spikes still produce stronger wording, but a spike
+  is no longer required.
+- For signed-in users, the app automatically calls the `enrich-linkedin-archive` Edge
+  Function after the ZIP import finishes. LLM notes are generated from `messages.csv` /
+  `guide_messages.csv`, `Invitations.csv`, and post exports. The archive stays in memory
+  for that tab while processing. Raw text is sent only for transient server-side
+  processing; the graph persists only returned notes such as `AI Relationship Summary`,
+  `Origin Context`, `AI Event Context`, and `Action Items`. Professional title
+  classification stays in the deterministic import notes so AI context progress reflects
+  relationship-oriented context.
 - New LinkedIn company circles use a stable deterministic tone from the Material 3 circle
   palette instead of defaulting every imported company to blue. Existing company circles
   keep their current tone on re-import, except legacy default-blue LinkedIn company circles

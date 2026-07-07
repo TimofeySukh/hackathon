@@ -143,11 +143,13 @@ Safety invariants:
 - Search (toolbar): local ranked search; signed-in natural-language **smart search** via AI;
   paste LinkedIn profile URL to import one person.
 - LinkedIn ZIP import reads `Connections.csv`, groups people by company, and, when present,
-  uses non-LLM Part 1 context files (`Positions.csv`, `Rich_Media.csv`, recommendations)
-  to add derived person notes. It caches the uploaded archive in memory for the current tab
-  only. Signed-in users can then run server-side LLM enrichment over messages, invitations,
-  and posts from **Add AI context from ZIP** in Settings; progress is shown per batch and
-  the app persists only returned relationship/event/action notes, not raw export text.
+  uses non-LLM Part 1 context files (`Positions.csv`, `Rich_Media.csv`, `Shares.csv`,
+  recommendations) to add derived person notes. Event context is attached when a
+  connection date is near a LinkedIn post date, even without a large same-day connection
+  spike. It caches the uploaded archive in memory for the current tab only. For signed-in
+  users, server-side LLM enrichment over messages, invitations, and posts starts
+  automatically after import; progress is shown per batch and the app persists only
+  returned relationship/event/action notes, not raw export text.
 - Anonymous users see a red `!` badge on the Settings gear until they open the LinkedIn
   sync guide from the `?` helper inside Settings (not a floating banner).
 - The LinkedIn sync guide `?` inside Settings shows the same badge until the user opens

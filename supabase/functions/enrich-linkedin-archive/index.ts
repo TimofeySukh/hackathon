@@ -29,6 +29,7 @@ type MessageInput = {
   senderProfileUrl?: string
   to?: string
   recipientProfileUrls?: string
+  participants?: string
   date?: string
   content: string
 }
@@ -104,7 +105,7 @@ async function requireUser(authHeader: string) {
 
 function pickString(value: unknown) {
   return typeof value === 'string' && value.trim()
-    ? value.trim().replace(/\u0000/g, '').replace(/\s+/g, ' ')
+    ? value.trim().replaceAll('\u0000', '').replace(/\s+/g, ' ')
     : undefined
 }
 
@@ -139,6 +140,7 @@ function normalizeMessage(value: unknown): MessageInput | null {
     senderProfileUrl: pickString(record.senderProfileUrl),
     to: pickString(record.to),
     recipientProfileUrls: pickString(record.recipientProfileUrls),
+    participants: pickString(record.participants),
     date: pickString(record.date),
     content: clampText(content, 1500),
   }
@@ -194,7 +196,7 @@ function normalizeBody(value: unknown) {
 
 function getOpenRouterConfig() {
   const apiKey = Deno.env.get('OPENROUTER_API_KEY') ?? Deno.env.get('LINKEDIN_ARCHIVE_OPENROUTER_API_KEY')
-  if (!apiKey) return null
+  if (!apiKey) throw new Error('Missing required environment variable: OPENROUTER_API_KEY')
   return {
     apiKey,
     smartModel: Deno.env.get('OPENROUTER_SMART_MODEL') ?? DEFAULT_SMART_MODEL,
@@ -255,7 +257,6 @@ async function callOpenRouterJson(input: {
   maxTokens?: number
 }): Promise<unknown | null> {
   const config = getOpenRouterConfig()
-  if (!config) return null
 
   const model = input.tier === 'smart' ? config.smartModel : config.fastModel
   const controller = new AbortController()

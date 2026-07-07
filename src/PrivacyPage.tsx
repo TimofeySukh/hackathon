@@ -122,6 +122,12 @@ export default function PrivacyPage({ onLogin, onSignUp, isAuthenticated }: Priv
                 Results may be cached in your browser for up to 30 days to reduce repeat requests.
               </li>
               <li>
+                <strong>LinkedIn archive AI context.</strong> If you are signed in and import a LinkedIn archive ZIP,
+                the browser sends relevant message, invitation, and post excerpts to our Supabase Edge Function so it
+                can generate relationship context notes. We store only the generated notes in your private graph, not
+                the raw archive text.
+              </li>
+              <li>
                 <strong>Agent access tokens (optional).</strong> If you create API or MCP tokens in Settings, we store
                 a hashed token, a short prefix, a label you choose, scopes, and usage timestamps. The full token is
                 shown only once at creation.
@@ -142,7 +148,7 @@ export default function PrivacyPage({ onLogin, onSignUp, isAuthenticated }: Priv
               <li>Authenticate you and protect your account.</li>
               <li>Save anonymous board edits locally when you choose not to sign in.</li>
               <li>Import and organize connection data you choose to add to the board.</li>
-              <li>Enrich LinkedIn profiles only when you request it.</li>
+              <li>Enrich LinkedIn profiles when you request it and add LinkedIn archive context after signed-in ZIP imports.</li>
               <li>Let you connect approved AI tools or scripts through scoped agent tokens you create.</li>
               <li>Prevent data loss from concurrent edits through revision checks.</li>
               <li>Respond to support or privacy requests.</li>

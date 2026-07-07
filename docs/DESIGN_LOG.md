@@ -17,6 +17,17 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-07-07 — LinkedIn archive context starts automatically
+
+- Decision: Signed-in ZIP imports now start `enrich-linkedin-archive` immediately after
+  deterministic import persistence, instead of showing a separate **Add AI context**
+  button.
+- Decision: Deterministic event context uses both `Rich_Media.csv` and `Shares.csv`, and
+  attaches likely event context when a connection date is near a LinkedIn post date even
+  without a large same-day connection spike.
+- Why: archive context is the product's core value; requiring a second click and relying
+  only on spike detection left obvious event relationships without notes.
+
 ### 2026-07-07 — LinkedIn archive LLM enrichment stays server-side
 
 - Decision: Add `enrich-linkedin-archive`, a signed-in Supabase Edge Function that calls

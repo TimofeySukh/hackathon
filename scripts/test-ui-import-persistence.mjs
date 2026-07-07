@@ -84,9 +84,16 @@ function startMockGraphApi({ port }) {
       const url = new URL(request.url ?? '/', `http://127.0.0.1:${port}`)
       const isGraphRoute = url.pathname === '/functions/v1/graph-api/v1/graph'
       const isGraphMetaRoute = url.pathname === '/functions/v1/graph-api/v1/graph/meta'
+      const isLinkedInArchiveEnrichmentRoute = url.pathname === '/functions/v1/enrich-linkedin-archive'
       const isRestGraphRoute = url.pathname === '/rest/v1/user_graphs'
-      if (!isGraphRoute && !isGraphMetaRoute && !isRestGraphRoute) {
+      if (!isGraphRoute && !isGraphMetaRoute && !isRestGraphRoute && !isLinkedInArchiveEnrichmentRoute) {
         jsonResponse(response, 404, { error: `Unhandled mock route: ${request.method} ${url.pathname}` })
+        return
+      }
+
+      if (request.method === 'POST' && isLinkedInArchiveEnrichmentRoute) {
+        await readBody(request)
+        jsonResponse(response, 200, { notes: [] })
         return
       }
 
@@ -248,10 +255,18 @@ function buildConnectionsCsv({ people, companies }) {
   return rows.map((row) => row.map(csvCell).join(',')).join('\n')
 }
 
+function buildSharesCsv() {
+  return [
+    ['Date', 'Share Commentary'],
+    ['2026-06-14', 'Great conversations at #RoyalHacks with builders, founders, and AI engineers.'],
+  ].map((row) => row.map(csvCell).join(',')).join('\n')
+}
+
 async function buildLinkedInZip(args) {
   const csv = buildConnectionsCsv(args)
   const zipWriter = new ZipWriter(new BlobWriter('application/zip'))
   await zipWriter.add('Connections.csv', new TextReader(csv))
+  await zipWriter.add('Shares.csv', new TextReader(buildSharesCsv()))
   const blob = await zipWriter.close()
   return Buffer.from(await blob.arrayBuffer())
 }
@@ -380,6 +395,15 @@ async function uploadAndAcceptDialog(page, locator, file) {
   return message
 }
 
+async function waitForImportedPeople(mock, expectedPeople) {
+  const startedAt = Date.now()
+  while (Date.now() - startedAt < 60000) {
+    if (mock.state.graph?.people?.length === expectedPeople) return
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+  throw new Error(`Timed out waiting for ${expectedPeople} imported people; got ${mock.state.graph?.people?.length ?? 0}.`)
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2))
   if (!Number.isInteger(args.people) || args.people <= 0) throw new Error('--people must be a positive integer.')
@@ -406,14 +430,22 @@ async function main() {
     await page.getByLabel('Settings', { exact: true }).click()
 
     const zipBuffer = await buildLinkedInZip(args)
-    const zipMessage = await uploadAndAcceptDialog(
-      page,
-      page.locator('input[type="file"][accept=".zip"]'),
-      { name: 'linkedin-persistence-test.zip', mimeType: 'application/zip', buffer: zipBuffer },
-    )
+    await page.locator('input[type="file"][accept=".zip"]').setInputFiles({
+      name: 'linkedin-persistence-test.zip',
+      mimeType: 'application/zip',
+      buffer: zipBuffer,
+    })
+    await waitForImportedPeople(mock, args.people)
+    const zipMessage = 'LinkedIn ZIP imported without blocking dialog'
 
     if (mock.state.graph?.people?.length !== args.people) {
       throw new Error(`ZIP import saved ${mock.state.graph?.people?.length ?? 0} people, expected ${args.people}.`)
+    }
+
+    const firstImportedPerson = mock.state.graph?.people?.find((person) => person.id === 'linkedin-person-persist1-person1')
+    const eventContext = firstImportedPerson?.notes?.find((note) => note.title === 'Event Context')
+    if (!eventContext?.body.includes('RoyalHacks')) {
+      throw new Error(`ZIP import did not add deterministic event context from Shares.csv: ${JSON.stringify(firstImportedPerson?.notes ?? [])}.`)
     }
 
     const importedCompanyTones = new Set(

@@ -6,14 +6,16 @@ The goal is to automatically categorize, tag, and summarize relationships withou
 
 Implementation alignment for Social Datanode:
 
-- First shipped flow runs a deterministic pass first, then signed-in users get batched
-  server-side LLM enrichment for messages, invitations, and posts through
+- First shipped flow runs a deterministic pass first, then signed-in users automatically
+  get batched server-side LLM enrichment for messages, invitations, and posts through
   `enrich-linkedin-archive`.
 - Enrichment output is stored as regular person notes in the existing `user_graphs.graph`
   JSON blob, not as a separate database table or a new `PersonNode.enrichment` field.
 - Raw message and invitation text may be sent transiently to the Edge Function/OpenRouter
   for summarization, but only returned notes are persisted. The database does not store raw
   export text.
+- Deterministic event context uses both `Rich_Media.csv` and `Shares.csv`; it no longer
+  requires a large same-day connection spike before attaching likely event context.
 - Agent API, CLI, and MCP surfaces are unchanged for this pass.
 
 ---
@@ -300,5 +302,4 @@ Tasks are mapped to these configuration pools in a central routing map. If a mod
 | **Task D** | Event & Post Content Analyzer | `SmartLLMClient` | Requires extraction of dates, names, and custom highlights from unstructured posts. |
 | **Task B** | Invitation Note Parser | `FastLLMClient` | Requires quick, low-cost extraction from very short texts (1-3 sentences). |
 | **Task C** | Job Title Classifier | `FastLLMClient` | Simple mapping of a single job title string to category enums. |
-
 

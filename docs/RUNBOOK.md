@@ -611,7 +611,9 @@ or `::1`, has the matching `x-linkedin-enrichment-test-secret` header, and the E
 Function has `LINKEDIN_ENRICHMENT_ALLOW_TEST_AUTH=true`. Production must leave these
 test variables unset so unauthenticated enrichment still fails.
 
-Manual one-profile LinkedIn search imports call the profile enrichment Edge Function. LinkedIn ZIP import parses the core archive locally, then signed-in users can call `enrich-linkedin-archive` for server-side LLM context notes.
+Manual one-profile LinkedIn search imports call the profile enrichment Edge Function.
+LinkedIn ZIP import parses the core archive locally, then signed-in users automatically
+call `enrich-linkedin-archive` for server-side LLM context notes.
 
 The browser never calls the LinkedIn enrichment provider directly. It invokes the Edge Function, and that function authenticates the user, calls the provider with a server-side API key, and returns normalized profile data.
 

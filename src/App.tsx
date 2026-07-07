@@ -1594,7 +1594,6 @@ function App() {
   const settingsPanelRef = useRef<HTMLDivElement>(null)
   const linkedInGuidePanelRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const linkedInContextFileInputRef = useRef<HTMLInputElement>(null)
   const linkedInArchiveCacheRef = useRef<LinkedInArchiveZipTexts | null>(null)
   const graphFileInputRef = useRef<HTMLInputElement>(null)
 
@@ -1620,7 +1619,6 @@ function App() {
   const [isImportingLinkedInProfile, setIsImportingLinkedInProfile] = useState(false)
   const [isImportingLinkedInZip, setIsImportingLinkedInZip] = useState(false)
   const [isEnrichingLinkedInArchive, setIsEnrichingLinkedInArchive] = useState(false)
-  const [hasLinkedInArchiveInMemory, setHasLinkedInArchiveInMemory] = useState(false)
   const [linkedInArchiveAiProgress, setLinkedInArchiveAiProgress] = useState<LinkedInArchiveAiProgress | null>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const searchPanelRef = useRef<HTMLDivElement>(null)
@@ -1854,6 +1852,7 @@ function App() {
       const archiveContext = buildLinkedInArchiveContext({
         positionsText: archive.positionsText,
         richMediaText: archive.richMediaText,
+        sharesText: archive.sharesText,
         recommendationsReceivedText: archive.recommendationsReceivedText,
         recommendationsGivenText: archive.recommendationsGivenText,
       })
@@ -1861,18 +1860,21 @@ function App() {
       pushHistory()
       await persistGraphImmediately(result.graph)
       linkedInArchiveCacheRef.current = archive
-      setHasLinkedInArchiveInMemory(true)
       setLinkedInArchiveAiProgress({
         phase: 'done',
         current: 1,
         total: 1,
         message: auth.status === 'authenticated'
-          ? 'Contacts imported. Press Add AI context to analyze this archive.'
+          ? 'Contacts imported. Starting AI context analysis...'
           : 'Contacts imported. Sign in to add AI context notes.',
       })
 
       const enrichmentSummary = result.enrichedPeople > 0 ? ` Added context notes for ${result.enrichedPeople} people.` : ''
-      alert(`LinkedIn data imported successfully: ${result.importedPeople} people across ${result.importedCompanies} companies.${enrichmentSummary}`)
+      if (auth.status === 'authenticated') {
+        void runLinkedInContextEnrichment(archive, result.graph)
+      } else {
+        alert(`LinkedIn data imported successfully: ${result.importedPeople} people across ${result.importedCompanies} companies.${enrichmentSummary}`)
+      }
     } catch (err) {
       console.error(err)
       const errorMessage = getErrorMessage(err)
@@ -1883,8 +1885,8 @@ function App() {
     }
   }
 
-  async function runLinkedInContextEnrichment(archive: LinkedInArchiveZipTexts) {
-    if (isEnrichingLinkedInArchive || isImportingLinkedInZip) return
+  async function runLinkedInContextEnrichment(archive: LinkedInArchiveZipTexts, sourceGraph: GraphState = graphRef.current) {
+    if (isEnrichingLinkedInArchive) return
     if (auth.status !== 'authenticated') {
       alert('Sign in to add AI context from a LinkedIn ZIP.')
       return
@@ -1895,18 +1897,18 @@ function App() {
       phase: 'reading',
       current: 0,
       total: 1,
-      message: 'Preparing AI context...',
+      message: 'Preparing AI context from LinkedIn messages, invitations, and posts...',
     })
 
     try {
       const llmContext = buildLinkedInArchiveLlmContext({
-        graph,
+        graph: sourceGraph,
         connectionsText: archive.connectionsText,
         messagesText: archive.messagesText,
         invitationsText: archive.invitationsText,
-        postsText: archive.sharesText ?? archive.richMediaText,
+        postsTexts: [archive.sharesText, archive.richMediaText],
       })
-      const aiResult = await enrichLinkedInArchiveGraph(graph, llmContext, setLinkedInArchiveAiProgress)
+      const aiResult = await enrichLinkedInArchiveGraph(sourceGraph, llmContext, setLinkedInArchiveAiProgress)
 
       if (aiResult.addedNotes > 0) {
         const summary = formatLinkedInAiNoteSummary(aiResult.noteTitleCounts)
@@ -1946,45 +1948,6 @@ function App() {
       alert(`Failed to add AI context: ${errorMessage}`)
     } finally {
       setIsEnrichingLinkedInArchive(false)
-    }
-  }
-
-  function handleLinkedInContextButtonClick() {
-    const archive = linkedInArchiveCacheRef.current
-    if (archive) {
-      void runLinkedInContextEnrichment(archive)
-      return
-    }
-    linkedInContextFileInputRef.current?.click()
-  }
-
-  async function handleLinkedInContextEnrichment(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    try {
-      setLinkedInArchiveAiProgress({
-        phase: 'reading',
-        current: 0,
-        total: 1,
-        message: 'Reading LinkedIn archive...',
-      })
-      const archive = await readLinkedInArchiveZip(file)
-      linkedInArchiveCacheRef.current = archive
-      setHasLinkedInArchiveInMemory(true)
-      await runLinkedInContextEnrichment(archive)
-    } catch (err) {
-      console.error(err)
-      const errorMessage = getErrorMessage(err)
-      setLinkedInArchiveAiProgress({
-        phase: 'error',
-        current: 0,
-        total: 1,
-        message: errorMessage,
-      })
-      alert(`Failed to read LinkedIn ZIP: ${errorMessage}`)
-    } finally {
-      event.target.value = ''
     }
   }
 
@@ -5679,33 +5642,9 @@ Content-Type: application/json
                 style={{ display: 'none' }}
                 onChange={handleLinkedInImport}
               />
-              <button
-                type="button"
-                className="m3-primary-button m3-primary-button--tonal linkedin-context-button"
-                disabled={auth.status !== 'authenticated' || isImportingLinkedInZip || isEnrichingLinkedInArchive}
-                onClick={handleLinkedInContextButtonClick}
-              >
-                <SparkleIcon />
-                <span>
-                  {isEnrichingLinkedInArchive
-                    ? 'Adding AI context...'
-                    : hasLinkedInArchiveInMemory
-                      ? 'Add AI context'
-                      : 'Add AI context from ZIP'}
-                </span>
-              </button>
-              <input
-                ref={linkedInContextFileInputRef}
-                type="file"
-                accept="application/zip,.zip"
-                style={{ display: 'none' }}
-                onChange={handleLinkedInContextEnrichment}
-              />
               <p className="linkedin-context-helper">
                 {auth.status === 'authenticated'
-                  ? hasLinkedInArchiveInMemory
-                    ? 'Uses the ZIP you just imported. Only generated notes are saved.'
-                    : 'Choose a ZIP only if you have not imported it in this tab. Only generated notes are saved.'
+                  ? 'After import, AI context starts automatically. Only generated notes are saved.'
                   : 'Sign in to add AI context notes from your archive.'}
               </p>
               {linkedInArchiveAiProgress && (
@@ -7392,20 +7331,53 @@ function createHeaderMap(headerRow: string[]) {
   return new Map(headerRow.map((header, index) => [normalizeCsvHeader(header), index]))
 }
 
-function findCsvHeaderIndex(rows: string[][], requiredHeaders: string[]) {
-  const required = requiredHeaders.map(normalizeCsvHeader)
-  return rows.findIndex((row) => {
-    const headers = new Set(row.map(normalizeCsvHeader))
-    return required.every((header) => headers.has(header))
-  })
+function findCsvHeaderIndexByAny(rows: string[][], candidateHeaders: string[]) {
+  const candidates = new Set(candidateHeaders.map(normalizeCsvHeader))
+  return rows.findIndex((row) => row.some((cell) => candidates.has(normalizeCsvHeader(cell))))
+}
+
+function sanitizeLinkedInArchiveText(value: string) {
+  let sanitized = ''
+  let changed = false
+
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index)
+    if (code === 0) {
+      changed = true
+      continue
+    }
+    if (code >= 0xD800 && code <= 0xDBFF) {
+      const next = value.charCodeAt(index + 1)
+      if (next >= 0xDC00 && next <= 0xDFFF) {
+        sanitized += value[index] + value[index + 1]
+        index += 1
+      } else {
+        sanitized += '\uFFFD'
+        changed = true
+      }
+      continue
+    }
+    if (code >= 0xDC00 && code <= 0xDFFF) {
+      sanitized += '\uFFFD'
+      changed = true
+      continue
+    }
+    sanitized += value[index]
+  }
+
+  return changed ? sanitized : value
 }
 
 function readCsvField(row: string[], headerMap: Map<string, number>, names: string[]) {
   for (const name of names) {
     const index = headerMap.get(normalizeCsvHeader(name))
-    if (index !== undefined) return row[index]?.trim() ?? ''
+    if (index !== undefined) return sanitizeLinkedInArchiveText(row[index]?.trim() ?? '')
   }
   return ''
+}
+
+function readCsvIndex(row: string[], index: number) {
+  return index === -1 ? '' : sanitizeLinkedInArchiveText(row[index]?.trim() ?? '')
 }
 
 function parseLinkedInDate(value: string): number | null {
@@ -7445,8 +7417,10 @@ function parseLinkedInPositionsCsv(text: string | null): LinkedInUserPosition[] 
   const rows = parseCSV(text)
   if (rows.length < 2) return []
 
-  const headerMap = createHeaderMap(rows[0])
-  return rows.slice(1).map((row): LinkedInUserPosition | null => {
+  const headerIdx = findCsvHeaderIndexByAny(rows, ['Company Name', 'Company'])
+  if (headerIdx === -1) return []
+  const headerMap = createHeaderMap(rows[headerIdx])
+  return rows.slice(headerIdx + 1).map((row): LinkedInUserPosition | null => {
     const company = readCsvField(row, headerMap, ['Company Name', 'Company'])
     if (!company) return null
     return {
@@ -7494,15 +7468,56 @@ function extractMediaEventLabel(description: string) {
   return words.length > 0 ? words.join(' ') : ''
 }
 
-function parseLinkedInRichMediaCsv(text: string | null): LinkedInMediaEvent[] {
+function parseLinkedInPostEventsCsv(text: string | null): LinkedInMediaEvent[] {
   if (!text) return []
   const rows = parseCSV(text)
   if (rows.length < 2) return []
 
-  const headerMap = createHeaderMap(rows[0])
-  return rows.slice(1).map((row): LinkedInMediaEvent | null => {
-    const dateMs = parseLinkedInDate(readCsvField(row, headerMap, ['Date/Time', 'Date', 'Created At']))
-    const label = extractMediaEventLabel(readCsvField(row, headerMap, ['Media Description', 'Description', 'Commentary']))
+  const headerIdx = rows.findIndex((row) => {
+    const headers = new Set(row.map(normalizeCsvHeader))
+    const hasDescription = [
+      'mediadescription',
+      'sharecommentary',
+      'sharecommentarytext',
+      'commentary',
+      'description',
+      'content',
+      'text',
+    ].some((header) => headers.has(header))
+    const hasDate = [
+      'datetime',
+      'date',
+      'sharedate',
+      'shareddate',
+      'createdat',
+      'createdtime',
+      'timestamp',
+    ].some((header) => headers.has(header))
+    return hasDescription && hasDate
+  })
+  if (headerIdx === -1) return []
+
+  const headerMap = createHeaderMap(rows[headerIdx])
+  return rows.slice(headerIdx + 1).map((row): LinkedInMediaEvent | null => {
+    const dateMs = parseLinkedInDate(readCsvField(row, headerMap, [
+      'Date/Time',
+      'Date',
+      'Share Date',
+      'Shared Date',
+      'Created At',
+      'Created Time',
+      'Timestamp',
+    ]))
+    const label = extractMediaEventLabel(readCsvField(row, headerMap, [
+      'Media Description',
+      'ShareCommentary',
+      'Share Commentary',
+      'Share Commentary Text',
+      'Commentary',
+      'Description',
+      'Content',
+      'Text',
+    ]))
     if (!dateMs || !label) return null
     return { dateMs, label }
   }).filter((event): event is LinkedInMediaEvent => event !== null)
@@ -7515,8 +7530,10 @@ function parseLinkedInRecommendationNames(text: string | null): Set<string> {
   const rows = parseCSV(text)
   if (rows.length < 2) return names
 
-  const headerMap = createHeaderMap(rows[0])
-  for (const row of rows.slice(1)) {
+  const headerIdx = findCsvHeaderIndexByAny(rows, ['Name', 'Full Name', 'First Name', 'From', 'To'])
+  if (headerIdx === -1) return names
+  const headerMap = createHeaderMap(rows[headerIdx])
+  for (const row of rows.slice(headerIdx + 1)) {
     const fullName = readCsvField(row, headerMap, ['Name', 'Full Name', 'From', 'To'])
     const firstName = readCsvField(row, headerMap, ['First Name'])
     const lastName = readCsvField(row, headerMap, ['Last Name'])
@@ -7529,12 +7546,23 @@ function parseLinkedInRecommendationNames(text: string | null): Set<string> {
 function buildLinkedInArchiveContext(input: {
   positionsText: string | null
   richMediaText: string | null
+  sharesText: string | null
   recommendationsReceivedText: string | null
   recommendationsGivenText: string | null
 }): LinkedInArchiveContext {
+  const mediaEvents = [
+    ...parseLinkedInPostEventsCsv(input.richMediaText),
+    ...parseLinkedInPostEventsCsv(input.sharesText),
+  ]
+  const seenEvents = new Set<string>()
   return {
     positions: parseLinkedInPositionsCsv(input.positionsText),
-    mediaEvents: parseLinkedInRichMediaCsv(input.richMediaText),
+    mediaEvents: mediaEvents.filter((event) => {
+      const key = `${dateKeyFromMs(event.dateMs)}\n${event.label}`
+      if (seenEvents.has(key)) return false
+      seenEvents.add(key)
+      return true
+    }),
     recommendedBy: parseLinkedInRecommendationNames(input.recommendationsReceivedText),
     recommendedByMe: parseLinkedInRecommendationNames(input.recommendationsGivenText),
   }
@@ -7610,7 +7638,7 @@ function buildEventContextByDate(rows: string[][], headers: LinkedInConnectionsH
 
   const countsByDate = new Map<string, number>()
   for (const row of rows) {
-    const connectedAt = parseLinkedInDate(row[headers.connectedOnIdx] || '')
+    const connectedAt = parseLinkedInDate(readCsvIndex(row, headers.connectedOnIdx))
     if (!connectedAt) continue
     const key = dateKeyFromMs(connectedAt)
     countsByDate.set(key, (countsByDate.get(key) ?? 0) + 1)
@@ -7626,11 +7654,18 @@ function buildEventContextByDate(rows: string[][], headers: LinkedInConnectionsH
   const twoDaysMs = 2 * 24 * 60 * 60 * 1000
 
   for (const [dateKey, count] of countsByDate) {
-    if (count < spikeThreshold) continue
     const connectedAt = Date.parse(`${dateKey}T00:00:00.000Z`)
-    const nearbyEvent = mediaEvents.find((event) => Math.abs(event.dateMs - connectedAt) <= twoDaysMs)
+    const nearbyEvent = mediaEvents
+      .map((event) => ({ event, distance: Math.abs(event.dateMs - connectedAt) }))
+      .filter((candidate) => candidate.distance <= twoDaysMs)
+      .sort((left, right) => left.distance - right.distance)[0]?.event
     if (!nearbyEvent) continue
-    eventByDate.set(dateKey, `Likely event context: ${nearbyEvent.label}. LinkedIn connections spiked around ${dateKey}.`)
+    if (count >= spikeThreshold) {
+      eventByDate.set(dateKey, `Likely event context: ${nearbyEvent.label}. LinkedIn connections spiked around ${dateKey}.`)
+    } else {
+      const eventDateKey = dateKeyFromMs(nearbyEvent.dateMs)
+      eventByDate.set(dateKey, `Likely event context: ${nearbyEvent.label}. This connection was added near your LinkedIn post dated ${eventDateKey}.`)
+    }
   }
 
   return eventByDate
@@ -7723,11 +7758,28 @@ function textMentionsName(value: string, name: string) {
   return Boolean(normalizedName && normalizedValue.includes(normalizedName))
 }
 
+function textMentionsNameLoosely(value: string, name: string) {
+  const normalizedValue = normalizeNameKey(value)
+  const parts = normalizeNameKey(name).split(' ').filter((part) => part.length >= 3)
+  if (parts.length === 0) return false
+  if (parts.every((part) => normalizedValue.includes(part))) return true
+  return parts.length >= 2 && parts.some((part) => normalizedValue.includes(part))
+}
+
+function textMentionsLinkedInSlug(value: string, profileUrl?: string) {
+  if (!profileUrl) return false
+  const slug = getLinkedInSlug(profileUrl)
+  if (!slug) return false
+  const normalizedValue = normalizeNameKey(value)
+  const slugParts = normalizeNameKey(slug.replace(/-/g, ' ')).split(' ').filter((part) => part.length >= 3)
+  return slugParts.length > 0 && slugParts.every((part) => normalizedValue.includes(part))
+}
+
 function parseLinkedInMessagesCsv(text: string | null): LinkedInArchiveMessageInput[] {
   if (!text) return []
   const rows = parseCSV(text)
   if (rows.length < 2) return []
-  const headerIdx = findCsvHeaderIndex(rows, ['CONVERSATION ID', 'CONTENT'])
+  const headerIdx = findCsvHeaderIndexByAny(rows, ['CONTENT', 'Message', 'Text', 'Body', 'Message Body'])
   if (headerIdx === -1) return []
   const headerMap = createHeaderMap(rows[headerIdx])
 
@@ -7737,10 +7789,28 @@ function parseLinkedInMessagesCsv(text: string | null): LinkedInArchiveMessageIn
     return {
       conversationId: readCsvField(row, headerMap, ['CONVERSATION ID', 'Conversation ID']),
       from: readCsvField(row, headerMap, ['FROM', 'From']),
-      senderProfileUrl: readCsvField(row, headerMap, ['SENDER PROFILE URL', 'Sender Profile URL']),
-      to: readCsvField(row, headerMap, ['TO', 'To']),
-      recipientProfileUrls: readCsvField(row, headerMap, ['RECIPIENT PROFILE URLS', 'Recipient Profile URLs']),
-      date: readCsvField(row, headerMap, ['DATE', 'Date']),
+      senderProfileUrl: readCsvField(row, headerMap, [
+        'SENDER PROFILE URL',
+        'Sender Profile URL',
+        'Sender Profile',
+        'From Profile URL',
+        'Member Profile URL',
+      ]),
+      to: readCsvField(row, headerMap, ['TO', 'To', 'Recipients', 'Recipient', 'Recipient Names']),
+      recipientProfileUrls: readCsvField(row, headerMap, [
+        'RECIPIENT PROFILE URLS',
+        'Recipient Profile URLs',
+        'Recipient Profile URL',
+        'To Profile URL',
+      ]),
+      participants: readCsvField(row, headerMap, [
+        'Participants',
+        'Conversation Participants',
+        'CONVERSATION PARTICIPANTS',
+        'Member Name',
+        'Member',
+      ]),
+      date: readCsvField(row, headerMap, ['DATE', 'Date', 'Created At', 'Timestamp']),
       content,
     }
   }).filter((message): message is LinkedInArchiveMessageInput => message !== null)
@@ -7750,16 +7820,16 @@ function parseLinkedInInvitationsCsv(text: string | null): LinkedInArchiveInvita
   if (!text) return []
   const rows = parseCSV(text)
   if (rows.length < 2) return []
-  const headerIdx = findCsvHeaderIndex(rows, ['Message'])
+  const headerIdx = findCsvHeaderIndexByAny(rows, ['Message', 'Invitation Message', 'Note'])
   if (headerIdx === -1) return []
   const headerMap = createHeaderMap(rows[headerIdx])
 
   return rows.slice(headerIdx + 1).map((row): LinkedInArchiveInvitationInput | null => {
-    const message = readCsvField(row, headerMap, ['Message', 'MESSAGE'])
+    const message = readCsvField(row, headerMap, ['Message', 'MESSAGE', 'Invitation Message', 'Note'])
     if (!message) return null
     return {
-      from: readCsvField(row, headerMap, ['From', 'FROM']),
-      to: readCsvField(row, headerMap, ['To', 'TO']),
+      from: readCsvField(row, headerMap, ['From', 'FROM', 'Sender']),
+      to: readCsvField(row, headerMap, ['To', 'TO', 'Recipient']),
       sentAt: readCsvField(row, headerMap, ['Sent At', 'SentAt', 'Date']),
       message,
     }
@@ -7772,7 +7842,7 @@ function parseLinkedInPostsForLlm(text: string | null): LinkedInArchivePostInput
   if (rows.length < 2) return []
   const headerIdx = rows.findIndex((row) => {
     const headers = new Set(row.map(normalizeCsvHeader))
-    return ['mediadescription', 'sharecommentary', 'commentary', 'description'].some((header) => headers.has(header))
+    return ['mediadescription', 'sharecommentary', 'sharecommentarytext', 'commentary', 'description', 'content', 'text'].some((header) => headers.has(header))
   })
   if (headerIdx === -1) return []
   const headerMap = createHeaderMap(rows[headerIdx])
@@ -7784,6 +7854,8 @@ function parseLinkedInPostsForLlm(text: string | null): LinkedInArchivePostInput
       'Share Commentary',
       'Commentary',
       'Description',
+      'Content',
+      'Text',
     ])
     if (!description) return null
     return {
@@ -7811,20 +7883,20 @@ function buildLinkedInArchiveConnectionsForLlm(graph: GraphState, connectionsTex
 
   const peopleById = new Map(graph.people.map((person) => [person.id, person]))
   return rows.slice(headerIdx + 1).map((row): LinkedInArchiveConnectionInput | null => {
-    const firstName = row[importHeaders.firstNameIdx] || ''
-    const lastName = row[importHeaders.lastNameIdx] || ''
+    const firstName = readCsvIndex(row, importHeaders.firstNameIdx)
+    const lastName = readCsvIndex(row, importHeaders.lastNameIdx)
     const name = `${firstName} ${lastName}`.trim()
     if (!name) return null
     const personId = `linkedin-person-${slugifyId(name)}`
     if (!peopleById.has(personId)) return null
-    const profileUrl = importHeaders.urlIdx !== -1 ? row[importHeaders.urlIdx] || '' : ''
+    const profileUrl = readCsvIndex(row, importHeaders.urlIdx)
     return {
       personId,
       name,
       profileUrl: profileUrl ? normalizeLinkedInProfileUrl(profileUrl) ?? profileUrl : undefined,
-      company: importHeaders.companyIdx !== -1 ? row[importHeaders.companyIdx] || '' : '',
-      position: importHeaders.positionIdx !== -1 ? row[importHeaders.positionIdx] || '' : '',
-      connectedOn: importHeaders.connectedOnIdx !== -1 ? row[importHeaders.connectedOnIdx] || '' : '',
+      company: readCsvIndex(row, importHeaders.companyIdx),
+      position: readCsvIndex(row, importHeaders.positionIdx),
+      connectedOn: readCsvIndex(row, importHeaders.connectedOnIdx),
     }
   }).filter((connection): connection is LinkedInArchiveConnectionInput => connection !== null)
 }
@@ -7834,13 +7906,13 @@ function buildLinkedInArchiveLlmContext(input: {
   connectionsText: string
   messagesText: string | null
   invitationsText: string | null
-  postsText: string | null
+  postsTexts: Array<string | null>
 }): LinkedInArchiveLlmContext {
   return {
     connections: buildLinkedInArchiveConnectionsForLlm(input.graph, input.connectionsText),
     messages: parseLinkedInMessagesCsv(input.messagesText),
     invitations: parseLinkedInInvitationsCsv(input.invitationsText),
-    posts: parseLinkedInPostsForLlm(input.postsText),
+    posts: input.postsTexts.flatMap((postsText) => parseLinkedInPostsForLlm(postsText)),
   }
 }
 
@@ -7850,15 +7922,24 @@ function filterMessagesForConnections(messages: LinkedInArchiveMessageInput[], c
     const senderUrl = normalizeLinkedInMatchValue(message.senderProfileUrl ?? '')
     const recipientUrls = normalizeLinkedInMatchValue(message.recipientProfileUrls ?? '')
     if (profileUrls.some((url) => senderUrl === url || recipientUrls.includes(url))) return true
+    const participantText = `${message.from ?? ''} ${message.to ?? ''} ${message.participants ?? ''} ${message.senderProfileUrl ?? ''} ${message.recipientProfileUrls ?? ''}`
+    const matchText = participantText.trim() ? participantText : message.content
     return connections.some((connection) =>
-      textMentionsName(`${message.from ?? ''} ${message.to ?? ''}`, connection.name)
+      textMentionsName(matchText, connection.name) ||
+      textMentionsNameLoosely(matchText, connection.name) ||
+      textMentionsLinkedInSlug(matchText, connection.profileUrl)
     )
   }).slice(0, 80)
 }
 
 function filterInvitationsForConnections(invitations: LinkedInArchiveInvitationInput[], connections: LinkedInArchiveConnectionInput[]) {
   return invitations.filter((invitation) =>
-    connections.some((connection) => textMentionsName(`${invitation.from ?? ''} ${invitation.to ?? ''}`, connection.name))
+    connections.some((connection) => {
+      const invitationText = `${invitation.from ?? ''} ${invitation.to ?? ''} ${invitation.message ?? ''}`
+      return textMentionsName(invitationText, connection.name) ||
+        textMentionsNameLoosely(invitationText, connection.name) ||
+        textMentionsLinkedInSlug(invitationText, connection.profileUrl)
+    })
   ).slice(0, 40)
 }
 
@@ -8000,7 +8081,7 @@ async function buildLinkedInConnectionsGraph(
   for (let index = 0; index < dataRows.length; index += 1) {
     const row = dataRows[index]
     if (row.length <= requiredWidth) continue
-    const company = row[importHeaders.companyIdx]?.trim() || ''
+    const company = readCsvIndex(row, importHeaders.companyIdx)
     const members = companyGroups.get(company) ?? []
     members.push(row)
     companyGroups.set(company, members)
@@ -8104,16 +8185,16 @@ async function buildLinkedInConnectionsGraph(
 
     let slot = slotByCircle.get(companyCircle.id) ?? 0
     for (const memberRow of company.members) {
-      const firstName = memberRow[importHeaders.firstNameIdx] || ''
-      const lastName = memberRow[importHeaders.lastNameIdx] || ''
+      const firstName = readCsvIndex(memberRow, importHeaders.firstNameIdx)
+      const lastName = readCsvIndex(memberRow, importHeaders.lastNameIdx)
       const name = `${firstName} ${lastName}`.trim()
       if (!name) continue
 
       const personId = `linkedin-person-${slugifyId(name)}`
-      const position = importHeaders.positionIdx !== -1 ? memberRow[importHeaders.positionIdx] || '' : ''
-      const url = importHeaders.urlIdx !== -1 ? memberRow[importHeaders.urlIdx] || '' : ''
-      const email = importHeaders.emailIdx !== -1 ? memberRow[importHeaders.emailIdx] || '' : ''
-      const connectedOn = importHeaders.connectedOnIdx !== -1 ? memberRow[importHeaders.connectedOnIdx] || '' : ''
+      const position = readCsvIndex(memberRow, importHeaders.positionIdx)
+      const url = readCsvIndex(memberRow, importHeaders.urlIdx)
+      const email = readCsvIndex(memberRow, importHeaders.emailIdx)
+      const connectedOn = readCsvIndex(memberRow, importHeaders.connectedOnIdx)
       const contextNotes = buildDeterministicLinkedInNotes({
         name,
         company: company.name,
@@ -8673,16 +8754,6 @@ function HelpIcon() {
       <circle cx="12" cy="12" r="9" />
       <path d="M9.75 9a2.5 2.5 0 0 1 4.54-1.43c.86 1.13.55 2.57-.56 3.31-.94.62-1.73 1.24-1.73 2.62" />
       <path d="M12 17h.01" />
-    </svg>
-  )
-}
-
-function SparkleIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 3l1.8 5.1L19 10l-5.2 1.9L12 17l-1.8-5.1L5 10l5.2-1.9L12 3z" />
-      <path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z" />
-      <path d="M5 14l.6 1.7L7 16.3l-1.4.5L5 18.5l-.6-1.7L3 16.3l1.4-.6L5 14z" />
     </svg>
   )
 }
