@@ -73,6 +73,7 @@ function startMockGraphApi({ port }) {
     failGraphWrites: 0,
     graphConflictIncludesRevision: true,
     enrichmentRequests: [],
+    enrichmentResponseDelayMs: 0,
   }
 
   const server = http.createServer(async (request, response) => {
@@ -95,6 +96,9 @@ function startMockGraphApi({ port }) {
       if (request.method === 'POST' && isLinkedInArchiveEnrichmentRoute) {
         const body = await readBody(request)
         state.enrichmentRequests.push(body)
+        if (state.enrichmentResponseDelayMs > 0) {
+          await new Promise((resolve) => setTimeout(resolve, state.enrichmentResponseDelayMs))
+        }
         jsonResponse(response, 200, {
           notes: [
             {
@@ -449,6 +453,15 @@ async function waitForEnrichmentRequest(mock) {
   throw new Error('Timed out waiting for LinkedIn archive enrichment request.')
 }
 
+async function waitForGraphPerson(mock, personId) {
+  const startedAt = Date.now()
+  while (Date.now() - startedAt < 60000) {
+    if (mock.state.graph?.people?.some((person) => person.id === personId)) return
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+  throw new Error(`Timed out waiting for graph person ${personId}; got ${JSON.stringify(mock.state.graph?.people ?? [])}.`)
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2))
   if (!Number.isInteger(args.people) || args.people <= 0) throw new Error('--people must be a positive integer.')
@@ -472,6 +485,39 @@ async function main() {
 
     await page.goto(`${vite.url}/#board`, { waitUntil: 'networkidle' })
     await waitForGraphRead(mock, 1)
+    await page.getByLabel('Settings', { exact: true }).click()
+
+    mock.state.enrichmentResponseDelayMs = 1500
+    const cancellationZipBuffer = await buildLinkedInZip({ people: 3, companies: 1 })
+    await page.locator('input[type="file"][accept=".zip"]').setInputFiles({
+      name: 'linkedin-cancellation-test.zip',
+      mimeType: 'application/zip',
+      buffer: cancellationZipBuffer,
+    })
+    await waitForImportedPeople(mock, 3)
+    await waitForEnrichmentRequest(mock)
+
+    const cancellationGraph = buildGraphImportFixture()
+    await uploadAndAcceptDialog(
+      page,
+      page.locator('input[type="file"][accept="application/json,.json"]'),
+      {
+        name: 'graph-import-during-ai-context.json',
+        mimeType: 'application/json',
+        buffer: Buffer.from(`${JSON.stringify(cancellationGraph)}\n`),
+      },
+    )
+    await waitForGraphPerson(mock, 'json-import-person')
+    await new Promise((resolve) => setTimeout(resolve, mock.state.enrichmentResponseDelayMs + 500))
+    if (mock.state.graph?.people?.[0]?.id !== 'json-import-person') {
+      throw new Error('Delayed LinkedIn AI context save overwrote a graph imported during enrichment.')
+    }
+
+    mock.state.graph = null
+    mock.state.revision = null
+    mock.state.enrichmentRequests = []
+    mock.state.enrichmentResponseDelayMs = 0
+    await page.reload({ waitUntil: 'networkidle' })
     await page.getByLabel('Settings', { exact: true }).click()
 
     const zipBuffer = await buildLinkedInZip(args)

@@ -17,6 +17,15 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-07-07 — Graph imports cancel LinkedIn archive AI sync
+
+- Decision: A new LinkedIn ZIP import, graph JSON import, or graph clear invalidates and
+  aborts any in-flight LinkedIn archive AI enrichment. Background AI saves use the graph
+  revision captured when that AI run starts, not the latest revision at save time.
+- Why: Automatic archive enrichment is asynchronous; if the user replaces the graph while
+  it runs, the user's new graph must win and stale AI notes must not resurrect the older
+  import snapshot.
+
 ### 2026-07-07 — LinkedIn archive messages carry exact person ids
 
 - Decision: Archive AI enrichment now uses a single DeepSeek OpenRouter model for every

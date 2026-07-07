@@ -279,6 +279,12 @@ type LinkedInArchiveAiProgress = {
   message: string
 }
 
+type LinkedInArchiveEnrichmentRun = {
+  id: number
+  controller: AbortController
+  expectedRevision: number | null
+}
+
 type PanState = {
   pointerId: number
   startX: number
@@ -1044,7 +1050,7 @@ function App() {
   useEffect(() => {
     if (auth.status !== 'authenticated' || !userId || !auth.session) return
     let cancelled = false
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+
     setGraphLoaded(false)
     setGraphLoadError(null)
     loadGraphRecord(userId)
@@ -1129,7 +1135,7 @@ function App() {
 
   useEffect(() => {
     if (!isLocalMode) return
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+
     setGraphLoaded(false)
     setGraphLoadError(null)
     const saved = loadLocalGraph()
@@ -1158,13 +1164,18 @@ function App() {
     return () => window.clearTimeout(timer)
   }, [graph, graphLoaded, isLocalMode])
 
-  async function persistGraphImmediately(nextGraph: GraphState) {
+  async function persistGraphImmediately(nextGraph: GraphState, options: {
+    expectedRevision?: number | null
+    signal?: AbortSignal
+  } = {}) {
     if (auth.status === 'authenticated' && userId) {
       try {
         const graphJson = JSON.stringify(nextGraph)
         pendingSaveGraphRef.current = nextGraph
         pendingSaveSnapshotRef.current = graphJson
-        const nextRevision = await saveGraph(userId, nextGraph, loadedGraphRevisionRef.current)
+        const expectedRevision = options.expectedRevision ?? loadedGraphRevisionRef.current
+        const nextRevision = await saveGraph(userId, nextGraph, expectedRevision, { signal: options.signal })
+        if (options.signal?.aborted) return
         loadedGraphRevisionRef.current = nextRevision
         loadedGraphSourceRef.current = 'saved'
         loadedGraphSnapshotRef.current = graphJson
@@ -1373,7 +1384,7 @@ function App() {
 
   useEffect(() => {
     if (isTouchLayout || boardToolMode === 'edit') return
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+
     setBoardToolMode('edit')
   }, [boardToolMode, isTouchLayout])
 
@@ -1595,6 +1606,8 @@ function App() {
   const linkedInGuidePanelRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const linkedInArchiveCacheRef = useRef<LinkedInArchiveZipTexts | null>(null)
+  const linkedInArchiveEnrichmentRunIdRef = useRef(0)
+  const linkedInArchiveEnrichmentControllerRef = useRef<AbortController | null>(null)
   const graphFileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -1618,7 +1631,7 @@ function App() {
   const smartSearchRequestRef = useRef(0)
   const [isImportingLinkedInProfile, setIsImportingLinkedInProfile] = useState(false)
   const [isImportingLinkedInZip, setIsImportingLinkedInZip] = useState(false)
-  const [isEnrichingLinkedInArchive, setIsEnrichingLinkedInArchive] = useState(false)
+  const [, setIsEnrichingLinkedInArchive] = useState(false)
   const [linkedInArchiveAiProgress, setLinkedInArchiveAiProgress] = useState<LinkedInArchiveAiProgress | null>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const searchPanelRef = useRef<HTMLDivElement>(null)
@@ -1662,7 +1675,7 @@ function App() {
     const cy = window.innerWidth <= 720 ? window.innerHeight * 0.22 : window.innerHeight * 0.44
     const end = { x: cx - wx * targetScale, y: cy - wy * targetScale, scale: targetScale }
     if (focusAnimRef.current != null) window.cancelAnimationFrame(focusAnimRef.current)
-    // eslint-disable-next-line react-hooks/purity -- animation start time is read from an event handler, not render.
+
     const t0 = performance.now()
     const duration = 520
     const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
@@ -1839,10 +1852,51 @@ function App() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
+  function startLinkedInArchiveEnrichmentRun(): LinkedInArchiveEnrichmentRun {
+    linkedInArchiveEnrichmentControllerRef.current?.abort()
+    const controller = new AbortController()
+    const run = {
+      id: linkedInArchiveEnrichmentRunIdRef.current + 1,
+      controller,
+      expectedRevision: loadedGraphRevisionRef.current,
+    }
+    linkedInArchiveEnrichmentRunIdRef.current = run.id
+    linkedInArchiveEnrichmentControllerRef.current = controller
+    return run
+  }
+
+  function isLinkedInArchiveEnrichmentRunCurrent(run: LinkedInArchiveEnrichmentRun) {
+    return linkedInArchiveEnrichmentRunIdRef.current === run.id && !run.controller.signal.aborted
+  }
+
+  function setLinkedInArchiveAiProgressForRun(run: LinkedInArchiveEnrichmentRun, progress: LinkedInArchiveAiProgress) {
+    if (!isLinkedInArchiveEnrichmentRunCurrent(run)) return
+    setLinkedInArchiveAiProgress(progress)
+  }
+
+  function cancelLinkedInArchiveEnrichment() {
+    linkedInArchiveEnrichmentRunIdRef.current += 1
+    linkedInArchiveEnrichmentControllerRef.current?.abort()
+    linkedInArchiveEnrichmentControllerRef.current = null
+    linkedInArchiveCacheRef.current = null
+    setIsEnrichingLinkedInArchive(false)
+    setLinkedInArchiveAiProgress(null)
+  }
+
+  function isAbortError(error: unknown) {
+    return Boolean(
+      error &&
+        typeof error === 'object' &&
+        'name' in error &&
+        (error as { name?: unknown }).name === 'AbortError',
+    )
+  }
+
   async function handleLinkedInImport(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file) return
     if (isImportingLinkedInZip) return
+    cancelLinkedInArchiveEnrichment()
     setIsImportingLinkedInZip(true)
     setLinkedInArchiveAiProgress(null)
 
@@ -1886,14 +1940,14 @@ function App() {
   }
 
   async function runLinkedInContextEnrichment(archive: LinkedInArchiveZipTexts, sourceGraph: GraphState = graphRef.current) {
-    if (isEnrichingLinkedInArchive) return
     if (auth.status !== 'authenticated') {
       alert('Sign in to add AI context from a LinkedIn ZIP.')
       return
     }
 
+    const run = startLinkedInArchiveEnrichmentRun()
     setIsEnrichingLinkedInArchive(true)
-    setLinkedInArchiveAiProgress({
+    setLinkedInArchiveAiProgressForRun(run, {
       phase: 'reading',
       current: 0,
       total: 1,
@@ -1908,19 +1962,30 @@ function App() {
         invitationsText: archive.invitationsText,
         postsTexts: [archive.sharesText, archive.richMediaText],
       })
-      const aiResult = await enrichLinkedInArchiveGraph(sourceGraph, llmContext, setLinkedInArchiveAiProgress)
+      if (!isLinkedInArchiveEnrichmentRunCurrent(run)) return
+      const aiResult = await enrichLinkedInArchiveGraph(
+        sourceGraph,
+        llmContext,
+        (progress) => setLinkedInArchiveAiProgressForRun(run, progress),
+        () => isLinkedInArchiveEnrichmentRunCurrent(run),
+      )
+      if (!isLinkedInArchiveEnrichmentRunCurrent(run)) return
 
       if (aiResult.addedNotes > 0) {
         const summary = formatLinkedInAiNoteSummary(aiResult.noteTitleCounts)
-        setLinkedInArchiveAiProgress({
+        setLinkedInArchiveAiProgressForRun(run, {
           phase: 'saving',
           current: 1,
           total: 1,
           message: `Saving ${aiResult.addedNotes} AI context notes...`,
         })
         pushHistory()
-        await persistGraphImmediately(aiResult.graph)
-        setLinkedInArchiveAiProgress({
+        await persistGraphImmediately(aiResult.graph, {
+          expectedRevision: run.expectedRevision,
+          signal: run.controller.signal,
+        })
+        if (!isLinkedInArchiveEnrichmentRunCurrent(run)) return
+        setLinkedInArchiveAiProgressForRun(run, {
           phase: 'done',
           current: 1,
           total: 1,
@@ -1929,7 +1994,7 @@ function App() {
             : `Added ${aiResult.addedNotes} AI context notes.`,
         })
       } else {
-        setLinkedInArchiveAiProgress({
+        setLinkedInArchiveAiProgressForRun(run, {
           phase: 'done',
           current: 1,
           total: 1,
@@ -1937,9 +2002,10 @@ function App() {
         })
       }
     } catch (err) {
+      if (!isLinkedInArchiveEnrichmentRunCurrent(run) || isAbortError(err)) return
       console.error(err)
       const errorMessage = getErrorMessage(err)
-      setLinkedInArchiveAiProgress({
+      setLinkedInArchiveAiProgressForRun(run, {
         phase: 'error',
         current: 0,
         total: 1,
@@ -1947,13 +2013,17 @@ function App() {
       })
       alert(`Failed to add AI context: ${errorMessage}`)
     } finally {
-      setIsEnrichingLinkedInArchive(false)
+      if (isLinkedInArchiveEnrichmentRunCurrent(run)) {
+        linkedInArchiveEnrichmentControllerRef.current = null
+        setIsEnrichingLinkedInArchive(false)
+      }
     }
   }
 
   async function handleGraphImport(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file) return
+    cancelLinkedInArchiveEnrichment()
 
     try {
       const parsed = JSON.parse(await file.text()) as unknown
@@ -1997,6 +2067,7 @@ function App() {
   function handleClearGraph() {
     const confirmed = window.confirm('Clear the current graph? This removes all circles, people, notes, and connections.')
     if (!confirmed) return
+    cancelLinkedInArchiveEnrichment()
     const nextGraph = auth.status === 'authenticated' && auth.session
       ? stampYouIdentity(createFreshGraph(), auth.session.user)
       : createFreshGraph()
@@ -2304,7 +2375,7 @@ function App() {
     setPressingSwatchId(id)
     setReturningSwatchId(null)
     pressingSwatchIdRef.current = id
-    // eslint-disable-next-line react-hooks/purity
+
     pressingSwatchTimeRef.current = performance.now()
     action()
   }
@@ -4586,9 +4657,9 @@ function App() {
     }
 
     const world = screenToWorld({ x: event.clientX, y: event.clientY })
-    // eslint-disable-next-line react-hooks/purity -- created from a pointer event, not during render.
+
     const id = `person-${Date.now()}`
-    // eslint-disable-next-line react-hooks/purity -- randomizes a newly created person's shape in an event handler.
+
     const sides = Math.floor(Math.random() * 5) + 8
     pushHistory()
     setGraph((current) => ({
@@ -4727,9 +4798,9 @@ function App() {
       circleId = hit.person.circleId ?? ''
     }
 
-    // eslint-disable-next-line react-hooks/purity -- created from a pointer event, not during render.
+
     const id = `person-${Date.now()}`
-    // eslint-disable-next-line react-hooks/purity -- randomizes a newly created person's shape in an event handler.
+
     const sides = Math.floor(Math.random() * 5) + 8
     pushHistory()
     setGraph((current) => {
@@ -5527,7 +5598,7 @@ Content-Type: application/json
                     disabled={result.kind === 'linkedin-profile' && isImportingLinkedInProfile}
                     style={{ '--search-row-index': index } as CSSProperties}
                     onMouseEnter={() => setActiveSearchIndex(index)}
-                    // eslint-disable-next-line react-hooks/refs
+
                     onClick={() => handleSelectSearchResult(result)}
                   >
                     <span
@@ -6048,7 +6119,7 @@ Content-Type: application/json
                 </button>
               </div>
             )}
-            
+
             {selectedCircle && (
               <>
                 {(() => {
@@ -6242,7 +6313,7 @@ Content-Type: application/json
                       </button>
                     </div>
                   </div>
-                  
+
                   {(selectedCircle.shapeType ?? 'wavy') !== 'circle' && (
                     <>
                       <div className="inspector-field">
@@ -6390,7 +6461,7 @@ Content-Type: application/json
                   <div className="trello-list__header">
                     <h4 className="trello-list__title">Notes</h4>
                   </div>
- 
+
                   {/* Scrollable list */}
                   <div className="trello-list__notes" ref={notesListRef}>
                     {selectedPerson.notes?.map((note, index) => (
@@ -6449,7 +6520,7 @@ Content-Type: application/json
                       </div>
                     ))}
                   </div>
- 
+
                   {/* Trello Card Composer */}
                   {isAddingNote ? (
                     <div className="trello-list__composer">
@@ -6637,7 +6708,7 @@ Content-Type: application/json
                       </button>
                     </div>
                   </div>
-                  
+
                   {(selectedPerson.shapeType ?? 'wavy') !== 'circle' && (
                     <>
                       <div className="inspector-field">
@@ -7705,7 +7776,7 @@ function normalizeEventKeyPart(value: string) {
 function getLinkedInEventNoteKey(note: PersonNote) {
   if (note.title !== 'Event Context' && note.title !== 'AI Event Context') return null
 
-  const dateMatch = note.body.match(/\b(?:Date|dated)\s*:?\s*(\d{4}-\d{2}-\d{2})\b/i)
+  const dateMatch = note.body.match(/\b(?:Date|dated|around)\s*:?\s*(\d{4}-\d{2}-\d{2})\b/i)
   const eventMatch = note.body.match(/\bEvent:\s*([^\n]+)/i)
   if (eventMatch) {
     const eventName = normalizeEventKeyPart(eventMatch[1])
@@ -8056,6 +8127,7 @@ async function enrichLinkedInArchiveGraph(
   graph: GraphState,
   context: LinkedInArchiveLlmContext,
   onProgress?: (progress: LinkedInArchiveAiProgress) => void,
+  isCurrent: () => boolean = () => true,
 ): Promise<{ graph: GraphState; addedNotes: number; noteTitleCounts: Record<string, number> }> {
   if (context.connections.length === 0) return { graph, addedNotes: 0, noteTitleCounts: {} }
   if (context.messages.length === 0 && context.invitations.length === 0 && context.posts.length === 0) {
@@ -8068,6 +8140,7 @@ async function enrichLinkedInArchiveGraph(
   const totalBatches = Math.ceil(context.connections.length / 8)
 
   for (let index = 0; index < context.connections.length; index += 8) {
+    if (!isCurrent()) return { graph: nextGraph, addedNotes, noteTitleCounts }
     const batchNumber = Math.floor(index / 8) + 1
     const connections = context.connections.slice(index, index + 8)
     onProgress?.({
@@ -8095,6 +8168,7 @@ async function enrichLinkedInArchiveGraph(
       invitations,
       posts,
     })
+    if (!isCurrent()) return { graph: nextGraph, addedNotes, noteTitleCounts }
 
     if (notes.length === 0) continue
 
@@ -9054,13 +9128,13 @@ function GlobalTooltip() {
     const handleOver = (e: Event) => {
       const target = (e.target as HTMLElement).closest('[data-tooltip]')
       if (!target) return
-      
+
       const text = target.getAttribute('data-tooltip')
       if (!text) return
-      
+
       const rect = target.getBoundingClientRect()
       const position = (target.getAttribute('data-tooltip-position') || 'top') as TooltipData['position']
-      
+
       setTooltip({ text, rect, position })
     }
 

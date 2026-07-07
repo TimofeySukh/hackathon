@@ -76,7 +76,20 @@ async function parseJsonResponse(response: Response) {
   }
 }
 
-async function writeGraphThroughApi(graph: GraphState, expectedRevision: number | null) {
+type SaveGraphOptions = {
+  signal?: AbortSignal
+}
+
+function isAbortError(error: unknown) {
+  return Boolean(
+    error &&
+      typeof error === 'object' &&
+      'name' in error &&
+      (error as { name?: unknown }).name === 'AbortError',
+  )
+}
+
+async function writeGraphThroughApi(graph: GraphState, expectedRevision: number | null, options: SaveGraphOptions = {}) {
   const baseUrl = getSupabaseFunctionUrl('graph-api')
   const accessToken = await getAccessToken()
   if (!baseUrl || !accessToken) {
@@ -85,6 +98,7 @@ async function writeGraphThroughApi(graph: GraphState, expectedRevision: number 
 
   const response = await fetch(`${baseUrl}/v1/graph`, {
     method: 'PUT',
+    signal: options.signal,
     headers: {
       Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
@@ -221,7 +235,7 @@ async function readGraphRevisionDirect(userId: string): Promise<number | null> {
   return readRevisionFromRows(data)
 }
 
-async function writeGraphDirect(userId: string, graph: GraphState, expectedRevision: number | null) {
+async function writeGraphDirect(userId: string, graph: GraphState, expectedRevision: number | null, options: SaveGraphOptions = {}) {
   const accessToken = await getAccessToken()
   if (!supabase || !supabasePublishableKey || !accessToken) {
     throw new GraphPersistenceError('Failed to save your board', 'Supabase session is not available.')
@@ -244,6 +258,7 @@ async function writeGraphDirect(userId: string, graph: GraphState, expectedRevis
 
     const response = await fetch(url, {
       method: 'POST',
+      signal: options.signal,
       headers,
       body: `{"user_id":${JSON.stringify(userId)},"graph":${graphJson}}`,
     })
@@ -268,6 +283,7 @@ async function writeGraphDirect(userId: string, graph: GraphState, expectedRevis
 
   const response = await fetch(url, {
     method: 'PATCH',
+    signal: options.signal,
     headers,
     body: `{"graph":${graphJson}}`,
   })
@@ -285,16 +301,17 @@ async function writeGraphDirect(userId: string, graph: GraphState, expectedRevis
   return { revision }
 }
 
-async function writeGraphWithFallback(userId: string, graph: GraphState, expectedRevision: number | null) {
+async function writeGraphWithFallback(userId: string, graph: GraphState, expectedRevision: number | null, options: SaveGraphOptions = {}) {
   try {
-    return await writeGraphThroughApi(graph, expectedRevision)
+    return await writeGraphThroughApi(graph, expectedRevision, options)
   } catch (apiError) {
+    if (isAbortError(apiError)) throw apiError
     if (apiError instanceof GraphRevisionConflictError) throw apiError
     if (!supabase) throw apiError
 
     console.warn('Failed to save graph through graph API, falling back to direct Supabase write.', apiError)
     try {
-      return await writeGraphDirect(userId, graph, expectedRevision)
+      return await writeGraphDirect(userId, graph, expectedRevision, options)
     } catch (directError) {
       if (directError instanceof GraphRevisionConflictError) throw directError
       throw new GraphPersistenceError('Failed to save your board', {
@@ -419,7 +436,12 @@ export async function loadGraphRecord(userId: string): Promise<LoadedGraphRecord
  * bulk import of thousands of nodes — it is still a single request. A stale
  * tab gets GraphRevisionConflictError instead of overwriting newer data.
  */
-export async function saveGraph(userId: string, graph: GraphState, expectedRevision: number | null): Promise<number | null> {
+export async function saveGraph(
+  userId: string,
+  graph: GraphState,
+  expectedRevision: number | null,
+  options: SaveGraphOptions = {},
+): Promise<number | null> {
   if (!supabase) return expectedRevision
   if (!isGraphState(graph)) {
     throw new Error('Cannot save board: graph data is missing or invalid.')
@@ -429,13 +451,13 @@ export async function saveGraph(userId: string, graph: GraphState, expectedRevis
   let data: { revision?: unknown } | null
   let savedFromRevision = expectedRevision
   try {
-    data = await writeGraphWithFallback(userId, safeGraph, expectedRevision)
+    data = await writeGraphWithFallback(userId, safeGraph, expectedRevision, options)
   } catch (error) {
     if (!(error instanceof GraphRevisionConflictError) || expectedRevision !== null) throw error
     const latestRevision = await readLatestGraphRevision(userId, error.revision)
     if (latestRevision === null) throw error
     savedFromRevision = latestRevision
-    data = await writeGraphWithFallback(userId, safeGraph, latestRevision)
+    data = await writeGraphWithFallback(userId, safeGraph, latestRevision, options)
   }
   return typeof data?.revision === 'number' ? data.revision : savedFromRevision === null ? 1 : savedFromRevision + 1
 }

@@ -149,7 +149,9 @@ Safety invariants:
   spike. It caches the uploaded archive in memory for the current tab only. For signed-in
   users, server-side LLM enrichment over messages, invitations, and posts starts
   automatically after import; progress is shown per batch and the app persists only
-  returned relationship/event/action notes, not raw export text.
+  returned relationship/event/action notes, not raw export text. Starting another ZIP
+  import, importing a graph JSON, or clearing the graph cancels any in-flight archive AI
+  enrichment so stale context cannot overwrite the newer graph.
 - Anonymous users see a red `!` badge on the Settings gear until they open the LinkedIn
   sync guide from the `?` helper inside Settings (not a floating banner).
 - The LinkedIn sync guide `?` inside Settings shows the same badge until the user opens
