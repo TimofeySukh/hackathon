@@ -1971,13 +1971,15 @@ function App() {
       )
       if (!isLinkedInArchiveEnrichmentRunCurrent(run)) return
 
-      if (aiResult.addedNotes > 0) {
+      if (aiResult.graph !== sourceGraph) {
         const summary = formatLinkedInAiNoteSummary(aiResult.noteTitleCounts)
         setLinkedInArchiveAiProgressForRun(run, {
           phase: 'saving',
           current: 1,
           total: 1,
-          message: `Saving ${aiResult.addedNotes} AI context notes...`,
+          message: aiResult.addedNotes > 0
+            ? `Saving ${aiResult.addedNotes} AI context notes...`
+            : 'Saving updated connection context...',
         })
         pushHistory()
         await persistGraphImmediately(aiResult.graph, {
@@ -1989,9 +1991,9 @@ function App() {
           phase: 'done',
           current: 1,
           total: 1,
-          message: summary
-            ? `Added ${aiResult.addedNotes} AI context notes: ${summary}.`
-            : `Added ${aiResult.addedNotes} AI context notes.`,
+          message: aiResult.addedNotes > 0
+            ? (summary ? `Added ${aiResult.addedNotes} AI context notes: ${summary}.` : `Added ${aiResult.addedNotes} AI context notes.`)
+            : 'AI context analysis complete.',
         })
       } else {
         setLinkedInArchiveAiProgressForRun(run, {
@@ -8199,18 +8201,37 @@ async function enrichLinkedInArchiveGraph(
       notesByPersonId.set(note.personId, existing)
     }
 
+    const batchPersonIds = new Set(connections.map((c) => c.personId))
+
     nextGraph = {
       ...nextGraph,
       people: nextGraph.people.map((person) => {
-        const personNotes = notesByPersonId.get(person.id)
-        if (!personNotes) return person
-        const newTitleCounts = countNewNoteTitles(person, personNotes)
-        const result = appendUniquePersonNotes(person, personNotes)
+        if (!batchPersonIds.has(person.id)) return person
+
+        const personNotes = notesByPersonId.get(person.id) ?? []
+        const hasIncomingAiEvent = personNotes.some((n) => n.title === 'AI Event Context')
+        
+        let cleanedNotes = person.notes ? [...person.notes] : []
+        if (!hasIncomingAiEvent) {
+          cleanedNotes = cleanedNotes.filter((n) => n.title !== 'Event Context')
+        }
+
+        const personWithCleanedNotes = { ...person, notes: cleanedNotes }
+        const result = appendUniquePersonNotes(personWithCleanedNotes, personNotes)
         addedNotes += result.added
+
+        const newTitleCounts = countNewNoteTitles(personWithCleanedNotes, personNotes)
         for (const [title, count] of Object.entries(newTitleCounts)) {
           noteTitleCounts[title] = (noteTitleCounts[title] ?? 0) + count
         }
-        return result.person
+
+        const notesChanged = person.notes?.length !== result.person.notes?.length ||
+          (person.notes ?? []).some((n, idx) => {
+            const rn = result.person.notes?.[idx]
+            return !rn || n.title !== rn.title || n.body !== rn.body
+          })
+
+        return notesChanged ? result.person : person
       }),
     }
 
