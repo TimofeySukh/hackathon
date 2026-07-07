@@ -27,7 +27,8 @@ not thousands of per-contact database writes.
   archive stays in memory for that tab so the user does not have to pick the same ZIP
   again. Raw text is sent only for transient server-side processing; the graph persists
   only returned notes such as `AI Relationship Summary`, `Origin Context`,
-  `AI Event Context`, `AI Professional Context`, and `Action Items`.
+  `AI Event Context`, and `Action Items`. Professional title classification stays in the
+  deterministic import notes so AI context progress reflects relationship-oriented context.
 - Settings also exposes **Add AI context from ZIP** for signed-in users who already
   imported contacts and want to enrich the existing graph later. If no archive is still in
   memory (for example after reload), the action asks for the ZIP once. The control shows a

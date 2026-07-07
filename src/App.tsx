@@ -1909,6 +1909,7 @@ function App() {
       const aiResult = await enrichLinkedInArchiveGraph(graph, llmContext, setLinkedInArchiveAiProgress)
 
       if (aiResult.addedNotes > 0) {
+        const summary = formatLinkedInAiNoteSummary(aiResult.noteTitleCounts)
         setLinkedInArchiveAiProgress({
           phase: 'saving',
           current: 1,
@@ -1921,7 +1922,9 @@ function App() {
           phase: 'done',
           current: 1,
           total: 1,
-          message: `Added ${aiResult.addedNotes} AI context notes.`,
+          message: summary
+            ? `Added ${aiResult.addedNotes} AI context notes: ${summary}.`
+            : `Added ${aiResult.addedNotes} AI context notes.`,
         })
       } else {
         setLinkedInArchiveAiProgress({
@@ -7389,6 +7392,14 @@ function createHeaderMap(headerRow: string[]) {
   return new Map(headerRow.map((header, index) => [normalizeCsvHeader(header), index]))
 }
 
+function findCsvHeaderIndex(rows: string[][], requiredHeaders: string[]) {
+  const required = requiredHeaders.map(normalizeCsvHeader)
+  return rows.findIndex((row) => {
+    const headers = new Set(row.map(normalizeCsvHeader))
+    return required.every((header) => headers.has(header))
+  })
+}
+
 function readCsvField(row: string[], headerMap: Map<string, number>, names: string[]) {
   for (const name of names) {
     const index = headerMap.get(normalizeCsvHeader(name))
@@ -7651,6 +7662,18 @@ function appendUniquePersonNotes(person: PersonNode, notes: PersonNote[]) {
   return added > 0 ? { person: { ...person, notes: nextNotes }, added } : { person, added: 0 }
 }
 
+function countNewNoteTitles(person: PersonNode, notes: PersonNote[]) {
+  const existingKeys = new Set((person.notes ?? []).map((note) => `${note.title}\n${note.body}`))
+  const counts: Record<string, number> = {}
+  for (const note of notes) {
+    const key = `${note.title}\n${note.body}`
+    if (existingKeys.has(key)) continue
+    existingKeys.add(key)
+    counts[note.title] = (counts[note.title] ?? 0) + 1
+  }
+  return counts
+}
+
 function buildDeterministicLinkedInNotes(input: {
   name: string
   company: string
@@ -7704,10 +7727,12 @@ function parseLinkedInMessagesCsv(text: string | null): LinkedInArchiveMessageIn
   if (!text) return []
   const rows = parseCSV(text)
   if (rows.length < 2) return []
-  const headerMap = createHeaderMap(rows[0])
+  const headerIdx = findCsvHeaderIndex(rows, ['CONVERSATION ID', 'CONTENT'])
+  if (headerIdx === -1) return []
+  const headerMap = createHeaderMap(rows[headerIdx])
 
-  return rows.slice(1).map((row): LinkedInArchiveMessageInput | null => {
-    const content = readCsvField(row, headerMap, ['CONTENT', 'Message', 'Text'])
+  return rows.slice(headerIdx + 1).map((row): LinkedInArchiveMessageInput | null => {
+    const content = readCsvField(row, headerMap, ['CONTENT', 'Message', 'Text', 'Body', 'Message Body'])
     if (!content) return null
     return {
       conversationId: readCsvField(row, headerMap, ['CONVERSATION ID', 'Conversation ID']),
@@ -7725,9 +7750,11 @@ function parseLinkedInInvitationsCsv(text: string | null): LinkedInArchiveInvita
   if (!text) return []
   const rows = parseCSV(text)
   if (rows.length < 2) return []
-  const headerMap = createHeaderMap(rows[0])
+  const headerIdx = findCsvHeaderIndex(rows, ['Message'])
+  if (headerIdx === -1) return []
+  const headerMap = createHeaderMap(rows[headerIdx])
 
-  return rows.slice(1).map((row): LinkedInArchiveInvitationInput | null => {
+  return rows.slice(headerIdx + 1).map((row): LinkedInArchiveInvitationInput | null => {
     const message = readCsvField(row, headerMap, ['Message', 'MESSAGE'])
     if (!message) return null
     return {
@@ -7743,9 +7770,14 @@ function parseLinkedInPostsForLlm(text: string | null): LinkedInArchivePostInput
   if (!text) return []
   const rows = parseCSV(text)
   if (rows.length < 2) return []
-  const headerMap = createHeaderMap(rows[0])
+  const headerIdx = rows.findIndex((row) => {
+    const headers = new Set(row.map(normalizeCsvHeader))
+    return ['mediadescription', 'sharecommentary', 'commentary', 'description'].some((header) => headers.has(header))
+  })
+  if (headerIdx === -1) return []
+  const headerMap = createHeaderMap(rows[headerIdx])
 
-  return rows.slice(1).map((row): LinkedInArchivePostInput | null => {
+  return rows.slice(headerIdx + 1).map((row): LinkedInArchivePostInput | null => {
     const description = readCsvField(row, headerMap, [
       'Media Description',
       'ShareCommentary',
@@ -7845,18 +7877,27 @@ function filterPostsForConnections(posts: LinkedInArchivePostInput[], connection
   }).slice(0, 30)
 }
 
+function formatLinkedInAiNoteSummary(counts: Record<string, number>) {
+  return Object.entries(counts)
+    .filter(([, count]) => count > 0)
+    .sort(([leftTitle], [rightTitle]) => leftTitle.localeCompare(rightTitle))
+    .map(([title, count]) => `${title}: ${count}`)
+    .join(', ')
+}
+
 async function enrichLinkedInArchiveGraph(
   graph: GraphState,
   context: LinkedInArchiveLlmContext,
   onProgress?: (progress: LinkedInArchiveAiProgress) => void,
-): Promise<{ graph: GraphState; addedNotes: number }> {
-  if (context.connections.length === 0) return { graph, addedNotes: 0 }
+): Promise<{ graph: GraphState; addedNotes: number; noteTitleCounts: Record<string, number> }> {
+  if (context.connections.length === 0) return { graph, addedNotes: 0, noteTitleCounts: {} }
   if (context.messages.length === 0 && context.invitations.length === 0 && context.posts.length === 0) {
-    return { graph, addedNotes: 0 }
+    return { graph, addedNotes: 0, noteTitleCounts: {} }
   }
 
   let nextGraph = graph
   let addedNotes = 0
+  const noteTitleCounts: Record<string, number> = {}
   const totalBatches = Math.ceil(context.connections.length / 8)
 
   for (let index = 0; index < context.connections.length; index += 8) {
@@ -7868,11 +7909,24 @@ async function enrichLinkedInArchiveGraph(
       total: totalBatches,
       message: `Analyzing LinkedIn context batch ${batchNumber} of ${totalBatches}...`,
     })
+    const messages = filterMessagesForConnections(context.messages, connections)
+    const invitations = filterInvitationsForConnections(context.invitations, connections)
+    const posts = filterPostsForConnections(context.posts, connections)
+    if (messages.length === 0 && invitations.length === 0 && posts.length === 0) {
+      onProgress?.({
+        phase: 'processing',
+        current: batchNumber,
+        total: totalBatches,
+        message: `Skipped ${batchNumber} of ${totalBatches} batches without matched archive context.`,
+      })
+      continue
+    }
+
     const notes = await enrichLinkedInArchiveBatch({
       connections,
-      messages: filterMessagesForConnections(context.messages, connections),
-      invitations: filterInvitationsForConnections(context.invitations, connections),
-      posts: filterPostsForConnections(context.posts, connections),
+      messages,
+      invitations,
+      posts,
     })
 
     if (notes.length === 0) continue
@@ -7889,8 +7943,12 @@ async function enrichLinkedInArchiveGraph(
       people: nextGraph.people.map((person) => {
         const personNotes = notesByPersonId.get(person.id)
         if (!personNotes) return person
+        const newTitleCounts = countNewNoteTitles(person, personNotes)
         const result = appendUniquePersonNotes(person, personNotes)
         addedNotes += result.added
+        for (const [title, count] of Object.entries(newTitleCounts)) {
+          noteTitleCounts[title] = (noteTitleCounts[title] ?? 0) + count
+        }
         return result.person
       }),
     }
@@ -7904,7 +7962,7 @@ async function enrichLinkedInArchiveGraph(
     })
   }
 
-  return { graph: nextGraph, addedNotes }
+  return { graph: nextGraph, addedNotes, noteTitleCounts }
 }
 
 async function buildLinkedInConnectionsGraph(

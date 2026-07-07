@@ -319,29 +319,6 @@ function compactConnections(connections: ConnectionInput[]) {
   }))
 }
 
-async function runJobTitleClassifier(input: ReturnType<typeof normalizeBody>, allowedPersonIds: Set<string>) {
-  const connections = input.connections.filter((connection) => connection.position)
-  if (connections.length === 0) return []
-
-  return callTaskForNotes({
-    tier: 'fast',
-    allowedPersonIds,
-    system: `Task C: Job Title Classifier for Social Datanode.
-
-${OUTPUT_CONTRACT}
-
-Specific rules:
-- Use only the position/title and company fields, not messages or posts.
-- Classify seniority into exactly one of: LPR / C-Level, Management / Lead, Specialist.
-- Classify domain into exactly one of: Engineering, Product, HR/Agile, Sales/Marketing, Finance, Operations, Other.
-- Output title "AI Professional Context".
-- Body format: "Seniority: <level>\\nDomain: <domain>\\nWhy: <short reason from title words>".
-- Skip titles that are too vague to classify.`,
-    user: { connections: compactConnections(connections) },
-    maxTokens: 900,
-  })
-}
-
 async function runInvitationParser(input: ReturnType<typeof normalizeBody>, allowedPersonIds: Set<string>) {
   if (input.invitations.length === 0) return []
 
@@ -428,7 +405,6 @@ Specific rules:
 async function runArchiveEnrichmentTasks(input: ReturnType<typeof normalizeBody>): Promise<OutputNote[]> {
   const allowedPersonIds = new Set(input.connections.map((connection) => connection.personId))
   const taskResults = await Promise.all([
-    runJobTitleClassifier(input, allowedPersonIds),
     runInvitationParser(input, allowedPersonIds),
     runChatTranscriptSummarizer(input, allowedPersonIds),
     runEventPostAnalyzer(input, allowedPersonIds),

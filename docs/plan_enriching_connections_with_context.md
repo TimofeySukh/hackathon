@@ -7,7 +7,8 @@ The goal is to automatically categorize, tag, and summarize relationships withou
 Implementation alignment for Social Datanode:
 
 - First shipped flow runs a deterministic pass first, then signed-in users get batched
-  server-side LLM enrichment through `enrich-linkedin-archive`.
+  server-side LLM enrichment for messages, invitations, and posts through
+  `enrich-linkedin-archive`.
 - Enrichment output is stored as regular person notes in the existing `user_graphs.graph`
   JSON blob, not as a separate database table or a new `PersonNode.enrichment` field.
 - Raw message and invitation text may be sent transiently to the Edge Function/OpenRouter
