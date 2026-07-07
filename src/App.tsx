@@ -32,9 +32,10 @@ import {
 } from './lib/linkedinArchiveEnrichment'
 import { searchGraphByQuery } from './lib/search/graphSearch'
 import { mapSmartSearchResults, shouldUseSmartSearch, smartSearchGraph, type AgentSearchStep } from './lib/smartSearch'
-import { ProgressiveHints } from './Onboarding'
-import { getOnboardingHints, type OnboardingSurface } from './onboardingSteps'
+import { OnboardingCoach } from './Onboarding'
+import { getOnboardingSteps, type OnboardingSurface } from './onboardingSteps'
 import type { OnboardingAction } from './onboardingSteps'
+import { createOnboardingDemoGraph } from './lib/onboardingDemoGraph'
 import { SelectionIndicator } from './components/SelectionIndicator'
 import { M3Slider } from './components/M3Slider'
 // STRESS TEST — dev-only performance harness. See src/lib/stressTest.ts.
@@ -540,9 +541,25 @@ const LINKEDIN_GUIDE_HINT_KEY = 'social-linkedin-guide-hint-seen-v1'
 const PERSON_DOUBLE_TAP_MS = 350
 const PERSON_DOUBLE_TAP_DISTANCE = 28
 const SEARCH_LINKEDIN_HINT_KEY = 'social-search-linkedin-hint-seen-v1'
-const BOARD_HINTS_STORAGE_KEY = 'social-board-progressive-hints-done-v1'
-const BOARD_HINT_COMPLETE_DELAY_MS = 850
-const DESKTOP_VISIBLE_HINT_LIMIT = 5
+const BOARD_ONBOARDING_STORAGE_KEY = 'social-board-onboarding-done-v3'
+const BOARD_ONBOARDING_FORCE_KEY = 'social-board-onboarding-open-v3'
+const ONBOARDING_COMPLETE_DELAY_MS = 1000
+const ONBOARDING_DOCK_GAP_PX = 12
+const ONBOARDING_TOP_CHROME_CLEARANCE_PX = 72
+const ONBOARDING_LINKEDIN_SEARCH_EXAMPLES = [
+  {
+    name: 'Timofey Sukhov',
+    role: 'CEO',
+    profileUrl: 'https://www.linkedin.com/in/timofey-sukhov-775b38404/',
+    avatarUrl: '/timofey_avatar.jpeg',
+  },
+  {
+    name: 'Velizar Seleznev',
+    role: 'CTO',
+    profileUrl: 'https://www.linkedin.com/in/velizar-seleznev/',
+    avatarUrl: '/velizar_avatar.jpeg',
+  },
+] as const
 const CIRCLE_CREATION_DEFAULTS_KEY = 'hackathon-board:circle-creation-defaults:v1'
 const LINKEDIN_MOBILE_ARCHIVE_MESSAGE =
   'LinkedIn archive requests do not work from a phone. Please request your archive from LinkedIn on a computer, then return here to import the ZIP.'
@@ -587,23 +604,13 @@ function markLocalFlag(key: string) {
   }
 }
 
-function loadLocalStringSet(key: string): Set<string> {
+function consumeSessionFlag(key: string): boolean {
   try {
-    const raw = window.localStorage.getItem(key)
-    if (!raw) return new Set()
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return new Set()
-    return new Set(parsed.filter((item): item is string => typeof item === 'string'))
+    const value = window.sessionStorage.getItem(key) === '1'
+    window.sessionStorage.removeItem(key)
+    return value
   } catch {
-    return new Set()
-  }
-}
-
-function saveLocalStringSet(key: string, values: Set<string>) {
-  try {
-    window.localStorage.setItem(key, JSON.stringify([...values]))
-  } catch {
-    // ignore
+    return false
   }
 }
 
@@ -690,7 +697,9 @@ function App() {
   const loadedGraphRevisionRef = useRef<number | null>(null)
   const pendingSaveGraphRef = useRef<GraphState | null>(null)
   const pendingSaveSnapshotRef = useRef<string | null>(null)
-  const hintCompletionTimersRef = useRef<Map<string, number>>(new Map())
+  const onboardingDemoActiveRef = useRef(false)
+  const onboardingRestoreGraphRef = useRef<GraphState | null>(null)
+  const onboardingNoticeTimerRef = useRef<number | null>(null)
   const [saveEpoch, bumpSaveEpoch] = useState(0)
   const graphChannelId = useId()
   const pendingConnectorRef = useRef<DragConnector | null>(null)
@@ -892,6 +901,7 @@ function App() {
   // The board stays hidden until then so the demo seed never flashes or gets saved.
   const [graphLoaded, setGraphLoaded] = useState(false)
   const [graphLoadError, setGraphLoadError] = useState<string | null>(null)
+  const [onboardingCompletionNotice, setOnboardingCompletionNotice] = useState<string | null>(null)
   // Bumped when an avatar image finishes decoding, to force a board repaint.
   const [imageEpoch, setImageEpoch] = useState(0)
 
@@ -1052,6 +1062,7 @@ function App() {
 
   // Debounced autosave: a flood of drags or a bulk import collapses into one write.
   useEffect(() => {
+    if (onboardingDemoActiveRef.current) return
     if (!graphLoaded || auth.status !== 'authenticated' || !userId) return
     if (loadedGraphSourceRef.current === 'error') return
     if (loadedGraphSourceRef.current === 'local') return
@@ -1121,6 +1132,7 @@ function App() {
 
   // Debounced local autosave for signed-out visitors.
   useEffect(() => {
+    if (onboardingDemoActiveRef.current) return
     if (!graphLoaded || !isLocalMode) return
     const timer = window.setTimeout(() => {
       saveLocalGraph(graph)
@@ -1313,15 +1325,20 @@ function App() {
   const [boardToolMode, setBoardToolMode] = useState<BoardToolMode>('edit')
   const [isTouchLayout, setIsTouchLayout] = useState(isTouchBoardLayout)
   const onboardingSurface: OnboardingSurface = isTouchLayout ? 'mobile' : 'desktop'
-  const onboardingHints = useMemo(() => getOnboardingHints(onboardingSurface), [onboardingSurface])
-  const canResetBoardHintsFromToolbar = auth.status === 'anonymous' || auth.status === 'unconfigured'
-  const [completedHintIds, setCompletedHintIds] = useState(() => loadLocalStringSet(BOARD_HINTS_STORAGE_KEY))
-  const [completingHintIds, setCompletingHintIds] = useState<Set<string>>(() => new Set())
+  const onboardingSteps = useMemo(() => getOnboardingSteps(onboardingSurface), [onboardingSurface])
+  const canOpenBoardGuideFromToolbar = auth.status === 'anonymous' || auth.status === 'unconfigured'
+  const [onboardingStep, setOnboardingStep] = useState(-1)
+  const [completedOnboardingStep, setCompletedOnboardingStep] = useState<number | null>(null)
+  const onboardingStepRef = useRef(onboardingStep)
+  const completedOnboardingStepRef = useRef(completedOnboardingStep)
+  const onboardingDecidedRef = useRef(false)
+  const onboardingAdvanceTimerRef = useRef<number | null>(null)
   const appShellRef = useRef<HTMLElement>(null)
   const inspectorPanelRef = useRef<HTMLElement>(null)
   const createMenuRef = useRef<HTMLDivElement>(null)
   const mergePromptRef = useRef<HTMLDivElement>(null)
   const circleStylePopoverRef = useRef<HTMLDivElement>(null)
+  const [onboardingDocked, setOnboardingDocked] = useState(false)
   const [highlightLinkedInGuideHelp, setHighlightLinkedInGuideHelp] = useState(
     () => !hasLocalFlag(LINKEDIN_GUIDE_HINT_KEY),
   )
@@ -1342,62 +1359,169 @@ function App() {
     setBoardToolMode('edit')
   }, [boardToolMode, isTouchLayout])
 
+  useLayoutEffect(() => {
+    onboardingStepRef.current = onboardingStep
+    completedOnboardingStepRef.current = completedOnboardingStep
+  }, [onboardingStep, completedOnboardingStep])
+
   useEffect(() => {
-    const hintCompletionTimers = hintCompletionTimersRef.current
+    if (onboardingStep < 0 || !isTouchLayout) return
+    if (onboardingSteps[onboardingStep]?.trigger === 'linkedin-guide') {
+      setShowSettings(true)
+    }
+  }, [onboardingStep, onboardingSteps, isTouchLayout])
+
+  useEffect(() => {
     return () => {
-      for (const timer of hintCompletionTimers.values()) {
-        window.clearTimeout(timer)
+      if (onboardingAdvanceTimerRef.current !== null) {
+        window.clearTimeout(onboardingAdvanceTimerRef.current)
       }
-      hintCompletionTimers.clear()
+      if (onboardingNoticeTimerRef.current !== null) {
+        window.clearTimeout(onboardingNoticeTimerRef.current)
+      }
     }
   }, [])
 
-  function completeOnboardingAction(action: OnboardingAction) {
-    const matches = onboardingHints.filter(
-      (hint) => hint.trigger === action && !completedHintIds.has(hint.id) && !completingHintIds.has(hint.id),
-    )
-    if (matches.length === 0) return
-
-    setCompletingHintIds((current) => {
-      const next = new Set(current)
-      for (const hint of matches) next.add(hint.id)
-      return next
-    })
-
-    for (const hint of matches) {
-      const existingTimer = hintCompletionTimersRef.current.get(hint.id)
-      if (existingTimer !== undefined) window.clearTimeout(existingTimer)
-      const timer = window.setTimeout(() => {
-        hintCompletionTimersRef.current.delete(hint.id)
-        setCompletingHintIds((current) => {
-          const next = new Set(current)
-          next.delete(hint.id)
-          return next
-        })
-        setCompletedHintIds((current) => {
-          const next = new Set(current)
-          next.add(hint.id)
-          saveLocalStringSet(BOARD_HINTS_STORAGE_KEY, next)
-          return next
-        })
-      }, BOARD_HINT_COMPLETE_DELAY_MS)
-      hintCompletionTimersRef.current.set(hint.id, timer)
-    }
+  function clearOnboardingAdvanceTimer() {
+    if (onboardingAdvanceTimerRef.current === null) return
+    window.clearTimeout(onboardingAdvanceTimerRef.current)
+    onboardingAdvanceTimerRef.current = null
   }
 
-  function resetProgressiveHints() {
-    for (const timer of hintCompletionTimersRef.current.values()) {
-      window.clearTimeout(timer)
+  function showOnboardingCompletionNotice() {
+    setOnboardingCompletionNotice('You successfully completed onboarding. Demo data has been removed.')
+    if (onboardingNoticeTimerRef.current !== null) {
+      window.clearTimeout(onboardingNoticeTimerRef.current)
     }
-    hintCompletionTimersRef.current.clear()
-    setCompletingHintIds(new Set())
-    const next = new Set<string>()
-    setCompletedHintIds(next)
-    saveLocalStringSet(BOARD_HINTS_STORAGE_KEY, next)
+    onboardingNoticeTimerRef.current = window.setTimeout(() => {
+      onboardingNoticeTimerRef.current = null
+      setOnboardingCompletionNotice(null)
+    }, 4200)
+  }
+
+  function startOnboardingDemo() {
+    if (onboardingDemoActiveRef.current) return
+    onboardingDemoActiveRef.current = true
+    onboardingRestoreGraphRef.current = graphRef.current
+    setCreateMenu(null)
+    setSelectedItem(null)
+    setSelectedPeopleIds([])
+    setSelectedCircleIds([])
+    setOnboardingCompletionNotice(null)
+    const demoGraph = createOnboardingDemoGraph()
+    setGraph(demoGraph)
+    const nextCamera = { x: window.innerWidth / 2, y: window.innerHeight / 2, scale: 0.78 }
+    cameraRef.current = nextCamera
+    setCamera(nextCamera)
+  }
+
+  function restoreAfterOnboardingDemo() {
+    const restoreGraph = onboardingRestoreGraphRef.current
+    onboardingDemoActiveRef.current = false
+    onboardingRestoreGraphRef.current = null
+    setCreateMenu(null)
+    setSelectedItem(null)
+    setSelectedPeopleIds([])
+    setSelectedCircleIds([])
+    if (restoreGraph) {
+      setGraph(restoreGraph)
+    }
+    showOnboardingCompletionNotice()
+  }
+
+  useEffect(() => {
+    if (onboardingDecidedRef.current) return
+    if (!graphLoaded || auth.status === 'loading') return
+    onboardingDecidedRef.current = true
+    const forced = consumeSessionFlag(BOARD_ONBOARDING_FORCE_KEY)
+    if (!forced && hasLocalFlag(BOARD_ONBOARDING_STORAGE_KEY)) return
+    const frame = window.requestAnimationFrame(() => {
+      startOnboardingDemo()
+      onboardingStepRef.current = 0
+      setOnboardingStep(0)
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [auth.status, graphLoaded])
+
+  function finishOnboarding() {
+    clearOnboardingAdvanceTimer()
+    markLocalFlag(BOARD_ONBOARDING_STORAGE_KEY)
+    onboardingStepRef.current = -1
+    completedOnboardingStepRef.current = null
+    setCompletedOnboardingStep(null)
+    setOnboardingStep(-1)
+    restoreAfterOnboardingDemo()
+  }
+
+  function onboardingNext() {
+    clearOnboardingAdvanceTimer()
+    const step = onboardingStepRef.current
+    if (step < 0) return
+    const next = step + 1
+    const nextStep = next >= onboardingSteps.length ? -1 : next
+    if (nextStep < 0) {
+      markLocalFlag(BOARD_ONBOARDING_STORAGE_KEY)
+      restoreAfterOnboardingDemo()
+    }
+    onboardingStepRef.current = nextStep
+    completedOnboardingStepRef.current = null
+    setCompletedOnboardingStep(null)
+    setOnboardingStep(nextStep)
+  }
+
+  function onboardingBack() {
+    clearOnboardingAdvanceTimer()
+    const nextStep = onboardingStepRef.current > 0 ? onboardingStepRef.current - 1 : onboardingStepRef.current
+    onboardingStepRef.current = nextStep
+    completedOnboardingStepRef.current = null
+    setCompletedOnboardingStep(null)
+    setOnboardingStep(nextStep)
+  }
+
+  function completeOnboardingStep(stepIndex: number) {
+    if (stepIndex < 0 || stepIndex >= onboardingSteps.length) return
+    clearOnboardingAdvanceTimer()
+    onboardingStepRef.current = stepIndex
+    completedOnboardingStepRef.current = stepIndex
+    setOnboardingStep(stepIndex)
+    setCompletedOnboardingStep(stepIndex)
+    onboardingAdvanceTimerRef.current = window.setTimeout(() => {
+      onboardingAdvanceTimerRef.current = null
+      if (onboardingStepRef.current !== stepIndex) return
+      completedOnboardingStepRef.current = null
+      setCompletedOnboardingStep(null)
+      const next = stepIndex + 1
+      if (next >= onboardingSteps.length) {
+        markLocalFlag(BOARD_ONBOARDING_STORAGE_KEY)
+        onboardingStepRef.current = -1
+        setOnboardingStep(-1)
+        restoreAfterOnboardingDemo()
+        return
+      }
+      onboardingStepRef.current = next
+      setOnboardingStep(next)
+    }, ONBOARDING_COMPLETE_DELAY_MS)
+  }
+
+  function completeOnboardingAction(action: OnboardingAction) {
+    const step = onboardingStepRef.current
+    if (step < 0 || completedOnboardingStepRef.current !== null) return
+    const current = onboardingSteps[step]
+    if (!current || current.trigger !== action) return
+    completeOnboardingStep(step)
   }
 
   function openLinkedInGuide() {
-    completeOnboardingAction('linkedin-guide')
+    const step = onboardingStepRef.current
+    const currentTrigger = onboardingSteps[step]?.trigger
+    if (currentTrigger === 'linkedin-guide') {
+      completeOnboardingStep(step)
+    } else if (
+      currentTrigger === 'settings' &&
+      onboardingSteps[step + 1]?.trigger === 'linkedin-guide'
+    ) {
+      completeOnboardingStep(step + 1)
+    }
     markLocalFlag(LINKEDIN_GUIDE_HINT_KEY)
     setHighlightLinkedInGuideHelp(false)
     setShowSettings(false)
@@ -1406,9 +1530,23 @@ function App() {
 
   function handleLinkedInGuideHelpClick() {
     if (isPhoneViewport()) {
-      completeOnboardingAction('linkedin-guide')
-      markLocalFlag(LINKEDIN_GUIDE_HINT_KEY)
-      setHighlightLinkedInGuideHelp(false)
+      const step = onboardingStepRef.current
+      const currentTrigger = step >= 0 ? onboardingSteps[step]?.trigger : null
+      if (currentTrigger === 'linkedin-guide') {
+        completeOnboardingStep(step)
+        markLocalFlag(LINKEDIN_GUIDE_HINT_KEY)
+        setHighlightLinkedInGuideHelp(false)
+        return
+      }
+      if (
+        currentTrigger === 'settings' &&
+        onboardingSteps[step + 1]?.trigger === 'linkedin-guide'
+      ) {
+        completeOnboardingStep(step + 1)
+        markLocalFlag(LINKEDIN_GUIDE_HINT_KEY)
+        setHighlightLinkedInGuideHelp(false)
+        return
+      }
       alert(LINKEDIN_MOBILE_ARCHIVE_MESSAGE)
       return
     }
@@ -1596,6 +1734,12 @@ function App() {
     } finally {
       setIsImportingLinkedInProfile(false)
     }
+  }
+
+  function handleOnboardingLinkedInSearchExample(profileUrl: string) {
+    setShowSearchLinkedInHint(false)
+    setSearchQuery(profileUrl)
+    void handleImportLinkedInProfileFromSearch(profileUrl)
   }
 
   function handleSelectSearchResult(result: SearchResult) {
@@ -2516,10 +2660,95 @@ function App() {
   const currentSearchIndex = searchResults.length > 0
     ? clamp(activeSearchIndex, 0, searchResults.length - 1)
     : 0
-  const availableOnboardingHints = onboardingHints.filter((hint) => !completedHintIds.has(hint.id))
-  const visibleOnboardingHints = isTouchLayout
-    ? availableOnboardingHints.slice(0, 1)
-    : availableOnboardingHints.slice(0, DESKTOP_VISIBLE_HINT_LIMIT)
+  const isOnboardingSearchImportStep =
+    onboardingStep >= 0 &&
+    completedOnboardingStep === null &&
+    onboardingSteps[onboardingStep]?.trigger === 'search-import'
+  const isOnboardingLinkedInImportStep =
+    onboardingStep >= 0 &&
+    completedOnboardingStep === null &&
+    onboardingSteps[onboardingStep]?.trigger === 'linkedin-import'
+  const isOnboardingActiveSearchStep = isOnboardingSearchImportStep || isOnboardingLinkedInImportStep
+  const activeOnboardingTrigger =
+    onboardingStep >= 0 ? onboardingSteps[onboardingStep]?.trigger ?? null : null
+  const isOnboardingSettingsStep = activeOnboardingTrigger === 'settings'
+
+  useLayoutEffect(() => {
+    const shell = appShellRef.current
+    if (!shell || onboardingStep < 0 || !isTouchLayout) {
+      setOnboardingDocked(false)
+      return
+    }
+
+    const updateDock = () => {
+      const dockCandidates: HTMLElement[] = []
+      if (isInspectorOpen && inspectorPanelRef.current) {
+        dockCandidates.push(inspectorPanelRef.current)
+      }
+      if (createMenu && createMenuRef.current) {
+        dockCandidates.push(createMenuRef.current)
+      }
+      if (showCircleStylePanel && circleStylePopoverRef.current) {
+        dockCandidates.push(circleStylePopoverRef.current)
+      }
+      if ((selectedPeopleIds.length + selectedCircleIds.length) >= 2 && mergePromptRef.current) {
+        dockCandidates.push(mergePromptRef.current)
+      }
+
+      let nearestTop = window.innerHeight
+      for (const element of dockCandidates) {
+        const rect = element.getBoundingClientRect()
+        if (rect.height > 8 && rect.width > 8) {
+          nearestTop = Math.min(nearestTop, rect.top)
+        }
+      }
+
+      if (nearestTop < window.innerHeight - 1) {
+        const bottomOffset = window.innerHeight - nearestTop + ONBOARDING_DOCK_GAP_PX
+        const maxHeight = Math.max(
+          140,
+          nearestTop - ONBOARDING_TOP_CHROME_CLEARANCE_PX - ONBOARDING_DOCK_GAP_PX,
+        )
+        shell.style.setProperty('--onboarding-dock-offset', `${bottomOffset}px`)
+        shell.style.setProperty('--onboarding-coach-max-height', `${maxHeight}px`)
+        setOnboardingDocked(true)
+        return
+      }
+
+      shell.style.removeProperty('--onboarding-dock-offset')
+      shell.style.removeProperty('--onboarding-coach-max-height')
+      setOnboardingDocked(false)
+    }
+
+    updateDock()
+    const resizeObserver = new ResizeObserver(updateDock)
+    for (const element of [
+      inspectorPanelRef.current,
+      createMenuRef.current,
+      circleStylePopoverRef.current,
+      mergePromptRef.current,
+    ]) {
+      if (element) resizeObserver.observe(element)
+    }
+
+    window.addEventListener('resize', updateDock)
+    return () => {
+      resizeObserver.disconnect()
+      window.removeEventListener('resize', updateDock)
+      shell.style.removeProperty('--onboarding-dock-offset')
+      shell.style.removeProperty('--onboarding-coach-max-height')
+      setOnboardingDocked(false)
+    }
+  }, [
+    onboardingStep,
+    isTouchLayout,
+    isInspectorOpen,
+    createMenu,
+    showCircleStylePanel,
+    selectedPeopleIds.length,
+    selectedCircleIds.length,
+    renderedInspectorItem,
+  ])
 
   const sortedCircles = useMemo(() => {
     function getDepth(circleId: string | null): number {
@@ -4958,7 +5187,7 @@ Content-Type: application/json
   return (
     <main
       ref={appShellRef}
-      className={`app-shell ${searchOpen ? 'is-search-open' : ''} ${showSettings ? 'is-settings-open' : ''} ${selectedItem ? 'is-inspector-open' : ''} ${boardToolMode === 'pan' ? 'is-pan-mode' : ''}`}
+      className={`app-shell ${searchOpen ? 'is-search-open' : ''} ${showSettings ? 'is-settings-open' : ''} ${selectedItem ? 'is-inspector-open' : ''} ${boardToolMode === 'pan' ? 'is-pan-mode' : ''} ${onboardingStep >= 0 ? 'is-onboarding-active' : ''} ${onboardingDocked ? 'is-onboarding-docked' : ''} ${isOnboardingSettingsStep ? 'is-onboarding-settings-step' : ''}`}
     >
       {graphLoadError && (
         <div style={{
@@ -5066,13 +5295,6 @@ Content-Type: application/json
           </button>
         </div>
         )}
-        {graphLoaded && !isTouchLayout && (
-          <ProgressiveHints
-            surface={onboardingSurface}
-            hints={visibleOnboardingHints}
-            completingHintIds={completingHintIds}
-          />
-        )}
       </div>
 
       <div className="toolbar" aria-label="Graph controls">
@@ -5092,7 +5314,6 @@ Content-Type: application/json
               } else {
                 setShowSettings(false)
                 setSearchOpen(true)
-                completeOnboardingAction('search-import')
                 if (!hasLocalFlag(SEARCH_LINKEDIN_HINT_KEY)) {
                   setShowSearchLinkedInHint(true)
                   markLocalFlag(SEARCH_LINKEDIN_HINT_KEY)
@@ -5153,9 +5374,35 @@ Content-Type: application/json
               )}
             </>
           )}
-          {searchOpen && searchQuery.trim() === '' && showSearchLinkedInHint && (
+          {searchOpen && searchQuery.trim() === '' && showSearchLinkedInHint && !isOnboardingActiveSearchStep && (
             <div className="search-linkedin-hint" role="note">
               Paste a LinkedIn profile link here to add that person to your board.
+            </div>
+          )}
+          {searchOpen && searchQuery.trim() === '' && isOnboardingLinkedInImportStep && (
+            <div className="search-onboarding-links" role="listbox" aria-label="LinkedIn profile examples">
+              <span className="search-onboarding-links__title">Try a LinkedIn profile</span>
+              {ONBOARDING_LINKEDIN_SEARCH_EXAMPLES.map((profile) => (
+                <button
+                  key={profile.profileUrl}
+                  type="button"
+                  role="option"
+                  className="search-onboarding-links__item"
+                  disabled={isImportingLinkedInProfile}
+                  onClick={() => handleOnboardingLinkedInSearchExample(profile.profileUrl)}
+                >
+                  <img
+                    className="search-onboarding-links__avatar search-onboarding-links__avatar--photo"
+                    src={profile.avatarUrl}
+                    alt=""
+                    aria-hidden="true"
+                  />
+                  <span>
+                    <span className="search-onboarding-links__name">{profile.name}</span>
+                    <span className="search-onboarding-links__sub">{profile.role} · LinkedIn profile</span>
+                  </span>
+                </button>
+              ))}
             </div>
           )}
           {searchOpen && searchQuery.trim() !== '' && (
@@ -5247,16 +5494,18 @@ Content-Type: application/json
           )}
         </div>
         <div className="toolbar__group">
-          {canResetBoardHintsFromToolbar && (
+          {canOpenBoardGuideFromToolbar && (
             <button
               type="button"
               onClick={() => {
                 setShowSettings(false)
                 closeSearch()
-                resetProgressiveHints()
+                startOnboardingDemo()
+                onboardingStepRef.current = 0
+                setOnboardingStep(0)
               }}
-              aria-label="Show board hints"
-              title="Show board hints"
+              aria-label="Open board guide"
+              title="Open board guide"
             >
               <HelpIcon />
             </button>
@@ -5287,14 +5536,6 @@ Content-Type: application/json
           </button>
         </div>
       </div>
-
-      {graphLoaded && isTouchLayout && (
-        <ProgressiveHints
-          surface={onboardingSurface}
-          hints={visibleOnboardingHints}
-          completingHintIds={completingHintIds}
-        />
-      )}
 
         <div
           ref={settingsPanelRef}
@@ -5568,7 +5809,7 @@ Content-Type: application/json
       </div>
 
       {createMenu ? (
-        <div ref={createMenuRef} className="create-menu" style={menuPosition(createMenu)}>
+        <div ref={createMenuRef} className="create-menu onboarding-dock-anchor" style={menuPosition(createMenu)}>
           <button type="button" onClick={createPerson}>
             <PersonIcon />
             <span>Add person</span>
@@ -5581,7 +5822,7 @@ Content-Type: application/json
       ) : null}
 
       {(selectedPeopleIds.length + selectedCircleIds.length) >= 2 && (
-        <div ref={mergePromptRef} className="merge-prompt-panel">
+        <div ref={mergePromptRef} className="merge-prompt-panel onboarding-dock-anchor">
           <span className="merge-prompt-text">
             Selected{' '}
             <strong>
@@ -5616,7 +5857,7 @@ Content-Type: application/json
       <aside
         ref={inspectorPanelRef}
         key={`${renderedInspectorItem.type}:${renderedInspectorItem.id}`}
-        className={`inspector ${isInspectorOpen ? 'is-open' : ''}`}
+        className={`inspector onboarding-dock-anchor ${isInspectorOpen ? 'is-open' : ''}`}
         aria-label="Selection details"
       >
 
@@ -5774,7 +6015,7 @@ Content-Type: application/json
 
                         <div
                           ref={circleStylePopoverRef}
-                          className={`circle-style-popover ${showCircleStylePanel ? 'is-open' : ''}`}
+                          className={`circle-style-popover onboarding-dock-anchor ${showCircleStylePanel ? 'is-open' : ''}`}
                         >
                           <div className="circle-style-theme-tabs">
                             <SelectionIndicator
@@ -6845,6 +7086,23 @@ Content-Type: application/json
               <AuthPrivacyNotice onOpenPrivacy={openPrivacyFromAuthDialog} />
             )}
           </div>
+        </div>
+      )}
+
+      {graphLoaded && onboardingStep >= 0 && (
+        <OnboardingCoach
+          surface={onboardingSurface}
+          step={onboardingStep}
+          completed={completedOnboardingStep === onboardingStep}
+          onNext={onboardingNext}
+          onBack={onboardingBack}
+          onSkip={finishOnboarding}
+        />
+      )}
+
+      {graphLoaded && onboardingCompletionNotice && (
+        <div className="onboarding-success" role="status" aria-live="polite">
+          {onboardingCompletionNotice}
         </div>
       )}
 

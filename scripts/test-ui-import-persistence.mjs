@@ -398,16 +398,7 @@ async function main() {
     page.on('pageerror', (error) => console.error(error))
     await page.addInitScript(() => {
       window.localStorage.clear()
-      window.localStorage.setItem('social-board-progressive-hints-done-v1', JSON.stringify([
-        'pan',
-        'create-person',
-        'create-circle',
-        'select-area',
-        'search',
-        'linkedin-profile',
-        'settings',
-        'linkedin-archive',
-      ]))
+      window.localStorage.setItem('social-board-onboarding-done-v3', '1')
     })
 
     await page.goto(`${vite.url}/#board`, { waitUntil: 'networkidle' })
@@ -474,16 +465,7 @@ async function main() {
     const failedLoadPage = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
     await failedLoadPage.addInitScript(() => {
       window.localStorage.clear()
-      window.localStorage.setItem('social-board-progressive-hints-done-v1', JSON.stringify([
-        'pan',
-        'create-person',
-        'create-circle',
-        'select-area',
-        'search',
-        'linkedin-profile',
-        'settings',
-        'linkedin-archive',
-      ]))
+      window.localStorage.setItem('social-board-onboarding-done-v3', '1')
     })
     await failedLoadPage.goto(`${vite.url}/#board`, { waitUntil: 'networkidle' })
     await failedLoadPage.getByLabel('Settings', { exact: true }).waitFor({ timeout: 10000 })

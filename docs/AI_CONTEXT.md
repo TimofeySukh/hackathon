@@ -103,18 +103,26 @@ Safety invariants:
 
 **Onboarding**:
 
-- The board opens directly on the user's real saved/local graph. There is no forced
-  first-run modal, no coach card, and no temporary demo graph.
-- Progressive hints are shown as small layout affordances: desktop shows up to five gray
-  text hints under the left rail; mobile shows one compact hint row below the toolbar.
-- When the matching action happens, the hint flashes in the Material 3 primary color for
-  about 850ms, then disappears and is stored locally under
-  `social-board-progressive-hints-done-v1`.
-- Hints cover pan/zoom, mobile modes, creating a person/circle, selection, Search,
-  LinkedIn profile import, Settings, and the LinkedIn archive guide.
-- Landing page board CTAs open the board only; they do not force a guide.
-- For signed-out/local users, the board toolbar Help button resets and shows the
-  progressive hints again. Signed-in users do not see this toolbar Help button.
+- First board visit opens a short guide on a temporary demo graph matching the landing
+  screenshot: `You` plus OpenAI, Anthropic, and Google circles with named people, role
+  notes, and profile connections. The real saved/local graph is restored when onboarding
+  ends.
+- The guide explains pan/zoom, creating a person by double-click/double-tap, creating a
+  circle from a center drag, moving/resizing, area selection, Search-based demo person
+  lookup, Search-based LinkedIn profile import, Settings, and the LinkedIn archive sync
+  guide.
+- Guide steps show a blue completed state with a checkmark for one second after the
+  matching action is performed, then auto-advance; the visible button skips a step
+  manually.
+- Landing page board CTAs force-open the guide for that launch.
+- For signed-out/local users, the board toolbar Help button reopens the guide. Signed-in
+  users do not see this toolbar Help button.
+- Mobile guide copy explicitly explains Edit / Select / Pan modes.
+- During the Search demo step, opening empty Search shows built-in demo people from the
+  temporary graph. The next step teaches LinkedIn profile link import with Timofey Sukhov
+  and Velizar Seleznev examples.
+- Completing or dismissing the guide shows a success notice and removes the temporary
+  demo data.
 
 **Create**:
 

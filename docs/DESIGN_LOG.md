@@ -39,17 +39,6 @@ rediscover, write it here.
 - Why: richer relationship context should improve search and inspection while keeping the
   user's private communication exports out of the database.
 
-### 2026-07-02 — Progressive hints replace forced board onboarding
-
-- Decision: The board no longer opens a forced coach card or temporary demo graph. It
-  opens directly on the user's real graph with progressive hints: up to five quiet text
-  hints under the desktop left rail and one compact hint below the mobile toolbar. A
-  completed hint flashes in the primary color, then disappears and is stored under
-  `social-board-progressive-hints-done-v1`.
-- Why: Control discovery should live in the board layout without blocking the canvas,
-  inspector, Search, or Settings. Mobile has too little chrome space to reuse the desktop
-  hint column.
-
 ### 2026-07-02 — Board chrome uses shared size tokens
 
 - Decision: Board floating chrome now shares `--board-chrome-*` tokens for outer shell

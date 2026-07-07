@@ -74,7 +74,7 @@ Required elements:
 1. Header at the top.
 2. A real product screenshot of the board with the inspector open.
 3. A short headline, lead line, and three aligned bullet points beside the screenshot.
-4. A single primary **Open board** button.
+4. A single primary **Open guided board** button.
 5. A short non-clickable reassurance line under the CTA.
 
 Do not bring back the stepped-path ribbon as the main hero element.
@@ -92,8 +92,8 @@ Current hero positioning:
 
 - Headline: direct problem framing (`Stop managing people from memory and spreadsheets`).
 - Lead: describes the product as a private visual board for people, notes, groups, and links.
-- CTA note: explains that the board opens with lightweight progressive hints and that
-  visitors can sign in later for private sync.
+- CTA note: explains that the first board opens with a short guide and that visitors can
+  sign in later for private sync.
 - The desktop product screenshot aligns with the top of the hero copy stack so the first
   viewport stays balanced and the preview reads at full size beside the CTA.
 
@@ -122,16 +122,16 @@ After the hero, the landing page includes:
 1. **Problem and solution** — a vertical Before → After stack with distinct styling:
    scattered memory in a muted dashed card, then a bridge label, then the product answer
    in a brighter primary-accent card.
-2. **How it works** — three step cards describing progressive hints, first person,
+2. **How it works** — three step cards describing the guided control intro, first person,
    and organize-in-place workflow.
 3. **Core Capabilities** — a compact two-column table (capability + what you get).
 4. **LinkedIn import** — deck cards describing the import flow.
-5. **Final CTA** — a quiet centered `Open board` section before the footer.
+5. **Final CTA** — a quiet centered `Open guided board` section before the footer.
 
-The hero owns the first and most important board CTA. A second **Open board** CTA is allowed
+The hero owns the first and most important board CTA. A second **Open guided board** CTA is allowed
 near the bottom after the product story has been explained.
-Board CTAs navigate directly to `#board`; they do not set a session flag or force-open a
-guide for returning browsers.
+Board CTAs set a session flag so the board guide opens on launch, including for returning
+browsers that have already completed onboarding.
 
 Deck cards across these sections share the white rounded-card, slight rotation,
 and hover straightening behavior from the hero slogan stack.
