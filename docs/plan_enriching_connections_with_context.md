@@ -193,3 +193,38 @@ For every connection in `Connections.csv`, the final enriched record in the data
   }
 }
 ```
+
+---
+
+## 6. Performance & UX: Asynchronous Enrichment Flow
+
+Enriching hundreds or thousands of profiles using LLM API calls takes time (due to API rate limits and network latency). A synchronous "wait for upload" UI would freeze or time out. The system must use a **Two-Phase Import Workflow**.
+
+### Phase 1: Instant Core Import (Fast Sync)
+*   **Duration:** ~2-5 seconds.
+*   **Execution:**
+    1.  Parse `Connections.csv` and insert the core roster of connections into the database.
+    2.  Run deterministic modules (Company Mafia matching, Recommendation matching, and Time-Clustering for events).
+    3.  Immediately unlock the UI. The user can see, search, and navigate their connection list with basic tags.
+
+### Phase 2: Asynchronous Enrichment (Lazy AI Processing)
+*   **Duration:** Several minutes to an hour (depending on connection count).
+*   **Execution:**
+    1.  The client or a background worker triggers the LLM Processing Layer for connections lacking AI context.
+    2.  Process tasks in sequential batches (e.g., 5-10 parallel requests) to avoid exceeding API rate limits.
+    3.  Use exponential backoff retry logic for `429 Too Many Requests` API responses.
+    4.  **Idempotency & Caching:** Skip LLM summarization if a conversation or invitation note hasn't changed since the last import.
+
+### UI/UX Specifications
+
+1.  **Enrichment Progress Indicator:**
+    *   Show a subtle progress bar or spinner in the application header or sidebar (e.g., *"AI Enrichment: 45% complete"*).
+    *   On hover, display details:
+        *   Estimated time remaining: `Remaining Connections * Average LLM Latency` (e.g., *"~8 minutes remaining"*).
+        *   Current task: *"Processing chat history for Mikhail Sukhov..."*
+2.  **User Notice:**
+    *   Display a warning message: **"Enriching profiles with AI context. Please do not close or reload this page."** (If processing client-side).
+    *   *Alternative (Server-side):* If processed via backend edge functions, notify the user: *"Enrichment is running in the background. You can safely close this page. We'll show a notification when it's done."*
+3.  **Partial Data States:**
+    *   Profiles that are not yet processed by the LLM should display a loading skeleton or a placeholder (e.g., *"Generating AI summary..."*) in their detail views, rather than failing or remaining empty.
+
