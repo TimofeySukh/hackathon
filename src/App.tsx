@@ -8250,7 +8250,7 @@ async function enrichLinkedInArchiveGraph(
     const connections = context.connections.slice(index, index + 8)
     onProgress?.({
       phase: 'processing',
-      current: batchNumber - 1,
+      current: batchNumber,
       total: totalBatches,
       message: `Analyzing LinkedIn context batch ${batchNumber} of ${totalBatches}...`,
     })
