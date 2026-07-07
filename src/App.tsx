@@ -7746,9 +7746,16 @@ function buildEventContextByDate(rows: string[][], headers: LinkedInConnectionsH
   for (const [dateKey, count] of countsByDate) {
     const connectedAt = Date.parse(`${dateKey}T00:00:00.000Z`)
     const nearbyEvent = mediaEvents
-      .map((event) => ({ event, distance: connectedAt - event.dateMs }))
-      .filter((candidate) => candidate.distance >= 0 && candidate.distance <= twoDaysMs)
-      .sort((left, right) => left.distance - right.distance)[0]?.event
+      .map((event) => {
+        const eventDateKey = dateKeyFromMs(event.dateMs)
+        const sameDay = eventDateKey === dateKey
+        const distance = connectedAt - event.dateMs
+        const sortDistance = sameDay ? 0 : Math.abs(distance)
+        const isValid = sameDay || (distance >= 0 && distance <= twoDaysMs)
+        return { event, sortDistance, isValid }
+      })
+      .filter((candidate) => candidate.isValid)
+      .sort((left, right) => left.sortDistance - right.sortDistance)[0]?.event
     if (!nearbyEvent) continue
     if (count >= spikeThreshold) {
       eventByDate.set(dateKey, `Likely event context: ${nearbyEvent.label}. LinkedIn connections spiked around ${dateKey}.`)
@@ -8107,7 +8114,8 @@ function filterPostsForConnections(posts: LinkedInArchivePostInput[], connection
     return Array.from(connectedDates).some((dateKey) => {
       const connectedAt = Date.parse(`${dateKey}T00:00:00.000Z`)
       const distance = connectedAt - postDate
-      return distance >= 0 && distance <= twoDaysMs
+      const sameDay = dateKeyFromMs(postDate) === dateKey
+      return sameDay || (distance >= 0 && distance <= twoDaysMs)
     })
   }).slice(0, 30)
 }
