@@ -51,6 +51,18 @@ function normalizeNote(value: unknown): LinkedInArchiveEnrichmentNote | null {
   return { personId, title, body }
 }
 
+function getFriendlyFunctionErrorMessage(message: string) {
+  if (/failed to send a request|fetch/i.test(message)) {
+    return 'Could not reach the LinkedIn AI context service. Check that the enrich-linkedin-archive Edge Function is deployed.'
+  }
+
+  if (/OPENROUTER_API_KEY|openrouter|api key|secret/i.test(message)) {
+    return 'LinkedIn AI context is not configured yet. Add the OpenRouter secret for the enrich-linkedin-archive Edge Function.'
+  }
+
+  return message
+}
+
 async function getFunctionErrorMessage(error: unknown) {
   const context = error && typeof error === 'object' && 'context' in error
     ? (error as { context?: unknown }).context
@@ -61,21 +73,23 @@ async function getFunctionErrorMessage(error: unknown) {
       const body = await context.clone().json() as unknown
       if (body && typeof body === 'object' && !Array.isArray(body)) {
         const message = pickString((body as Record<string, unknown>).error)
-        if (message) return message
+        if (message) return getFriendlyFunctionErrorMessage(message)
       }
     } catch {
       try {
         const text = await context.clone().text()
-        if (text.trim()) return text.trim()
+        if (text.trim()) return getFriendlyFunctionErrorMessage(text.trim())
       } catch {
         // Fall back to the generic Error message below.
       }
     }
   }
 
-  return error instanceof Error && error.message
+  const fallback = error instanceof Error && error.message
     ? error.message
     : 'LinkedIn archive enrichment failed.'
+
+  return getFriendlyFunctionErrorMessage(fallback)
 }
 
 function getLocalTestHeaders() {
