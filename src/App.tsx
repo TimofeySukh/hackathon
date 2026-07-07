@@ -7769,49 +7769,46 @@ function makeLinkedInNote(title: string, body: string): PersonNote {
   }
 }
 
-function normalizeEventKeyPart(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ')
-}
-
 function getLinkedInEventNoteKey(note: PersonNote) {
   if (note.title !== 'Event Context' && note.title !== 'AI Event Context') return null
-
   const dateMatch = note.body.match(/\b(?:Date|dated|around)\s*:?\s*(\d{4}-\d{2}-\d{2})\b/i)
-  const eventMatch = note.body.match(/\bEvent:\s*([^\n]+)/i)
-  if (eventMatch) {
-    const eventName = normalizeEventKeyPart(eventMatch[1])
-    return eventName ? `event:${dateMatch?.[1] ?? 'unknown'}:${eventName}` : null
-  }
-
-  const deterministicMatch = note.body.match(/^Likely event context:\s*([^.]+)\./i)
-  if (deterministicMatch) {
-    const eventName = normalizeEventKeyPart(deterministicMatch[1])
-    return eventName ? `event:${dateMatch?.[1] ?? 'unknown'}:${eventName}` : null
-  }
-
-  return null
+  return `event:${dateMatch?.[1] ?? 'unknown'}`
 }
 
 function getPersonNoteDedupeKey(note: PersonNote) {
+  if (note.title === 'AI Relationship Summary') return 'ai-relationship-summary'
+  if (note.title === 'Action Items') return 'action-items'
+  if (note.title === 'Origin Context') return 'origin-context'
+  if (note.title === 'Professional Context') return 'professional-context'
+  if (note.title === 'Shared Company Context') return 'shared-company-context'
+  if (note.title === 'Trust Context') return 'trust-context'
   return getLinkedInEventNoteKey(note) ?? `${note.title}\n${note.body}`
 }
 
 function appendUniquePersonNotes(person: PersonNode, notes: PersonNote[]) {
   if (notes.length === 0) return { person, added: 0 }
-  const existingNotes = person.notes ? [...person.notes] : []
-  const existingKeys = new Set(existingNotes.map(getPersonNoteDedupeKey))
-  const nextNotes = [...existingNotes]
+  const nextNotes = person.notes ? [...person.notes] : []
   let added = 0
+  let changed = false
 
   for (const note of notes) {
     const key = getPersonNoteDedupeKey(note)
-    if (existingKeys.has(key)) continue
-    nextNotes.push(note)
-    existingKeys.add(key)
-    added += 1
+    const existingIndex = nextNotes.findIndex((n) => getPersonNoteDedupeKey(n) === key)
+
+    if (existingIndex !== -1) {
+      const existingNote = nextNotes[existingIndex]
+      if (existingNote.title !== note.title || existingNote.body !== note.body) {
+        nextNotes[existingIndex] = note
+        changed = true
+      }
+    } else {
+      nextNotes.push(note)
+      added += 1
+      changed = true
+    }
   }
 
-  return added > 0 ? { person: { ...person, notes: nextNotes }, added } : { person, added: 0 }
+  return changed ? { person: { ...person, notes: nextNotes }, added } : { person, added: 0 }
 }
 
 function countNewNoteTitles(person: PersonNode, notes: PersonNote[]) {
