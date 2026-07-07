@@ -21,14 +21,17 @@ not thousands of per-contact database writes.
 - Deterministic context is stored only as regular person notes: `Professional Context`,
   `Shared Company Context`, `Event Context`, and `Trust Context`. Re-imports add missing
   context notes to existing imported people without duplicating the same `title + body`.
-- Signed-in imports can then call the `enrich-linkedin-archive` Edge Function in batches
-  for LLM notes from `messages.csv` / `guide_messages.csv`, `Invitations.csv`, and post
-  exports. Raw text is sent only for transient server-side processing; the graph persists
+- Signed-in users can then press **Add AI context from ZIP** to call the
+  `enrich-linkedin-archive` Edge Function in batches for LLM notes from `messages.csv` /
+  `guide_messages.csv`, `Invitations.csv`, and post exports. After a ZIP import, the
+  archive stays in memory for that tab so the user does not have to pick the same ZIP
+  again. Raw text is sent only for transient server-side processing; the graph persists
   only returned notes such as `AI Relationship Summary`, `Origin Context`,
   `AI Event Context`, `AI Professional Context`, and `Action Items`.
 - Settings also exposes **Add AI context from ZIP** for signed-in users who already
-  imported contacts and want to enrich the existing graph from the same LinkedIn archive.
-  The control shows a batch progress bar while AI context is being analyzed and saved.
+  imported contacts and want to enrich the existing graph later. If no archive is still in
+  memory (for example after reload), the action asks for the ZIP once. The control shows a
+  batch progress bar while AI context is being analyzed and saved.
 - New LinkedIn company circles use a stable deterministic tone from the Material 3 circle
   palette instead of defaulting every imported company to blue. Existing company circles
   keep their current tone on re-import, except legacy default-blue LinkedIn company circles

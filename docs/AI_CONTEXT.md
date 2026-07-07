@@ -144,9 +144,10 @@ Safety invariants:
   paste LinkedIn profile URL to import one person.
 - LinkedIn ZIP import reads `Connections.csv`, groups people by company, and, when present,
   uses non-LLM Part 1 context files (`Positions.csv`, `Rich_Media.csv`, recommendations)
-  to add derived person notes. Signed-in users can also run server-side LLM enrichment over
-  messages, invitations, and posts from **Add AI context from ZIP** in Settings; progress is
-  shown per batch and the app persists only returned notes, not raw export text.
+  to add derived person notes. It caches the uploaded archive in memory for the current tab
+  only. Signed-in users can then run server-side LLM enrichment over messages, invitations,
+  and posts from **Add AI context from ZIP** in Settings; progress is shown per batch and
+  the app persists only returned notes, not raw export text.
 - Anonymous users see a red `!` badge on the Settings gear until they open the LinkedIn
   sync guide from the `?` helper inside Settings (not a floating banner).
 - The LinkedIn sync guide `?` inside Settings shows the same badge until the user opens

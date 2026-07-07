@@ -1595,6 +1595,7 @@ function App() {
   const linkedInGuidePanelRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const linkedInContextFileInputRef = useRef<HTMLInputElement>(null)
+  const linkedInArchiveCacheRef = useRef<LinkedInArchiveZipTexts | null>(null)
   const graphFileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -1619,6 +1620,7 @@ function App() {
   const [isImportingLinkedInProfile, setIsImportingLinkedInProfile] = useState(false)
   const [isImportingLinkedInZip, setIsImportingLinkedInZip] = useState(false)
   const [isEnrichingLinkedInArchive, setIsEnrichingLinkedInArchive] = useState(false)
+  const [hasLinkedInArchiveInMemory, setHasLinkedInArchiveInMemory] = useState(false)
   const [linkedInArchiveAiProgress, setLinkedInArchiveAiProgress] = useState<LinkedInArchiveAiProgress | null>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const searchPanelRef = useRef<HTMLDivElement>(null)
@@ -1858,42 +1860,19 @@ function App() {
       const result = await buildLinkedInConnectionsGraph(graph, archive.connectionsText, archiveContext)
       pushHistory()
       await persistGraphImmediately(result.graph)
-
-      const aiResult = auth.status === 'authenticated'
-        ? await enrichLinkedInArchiveGraph(result.graph, buildLinkedInArchiveLlmContext({
-            graph: result.graph,
-            connectionsText: archive.connectionsText,
-            messagesText: archive.messagesText,
-            invitationsText: archive.invitationsText,
-            postsText: archive.sharesText ?? archive.richMediaText,
-          }), setLinkedInArchiveAiProgress)
-        : { graph: result.graph, addedNotes: 0 }
-      if (aiResult.addedNotes > 0) {
-        setLinkedInArchiveAiProgress({
-          phase: 'saving',
-          current: 1,
-          total: 1,
-          message: `Saving ${aiResult.addedNotes} AI context notes...`,
-        })
-        await persistGraphImmediately(aiResult.graph)
-        setLinkedInArchiveAiProgress({
-          phase: 'done',
-          current: 1,
-          total: 1,
-          message: `Added ${aiResult.addedNotes} AI context notes.`,
-        })
-      } else if (auth.status === 'authenticated' && (archive.messagesText || archive.invitationsText || archive.sharesText || archive.richMediaText)) {
-        setLinkedInArchiveAiProgress({
-          phase: 'done',
-          current: 1,
-          total: 1,
-          message: 'No new AI context notes were found.',
-        })
-      }
+      linkedInArchiveCacheRef.current = archive
+      setHasLinkedInArchiveInMemory(true)
+      setLinkedInArchiveAiProgress({
+        phase: 'done',
+        current: 1,
+        total: 1,
+        message: auth.status === 'authenticated'
+          ? 'Contacts imported. Press Add AI context to analyze this archive.'
+          : 'Contacts imported. Sign in to add AI context notes.',
+      })
 
       const enrichmentSummary = result.enrichedPeople > 0 ? ` Added context notes for ${result.enrichedPeople} people.` : ''
-      const aiSummary = aiResult.addedNotes > 0 ? ` Added ${aiResult.addedNotes} AI context notes.` : ''
-      alert(`LinkedIn data imported successfully: ${result.importedPeople} people across ${result.importedCompanies} companies.${enrichmentSummary}${aiSummary}`)
+      alert(`LinkedIn data imported successfully: ${result.importedPeople} people across ${result.importedCompanies} companies.${enrichmentSummary}`)
     } catch (err) {
       console.error(err)
       const errorMessage = getErrorMessage(err)
@@ -1904,13 +1883,10 @@ function App() {
     }
   }
 
-  async function handleLinkedInContextEnrichment(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    if (!file) return
+  async function runLinkedInContextEnrichment(archive: LinkedInArchiveZipTexts) {
     if (isEnrichingLinkedInArchive || isImportingLinkedInZip) return
     if (auth.status !== 'authenticated') {
       alert('Sign in to add AI context from a LinkedIn ZIP.')
-      event.target.value = ''
       return
     }
 
@@ -1919,11 +1895,10 @@ function App() {
       phase: 'reading',
       current: 0,
       total: 1,
-      message: 'Reading LinkedIn archive...',
+      message: 'Preparing AI context...',
     })
 
     try {
-      const archive = await readLinkedInArchiveZip(file)
       const llmContext = buildLinkedInArchiveLlmContext({
         graph,
         connectionsText: archive.connectionsText,
@@ -1968,6 +1943,44 @@ function App() {
       alert(`Failed to add AI context: ${errorMessage}`)
     } finally {
       setIsEnrichingLinkedInArchive(false)
+    }
+  }
+
+  function handleLinkedInContextButtonClick() {
+    const archive = linkedInArchiveCacheRef.current
+    if (archive) {
+      void runLinkedInContextEnrichment(archive)
+      return
+    }
+    linkedInContextFileInputRef.current?.click()
+  }
+
+  async function handleLinkedInContextEnrichment(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    try {
+      setLinkedInArchiveAiProgress({
+        phase: 'reading',
+        current: 0,
+        total: 1,
+        message: 'Reading LinkedIn archive...',
+      })
+      const archive = await readLinkedInArchiveZip(file)
+      linkedInArchiveCacheRef.current = archive
+      setHasLinkedInArchiveInMemory(true)
+      await runLinkedInContextEnrichment(archive)
+    } catch (err) {
+      console.error(err)
+      const errorMessage = getErrorMessage(err)
+      setLinkedInArchiveAiProgress({
+        phase: 'error',
+        current: 0,
+        total: 1,
+        message: errorMessage,
+      })
+      alert(`Failed to read LinkedIn ZIP: ${errorMessage}`)
+    } finally {
       event.target.value = ''
     }
   }
@@ -5667,10 +5680,16 @@ Content-Type: application/json
                 type="button"
                 className="m3-primary-button m3-primary-button--tonal linkedin-context-button"
                 disabled={auth.status !== 'authenticated' || isImportingLinkedInZip || isEnrichingLinkedInArchive}
-                onClick={() => linkedInContextFileInputRef.current?.click()}
+                onClick={handleLinkedInContextButtonClick}
               >
                 <SparkleIcon />
-                <span>{isEnrichingLinkedInArchive ? 'Adding AI context...' : 'Add AI context from ZIP'}</span>
+                <span>
+                  {isEnrichingLinkedInArchive
+                    ? 'Adding AI context...'
+                    : hasLinkedInArchiveInMemory
+                      ? 'Add AI context'
+                      : 'Add AI context from ZIP'}
+                </span>
               </button>
               <input
                 ref={linkedInContextFileInputRef}
@@ -5681,7 +5700,9 @@ Content-Type: application/json
               />
               <p className="linkedin-context-helper">
                 {auth.status === 'authenticated'
-                  ? 'Runs AI over messages, invitations, and posts. Only generated notes are saved.'
+                  ? hasLinkedInArchiveInMemory
+                    ? 'Uses the ZIP you just imported. Only generated notes are saved.'
+                    : 'Choose a ZIP only if you have not imported it in this tab. Only generated notes are saved.'
                   : 'Sign in to add AI context notes from your archive.'}
               </p>
               {linkedInArchiveAiProgress && (
