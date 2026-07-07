@@ -7748,6 +7748,7 @@ function buildEventContextByDate(rows: string[][], headers: LinkedInConnectionsH
   const deviation = Math.sqrt(variance)
   const spikeThreshold = Math.max(10, Math.ceil(mean + (deviation * 3)), 5)
   const twoDaysMs = 2 * 24 * 60 * 60 * 1000
+  const threeDaysMs = 3 * 24 * 60 * 60 * 1000
 
   for (const [dateKey, count] of countsByDate) {
     const connectedAt = parseLinkedInDate(dateKey) ?? 0
@@ -7757,7 +7758,7 @@ function buildEventContextByDate(rows: string[][], headers: LinkedInConnectionsH
         const sameDay = eventDateKey === dateKey
         const distance = connectedAt - event.dateMs
         const sortDistance = sameDay ? 0 : Math.abs(distance)
-        const isValid = sameDay || (distance >= 0 && distance <= twoDaysMs)
+        const isValid = sameDay || (distance >= -threeDaysMs && distance <= twoDaysMs)
         return { event, sortDistance, isValid }
       })
       .filter((candidate) => candidate.isValid)
@@ -8122,23 +8123,101 @@ function filterInvitationsForConnections(invitations: LinkedInArchiveInvitationI
 }
 
 function filterPostsForConnections(posts: LinkedInArchivePostInput[], connections: LinkedInArchiveConnectionInput[]) {
-  const connectedDates = new Set(connections.map((connection) => {
-    const parsed = connection.connectedOn ? parseLinkedInDate(connection.connectedOn) : null
-    return parsed ? dateKeyFromMs(parsed) : ''
-  }).filter(Boolean))
-  if (connectedDates.size === 0) return posts.slice(0, 20)
+  if (connections.length === 0) return posts.slice(0, 20)
 
   const twoDaysMs = 2 * 24 * 60 * 60 * 1000
-  return posts.filter((post) => {
-    const postDate = post.date ? parseLinkedInDate(post.date) : null
-    if (!postDate) return false
-    return Array.from(connectedDates).some((dateKey) => {
-      const connectedAt = parseLinkedInDate(dateKey) ?? 0
-      const distance = connectedAt - postDate
-      const sameDay = dateKeyFromMs(postDate) === dateKey
-      return sameDay || (distance >= 0 && distance <= twoDaysMs)
-    })
-  }).slice(0, 30)
+  const threeDaysMs = 3 * 24 * 60 * 60 * 1000
+  const oneDayMs = 24 * 60 * 60 * 1000
+
+  const selectedPosts = new Set<LinkedInArchivePostInput>()
+  const eventKeywords = ['hackathon', 'meetup', 'conference', 'presentation', 'workshop', 'event', 'summit', 'lecture', 'seminar']
+
+  for (const connection of connections) {
+    const connectionDateMs = connection.connectedOn ? parseLinkedInDate(connection.connectedOn) : null
+    if (!connectionDateMs) continue
+
+    const connectionDateStr = dateKeyFromMs(connectionDateMs)
+    const connectionNameLower = connection.name.toLowerCase()
+    const companyClean = connection.company ? connection.company.trim() : ''
+    const companyLower = companyClean.toLowerCase()
+    const hasValidCompany = companyClean.length > 3 && 
+      !['freelance', 'self-employed', 'self employed', 'linkedin', 'no company'].includes(companyLower)
+
+    let bestPost: LinkedInArchivePostInput | null = null
+    let bestScore = 0
+
+    for (const post of posts) {
+      const postDateMs = post.date ? parseLinkedInDate(post.date) : null
+      if (!postDateMs) continue
+
+      const distance = connectionDateMs - postDateMs
+      const postDateStr = dateKeyFromMs(postDateMs)
+      const sameDay = postDateStr === connectionDateStr
+
+      if (!sameDay && (distance < -threeDaysMs || distance > twoDaysMs)) {
+        continue
+      }
+
+      let score = 0
+      if (sameDay) {
+        score += 100
+      } else {
+        score += 50
+        if (distance > 0) {
+          score -= (distance / oneDayMs) * 15
+        } else {
+          score -= (Math.abs(distance) / oneDayMs) * 20
+        }
+      }
+
+      const postDescLower = post.description.toLowerCase()
+
+      // Full name match
+      if (postDescLower.includes(connectionNameLower)) {
+        score += 150
+      }
+
+      // Company match
+      if (hasValidCompany && postDescLower.includes(companyLower)) {
+        score += 80
+      }
+
+      // Event keyword match
+      if (eventKeywords.some((kw) => postDescLower.includes(kw))) {
+        score += 40
+      }
+
+      if (score > bestScore) {
+        bestScore = score
+        bestPost = post
+      }
+    }
+
+    if (bestPost && bestScore > 0) {
+      selectedPosts.add(bestPost)
+    }
+  }
+
+  // If no posts matched connection scoring, fall back to simple date window for safety
+  if (selectedPosts.size === 0) {
+    const connectedDates = new Set(connections.map((c) => {
+      const parsed = c.connectedOn ? parseLinkedInDate(c.connectedOn) : null
+      return parsed ? dateKeyFromMs(parsed) : ''
+    }).filter(Boolean))
+
+    return posts.filter((post) => {
+      const postDate = post.date ? parseLinkedInDate(post.date) : null
+      if (!postDate) return false
+      return Array.from(connectedDates).some((dateKey) => {
+        const connectedAt = parseLinkedInDate(dateKey) ?? 0
+        const distance = connectedAt - postDate
+        const sameDay = dateKeyFromMs(postDate) === dateKey
+        return sameDay || (distance >= -threeDaysMs && distance <= twoDaysMs)
+      })
+    }).slice(0, 30)
+  }
+
+  return Array.from(selectedPosts)
 }
 
 function formatLinkedInAiNoteSummary(counts: Record<string, number>) {
