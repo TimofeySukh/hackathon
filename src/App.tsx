@@ -7794,11 +7794,26 @@ function getPersonNoteDedupeKey(note: PersonNote) {
 
 function appendUniquePersonNotes(person: PersonNode, notes: PersonNote[]) {
   if (notes.length === 0) return { person, added: 0 }
-  const nextNotes = person.notes ? [...person.notes] : []
+  let nextNotes = person.notes ? [...person.notes] : []
   let added = 0
   let changed = false
 
   for (const note of notes) {
+    if (note.title === 'Event Context') {
+      const hasAiEvent = nextNotes.some((n) => n.title === 'AI Event Context')
+      if (hasAiEvent) {
+        continue
+      }
+    }
+
+    if (note.title === 'AI Event Context') {
+      const initialLength = nextNotes.length
+      nextNotes = nextNotes.filter((n) => n.title !== 'Event Context')
+      if (nextNotes.length !== initialLength) {
+        changed = true
+      }
+    }
+
     const key = getPersonNoteDedupeKey(note)
     const existingIndex = nextNotes.findIndex((n) => getPersonNoteDedupeKey(n) === key)
 

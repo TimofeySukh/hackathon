@@ -536,7 +536,7 @@ async function main() {
     }
 
     const firstImportedPerson = mock.state.graph?.people?.find((person) => person.id === 'linkedin-person-persist1-person1')
-    const eventContext = firstImportedPerson?.notes?.find((note) => note.title === 'Event Context')
+    const eventContext = firstImportedPerson?.notes?.find((note) => note.title === 'Event Context' || note.title === 'AI Event Context')
     if (!eventContext?.body.includes('RoyalHacks')) {
       throw new Error(`ZIP import did not add deterministic event context from Shares.csv: ${JSON.stringify(firstImportedPerson?.notes ?? [])}.`)
     }
