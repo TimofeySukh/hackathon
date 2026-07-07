@@ -2,7 +2,7 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
-const DEFAULT_SMART_MODEL = 'openai/gpt-4o-mini'
+const DEFAULT_SMART_MODEL = 'deepseek/deepseek-chat-v3-0324'
 const DEFAULT_FAST_MODEL = 'deepseek/deepseek-chat-v3-0324'
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 const MAX_CONNECTIONS_PER_REQUEST = 12
@@ -231,35 +231,33 @@ function normalizeOutputNotes(value: unknown, allowedPersonIds: Set<string>): Ou
   return output
 }
 
-function buildPrompt(input: ReturnType<typeof normalizeBody>) {
-  const payload = JSON.stringify(input)
-  return {
-    system: `You enrich a private Social Datanode graph from a LinkedIn Part 1 export.
-Return ONLY valid JSON:
+const OUTPUT_CONTRACT = `Return ONLY valid JSON:
 {
   "notes": [
     { "personId": "string", "title": "string", "body": "string" }
   ]
 }
 
-Rules:
-- Store only derived relationship context. Never quote long raw messages.
-- Do not invent facts. Use "Likely" when context is inferred from weak evidence.
-- Produce notes only for provided personId values.
-- Prefer these note titles: AI Relationship Summary, Origin Context, AI Event Context, AI Professional Context, Action Items.
-- Keep each note under 120 words.
-- Skip empty or low-confidence notes.`,
-    user: clampText(payload, MAX_TEXT_CHARS),
-  }
-}
+Global rules:
+- Only produce notes for personId values provided in the request.
+- Persist only derived context. Never quote long raw messages, invitation text, or post text.
+- Do not invent facts. If evidence is weak, write "Likely" and keep it specific.
+- If the evidence is empty, generic, spammy, or not clearly tied to a person, return {"notes":[]}.
+- Each note body must be under 120 words.
+- Prefer one high-signal note over several weak notes.`
 
-async function callOpenRouter(input: ReturnType<typeof normalizeBody>): Promise<OutputNote[]> {
+type LlmTier = 'smart' | 'fast'
+
+async function callOpenRouterJson(input: {
+  tier: LlmTier
+  system: string
+  user: unknown
+  maxTokens?: number
+}): Promise<unknown | null> {
   const config = getOpenRouterConfig()
-  if (!config) return []
+  if (!config) return null
 
-  const prompt = buildPrompt(input)
-  const hasNarrativeContext = input.messages.length > 0 || input.posts.length > 0
-  const model = hasNarrativeContext ? config.smartModel : config.fastModel
+  const model = input.tier === 'smart' ? config.smartModel : config.fastModel
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 30000)
 
@@ -276,10 +274,10 @@ async function callOpenRouter(input: ReturnType<typeof normalizeBody>): Promise<
       body: JSON.stringify({
         model,
         temperature: 0.1,
-        max_tokens: 1600,
+        max_tokens: input.maxTokens ?? 1400,
         messages: [
-          { role: 'system', content: prompt.system },
-          { role: 'user', content: prompt.user },
+          { role: 'system', content: input.system },
+          { role: 'user', content: clampText(JSON.stringify(input.user), MAX_TEXT_CHARS) },
         ],
       }),
     })
@@ -291,13 +289,160 @@ async function callOpenRouter(input: ReturnType<typeof normalizeBody>): Promise<
 
     const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> }
     const content = payload.choices?.[0]?.message?.content
-    if (!content) return []
+    if (!content) return null
 
-    const parsed = JSON.parse(extractJsonObject(content)) as unknown
-    return normalizeOutputNotes(parsed, new Set(input.connections.map((connection) => connection.personId)))
+    return JSON.parse(extractJsonObject(content)) as unknown
   } finally {
     clearTimeout(timeout)
   }
+}
+
+async function callTaskForNotes(input: {
+  tier: LlmTier
+  system: string
+  user: unknown
+  allowedPersonIds: Set<string>
+  maxTokens?: number
+}): Promise<OutputNote[]> {
+  const parsed = await callOpenRouterJson(input)
+  return normalizeOutputNotes(parsed, input.allowedPersonIds)
+}
+
+function compactConnections(connections: ConnectionInput[]) {
+  return connections.map((connection) => ({
+    personId: connection.personId,
+    name: connection.name,
+    profileUrl: connection.profileUrl,
+    company: connection.company,
+    position: connection.position,
+    connectedOn: connection.connectedOn,
+  }))
+}
+
+async function runJobTitleClassifier(input: ReturnType<typeof normalizeBody>, allowedPersonIds: Set<string>) {
+  const connections = input.connections.filter((connection) => connection.position)
+  if (connections.length === 0) return []
+
+  return callTaskForNotes({
+    tier: 'fast',
+    allowedPersonIds,
+    system: `Task C: Job Title Classifier for Social Datanode.
+
+${OUTPUT_CONTRACT}
+
+Specific rules:
+- Use only the position/title and company fields, not messages or posts.
+- Classify seniority into exactly one of: LPR / C-Level, Management / Lead, Specialist.
+- Classify domain into exactly one of: Engineering, Product, HR/Agile, Sales/Marketing, Finance, Operations, Other.
+- Output title "AI Professional Context".
+- Body format: "Seniority: <level>\\nDomain: <domain>\\nWhy: <short reason from title words>".
+- Skip titles that are too vague to classify.`,
+    user: { connections: compactConnections(connections) },
+    maxTokens: 900,
+  })
+}
+
+async function runInvitationParser(input: ReturnType<typeof normalizeBody>, allowedPersonIds: Set<string>) {
+  if (input.invitations.length === 0) return []
+
+  return callTaskForNotes({
+    tier: 'fast',
+    allowedPersonIds,
+    system: `Task B: Invitation Note Parser for Social Datanode.
+
+${OUTPUT_CONTRACT}
+
+Specific rules:
+- Infer origin context only from short invitation notes and sender/recipient names.
+- Ignore greetings, signatures, generic networking text, sales spam, and empty courtesy phrases.
+- Extract concrete origins only: event name, company/team, shared project, referral, role relation, hiring/recruiting context, speaker/audience context.
+- Output title "Origin Context".
+- Body format: "Origin: <specific context>\\nRole at first contact: <Recruiter | Candidate | Speaker | Peer | Attendee | Cold | Unknown>\\nEvidence: <short paraphrase, no raw quote>".
+- If the note is generic ("let's connect", "grow network"), return no note for that person.`,
+    user: {
+      connections: compactConnections(input.connections),
+      invitations: input.invitations,
+    },
+    maxTokens: 1200,
+  })
+}
+
+async function runChatTranscriptSummarizer(input: ReturnType<typeof normalizeBody>, allowedPersonIds: Set<string>) {
+  if (input.messages.length === 0) return []
+
+  return callTaskForNotes({
+    tier: 'smart',
+    allowedPersonIds,
+    system: `Task A: Chat Transcript Summarizer for Social Datanode.
+
+${OUTPUT_CONTRACT}
+
+Specific rules:
+- Summarize only relationship context that helps the user remember who the person is and why they matter.
+- Ignore boilerplate, scheduling noise, auto-replies, greetings, signatures, repeated "thanks", and unrelated platform noise.
+- Do not quote raw messages. Paraphrase the durable context.
+- Extract: relationship_summary, domain_tags, action_items, relationship_warmth.
+- relationship_warmth must be one of: Cold, Warm, Hot.
+- Output at most two notes per person:
+  1. title "AI Relationship Summary" with body:
+     "Summary: ...\\nTags: tag1, tag2\\nWarmth: Cold|Warm|Hot"
+  2. title "Action Items" only when a real user action exists, with body as short bullet-like lines.
+- Skip people when messages do not clearly identify a meaningful relationship.`,
+    user: {
+      connections: compactConnections(input.connections),
+      messages: input.messages,
+    },
+    maxTokens: 1800,
+  })
+}
+
+async function runEventPostAnalyzer(input: ReturnType<typeof normalizeBody>, allowedPersonIds: Set<string>) {
+  if (input.posts.length === 0) return []
+
+  return callTaskForNotes({
+    tier: 'smart',
+    allowedPersonIds,
+    system: `Task D: Event & Post Content Analyzer for Social Datanode.
+
+${OUTPUT_CONTRACT}
+
+Specific rules:
+- First decide whether each post describes a professional event: hackathon, conference, meetup, workshop, office visit, panel, demo day, hiring fair, community event.
+- Ignore personal life posts, generic marketing posts, reposts without event context, image descriptions with no event, and posts unrelated to networking.
+- Resolve relative dates only when the post date is provided; otherwise say "date unknown".
+- Correlate events to people only when:
+  1. their Connected On date is within two days of the event/post date, OR
+  2. the post explicitly mentions their name.
+- Output title "AI Event Context".
+- Body format: "Event: <clean event name>\\nDate: <YYYY-MM-DD or unknown>\\nContext: <why this person is linked>\\nHighlights: <1-2 durable highlights>".
+- If correlation is only date-spike based, start Context with "Likely".
+- Do not attach an event to every connection unless the evidence supports the batch date correlation.`,
+    user: {
+      connections: compactConnections(input.connections),
+      posts: input.posts,
+    },
+    maxTokens: 1800,
+  })
+}
+
+async function runArchiveEnrichmentTasks(input: ReturnType<typeof normalizeBody>): Promise<OutputNote[]> {
+  const allowedPersonIds = new Set(input.connections.map((connection) => connection.personId))
+  const taskResults = await Promise.all([
+    runJobTitleClassifier(input, allowedPersonIds),
+    runInvitationParser(input, allowedPersonIds),
+    runChatTranscriptSummarizer(input, allowedPersonIds),
+    runEventPostAnalyzer(input, allowedPersonIds),
+  ])
+
+  const seen = new Set<string>()
+  const notes: OutputNote[] = []
+  for (const note of taskResults.flat()) {
+    const key = `${note.personId}\n${note.title}\n${note.body}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    notes.push(note)
+  }
+  return notes
 }
 
 Deno.serve(async (req) => {
@@ -323,7 +468,7 @@ Deno.serve(async (req) => {
     }
 
     const input = normalizeBody(await req.json())
-    const notes = await callOpenRouter(input)
+    const notes = await runArchiveEnrichmentTasks(input)
     return jsonResponse({ notes })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unable to enrich LinkedIn archive.'
