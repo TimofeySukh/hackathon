@@ -61,6 +61,66 @@
   transform: scale(0.985);
 }
 
+.linkedin-context-button {
+  margin-top: 8px;
+}
+
+.linkedin-context-helper {
+  margin: 8px 0 0;
+  color: var(--md-on-surface-variant);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.linkedin-context-progress {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: var(--md-r-sm);
+  background: var(--md-surface-container-high);
+}
+
+.linkedin-context-progress--done {
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+.linkedin-context-progress--error {
+  background: var(--md-error-container);
+  color: var(--md-on-error-container);
+}
+
+.linkedin-context-progress__track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--md-r-full);
+  background: color-mix(in srgb, var(--md-on-surface) 10%, transparent);
+}
+
+.linkedin-context-progress__track span {
+  display: block;
+  height: 100%;
+  min-width: 4px;
+  border-radius: inherit;
+  background: var(--md-primary);
+  transition: width var(--md-dur-medium) var(--md-ease-decelerate);
+}
+
+.linkedin-context-progress__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: inherit;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.linkedin-context-progress__meta small {
+  color: var(--md-on-surface-variant);
+  white-space: nowrap;
+}
+
 /* Small "?" help button next to the LinkedIn Data Import label. Opens the
    step-by-step sync guide. */
 .linkedin-guide-help {

@@ -22,6 +22,9 @@ rediscover, write it here.
 - Decision: Add `enrich-linkedin-archive`, a signed-in Supabase Edge Function that calls
   OpenRouter for batched Part 1 archive enrichment. The browser parses the ZIP, sends only
   relevant excerpts for the current batch, and persists only returned person notes.
+- Decision: Settings exposes an explicit **Add AI context from ZIP** action with batch
+  progress, so enrichment is visible and rerunnable instead of being an invisible import
+  side effect.
 - Decision: Do not add graph API, CLI, or MCP surfaces for this pass; it is a browser import
   helper, not a remote agent graph operation.
 - Why: OpenRouter keys must stay out of the browser, and raw LinkedIn messages/invitations

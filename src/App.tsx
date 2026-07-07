@@ -261,6 +261,24 @@ type LinkedInArchiveLlmContext = {
   posts: LinkedInArchivePostInput[]
 }
 
+type LinkedInArchiveZipTexts = {
+  connectionsText: string
+  positionsText: string | null
+  richMediaText: string | null
+  recommendationsReceivedText: string | null
+  recommendationsGivenText: string | null
+  messagesText: string | null
+  invitationsText: string | null
+  sharesText: string | null
+}
+
+type LinkedInArchiveAiProgress = {
+  phase: 'idle' | 'reading' | 'processing' | 'saving' | 'done' | 'error'
+  current: number
+  total: number
+  message: string
+}
+
 type PanState = {
   pointerId: number
   startX: number
@@ -1576,6 +1594,7 @@ function App() {
   const settingsPanelRef = useRef<HTMLDivElement>(null)
   const linkedInGuidePanelRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const linkedInContextFileInputRef = useRef<HTMLInputElement>(null)
   const graphFileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -1599,6 +1618,8 @@ function App() {
   const smartSearchRequestRef = useRef(0)
   const [isImportingLinkedInProfile, setIsImportingLinkedInProfile] = useState(false)
   const [isImportingLinkedInZip, setIsImportingLinkedInZip] = useState(false)
+  const [isEnrichingLinkedInArchive, setIsEnrichingLinkedInArchive] = useState(false)
+  const [linkedInArchiveAiProgress, setLinkedInArchiveAiProgress] = useState<LinkedInArchiveAiProgress | null>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const searchPanelRef = useRef<HTMLDivElement>(null)
   const focusAnimRef = useRef<number | null>(null)
@@ -1823,60 +1844,52 @@ function App() {
     if (!file) return
     if (isImportingLinkedInZip) return
     setIsImportingLinkedInZip(true)
+    setLinkedInArchiveAiProgress(null)
 
     try {
-      const zipReader = new zip.ZipReader(new zip.BlobReader(file))
-      const entries = await zipReader.getEntries()
-
-      const connectionsEntry = findZipEntryByFileName(entries, 'Connections.csv')
-
-      if (!connectionsEntry) {
-        alert('Could not find Connections.csv inside the ZIP file.')
-        await zipReader.close()
-        return
-      }
-
-      const [
-        csvText,
-        positionsText,
-        richMediaText,
-        recommendationsReceivedText,
-        recommendationsGivenText,
-        messagesText,
-        invitationsText,
-        sharesText,
-      ] = await Promise.all([
-        readZipTextEntry(connectionsEntry),
-        readOptionalZipTextEntry(entries, 'Positions.csv'),
-        readOptionalZipTextEntry(entries, 'Rich_Media.csv'),
-        readOptionalZipTextEntry(entries, 'Recommendations_Received.csv'),
-        readOptionalZipTextEntry(entries, 'Recommendations_Given.csv'),
-        readOptionalZipTextEntry(entries, 'guide_messages.csv').then((text) => text ?? readOptionalZipTextEntry(entries, 'messages.csv')),
-        readOptionalZipTextEntry(entries, 'Invitations.csv'),
-        readOptionalZipTextEntry(entries, 'Shares.csv'),
-      ])
-      await zipReader.close()
+      const archive = await readLinkedInArchiveZip(file)
 
       const archiveContext = buildLinkedInArchiveContext({
-        positionsText,
-        richMediaText,
-        recommendationsReceivedText,
-        recommendationsGivenText,
+        positionsText: archive.positionsText,
+        richMediaText: archive.richMediaText,
+        recommendationsReceivedText: archive.recommendationsReceivedText,
+        recommendationsGivenText: archive.recommendationsGivenText,
       })
-      const result = await buildLinkedInConnectionsGraph(graph, csvText, archiveContext)
+      const result = await buildLinkedInConnectionsGraph(graph, archive.connectionsText, archiveContext)
       pushHistory()
       await persistGraphImmediately(result.graph)
 
       const aiResult = auth.status === 'authenticated'
         ? await enrichLinkedInArchiveGraph(result.graph, buildLinkedInArchiveLlmContext({
             graph: result.graph,
-            connectionsText: csvText,
-            messagesText,
-            invitationsText,
-            postsText: sharesText ?? richMediaText,
-          }))
+            connectionsText: archive.connectionsText,
+            messagesText: archive.messagesText,
+            invitationsText: archive.invitationsText,
+            postsText: archive.sharesText ?? archive.richMediaText,
+          }), setLinkedInArchiveAiProgress)
         : { graph: result.graph, addedNotes: 0 }
-      if (aiResult.addedNotes > 0) await persistGraphImmediately(aiResult.graph)
+      if (aiResult.addedNotes > 0) {
+        setLinkedInArchiveAiProgress({
+          phase: 'saving',
+          current: 1,
+          total: 1,
+          message: `Saving ${aiResult.addedNotes} AI context notes...`,
+        })
+        await persistGraphImmediately(aiResult.graph)
+        setLinkedInArchiveAiProgress({
+          phase: 'done',
+          current: 1,
+          total: 1,
+          message: `Added ${aiResult.addedNotes} AI context notes.`,
+        })
+      } else if (auth.status === 'authenticated' && (archive.messagesText || archive.invitationsText || archive.sharesText || archive.richMediaText)) {
+        setLinkedInArchiveAiProgress({
+          phase: 'done',
+          current: 1,
+          total: 1,
+          message: 'No new AI context notes were found.',
+        })
+      }
 
       const enrichmentSummary = result.enrichedPeople > 0 ? ` Added context notes for ${result.enrichedPeople} people.` : ''
       const aiSummary = aiResult.addedNotes > 0 ? ` Added ${aiResult.addedNotes} AI context notes.` : ''
@@ -1887,6 +1900,74 @@ function App() {
       alert(`Failed to import LinkedIn ZIP: ${errorMessage}`)
     } finally {
       setIsImportingLinkedInZip(false)
+      event.target.value = ''
+    }
+  }
+
+  async function handleLinkedInContextEnrichment(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    if (isEnrichingLinkedInArchive || isImportingLinkedInZip) return
+    if (auth.status !== 'authenticated') {
+      alert('Sign in to add AI context from a LinkedIn ZIP.')
+      event.target.value = ''
+      return
+    }
+
+    setIsEnrichingLinkedInArchive(true)
+    setLinkedInArchiveAiProgress({
+      phase: 'reading',
+      current: 0,
+      total: 1,
+      message: 'Reading LinkedIn archive...',
+    })
+
+    try {
+      const archive = await readLinkedInArchiveZip(file)
+      const llmContext = buildLinkedInArchiveLlmContext({
+        graph,
+        connectionsText: archive.connectionsText,
+        messagesText: archive.messagesText,
+        invitationsText: archive.invitationsText,
+        postsText: archive.sharesText ?? archive.richMediaText,
+      })
+      const aiResult = await enrichLinkedInArchiveGraph(graph, llmContext, setLinkedInArchiveAiProgress)
+
+      if (aiResult.addedNotes > 0) {
+        setLinkedInArchiveAiProgress({
+          phase: 'saving',
+          current: 1,
+          total: 1,
+          message: `Saving ${aiResult.addedNotes} AI context notes...`,
+        })
+        pushHistory()
+        await persistGraphImmediately(aiResult.graph)
+        setLinkedInArchiveAiProgress({
+          phase: 'done',
+          current: 1,
+          total: 1,
+          message: `Added ${aiResult.addedNotes} AI context notes.`,
+        })
+      } else {
+        setLinkedInArchiveAiProgress({
+          phase: 'done',
+          current: 1,
+          total: 1,
+          message: 'No new AI context notes were found.',
+        })
+      }
+    } catch (err) {
+      console.error(err)
+      const errorMessage = getErrorMessage(err)
+      setLinkedInArchiveAiProgress({
+        phase: 'error',
+        current: 0,
+        total: 1,
+        message: errorMessage,
+      })
+      alert(`Failed to add AI context: ${errorMessage}`)
+    } finally {
+      setIsEnrichingLinkedInArchive(false)
       event.target.value = ''
     }
   }
@@ -5582,6 +5663,44 @@ Content-Type: application/json
                 style={{ display: 'none' }}
                 onChange={handleLinkedInImport}
               />
+              <button
+                type="button"
+                className="m3-primary-button m3-primary-button--tonal linkedin-context-button"
+                disabled={auth.status !== 'authenticated' || isImportingLinkedInZip || isEnrichingLinkedInArchive}
+                onClick={() => linkedInContextFileInputRef.current?.click()}
+              >
+                <SparkleIcon />
+                <span>{isEnrichingLinkedInArchive ? 'Adding AI context...' : 'Add AI context from ZIP'}</span>
+              </button>
+              <input
+                ref={linkedInContextFileInputRef}
+                type="file"
+                accept="application/zip,.zip"
+                style={{ display: 'none' }}
+                onChange={handleLinkedInContextEnrichment}
+              />
+              <p className="linkedin-context-helper">
+                {auth.status === 'authenticated'
+                  ? 'Runs AI over messages, invitations, and posts. Only generated notes are saved.'
+                  : 'Sign in to add AI context notes from your archive.'}
+              </p>
+              {linkedInArchiveAiProgress && (
+                <div className={`linkedin-context-progress linkedin-context-progress--${linkedInArchiveAiProgress.phase}`} role="status">
+                  <div className="linkedin-context-progress__track" aria-hidden="true">
+                    <span
+                      style={{
+                        width: `${Math.round((linkedInArchiveAiProgress.current / Math.max(1, linkedInArchiveAiProgress.total)) * 100)}%`,
+                      }}
+                    />
+                  </div>
+                  <div className="linkedin-context-progress__meta">
+                    <span>{linkedInArchiveAiProgress.message}</span>
+                    {linkedInArchiveAiProgress.phase === 'processing' && (
+                      <small>{linkedInArchiveAiProgress.current}/{linkedInArchiveAiProgress.total}</small>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
             {auth.status === 'authenticated' && (
               <div style={{ borderTop: '1px solid var(--md-outline-variant)', paddingTop: '16px' }}>
@@ -7140,6 +7259,50 @@ async function readOptionalZipTextEntry(entries: zip.Entry[], fileName: string):
   return entry ? readZipTextEntry(entry) : null
 }
 
+async function readLinkedInArchiveZip(file: File): Promise<LinkedInArchiveZipTexts> {
+  const zipReader = new zip.ZipReader(new zip.BlobReader(file))
+  try {
+    const entries = await zipReader.getEntries()
+    const connectionsEntry = findZipEntryByFileName(entries, 'Connections.csv')
+    if (!connectionsEntry) {
+      throw new Error('Could not find Connections.csv inside the ZIP file.')
+    }
+
+    const [
+      connectionsText,
+      positionsText,
+      richMediaText,
+      recommendationsReceivedText,
+      recommendationsGivenText,
+      messagesText,
+      invitationsText,
+      sharesText,
+    ] = await Promise.all([
+      readZipTextEntry(connectionsEntry),
+      readOptionalZipTextEntry(entries, 'Positions.csv'),
+      readOptionalZipTextEntry(entries, 'Rich_Media.csv'),
+      readOptionalZipTextEntry(entries, 'Recommendations_Received.csv'),
+      readOptionalZipTextEntry(entries, 'Recommendations_Given.csv'),
+      readOptionalZipTextEntry(entries, 'guide_messages.csv').then((text) => text ?? readOptionalZipTextEntry(entries, 'messages.csv')),
+      readOptionalZipTextEntry(entries, 'Invitations.csv'),
+      readOptionalZipTextEntry(entries, 'Shares.csv'),
+    ])
+
+    return {
+      connectionsText,
+      positionsText,
+      richMediaText,
+      recommendationsReceivedText,
+      recommendationsGivenText,
+      messagesText,
+      invitationsText,
+      sharesText,
+    }
+  } finally {
+    await zipReader.close()
+  }
+}
+
 function parseCSV(text: string): string[][] {
   const lines: string[][] = []
   let row: string[] = []
@@ -7661,7 +7824,11 @@ function filterPostsForConnections(posts: LinkedInArchivePostInput[], connection
   }).slice(0, 30)
 }
 
-async function enrichLinkedInArchiveGraph(graph: GraphState, context: LinkedInArchiveLlmContext): Promise<{ graph: GraphState; addedNotes: number }> {
+async function enrichLinkedInArchiveGraph(
+  graph: GraphState,
+  context: LinkedInArchiveLlmContext,
+  onProgress?: (progress: LinkedInArchiveAiProgress) => void,
+): Promise<{ graph: GraphState; addedNotes: number }> {
   if (context.connections.length === 0) return { graph, addedNotes: 0 }
   if (context.messages.length === 0 && context.invitations.length === 0 && context.posts.length === 0) {
     return { graph, addedNotes: 0 }
@@ -7669,9 +7836,17 @@ async function enrichLinkedInArchiveGraph(graph: GraphState, context: LinkedInAr
 
   let nextGraph = graph
   let addedNotes = 0
+  const totalBatches = Math.ceil(context.connections.length / 8)
 
   for (let index = 0; index < context.connections.length; index += 8) {
+    const batchNumber = Math.floor(index / 8) + 1
     const connections = context.connections.slice(index, index + 8)
+    onProgress?.({
+      phase: 'processing',
+      current: batchNumber - 1,
+      total: totalBatches,
+      message: `Analyzing LinkedIn context batch ${batchNumber} of ${totalBatches}...`,
+    })
     const notes = await enrichLinkedInArchiveBatch({
       connections,
       messages: filterMessagesForConnections(context.messages, connections),
@@ -7700,6 +7875,12 @@ async function enrichLinkedInArchiveGraph(graph: GraphState, context: LinkedInAr
     }
 
     await yieldToBrowser()
+    onProgress?.({
+      phase: 'processing',
+      current: batchNumber,
+      total: totalBatches,
+      message: `Analyzed ${batchNumber} of ${totalBatches} batches.`,
+    })
   }
 
   return { graph: nextGraph, addedNotes }
@@ -8413,6 +8594,16 @@ function HelpIcon() {
       <circle cx="12" cy="12" r="9" />
       <path d="M9.75 9a2.5 2.5 0 0 1 4.54-1.43c.86 1.13.55 2.57-.56 3.31-.94.62-1.73 1.24-1.73 2.62" />
       <path d="M12 17h.01" />
+    </svg>
+  )
+}
+
+function SparkleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 3l1.8 5.1L19 10l-5.2 1.9L12 17l-1.8-5.1L5 10l5.2-1.9L12 3z" />
+      <path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z" />
+      <path d="M5 14l.6 1.7L7 16.3l-1.4.5L5 18.5l-.6-1.7L3 16.3l1.4-.6L5 14z" />
     </svg>
   )
 }

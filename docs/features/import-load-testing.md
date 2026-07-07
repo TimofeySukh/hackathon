@@ -26,6 +26,9 @@ not thousands of per-contact database writes.
   exports. Raw text is sent only for transient server-side processing; the graph persists
   only returned notes such as `AI Relationship Summary`, `Origin Context`,
   `AI Event Context`, `AI Professional Context`, and `Action Items`.
+- Settings also exposes **Add AI context from ZIP** for signed-in users who already
+  imported contacts and want to enrich the existing graph from the same LinkedIn archive.
+  The control shows a batch progress bar while AI context is being analyzed and saved.
 - New LinkedIn company circles use a stable deterministic tone from the Material 3 circle
   palette instead of defaulting every imported company to blue. Existing company circles
   keep their current tone on re-import, except legacy default-blue LinkedIn company circles
