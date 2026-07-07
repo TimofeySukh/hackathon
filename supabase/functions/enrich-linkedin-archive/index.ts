@@ -294,7 +294,13 @@ async function callOpenRouterJson(input: {
     const content = payload.choices?.[0]?.message?.content
     if (!content) return null
 
-    return JSON.parse(extractJsonObject(content)) as unknown
+    try {
+      return JSON.parse(extractJsonObject(content)) as unknown
+    } catch (err) {
+      console.warn('Failed to parse JSON from OpenRouter response:', err)
+      console.warn('Raw content was:', content)
+      return null
+    }
   } finally {
     clearTimeout(timeout)
   }
