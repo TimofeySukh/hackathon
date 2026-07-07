@@ -268,24 +268,25 @@ The application code does not interact with specific providers (like OpenAI or A
 *   `callFastLLM(prompt, options)` -> Used for simple extraction/parsing.
 
 ### B. Configuration Schema (JSON / Environment Variables)
-All API keys, endpoints, and model identifiers are stored in a configuration file (or `.env` environment variables). Changing the keys or switching from Gemini to OpenAI only requires updating this config.
+All API keys, endpoints, and model identifiers are stored in a configuration file (or `.env` environment variables). This setup uses **DeepSeek** as the single provider, sharing one API key but routing to two different models to optimize speed, cost, and rate-limits.
 
 ```json
 {
   "SMART_LLM_CONFIG": {
-    "provider": "anthropic", // anthropic, openai, gemini, openrouter
-    "apiKey": "YOUR_SMART_API_KEY",
-    "model": "claude-3-5-sonnet-latest",
-    "baseURL": "https://api.anthropic.com/v1"
+    "provider": "deepseek",
+    "apiKey": "YOUR_DEEPSEEK_API_KEY",
+    "model": "deepseek-v4-pro",
+    "baseURL": "https://api.deepseek.com/v1"
   },
   "FAST_LLM_CONFIG": {
-    "provider": "openai",
-    "apiKey": "YOUR_FAST_API_KEY",
-    "model": "gpt-4o-mini",
-    "baseURL": "https://api.openai.com/v1"
+    "provider": "deepseek",
+    "apiKey": "YOUR_DEEPSEEK_API_KEY", // Shared key
+    "model": "deepseek-v4-flash",
+    "baseURL": "https://api.deepseek.com/v1"
   }
 }
 ```
+
 
 ### C. Task Routing Registry
 Tasks are mapped to these configuration pools in a central routing map. If a model tier becomes cheaper or more capable, tasks can be re-routed by changing this registry:
