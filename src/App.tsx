@@ -8363,17 +8363,22 @@ function filterPostsForConnections(posts: LinkedInArchivePostInput[], connection
       const postDateMs = post.date ? parseLinkedInDate(post.date) : null
       if (!postDateMs) continue
 
+      const postDescLower = post.description.toLowerCase()
+      const nameMentioned = postDescLower.includes(connectionNameLower)
+
       const distance = connectionDateMs - postDateMs
       const postDateStr = dateKeyFromMs(postDateMs)
       const sameDay = postDateStr === connectionDateStr
 
-      if (!sameDay && (distance < -fourDaysMs || distance > twoDaysMs)) {
+      if (!sameDay && !nameMentioned && (distance < -fourDaysMs || distance > twoDaysMs)) {
         continue
       }
 
       let score = 0
       if (sameDay) {
         score += 100
+      } else if (nameMentioned) {
+        score += 80
       } else {
         score += 50
         if (distance > 0) {
@@ -8383,10 +8388,8 @@ function filterPostsForConnections(posts: LinkedInArchivePostInput[], connection
         }
       }
 
-      const postDescLower = post.description.toLowerCase()
-
       // Full name match
-      if (postDescLower.includes(connectionNameLower)) {
+      if (nameMentioned) {
         score += 150
       }
 
@@ -8411,7 +8414,7 @@ function filterPostsForConnections(posts: LinkedInArchivePostInput[], connection
     }
   }
 
-  // If no posts matched connection scoring, fall back to simple date window for safety
+  // If no posts matched connection scoring, fall back to simple date window or name mention for safety
   if (selectedPosts.size === 0) {
     const connectedDates = new Set(connections.map((c) => {
       const parsed = c.connectedOn ? parseLinkedInDate(c.connectedOn) : null
@@ -8421,6 +8424,11 @@ function filterPostsForConnections(posts: LinkedInArchivePostInput[], connection
     return posts.filter((post) => {
       const postDate = post.date ? parseLinkedInDate(post.date) : null
       if (!postDate) return false
+
+      const postDescLower = post.description.toLowerCase()
+      const mentionsAny = connections.some((c) => postDescLower.includes(c.name.toLowerCase()))
+      if (mentionsAny) return true
+
       return Array.from(connectedDates).some((dateKey) => {
         const connectedAt = parseLinkedInDate(dateKey) ?? 0
         const distance = connectedAt - postDate
