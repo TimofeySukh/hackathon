@@ -2627,7 +2627,8 @@ function App() {
       if (
         searchOpen &&
         searchPanelRef.current &&
-        !searchPanelRef.current.contains(event.target as Node)
+        !searchPanelRef.current.contains(event.target as Node) &&
+        !inspectorPanelRef.current?.contains(event.target as Node)
       ) {
         closeSearch()
       }

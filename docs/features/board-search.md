@@ -50,7 +50,9 @@ selects the node and flies the camera to it at a comfortable zoom.
   (clear of the bottom inspector). Zoom is a fixed 1.5× for a person and fit-to-circle
   for a circle.
 - Closing: the × clears the field; clicking outside, pressing Escape, or opening the
-  settings panel closes search. Search and settings are mutually exclusive.
+  settings panel closes search. Interacting with or closing the open inspector does not
+  count as an outside click, so an active search query stays open. Search and settings are
+  mutually exclusive.
 - Empty query usually shows nothing, except for the one-time LinkedIn URL hint. A query
   with no matches shows "No matches".
 
