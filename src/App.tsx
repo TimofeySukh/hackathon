@@ -2175,6 +2175,12 @@ function App() {
     }
   }
 
+  function resizeNoteEditorTextarea(textarea: HTMLTextAreaElement) {
+    const maxHeight = 240
+    textarea.style.height = 'auto'
+    textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`
+  }
+
   function updatePersonNote(personId: string, noteId: string, title: string, body: string) {
     setGraph((current) => ({
       ...current,
@@ -6493,8 +6499,11 @@ Content-Type: application/json
                             <textarea
                               className="trello-card__editor-textarea"
                               autoFocus
+                              rows={4}
                               value={note.body}
+                              onFocus={(e) => resizeNoteEditorTextarea(e.currentTarget)}
                               onChange={(e) => {
+                                resizeNoteEditorTextarea(e.currentTarget)
                                 updatePersonNote(
                                   selectedPerson.id,
                                   note.id,
@@ -6512,7 +6521,7 @@ Content-Type: application/json
                                 }
                               }}
                               style={{
-                                minHeight: '40px',
+                                minHeight: '96px',
                               }}
                             />
                           </div>

@@ -17,6 +17,13 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-07-09 — Person notes preview collapsed, editor expanded
+
+- Decision: Resting person note cards show a compact two-line preview; clicking a note
+  opens an expanded inline textarea that grows with content up to a capped height.
+- Why: The previous behavior inverted user expectations by showing the full note when it
+  was not editable and shrinking it when the user clicked to edit.
+
 ### 2026-07-09 — LinkedIn archive AI re-imports are incremental
 
 - Decision: Automatic `enrich-linkedin-archive` runs after ZIP import are scoped to new

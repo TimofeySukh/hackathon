@@ -12,7 +12,8 @@ Connections feature, not in notes.
 - **Notes list**: Grouped under a compact Material 3 neutral container header containing the title "Notes".
 - **Note cards**: Each note is rendered as a filled M3 card on a tonal surface. Cards
   animate in with a short fade/translate, lift slightly on hover/focus, and scale down
-  subtly on press. Hovering or focusing a card reveals a small trash icon to delete it.
+  subtly on press. Resting cards show a compact two-line preview. Hovering or focusing a
+  card reveals a small trash icon to delete it.
 - **Add Note Composer**:
   - Toggled by clicking `+ Add note` at the bottom of the list.
   - Contains a borderless textarea in the same filled-card footprint.
@@ -21,7 +22,9 @@ Connections feature, not in notes.
 - **Keyboard Shortcuts**:
   - `Enter` (without Shift) in the composer: immediately saves the note, clears the text, and maintains input focus so the user can quickly type multiple notes in a row.
   - `Escape` in the composer: cancels card creation and closes the composer.
-- **Inline Editing**: Clicking on any card body transforms the card directly into an inline textarea for quick updates. Pressing `Enter` (without Shift) or `Escape` saves or exits the editor.
+- **Inline Editing**: Clicking on any card body transforms the card directly into an
+  expanded inline textarea for quick updates. Pressing `Enter` (without Shift) or `Escape`
+  saves or exits the editor.
 - **Save note button**: Clicking the "Save note" button does the same as pressing Enter (saves and keeps the composer open and focused).
 
 ## Design

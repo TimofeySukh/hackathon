@@ -287,13 +287,14 @@
   color: var(--md-on-surface);
   font-size: 14px;
   line-height: 1.45;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   white-space: pre-wrap;
   word-break: break-word;
   padding-right: 22px;
   flex: 1;
-  max-height: 200px;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
 }
 
 .trello-card__delete-btn {
@@ -358,7 +359,8 @@
   font-family: inherit !important;
   box-shadow: none !important;
   margin: 0 !important;
-  max-height: 200px !important;
+  min-height: 96px !important;
+  max-height: 240px !important;
   overflow-y: auto !important;
 }
 
