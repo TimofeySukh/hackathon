@@ -50,10 +50,15 @@ type SearchDoc = {
   name: string
   nameText: string
   nameTokens: string[]
+  nameTokensSet: Set<string>
   circleText: string
+  circleTokensSet: Set<string>
   roleText: string
+  roleTokensSet: Set<string>
   noteText: string
+  noteTokensSet: Set<string>
   linkText: string
+  linkTokensSet: Set<string>
   allText: string
   result: GraphSearchResult
 }
@@ -165,13 +170,6 @@ function buildCircleSubtitle(path: CircleNode[]) {
   return pathLabel || 'Circle'
 }
 
-function buildPersonHaystack(person: PersonNode, circlePath: CircleNode[]) {
-  const noteText = (person.notes ?? []).map((note) => `${note.title} ${note.body}`).join(' ')
-  const linkText = (person.links ?? []).map((link) => `${link.label} ${link.url}`).join(' ')
-  const pathText = circlePath.map((circle) => circle.name).join(' ')
-  return normalizeText([person.name, pathText, noteText, linkText].filter(Boolean).join(' '))
-}
-
 function circleNameMatches(pathNames: string[], target: string) {
   const needle = normalizeText(target)
   if (!needle) return false
@@ -184,17 +182,26 @@ function matchesCircleFilter(doc: SearchDoc, circleNames: string[] | undefined) 
   return circleNames.some((circleName) => circleNameMatches(pathNames, circleName))
 }
 
-function scoreText(text: string, tokens: string[], phrase: string, weights: { exact: number; phrase: number; token: number; prefix?: number }) {
+function scoreText(
+  text: string,
+  tokens: string[],
+  phrase: string,
+  weights: { exact: number; phrase: number; token: number; prefix?: number },
+  textTokens: Set<string>,
+) {
   if (!text || tokens.length === 0) return 0
   let score = 0
   if (phrase && text === phrase) score += weights.exact
   else if (phrase && text.includes(phrase)) score += weights.phrase
 
-  const textTokens = new Set(tokenize(text, { keepStopWords: true }))
   for (const token of tokens) {
-    if (textTokens.has(token)) score += weights.token
-    else if (weights.prefix && [...textTokens].some((part) => part.startsWith(token))) score += weights.prefix
-    else if (text.includes(token)) score += Math.max(1, Math.round(weights.token * 0.45))
+    if (textTokens.has(token)) {
+      score += weights.token
+    } else if (weights.prefix && [...textTokens].some((part) => part.startsWith(token))) {
+      score += weights.prefix
+    } else if (text.includes(token)) {
+      score += Math.max(1, Math.round(weights.token * 0.45))
+    }
   }
   return score
 }
@@ -207,7 +214,12 @@ function coverageScore(doc: SearchDoc, tokens: string[]) {
   return Math.round(coverage * 80) + (matched === tokens.length ? 35 : 0)
 }
 
+const searchDocsCache = new WeakMap<GraphState, SearchDoc[]>()
+
 function buildSearchDocs(graph: GraphState): SearchDoc[] {
+  const cached = searchDocsCache.get(graph)
+  if (cached) return cached
+
   const peopleDocs: SearchDoc[] = graph.people.map((person) => {
     const circlePath = getCirclePath(graph, person.circleId)
     const pathItems = circlePath.map((circle) => ({ id: circle.id, name: circle.name }))
@@ -223,10 +235,15 @@ function buildSearchDocs(graph: GraphState): SearchDoc[] {
       name: person.name,
       nameText,
       nameTokens: tokenize(person.name, { keepStopWords: true }),
+      nameTokensSet: new Set(tokenize(person.name, { keepStopWords: true })),
       circleText: normalizeText(circleText),
+      circleTokensSet: new Set(tokenize(circleText, { keepStopWords: true })),
       roleText,
+      roleTokensSet: new Set(tokenize(roleText, { keepStopWords: true })),
       noteText,
+      noteTokensSet: new Set(tokenize(noteText, { keepStopWords: true })),
       linkText,
+      linkTokensSet: new Set(tokenize(linkText, { keepStopWords: true })),
       allText,
       result: {
         type: 'person',
@@ -251,10 +268,15 @@ function buildSearchDocs(graph: GraphState): SearchDoc[] {
       name: circle.name,
       nameText,
       nameTokens: tokenize(circle.name, { keepStopWords: true }),
+      nameTokensSet: new Set(tokenize(circle.name, { keepStopWords: true })),
       circleText,
+      circleTokensSet: new Set(tokenize(circleText, { keepStopWords: true })),
       roleText: '',
+      roleTokensSet: new Set<string>(),
       noteText: '',
+      noteTokensSet: new Set<string>(),
       linkText: '',
+      linkTokensSet: new Set<string>(),
       allText: [nameText, circleText].filter(Boolean).join(' '),
       result: {
         type: 'circle',
@@ -268,7 +290,9 @@ function buildSearchDocs(graph: GraphState): SearchDoc[] {
     }
   })
 
-  return [...peopleDocs, ...circleDocs]
+  const result = [...peopleDocs, ...circleDocs]
+  searchDocsCache.set(graph, result)
+  return result
 }
 
 function addArmScores(
@@ -358,20 +382,20 @@ export function rankGraphSearch(graph: GraphState, intent: SearchIntent, limit: 
     return 0
   })
   addArmScores(scores, docs, 'name', 170, (doc) =>
-    scoreText(doc.nameText, tokens, phrase, { exact: 260, phrase: 170, token: doc.type === 'person' ? 80 : 70, prefix: 60 }),
+    scoreText(doc.nameText, tokens, phrase, { exact: 260, phrase: 170, token: doc.type === 'person' ? 80 : 70, prefix: 60 }, doc.nameTokensSet),
   )
   addArmScores(scores, docs.filter((doc) => doc.type === 'person'), 'role', 145, (doc) =>
-    scoreText(doc.roleText, tokens, phrase, { exact: 220, phrase: 150, token: 70, prefix: 45 }),
+    scoreText(doc.roleText, tokens, phrase, { exact: 220, phrase: 150, token: 70, prefix: 45 }, doc.roleTokensSet),
   )
   addArmScores(scores, docs.filter((doc) => doc.type === 'person'), 'notes', 95, (doc) =>
-    scoreText(doc.noteText, tokens, phrase, { exact: 140, phrase: 105, token: 38, prefix: 22 }),
+    scoreText(doc.noteText, tokens, phrase, { exact: 140, phrase: 105, token: 38, prefix: 22 }, doc.noteTokensSet),
   )
   addArmScores(scores, docs, 'circle', intent.circleNames?.length ? 190 : 85, (doc) => {
     const circleFilterScore = (intent.circleNames ?? []).some((circleName) => circleNameMatches(doc.circleText.split(' › '), circleName)) ? 180 : 0
-    return circleFilterScore + scoreText(doc.circleText, tokens, phrase, { exact: 160, phrase: 120, token: 45, prefix: 25 })
+    return circleFilterScore + scoreText(doc.circleText, tokens, phrase, { exact: 160, phrase: 120, token: 45, prefix: 25 }, doc.circleTokensSet)
   })
   addArmScores(scores, docs.filter((doc) => doc.type === 'person'), 'links', 55, (doc) =>
-    scoreText(doc.linkText, tokens, phrase, { exact: 90, phrase: 70, token: 25, prefix: 12 }),
+    scoreText(doc.linkText, tokens, phrase, { exact: 90, phrase: 70, token: 25, prefix: 12 }, doc.linkTokensSet),
   )
   addArmScores(scores, docs, 'coverage', 80, (doc) => coverageScore(doc, tokens))
 
@@ -433,6 +457,13 @@ export type PersonCandidateSummary = {
   name: string
   circle: string
   notes: string[]
+}
+
+function buildPersonHaystack(person: PersonNode, circlePath: CircleNode[]) {
+  const noteText = (person.notes ?? []).map((note) => `${note.title} ${note.body}`).join(' ')
+  const linkText = (person.links ?? []).map((link) => `${link.label} ${link.url}`).join(' ')
+  const pathText = circlePath.map((circle) => circle.name).join(' ')
+  return normalizeText([person.name, pathText, noteText, linkText].filter(Boolean).join(' '))
 }
 
 function scorePersonLoose(person: PersonNode, terms: string[], circlePath: CircleNode[]) {

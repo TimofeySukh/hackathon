@@ -1628,6 +1628,15 @@ function App() {
   // circles (the "tags"), then flies the camera to the picked node.
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery)
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
   const [activeSearchIndex, setActiveSearchIndex] = useState(0)
   const [aiSearchResults, setAiSearchResults] = useState<SearchResult[] | null>(null)
   const [aiSearchExplanation, setAiSearchExplanation] = useState<string | null>(null)
@@ -2720,9 +2729,9 @@ function App() {
   // Capped so the dropdown stays compact; people first since finding a person is
   // the primary use, circles after.
   const localSearchResults = useMemo<SearchResult[]>(() => {
-    const q = searchQuery.trim()
+    const q = debouncedSearchQuery.trim()
     if (!q) return []
-    const linkedInUrl = getLinkedInProfileImportUrl(searchQuery)
+    const linkedInUrl = getLinkedInProfileImportUrl(debouncedSearchQuery)
     const linkedInImport: SearchResult[] = linkedInUrl
       ? [{
           kind: 'linkedin-profile',
@@ -2737,15 +2746,15 @@ function App() {
       8,
     ))
     return [...linkedInImport, ...ranked].slice(0, 8)
-  }, [searchQuery, isImportingLinkedInProfile, displayPeople, displayCircles, displayConnections, circlesById, peopleById])
+  }, [debouncedSearchQuery, isImportingLinkedInProfile, displayPeople, displayCircles, displayConnections, circlesById, peopleById])
 
-  const isAiSearchActive = auth.status === 'authenticated' && shouldUseSmartSearch(searchQuery.trim())
+  const isAiSearchActive = auth.status === 'authenticated' && shouldUseSmartSearch(debouncedSearchQuery.trim())
   const searchResults = isAiSearchActive
     ? (isSmartSearching ? [] : (aiSearchResults ?? localSearchResults))
     : localSearchResults
 
   useEffect(() => {
-    const query = searchQuery.trim()
+    const query = debouncedSearchQuery.trim()
     if (!query) {
       setAiSearchResults(null)
       setAiSearchExplanation(null)
@@ -2775,7 +2784,7 @@ function App() {
       void smartSearchGraph(auth.session!, query, 8)
         .then((response) => {
           if (requestId !== smartSearchRequestRef.current) return
-          const linkedInUrl = getLinkedInProfileImportUrl(searchQuery)
+          const linkedInUrl = getLinkedInProfileImportUrl(debouncedSearchQuery)
           const linkedInImport: SearchResult[] = linkedInUrl
             ? [{
                 kind: 'linkedin-profile',
@@ -2806,7 +2815,7 @@ function App() {
     }, 450)
 
     return () => window.clearTimeout(timer)
-  }, [searchQuery, auth.status, auth.session, isImportingLinkedInProfile, displayPeople, displayCircles, displayConnections, circlesById, peopleById])
+  }, [debouncedSearchQuery, auth.status, auth.session, isImportingLinkedInProfile, displayPeople, displayCircles, displayConnections, circlesById, peopleById])
 
   const aiPanelSteps = isSmartSearching && aiSearchSteps.length === 0
     ? [
