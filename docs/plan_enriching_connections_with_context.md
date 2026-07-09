@@ -276,7 +276,7 @@ All API keys, endpoints, and model identifiers are stored in environment variabl
 ```json
 {
   "OPENROUTER_API_KEY": "YOUR_OPENROUTER_API_KEY",
-  "OPENROUTER_MODEL": "deepseek/deepseek-chat-v3-0324"
+  "OPENROUTER_MODEL": "deepseek/deepseek-v4-pro"
 }
 ```
 

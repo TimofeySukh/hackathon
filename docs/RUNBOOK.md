@@ -568,7 +568,7 @@ Required OpenRouter secrets for signed-in LinkedIn archive AI enrichment:
 
 ```bash
 supabase secrets set OPENROUTER_API_KEY=your-openrouter-key
-supabase secrets set OPENROUTER_MODEL=deepseek/deepseek-chat-v3-0324
+supabase secrets set OPENROUTER_MODEL=deepseek/deepseek-v4-pro
 ```
 
 `OPENROUTER_MODEL` is optional; all archive enrichment tasks use the same DeepSeek model by

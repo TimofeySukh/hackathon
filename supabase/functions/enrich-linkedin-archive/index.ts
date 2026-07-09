@@ -2,7 +2,7 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
-const DEFAULT_OPENROUTER_MODEL = 'deepseek/deepseek-chat-v3-0324'
+const DEFAULT_OPENROUTER_MODEL = 'deepseek/deepseek-v4-pro'
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 const MAX_CONNECTIONS_PER_REQUEST = 12
 const MAX_TEXT_CHARS = 24000
