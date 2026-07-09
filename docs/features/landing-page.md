@@ -44,7 +44,7 @@ Header requirements:
 - Clicking the Social Datanode logo on the landing page returns to the landing home
   (`#` / empty hash). It must not unexpectedly open the board; the board CTA owns that
   action.
-- On `#docs`, `#contact`, and `#privacy`, the top-left brand control also returns to the
+- On `#docs` and `#contact`, the top-left brand control also returns to the
   landing home. Do not add a separate Back button in the docs header.
 - `Contact` opens a separate contact screen at `#contact`.
 - Active header nav item (`Docs` / `Contact`) uses a light primary-container pill, not the
@@ -210,4 +210,4 @@ Buttons should feel consistent across the landing page.
 - Main component: [`LandingPage.tsx`](../../src/LandingPage.tsx)
 - Board preview screenshots: [`src/assets/landing/`](../../src/assets/landing/)
 - Stylesheet: [`landing.css`](../../src/styles/landing.css)
-- App integration: [`App.tsx`](../../src/App.tsx) (`#contact`, `#privacy` view modes)
+- App integration: [`App.tsx`](../../src/App.tsx) (`#contact` view mode)

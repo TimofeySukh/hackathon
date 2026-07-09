@@ -26,9 +26,9 @@ revision checks and Realtime sync. Anonymous visitors edit a board persisted to
 
 - `src/main.tsx` mounts the React app.
 - `src/App.tsx` is the shell and interaction host: hash routing (landing, board, docs,
-  contact, privacy), chrome/panels, pointer interaction, camera, persisted-graph wiring,
+  contact), chrome/panels, pointer interaction, camera, persisted-graph wiring,
   and the paint loop. Heavy canvas logic lives in `src/lib/board/`.
-- `src/LandingPage.tsx`, `DocsPage.tsx`, `ContactPage.tsx`, `PrivacyPage.tsx` — public routes.
+- `src/LandingPage.tsx`, `DocsPage.tsx`, `ContactPage.tsx` — public routes.
 - `src/lib/board/` — types, constants, colors, geometry, layout, render (spatial index,
   hit-testing, Canvas 2D).
 - `src/lib/graphPersistence.ts` — signed-in saves via `graph-api` first, RLS fallback,
@@ -59,7 +59,7 @@ Current scope:
 - LinkedIn ZIP import and signed-in single-profile/archive enrichment
 - per-person notes, tags, connections inside the graph blob
 - board search and signed-in smart search
-- landing, docs, contact, privacy pages
+- landing, docs, contact pages
 - revocable agent tokens, graph API, CLI, stdio MCP server
 
 Out of scope (not built):

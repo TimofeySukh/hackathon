@@ -17,6 +17,14 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-07-09 — Remove the public privacy policy route
+
+- Decision: Remove the standalone privacy policy screen, its `#privacy` route, public
+  links, auth-dialog notice, styles, and feature documentation. Legacy `#privacy` URLs
+  resolve to the landing page.
+- Why: The page is no longer part of the product and should not remain as stale public
+  product surface.
+
 ### 2026-07-09 — Person notes preview collapsed, editor expanded
 
 - Decision: Resting person note cards show a compact two-line preview; clicking a note

@@ -8,8 +8,8 @@ board app backed by Supabase. For an AI-friendly canonical summary, read
 
 Current product behavior (code-aligned):
 
-- Hash routes: landing (`#`), board (`#board`), developer docs (`#docs`), contact
-  (`#contact`), privacy (`#privacy`).
+- Hash routes: landing (`#`), board (`#board`), developer docs (`#docs`), and contact
+  (`#contact`).
 - Board opens on a **blank graph**: one central `You` circle only (no demo seed).
 - Canvas 2D board with circles, people, curved links, pan/zoom, edit/select/pan tool modes.
 - Create via circle context menu, double-tap, and connector drag-to-empty.

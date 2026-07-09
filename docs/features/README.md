@@ -32,7 +32,6 @@ humans or AI agents.
 - [Authentication](auth.md) — local editing, Google/email auth, recovery, sign-in entry points.
 - [Import load testing](import-load-testing.md) — database and browser import verification.
 - [Landing page](landing-page.md) — marketing entry, hash routing, inspector demo.
-- [Privacy policy](privacy-policy.md) — public page at `#privacy`.
 - [Agent API](agent-api.md) — revocable tokens, graph API, CLI, MCP.
 - [Real-time sync](realtime-sync.md) — Supabase Realtime for multi-tab/agent edits.
 

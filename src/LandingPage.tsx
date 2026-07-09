@@ -99,11 +99,6 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
     window.location.hash = '#contact'
   }
 
-  const handlePrivacy = (e: MouseEvent) => {
-    e.preventDefault()
-    window.location.hash = '#privacy'
-  }
-
   return (
     <div className="landing-container">
       <header className="landing-header">
@@ -285,9 +280,6 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
             <span className="footer-logo-text">Social Datanode</span>
           </a>
           <div className="footer-legal">
-            <a href="#privacy" className="footer-legal-link" onClick={handlePrivacy}>
-              Privacy Policy
-            </a>
             <span className="footer-copyright">
               &copy; {new Date().getFullYear()} Social Datanode. All rights reserved.
             </span>

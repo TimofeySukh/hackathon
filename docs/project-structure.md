@@ -28,7 +28,6 @@ For a concise product summary see [`AI_CONTEXT.md`](AI_CONTEXT.md).
 - `LandingPage.tsx` — marketing landing (`#`).
 - `DocsPage.tsx` — developer documentation (`#docs`) — API, CLI, MCP setup.
 - `ContactPage.tsx` — team contact (`#contact`).
-- `PrivacyPage.tsx` — privacy policy (`#privacy`).
 
 ### `src/lib/board/` (framework-free board engine)
 
@@ -66,7 +65,7 @@ For a concise product summary see [`AI_CONTEXT.md`](AI_CONTEXT.md).
 ### `src/styles/`
 
 `index.css` imports partials in cascade order: `base`, `theme`, `chrome`, `board`,
-`inspector`, `inspector-fields`, `panels`, `widgets`, `landing`, `docs`, `privacy`, …
+`inspector`, `inspector-fields`, `panels`, `widgets`, `landing`, `docs`, …
 
 ## Supabase
 

@@ -24,8 +24,8 @@ password so a database user is created without forcing profile setup.
 - Password recovery links are handled by Supabase URL session detection. When the app sees
   the `PASSWORD_RECOVERY` auth event, it opens the dialog directly in the new-password state.
 - Supabase OAuth, confirmation, and recovery callbacks return to the clean app URL without
-  a hash fragment. Authenticated users can still view the landing, docs, contact, and
-  privacy screens; the app opens `#board` only after an explicit board CTA, a direct
+  a hash fragment. Authenticated users can still view the landing, docs, and contact
+  screens; the app opens `#board` only after an explicit board CTA, a direct
   `#board` URL, or a stored auth callback return target.
 - Login attempts include a `sdn_auth_return=board` callback URL parameter and mirror that
   return target in `localStorage` and `sessionStorage`. Supabase callback signatures

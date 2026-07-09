@@ -16,7 +16,6 @@ zip.configure({ useWebWorkers: false })
 import { cancelPendingBoardAuthReturn, consumeAuthReturnHash, hasPendingBoardAuthReturn, useAuth } from './lib/useAuth'
 import LandingPage from './LandingPage'
 import ContactPage from './ContactPage'
-import PrivacyPage from './PrivacyPage'
 import DocsPage from './DocsPage'
 import { createAgentToken, getGraphApiBaseUrl, listAgentTokens, revokeAgentToken } from './lib/agentApi'
 import type { AgentScope, AgentTokenRecord } from './lib/agentApi'
@@ -653,36 +652,17 @@ function isPhoneViewport(): boolean {
 }
 
 
-function AuthPrivacyNotice({ onOpenPrivacy }: { onOpenPrivacy: () => void }) {
-  return (
-    <p className="auth-card__privacy">
-      By creating an account, you agree to our{' '}
-      <a
-        href="#privacy"
-        onClick={(event) => {
-          event.preventDefault()
-          onOpenPrivacy()
-        }}
-      >
-        Privacy Policy
-      </a>
-      .
-    </p>
-  )
-}
-
-function resolveViewModeFromLocation(options: { includePendingAuthReturn?: boolean } = {}): 'landing' | 'board' | 'docs' | 'contact' | 'privacy' {
+function resolveViewModeFromLocation(options: { includePendingAuthReturn?: boolean } = {}): 'landing' | 'board' | 'docs' | 'contact' {
   const hash = window.location.hash
   if (hash === '#board') return 'board'
   if (hash === '#docs' || hash.startsWith('#docs/')) return 'docs'
   if (hash === '#contact') return 'contact'
-  if (hash === '#privacy') return 'privacy'
   if (options.includePendingAuthReturn && hasPendingBoardAuthReturn()) return 'board'
   return 'landing'
 }
 
 function App() {
-  const [viewMode, setViewMode] = useState<'landing' | 'board' | 'docs' | 'contact' | 'privacy'>(() =>
+  const [viewMode, setViewMode] = useState<'landing' | 'board' | 'docs' | 'contact'>(() =>
     resolveViewModeFromLocation({ includePendingAuthReturn: true })
   );
 
@@ -749,7 +729,7 @@ function App() {
   const userId = auth.session?.user?.id ?? null
 
   // Redirect only authenticated auth callback returns to the board. A normal signed-in
-  // visitor can still open and stay on the landing/docs/contact/privacy pages.
+  // visitor can still open and stay on the landing/docs/contact pages.
   useEffect(() => {
     if (auth.status !== 'authenticated') return
 
@@ -5131,17 +5111,7 @@ Content-Type: application/json
   "notes": [{ "body": "Met at conference" }]
 }`
 
-  function openPrivacyFromAuthDialog() {
-    setEmailAuthNotice(null)
-    setEmailAuthError(null)
-    auth.clearError()
-    setShowSignInModal(false)
-    window.location.hash = '#privacy'
-  }
-
-
-
-  if (viewMode === 'landing' || viewMode === 'contact' || viewMode === 'privacy') {
+  if (viewMode === 'landing' || viewMode === 'contact') {
     const landingAuthProps = {
       onLogin: () => {
         setEmailAuthMode('signin')
@@ -5164,7 +5134,6 @@ Content-Type: application/json
       <div className="app-shell">
         {viewMode === 'landing' && <LandingPage {...landingAuthProps} />}
         {viewMode === 'contact' && <ContactPage {...landingAuthProps} />}
-        {viewMode === 'privacy' && <PrivacyPage {...landingAuthProps} />}
         {showAuthDialog && (
           <div
             className={`auth-overlay ${showAuthDialog ? 'is-open' : ''}`}
@@ -5341,9 +5310,6 @@ Content-Type: application/json
               )}
               {(emailAuthError || (authDialogMode !== 'reset' ? auth.error : null)) && (
                 <p className="auth-card__error" role="alert">{emailAuthError || auth.error}</p>
-              )}
-              {(authDialogMode === 'signin' || authDialogMode === 'signup') && (
-                <AuthPrivacyNotice onOpenPrivacy={openPrivacyFromAuthDialog} />
               )}
             </div>
           </div>
@@ -7279,9 +7245,6 @@ Content-Type: application/json
             )}
             {(emailAuthError || (authDialogMode !== 'reset' ? auth.error : null)) && (
               <p className="auth-card__error" role="alert">{emailAuthError || auth.error}</p>
-            )}
-            {(authDialogMode === 'signin' || authDialogMode === 'signup') && (
-              <AuthPrivacyNotice onOpenPrivacy={openPrivacyFromAuthDialog} />
             )}
           </div>
         </div>

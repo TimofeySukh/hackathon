@@ -1420,24 +1420,6 @@
   text-align: center;
 }
 
-.auth-card__privacy {
-  margin: 4px 0 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--md-on-surface-variant);
-  text-align: center;
-}
-
-.auth-card__privacy a {
-  color: var(--md-primary);
-  text-decoration: none;
-  font-weight: 500;
-}
-
-.auth-card__privacy a:hover {
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
 
 @media (max-width: 480px) {
   .agent-settings-overlay {

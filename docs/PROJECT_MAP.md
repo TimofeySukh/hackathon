@@ -19,7 +19,7 @@ Social Datanode is a live React + Vite + TypeScript product (not a local-only pr
   anonymous editing in `localStorage`.
 - LinkedIn ZIP import + signed-in single-profile/archive enrichment; board search + smart search.
 - Revocable agent tokens; graph API; CLI (`datanode-cli`); MCP server (`datanode-mcp`).
-- Landing page, developer docs page, contact, privacy policy (hash routes).
+- Landing page, developer docs page, and contact page (hash routes).
 - Material 3 design language for chrome and board-adjacent UI.
 
 Removed from the product (do not document as current): demo mode, demo seed graph, global
@@ -42,7 +42,7 @@ theme toggle, stress-test slider panel, floating anonymous sign-in banner.
 
 - `src/main.tsx` — React entry.
 - `src/App.tsx` — shell: routing, board interaction host, inspector, settings, persistence wiring (~7k lines).
-- `src/LandingPage.tsx`, `src/DocsPage.tsx`, `src/ContactPage.tsx`, `src/PrivacyPage.tsx` — public screens.
+- `src/LandingPage.tsx`, `src/DocsPage.tsx`, `src/ContactPage.tsx` — public screens.
 - `src/lib/board/` — framework-free board engine (types, geometry, layout, render, hit-test).
 - `src/lib/graphPersistence.ts` — load/save, Realtime, revision conflicts.
 - `src/lib/useAuth.ts` — Supabase auth session and flows.

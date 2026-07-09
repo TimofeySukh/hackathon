@@ -28,16 +28,15 @@ Remote **agents** (CLI / MCP) can read and write the same graph through a revisi
 | `#board` | Interactive board | `App.tsx` board shell |
 | `#docs` / `#docs/...` | Developer docs (API/CLI/MCP) | `DocsPage.tsx` |
 | `#contact` | Team contact | `ContactPage.tsx` |
-| `#privacy` | Privacy policy | `PrivacyPage.tsx` |
 
 Rules:
 
-- Signed-in users are **not** auto-redirected away from landing/docs/contact/privacy.
+- Signed-in users are **not** auto-redirected away from landing/docs/contact.
 - Auth callbacks land on the clean origin (no hash). A stored return marker opens `#board`
   after the session restores.
 - Logo on the landing page returns home; **Open board** is the primary CTA to `#board`.
 - The board shows a compact logo control in the top-left that returns to the landing home (`#`).
-- The top-left brand on docs, contact, and privacy also returns to the landing home (`#`).
+- The top-left brand on docs and contact also returns to the landing home (`#`).
   Docs no longer uses a separate Back button.
 
 ---
@@ -198,7 +197,7 @@ Local tools (not part of the hosted product):
 | Agent token UI API | `src/lib/agentApi.ts` |
 | Local + smart search | `src/lib/search/`, `src/lib/smartSearch.ts` |
 | LinkedIn enrichment client | `src/lib/linkedinEnrichment.ts` |
-| Landing / docs / contact / privacy | `src/LandingPage.tsx`, `DocsPage.tsx`, … |
+| Landing / docs / contact | `src/LandingPage.tsx`, `DocsPage.tsx`, `ContactPage.tsx` |
 | Shared UI components | `src/components/` (`M3Slider`, `SelectionIndicator`, …) |
 | Styles (Material 3 tokens) | `src/styles/` via `src/index.css` imports |
 

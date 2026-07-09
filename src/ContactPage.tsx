@@ -49,11 +49,6 @@ export default function ContactPage({ onLogin, onSignUp, isAuthenticated }: Cont
     window.location.hash = '#docs'
   }
 
-  const handlePrivacy = (e: MouseEvent) => {
-    e.preventDefault()
-    window.location.hash = '#privacy'
-  }
-
   return (
     <div className="landing-container contact-page">
       <header className="landing-header">
@@ -144,9 +139,6 @@ export default function ContactPage({ onLogin, onSignUp, isAuthenticated }: Cont
             <span className="footer-logo-text">Social Datanode</span>
           </a>
           <div className="footer-legal">
-            <a href="#privacy" className="footer-legal-link" onClick={handlePrivacy}>
-              Privacy Policy
-            </a>
             <span className="footer-copyright">
               &copy; {new Date().getFullYear()} Social Datanode. All rights reserved.
             </span>
