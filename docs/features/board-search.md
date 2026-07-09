@@ -13,7 +13,8 @@ selects the node and flies the camera to it at a comfortable zoom.
 - The first time a user opens search, a small hint explains that a LinkedIn profile URL can
   be pasted there to add that person to the board. The hint is tracked locally and only
   appears once per browser.
-- Typing filters live with deterministic hybrid ranking. People and circles are indexed
+- After a 250 ms typing pause, the deterministic hybrid ranker filters people and circles.
+  People and circles are indexed
   in memory for the query, then separate exact-name, name-token, role/headline, notes,
   circle-path, link, and coverage arms are fused with an RRF-style score. People are
   listed first unless the query asks for circles/tags; results are capped at 8. Subtitles

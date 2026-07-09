@@ -1633,7 +1633,7 @@ function App() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchQuery(searchQuery)
-    }, 100)
+    }, 250)
     return () => clearTimeout(timer)
   }, [searchQuery])
 
@@ -2721,6 +2721,10 @@ function App() {
   const displayCircles = graph.circles
   const displayPeople = graph.people
   const displayConnections = useMemo(() => graph.connections || [], [graph.connections])
+  const searchGraph = useMemo<GraphState>(
+    () => ({ circles: displayCircles, people: displayPeople, connections: displayConnections }),
+    [displayCircles, displayPeople, displayConnections],
+  )
 
   const circlesById = useMemo(() => new Map(displayCircles.map((circle) => [circle.id, circle])), [displayCircles])
   const peopleById = useMemo(() => new Map(displayPeople.map((person) => [person.id, person])), [displayPeople])
@@ -2742,12 +2746,12 @@ function App() {
         }]
       : []
     const ranked = graphSearchResultsToUi(searchGraphByQuery(
-      { circles: displayCircles, people: displayPeople, connections: displayConnections },
+      searchGraph,
       q,
       8,
     ))
     return [...linkedInImport, ...ranked].slice(0, 8)
-  }, [debouncedSearchQuery, isImportingLinkedInProfile, displayPeople, displayCircles, displayConnections, circlesById, peopleById])
+  }, [debouncedSearchQuery, isImportingLinkedInProfile, searchGraph])
 
   const isAiSearchActive = auth.status === 'authenticated' && shouldUseSmartSearch(debouncedSearchQuery.trim())
   const searchResults = isAiSearchActive
