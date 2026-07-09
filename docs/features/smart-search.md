@@ -34,8 +34,9 @@ interpret intent and a local ranker to search the graph hierarchy.
   - [`../../supabase/functions/graph-api/graphSearch.ts`](../../supabase/functions/graph-api/graphSearch.ts)
   - [`../../supabase/functions/graph-api/interpretSearch.ts`](../../supabase/functions/graph-api/interpretSearch.ts)
   - [`../../supabase/functions/graph-api/index.ts`](../../supabase/functions/graph-api/index.ts)
-- Provider: [NeuralDeep OpenAI-compatible API](https://neuraldeep.ru/docs), model default
-  `qwen3.6-35b-a3b-noreason`.
+- Provider: [OpenRouter OpenAI-compatible API](https://openrouter.ai/docs), using the same
+  `OPENROUTER_API_KEY` as LinkedIn archive enrichment. Default model:
+  `deepseek/deepseek-v4-flash`.
 
 ## Open questions / TODO
 

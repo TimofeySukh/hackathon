@@ -564,29 +564,25 @@ Required LinkedIn enrichment secret:
 supabase secrets set LINKEDIN_ENRICHMENT_API_KEY=your-linkedin-enrichment-provider-api-key
 ```
 
-Required OpenRouter secrets for signed-in LinkedIn archive AI enrichment:
+One OpenRouter key powers both signed-in AI features: LinkedIn archive enrichment and
+natural-language Smart Search. Keep it only in Supabase Edge Function secrets, never in
+the Vite/browser environment.
 
 ```bash
 supabase secrets set OPENROUTER_API_KEY=your-openrouter-key
 supabase secrets set OPENROUTER_MODEL=deepseek/deepseek-v4-pro
+supabase secrets set OPENROUTER_SEARCH_MODEL=deepseek/deepseek-v4-flash
 ```
 
-`OPENROUTER_MODEL` is optional; all archive enrichment tasks use the same DeepSeek model by
-default. The archive enrichment function sends message, invitation, and post excerpts only
-for transient LLM processing and returns derived notes; raw archive text is not persisted
-in `user_graphs`.
+`OPENROUTER_MODEL` selects the LinkedIn archive enrichment model; it defaults to
+`deepseek/deepseek-v4-pro`. `OPENROUTER_SEARCH_MODEL` selects the Smart Search model; it
+defaults to `deepseek/deepseek-v4-flash`. The archive enrichment function sends message,
+invitation, and post excerpts only for transient LLM processing and returns derived notes;
+raw archive text is not persisted in `user_graphs`.
 
-Required secrets for signed-in natural-language smart search (`POST /v1/search/smart`):
-
-```bash
-supabase secrets set AI_SEARCH_API_KEY=your-neuraldeep-sk-key
-supabase secrets set AI_SEARCH_API_BASE_URL=https://api.neuraldeep.ru/v1
-supabase secrets set AI_SEARCH_MODEL=qwen3.6-35b-a3b-noreason
-```
-
-Provider docs: [NeuralDeep](https://neuraldeep.ru/docs). Default model `qwen3.6-35b-a3b-noreason` is the fastest
-MoE chat model on the free tier (DaisyGPT / Qwen 3.6, reasoning disabled). `AI_SEARCH_API_BASE_URL` and
-`AI_SEARCH_MODEL` are optional overrides.
+Provider docs: [OpenRouter](https://openrouter.ai/docs). The prior NeuralDeep/Qwen
+variables (`AI_SEARCH_API_KEY`, `AI_SEARCH_API_BASE_URL`, and `AI_SEARCH_MODEL`) are
+deprecated and ignored by the current code.
 
 Redeploy `graph-api` after setting secrets:
 

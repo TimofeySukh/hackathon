@@ -202,7 +202,7 @@ function normalizeBody(value: unknown) {
 }
 
 function getOpenRouterConfig() {
-  const apiKey = Deno.env.get('OPENROUTER_API_KEY') ?? Deno.env.get('LINKEDIN_ARCHIVE_OPENROUTER_API_KEY')
+  const apiKey = Deno.env.get('OPENROUTER_API_KEY')
   if (!apiKey) throw new Error('Missing required environment variable: OPENROUTER_API_KEY')
   return {
     apiKey,

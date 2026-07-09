@@ -106,7 +106,7 @@ Optional local-only:
 - `VITE_LINKEDIN_ENRICHMENT_TEST_SECRET` — enrichment test bypass (never production).
 
 Edge Function secrets (Supabase dashboard / CLI): `SUPABASE_SERVICE_ROLE_KEY`,
-`LINKEDIN_ENRICHMENT_API_KEY`, `OPENROUTER_API_KEY`, `AI_SEARCH_API_KEY`, … — see
+`LINKEDIN_ENRICHMENT_API_KEY`, `OPENROUTER_API_KEY`, `OPENROUTER_SEARCH_MODEL`, … — see
 [`RUNBOOK.md`](RUNBOOK.md).
 
 ## Technical stack

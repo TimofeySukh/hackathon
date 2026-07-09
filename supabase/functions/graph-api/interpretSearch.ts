@@ -5,8 +5,8 @@ import {
   type SearchIntent,
 } from './graphSearch.ts'
 
-const DEFAULT_MODEL = 'qwen3.6-35b-a3b-noreason'
-const DEFAULT_BASE_URL = 'https://api.neuraldeep.ru/v1'
+const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash'
+const DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1'
 const INTENT_CACHE_TTL_MS = 5 * 60 * 1000
 
 const intentCache = new Map<string, { intent: SearchIntent; expiresAt: number }>()
@@ -36,12 +36,12 @@ function normalizeCacheKey(query: string) {
 }
 
 export function getAiSearchConfig() {
-  const apiKey = Deno.env.get('AI_SEARCH_API_KEY')
+  const apiKey = Deno.env.get('OPENROUTER_API_KEY')
   if (!apiKey) return null
   return {
     apiKey,
-    baseUrl: (Deno.env.get('AI_SEARCH_API_BASE_URL') ?? DEFAULT_BASE_URL).replace(/\/$/, ''),
-    model: Deno.env.get('AI_SEARCH_MODEL') ?? DEFAULT_MODEL,
+    baseUrl: (Deno.env.get('OPENROUTER_BASE_URL') ?? DEFAULT_BASE_URL).replace(/\/$/, ''),
+    model: Deno.env.get('OPENROUTER_SEARCH_MODEL') ?? DEFAULT_MODEL,
   }
 }
 
@@ -49,7 +49,7 @@ export function isAiSearchConfigured() {
   return Boolean(getAiSearchConfig())
 }
 
-export async function callNeuralDeepIntent(query: string, circleNames: string[]): Promise<SearchIntent | null> {
+export async function callSearchIntent(query: string, circleNames: string[]): Promise<SearchIntent | null> {
   const config = getAiSearchConfig()
   if (!config) return null
 
@@ -116,7 +116,7 @@ export async function interpretSearchQuery(graph: GraphState, query: string): Pr
   const trimmed = query.trim()
   const localIntent = buildSearchIntentFromQuery(trimmed)
   const circleNames = graph.circles.map((circle) => circle.name).filter(Boolean)
-  const aiIntent = await callNeuralDeepIntent(trimmed, circleNames)
+  const aiIntent = await callSearchIntent(trimmed, circleNames)
   if (aiIntent) {
     return { intent: aiIntent, source: 'ai' }
   }

@@ -701,7 +701,7 @@ ${pinnedCmd}`}</code>
               Runs multi-step agent search: analyze the query, scan note-backed candidates,
               match with AI (with an optional retry pass), then return ranked people/circles with
               `aiReason`, visible `steps`, and follow-up `suggestions`. Requires the
-              <code>search:read</code> scope and Edge Function secret <code>AI_SEARCH_API_KEY</code>.
+              <code>search:read</code> scope and the shared Edge Function secret <code>OPENROUTER_API_KEY</code>.
             </p>
 
             <h3>Request Body</h3>

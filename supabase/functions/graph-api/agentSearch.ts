@@ -8,7 +8,7 @@ import {
   type GraphSearchResult,
   type SearchIntent,
 } from './graphSearch.ts'
-import { callNeuralDeepIntent, getAiSearchConfig } from './interpretSearch.ts'
+import { callSearchIntent, getAiSearchConfig } from './interpretSearch.ts'
 
 const ANALYZE_PROMPT = `You help search a personal relationship graph. The user asks in natural language.
 Return ONLY JSON:
@@ -250,7 +250,7 @@ export async function runAgentSearch(graph: GraphState, query: string, limit: nu
       detail: explanation,
     })
   } else {
-    const aiIntent = await callNeuralDeepIntent(trimmed, circleNames)
+    const aiIntent = await callSearchIntent(trimmed, circleNames)
     if (aiIntent) intent = aiIntent
     searchTerms = uniqueTerms(intent.keywords, intent.nameTokens, [trimmed])
     steps.push({
