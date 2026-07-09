@@ -612,7 +612,10 @@ ${pinnedCmd}`}</code>
               <span className="docs-method-badge get">GET</span>
               <span className="docs-endpoint-path">/search</span>
             </div>
-            <p>Queries both people (by name, notes, links) and circles (by name) in the social graph.</p>
+            <p>
+              Queries people and circles with deterministic hybrid ranking across exact names,
+              name tokens, role/headline notes, note text, circle paths, links, and coverage.
+            </p>
 
             <h3>Query Parameters</h3>
             <table className="docs-table">

@@ -13,10 +13,14 @@ selects the node and flies the camera to it at a comfortable zoom.
 - The first time a user opens search, a small hint explains that a LinkedIn profile URL can
   be pasted there to add that person to the board. The hint is tracked locally and only
   appears once per browser.
-- Typing filters live: people match on name, owning circle path, notes (including Position/Headline), and saved
-  connections; circles match on name and path. People are listed first, then circles
-  (labelled "Circle"); results are capped at 8. Subtitles show `Circle › … · role` when available.
-- Signed-in users can type natural-language queries (multi-word or `at`/`in`/`в` scopes). After a short pause the app calls `POST /v1/search/smart` and replaces results with AI-ranked matches. See [`smart-search.md`](smart-search.md).
+- Typing filters live with deterministic hybrid ranking. People and circles are indexed
+  in memory for the query, then separate exact-name, name-token, role/headline, notes,
+  circle-path, link, and coverage arms are fused with an RRF-style score. People are
+  listed first unless the query asks for circles/tags; results are capped at 8. Subtitles
+  show `Circle › … · role` when available.
+- Signed-in users can type natural-language queries, including multi-word and scoped
+  queries. After a short pause the app calls `POST /v1/search/smart` and replaces results
+  with AI-ranked matches. See [`smart-search.md`](smart-search.md).
 - Pasting a LinkedIn profile URL (`linkedin.com/in/...` or `linkedin.com/pub/...`)
   shows an "Add LinkedIn profile" action at the top of results. Clicking it, or
   pressing Enter while it is first, imports the profile into the board.
@@ -86,3 +90,5 @@ Reuses the Material 3 chrome language (see [`../DESIGN_SYSTEM.md`](../DESIGN_SYS
 ## Open questions / TODO
 
 - Highlighting the matched substring in results.
+- Move signed-in search from per-request JSONB scans to persisted projection tables once
+  the fast search plan lands.

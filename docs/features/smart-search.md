@@ -14,8 +14,9 @@ interpret intent and a local ranker to search the graph hierarchy.
   suggestion chips.
 - Each AI result can include an `aiReason` citing notes or circle context.
 - Local keyword results still appear instantly as a fallback until AI finishes.
-- The ranker uses circle paths (company circles, nested subsets), note bodies, Position/Headline
-  notes, and link text. Results show `Circle › … · Role` subtitles.
+- The deterministic ranker uses separate exact-name, name-token, role/headline, notes,
+  circle-path, link, and coverage arms with RRF-style fusion. Results show
+  `Circle › … · Role` subtitles.
 - If AI is unavailable, the server falls back to the same local intent parser.
 - CLI: `datanode search:smart "product managers at Meta"`. MCP: `smart_search_people_and_circles`.
 
@@ -40,3 +41,5 @@ interpret intent and a local ranker to search the graph hierarchy.
 
 - Optional pgvector semantic rerank for fuzzy note matching.
 - Highlight matched substrings in result rows.
+- Replace the current fixed analyze/match/retry AI pipeline with the visible model/tool
+  loop described in [`fast-agentic-search.md`](fast-agentic-search.md).
