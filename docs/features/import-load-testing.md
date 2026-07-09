@@ -33,6 +33,10 @@ not thousands of per-contact database writes.
   `Origin Context`, `AI Event Context`, and `Action Items`. Professional title
   classification stays in the deterministic import notes so AI context progress reflects
   relationship-oriented context.
+- Automatic archive AI enrichment is scoped to the new data in the current ZIP upload.
+  Re-imports compare the latest in-memory archive with the previous successful upload:
+  new `Connections.csv` rows add new people to the scope, and new message, invitation, or
+  post rows add existing matched people to the scope. Old archive rows are not rechecked.
 - Message and invitation excerpts sent to the archive enrichment Edge Function include
   exact matched `personIds` when the browser can resolve them from profile URLs, names, or
   profile slugs. Message context is capped per batch with a per-person balance so one long

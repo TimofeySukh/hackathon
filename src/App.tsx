@@ -224,6 +224,7 @@ type LinkedInConnectionsImportResult = {
   importedPeople: number
   importedCompanies: number
   enrichedPeople: number
+  importedPersonIds: string[]
 }
 
 type LinkedInConnectionsHeaders = {
@@ -283,6 +284,11 @@ type LinkedInArchiveEnrichmentRun = {
   id: number
   controller: AbortController
   expectedRevision: number | null
+}
+
+type LinkedInArchiveEnrichmentScope = {
+  personIds?: string[]
+  previousArchive?: LinkedInArchiveZipTexts | null
 }
 
 type PanState = {
@@ -1606,6 +1612,7 @@ function App() {
   const linkedInGuidePanelRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const linkedInArchiveCacheRef = useRef<LinkedInArchiveZipTexts | null>(null)
+  const linkedInLastImportedArchiveRef = useRef<LinkedInArchiveZipTexts | null>(null)
   const linkedInArchiveEnrichmentRunIdRef = useRef(0)
   const linkedInArchiveEnrichmentControllerRef = useRef<AbortController | null>(null)
   const graphFileInputRef = useRef<HTMLInputElement>(null)
@@ -1896,6 +1903,7 @@ function App() {
     const file = event.target.files?.[0]
     if (!file) return
     if (isImportingLinkedInZip) return
+    const previousArchive = linkedInArchiveCacheRef.current ?? linkedInLastImportedArchiveRef.current
     cancelLinkedInArchiveEnrichment()
     setIsImportingLinkedInZip(true)
     setLinkedInArchiveAiProgress(null)
@@ -1914,6 +1922,7 @@ function App() {
       pushHistory()
       await persistGraphImmediately(result.graph)
       linkedInArchiveCacheRef.current = archive
+      linkedInLastImportedArchiveRef.current = archive
       setLinkedInArchiveAiProgress({
         phase: 'done',
         current: 1,
@@ -1925,7 +1934,10 @@ function App() {
 
       const enrichmentSummary = result.enrichedPeople > 0 ? ` Added context notes for ${result.enrichedPeople} people.` : ''
       if (auth.status === 'authenticated') {
-        void runLinkedInContextEnrichment(archive, result.graph)
+        void runLinkedInContextEnrichment(archive, result.graph, {
+          personIds: result.importedPersonIds,
+          previousArchive,
+        })
       } else {
         alert(`LinkedIn data imported successfully: ${result.importedPeople} people across ${result.importedCompanies} companies.${enrichmentSummary}`)
       }
@@ -1939,7 +1951,11 @@ function App() {
     }
   }
 
-  async function runLinkedInContextEnrichment(archive: LinkedInArchiveZipTexts, sourceGraph: GraphState = graphRef.current) {
+  async function runLinkedInContextEnrichment(
+    archive: LinkedInArchiveZipTexts,
+    sourceGraph: GraphState = graphRef.current,
+    scope?: LinkedInArchiveEnrichmentScope,
+  ) {
     if (auth.status !== 'authenticated') {
       alert('Sign in to add AI context from a LinkedIn ZIP.')
       return
@@ -1961,6 +1977,8 @@ function App() {
         messagesText: archive.messagesText,
         invitationsText: archive.invitationsText,
         postsTexts: [archive.sharesText, archive.richMediaText],
+        personIds: scope?.personIds,
+        previousArchive: scope?.previousArchive,
       })
       if (!isLinkedInArchiveEnrichmentRunCurrent(run)) return
       const aiResult = await enrichLinkedInArchiveGraph(
@@ -2026,6 +2044,7 @@ function App() {
     const file = event.target.files?.[0]
     if (!file) return
     cancelLinkedInArchiveEnrichment()
+    linkedInLastImportedArchiveRef.current = null
 
     try {
       const parsed = JSON.parse(await file.text()) as unknown
@@ -2070,6 +2089,7 @@ function App() {
     const confirmed = window.confirm('Clear the current graph? This removes all circles, people, notes, and connections.')
     if (!confirmed) return
     cancelLinkedInArchiveEnrichment()
+    linkedInLastImportedArchiveRef.current = null
     const nextGraph = auth.status === 'authenticated' && auth.session
       ? stampYouIdentity(createFreshGraph(), auth.session.user)
       : createFreshGraph()
@@ -8043,18 +8063,196 @@ function buildLinkedInArchiveConnectionsForLlm(graph: GraphState, connectionsTex
   }).filter((connection): connection is LinkedInArchiveConnectionInput => connection !== null)
 }
 
+function buildLinkedInArchiveConnectionRowKeys(connectionsText: string) {
+  const rows = parseCSV(connectionsText)
+  const headerIdx = findLinkedInConnectionsHeader(rows)
+  if (headerIdx === -1) return new Map<string, string>()
+
+  const headers = rows[headerIdx].map((cell) => cell.toLowerCase().replace(/\s+/g, ''))
+  const importHeaders: LinkedInConnectionsHeaders = {
+    firstNameIdx: headers.indexOf('firstname'),
+    lastNameIdx: headers.indexOf('lastname'),
+    companyIdx: headers.indexOf('company'),
+    positionIdx: headers.indexOf('position'),
+    urlIdx: headers.indexOf('url'),
+    emailIdx: headers.indexOf('emailaddress'),
+    connectedOnIdx: headers.indexOf('connectedon'),
+  }
+
+  const keys = new Map<string, string>()
+  for (const row of rows.slice(headerIdx + 1)) {
+    const firstName = readCsvIndex(row, importHeaders.firstNameIdx)
+    const lastName = readCsvIndex(row, importHeaders.lastNameIdx)
+    const name = `${firstName} ${lastName}`.trim()
+    if (!name) continue
+    const profileUrl = readCsvIndex(row, importHeaders.urlIdx)
+    const key = [
+      profileUrl ? normalizeLinkedInProfileUrl(profileUrl) ?? profileUrl : '',
+      name,
+      readCsvIndex(row, importHeaders.companyIdx),
+      readCsvIndex(row, importHeaders.positionIdx),
+      readCsvIndex(row, importHeaders.connectedOnIdx),
+    ].map((value) => value.trim().toLowerCase()).join('\n')
+    keys.set(key, `linkedin-person-${slugifyId(name)}`)
+  }
+  return keys
+}
+
+function uniqueArchiveItems<T>(items: T[], getKey: (item: T) => string) {
+  const seen = new Set<string>()
+  return items.filter((item) => {
+    const key = getKey(item)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+function filterNewArchiveItems<T>(current: T[], previous: T[], getKey: (item: T) => string) {
+  const previousKeys = new Set(previous.map(getKey))
+  return current.filter((item) => !previousKeys.has(getKey(item)))
+}
+
+function archiveMessageKey(message: LinkedInArchiveMessageInput) {
+  return [
+    message.conversationId,
+    message.date,
+    message.from,
+    message.senderProfileUrl,
+    message.to,
+    message.recipientProfileUrls,
+    message.participants,
+    message.content,
+  ].map((value) => (value ?? '').trim().toLowerCase()).join('\n')
+}
+
+function archiveInvitationKey(invitation: LinkedInArchiveInvitationInput) {
+  return [
+    invitation.sentAt,
+    invitation.from,
+    invitation.to,
+    invitation.message,
+  ].map((value) => (value ?? '').trim().toLowerCase()).join('\n')
+}
+
+function archivePostKey(post: LinkedInArchivePostInput) {
+  return [post.date, post.description].map((value) => (value ?? '').trim().toLowerCase()).join('\n')
+}
+
+function addMatchedPersonIds(items: Array<{ personIds?: string[] }>, personIds: Set<string>) {
+  for (const item of items) {
+    for (const personId of item.personIds ?? []) {
+      personIds.add(personId)
+    }
+  }
+}
+
+function findPersonIdsAffectedByPosts(posts: LinkedInArchivePostInput[], connections: LinkedInArchiveConnectionInput[]) {
+  const personIds = new Set<string>()
+  if (posts.length === 0 || connections.length === 0) return personIds
+
+  for (const connection of connections) {
+    if (filterPostsForConnections(posts, [connection]).length > 0) {
+      personIds.add(connection.personId)
+    }
+  }
+  return personIds
+}
+
+function messageDirectProfilePersonIds(message: LinkedInArchiveMessageInput, connections: LinkedInArchiveConnectionInput[]) {
+  const senderUrl = normalizeLinkedInMatchValue(message.senderProfileUrl ?? '')
+  const recipientUrls = normalizeLinkedInMatchValue(message.recipientProfileUrls ?? '')
+  if (!senderUrl && !recipientUrls) return []
+
+  return connections
+    .filter((connection) => {
+      const profileUrl = connection.profileUrl ? normalizeLinkedInMatchValue(connection.profileUrl) : ''
+      return Boolean(profileUrl && (senderUrl === profileUrl || recipientUrls.includes(profileUrl)))
+    })
+    .map((connection) => connection.personId)
+}
+
 function buildLinkedInArchiveLlmContext(input: {
   graph: GraphState
   connectionsText: string
   messagesText: string | null
   invitationsText: string | null
   postsTexts: Array<string | null>
+  personIds?: string[]
+  previousArchive?: LinkedInArchiveZipTexts | null
 }): LinkedInArchiveLlmContext {
+  const allConnections = buildLinkedInArchiveConnectionsForLlm(input.graph, input.connectionsText)
+  const currentMessages = parseLinkedInMessagesCsv(input.messagesText)
+  const currentInvitations = parseLinkedInInvitationsCsv(input.invitationsText)
+  const currentPosts = input.postsTexts.flatMap((postsText) => parseLinkedInPostsForLlm(postsText))
+
+  const scopedPersonIds = input.personIds ? new Set(input.personIds) : null
+  if (!input.previousArchive) {
+    return {
+      connections: allConnections.filter((connection) => !scopedPersonIds || scopedPersonIds.has(connection.personId)),
+      messages: currentMessages,
+      invitations: currentInvitations,
+      posts: currentPosts,
+    }
+  }
+
+  const previousConnectionKeys = buildLinkedInArchiveConnectionRowKeys(input.previousArchive.connectionsText)
+  const currentConnectionKeys = buildLinkedInArchiveConnectionRowKeys(input.connectionsText)
+  const newConnectionPersonIds = new Set<string>()
+  for (const [key, personId] of currentConnectionKeys) {
+    if (!previousConnectionKeys.has(key)) newConnectionPersonIds.add(personId)
+  }
+  const affectedPersonIds = new Set(
+    (input.personIds ?? []).filter((personId) => newConnectionPersonIds.has(personId)),
+  )
+  const importedConnections = allConnections.filter((connection) => affectedPersonIds.has(connection.personId))
+
+  const previousMessages = parseLinkedInMessagesCsv(input.previousArchive.messagesText)
+  const newMessages = filterNewArchiveItems(currentMessages, previousMessages, archiveMessageKey)
+  const messagesWithDirectProfileIds = newMessages.map((message) => {
+    const personIds = messageDirectProfilePersonIds(message, allConnections)
+    return personIds.length > 0 ? { ...message, personIds } : message
+  })
+  const directProfileMessages = messagesWithDirectProfileIds
+    .filter((message) => (message.personIds?.length ?? 0) > 0)
+  const looseMatchedMessages = filterMessagesForConnections(
+    messagesWithDirectProfileIds.filter((message) => (message.personIds?.length ?? 0) === 0),
+    allConnections,
+  )
+  const matchedNewMessages = [...directProfileMessages, ...looseMatchedMessages]
+  addMatchedPersonIds(matchedNewMessages, affectedPersonIds)
+
+  const previousInvitations = parseLinkedInInvitationsCsv(input.previousArchive.invitationsText)
+  const newInvitations = filterNewArchiveItems(currentInvitations, previousInvitations, archiveInvitationKey)
+  const matchedNewInvitations = filterInvitationsForConnections(newInvitations, allConnections)
+  addMatchedPersonIds(matchedNewInvitations, affectedPersonIds)
+
+  const previousPosts = [
+    input.previousArchive.sharesText,
+    input.previousArchive.richMediaText,
+  ].flatMap((postsText) => parseLinkedInPostsForLlm(postsText))
+  const newPosts = filterNewArchiveItems(currentPosts, previousPosts, archivePostKey)
+  for (const personId of findPersonIdsAffectedByPosts(newPosts, allConnections)) {
+    affectedPersonIds.add(personId)
+  }
+
+  const importedMessages = importedConnections.length > 0
+    ? filterMessagesForConnections(currentMessages, importedConnections)
+    : []
+  const importedInvitations = importedConnections.length > 0
+    ? filterInvitationsForConnections(currentInvitations, importedConnections)
+    : []
+  const importedPosts = importedConnections.length > 0
+    ? filterPostsForConnections(currentPosts, importedConnections)
+    : []
+
+  const connections = allConnections.filter((connection) => affectedPersonIds.has(connection.personId))
+
   return {
-    connections: buildLinkedInArchiveConnectionsForLlm(input.graph, input.connectionsText),
-    messages: parseLinkedInMessagesCsv(input.messagesText),
-    invitations: parseLinkedInInvitationsCsv(input.invitationsText),
-    posts: input.postsTexts.flatMap((postsText) => parseLinkedInPostsForLlm(postsText)),
+    connections,
+    messages: uniqueArchiveItems([...matchedNewMessages, ...importedMessages], archiveMessageKey),
+    invitations: uniqueArchiveItems([...matchedNewInvitations, ...importedInvitations], archiveInvitationKey),
+    posts: uniqueArchiveItems([...newPosts, ...importedPosts], archivePostKey),
   }
 }
 
@@ -8097,13 +8295,19 @@ function filterMessagesForConnections(messages: LinkedInArchiveMessageInput[], c
     const recipientUrls = normalizeLinkedInMatchValue(message.recipientProfileUrls ?? '')
     const directProfileMatch = profileUrls.some((url) => senderUrl === url || recipientUrls.includes(url))
     const participantText = `${message.from ?? ''} ${message.to ?? ''} ${message.participants ?? ''} ${message.senderProfileUrl ?? ''} ${message.recipientProfileUrls ?? ''}`
-    const matchText = participantText.trim() ? participantText : message.content
+    const hasParticipantText = Boolean(participantText.trim())
     const personIds = connections.filter((connection) => {
       const normalizedProfileUrl = connection.profileUrl ? normalizeLinkedInMatchValue(connection.profileUrl) : ''
+      const profileMatches = directProfileMatch && normalizedProfileUrl && (senderUrl === normalizedProfileUrl || recipientUrls.includes(normalizedProfileUrl))
+      if (profileMatches) return true
+      if (hasParticipantText) {
+        return textMentionsName(participantText, connection.name) ||
+          textMentionsLinkedInSlug(participantText, connection.profileUrl)
+      }
       return (directProfileMatch && normalizedProfileUrl && (senderUrl === normalizedProfileUrl || recipientUrls.includes(normalizedProfileUrl))) ||
-        textMentionsName(matchText, connection.name) ||
-        textMentionsNameLoosely(matchText, connection.name) ||
-        textMentionsLinkedInSlug(matchText, connection.profileUrl)
+        textMentionsName(message.content, connection.name) ||
+        textMentionsNameLoosely(message.content, connection.name) ||
+        textMentionsLinkedInSlug(message.content, connection.profileUrl)
     }).map((connection) => connection.personId)
     return personIds.length > 0 ? { ...message, personIds } : null
   }).filter((message): message is LinkedInArchiveMessageInput => message !== null)
@@ -8398,6 +8602,7 @@ async function buildLinkedInConnectionsGraph(
   let importedPeople = 0
   let importedCompanies = 0
   let enrichedPeople = 0
+  const importedPersonIds: string[] = []
 
   // Plan every company up front: its id, whether it already exists, and the radius
   // it needs to hold its members (sunflower-packed). New companies are then placed
@@ -8540,6 +8745,7 @@ async function buildLinkedInConnectionsGraph(
       existingPersonIds.add(personId)
       personIndexById.set(personId, nextPeople.length - 1)
       importedPeople += 1
+      importedPersonIds.push(personId)
       if (contextNotes.length > 0) enrichedPeople += 1
       slot += 1
 
@@ -8566,6 +8772,7 @@ async function buildLinkedInConnectionsGraph(
     importedPeople,
     importedCompanies,
     enrichedPeople,
+    importedPersonIds,
   }
 }
 

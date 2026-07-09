@@ -277,14 +277,15 @@ function buildSharesCsv() {
   ].map((row) => row.map(csvCell).join(',')).join('\n')
 }
 
-function buildMessagesCsv() {
+function buildMessagesCsv({ includeIncrementalFirstPersonMessage = false } = {}) {
   const rows = [
-    ['CONVERSATION ID', 'FROM', 'TO', 'DATE', 'CONTENT'],
+    ['CONVERSATION ID', 'FROM', 'SENDER PROFILE URL', 'TO', 'DATE', 'CONTENT'],
   ]
   for (let index = 0; index < 200; index += 1) {
     rows.push([
       'conversation-1',
       'Persist1 Person1',
+      'https://www.linkedin.com/in/persist-person-1',
       'Me',
       '2026-06-14',
       `Long thread message ${index + 1} about product discovery and follow-up.`,
@@ -293,10 +294,21 @@ function buildMessagesCsv() {
   rows.push([
     'conversation-3',
     'Persist3 Person3',
+    'https://www.linkedin.com/in/persist-person-3',
     'Me',
     '2026-06-15',
     'We discussed the roadmap, implementation details, and a concrete follow-up meeting.',
   ])
+  if (includeIncrementalFirstPersonMessage) {
+    rows.push([
+      'conversation-1',
+      'Persist1 Person1',
+      'https://www.linkedin.com/in/persist-person-1',
+      'Me',
+      '2026-06-16',
+      'Incremental re-import message about the follow-up that was not present in the first archive.',
+    ])
+  }
   return rows.map((row) => row.map(csvCell).join(',')).join('\n')
 }
 
@@ -305,7 +317,9 @@ async function buildLinkedInZip(args) {
   const zipWriter = new ZipWriter(new BlobWriter('application/zip'))
   await zipWriter.add('Connections.csv', new TextReader(csv))
   await zipWriter.add('Shares.csv', new TextReader(buildSharesCsv()))
-  await zipWriter.add('messages.csv', new TextReader(buildMessagesCsv()))
+  await zipWriter.add('messages.csv', new TextReader(buildMessagesCsv({
+    includeIncrementalFirstPersonMessage: Boolean(args.includeIncrementalFirstPersonMessage),
+  })))
   await zipWriter.add('guide_messages.csv', new TextReader('CONVERSATION ID,CONVERSATION TITLE,FROM,SENDER PROFILE URL,TO,RECIPIENT PROFILE URLS,DATE,SUBJECT,CONTENT,FOLDER\n'))
   const blob = await zipWriter.close()
   return Buffer.from(await blob.arrayBuffer())
@@ -445,12 +459,16 @@ async function waitForImportedPeople(mock, expectedPeople) {
 }
 
 async function waitForEnrichmentRequest(mock) {
+  return waitForEnrichmentRequestCount(mock, 1)
+}
+
+async function waitForEnrichmentRequestCount(mock, expectedCount) {
   const startedAt = Date.now()
   while (Date.now() - startedAt < 60000) {
-    if (mock.state.enrichmentRequests.length > 0) return mock.state.enrichmentRequests[0]
+    if (mock.state.enrichmentRequests.length >= expectedCount) return mock.state.enrichmentRequests[expectedCount - 1]
     await new Promise((resolve) => setTimeout(resolve, 100))
   }
-  throw new Error('Timed out waiting for LinkedIn archive enrichment request.')
+  throw new Error(`Timed out waiting for ${expectedCount} LinkedIn archive enrichment request(s).`)
 }
 
 async function waitForGraphPerson(mock, personId) {
@@ -566,11 +584,41 @@ async function main() {
       throw new Error(`ZIP import used only one LinkedIn company tone: ${JSON.stringify([...importedCompanyTones])}.`)
     }
 
+    const incrementalZipBuffer = await buildLinkedInZip({
+      people: args.people + 1,
+      companies: args.companies,
+      includeIncrementalFirstPersonMessage: true,
+    })
+    await page.locator('input[type="file"][accept=".zip"]').setInputFiles({
+      name: 'linkedin-incremental-persistence-test.zip',
+      mimeType: 'application/zip',
+      buffer: incrementalZipBuffer,
+    })
+    await waitForImportedPeople(mock, args.people + 1)
+    const incrementalEnrichmentRequest = await waitForEnrichmentRequestCount(mock, 2)
+    const expectedNewPersonId = `linkedin-person-persist${args.people + 1}-person${args.people + 1}`
+    const incrementalConnectionIds = (incrementalEnrichmentRequest.connections ?? []).map((connection) => connection.personId)
+    const expectedIncrementalConnectionIds = new Set(['linkedin-person-persist1-person1', expectedNewPersonId])
+    if (
+      incrementalConnectionIds.length !== expectedIncrementalConnectionIds.size ||
+      incrementalConnectionIds.some((personId) => !expectedIncrementalConnectionIds.has(personId))
+    ) {
+      throw new Error(`Re-import AI request did not include exactly new people plus people with new archive rows: ${JSON.stringify(incrementalConnectionIds)}.`)
+    }
+    const incrementalFirstPersonMessage = incrementalEnrichmentRequest.messages?.find((message) =>
+      Array.isArray(message.personIds) &&
+      message.personIds.includes('linkedin-person-persist1-person1') &&
+      String(message.content ?? '').includes('Incremental re-import message')
+    )
+    if (!incrementalFirstPersonMessage) {
+      throw new Error(`Re-import AI request did not include the new message for an existing connection: ${JSON.stringify(incrementalEnrichmentRequest.messages ?? [])}.`)
+    }
+
     const readsBeforeReload = mock.state.reads
     await page.reload({ waitUntil: 'networkidle' })
     await waitForGraphRead(mock, readsBeforeReload + 1)
 
-    if (mock.state.graph?.people?.length !== args.people) {
+    if (mock.state.graph?.people?.length !== args.people + 1) {
       throw new Error('ZIP import did not survive reload in mock persistence.')
     }
 

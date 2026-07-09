@@ -17,6 +17,16 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-07-09 — LinkedIn archive AI re-imports are incremental
+
+- Decision: Automatic `enrich-linkedin-archive` runs after ZIP import are scoped to new
+  archive rows from that upload. Re-importing an expanded archive still merges
+  deterministic graph data, but the server-side AI request checks only newly added
+  connections plus existing people matched by new messages, invitations, or posts.
+- Why: LinkedIn exports are cumulative. Re-running LLM analysis over every old contact and
+  old message/post on each upload wastes time and money, and makes small updates behave
+  like a full archive refresh.
+
 ### 2026-07-07 — Graph imports cancel LinkedIn archive AI sync
 
 - Decision: A new LinkedIn ZIP import, graph JSON import, or graph clear invalidates and
