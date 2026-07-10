@@ -189,7 +189,6 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
                   <span className="archive-step__number">{step.number}</span>
                   <h3>{step.title}</h3>
                   <p>{step.body}</p>
-                  <span className="archive-step__action">Open your board <span aria-hidden="true">→</span></span>
                 </button>
               ))}
             </div>
