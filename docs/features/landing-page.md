@@ -17,20 +17,22 @@ inventory:
 
 1. **Hero — relationship intelligence.** The headline is `Your network is full of
    answers. Stop losing them.` A real board screenshot with the person inspector open
-   makes the product immediately legible. The hero states the visual graph value and
-   includes three concise benefits.
-2. **From archive to action.** A LinkedIn ZIP becomes derived relationship context on
-   people. The visible workflow is `Upload archive → Keep context → Move with clarity`.
+   makes the product immediately legible. The hero has one board-first action and no
+   founder-audience label or secondary import CTA.
+2. **Board-first workflow.** The visible workflow is `Open your board → Map what matters
+   → Keep context close`. Each same-height workflow card opens the guided board. The
+   LinkedIn ZIP is explained only as a later Settings action for signed-in boards.
 3. **Find people by what matters.** Smart Search is presented with founder-relevant query
-   examples and the explanation that names, circles, and notes make a result relevant.
-   It is clearly marked as a signed-in feature.
+   examples and a denser multi-result surface showing how notes, circles, links, and
+   history make a result relevant. It is clearly marked as a signed-in feature.
 4. **Keep the relationship usable.** Rounded, slightly offset note cards echo the board's
-   person notes and show the kind of relationship context worth preserving.
+   person notes and show the kind of relationship context worth preserving. They align in
+   a compact grid and lift on hover.
 5. **Built for agent workflows.** MCP, CLI, and API are a visible advanced workflow.
    This section links to the existing developer documentation rather than duplicating
    setup instructions.
 6. **Closing CTA.** The final prompt is outcome-led: `Ready to get the context out of your
-   head?`
+   head?` and repeats only `Open your board`.
 
 ## Archive processing claims
 
@@ -52,24 +54,19 @@ All landing copy must remain aligned with the implementation:
 one-time onboarding session flag and navigates to `#board`, so the guided board opens even
 for a returning browser that previously completed onboarding.
 
-### Import LinkedIn archive
-
-`Import LinkedIn archive` is the supporting CTA in the hero, archive, and final section.
-It writes a one-time session flag and navigates to `#board`. The board consumes that flag,
-opens the existing Settings panel, and shows the LinkedIn Data Import surface. It does not
-start an upload, enrichment, or sign-in flow by itself.
-
-If session storage is unavailable, both CTA handlers still navigate to the board's normal
-entry state.
+There is no landing CTA that opens archive import. Import stays a later signed-in Settings
+action inside the product, after the visitor has entered the board and completed or skipped
+the standard guide. If session storage is unavailable, the board CTA still navigates to the
+normal board entry state.
 
 ## Visual direction
 
 - Use the existing board-and-inspector screenshot as the main product visual; it is a
-  preview, not an interactive element.
-- Use light surfaces, blue primary accents, calm shadows, and spacious typography.
-- The archive workflow uses three clear cards, not generic feature-grid filler.
-- Person-note inspired cards may have small desktop rotations and horizontal offsets; on
-  phone widths they stack cleanly with no translated geometry.
+  large preview, not an interactive element.
+- Use light surfaces, blue primary accents, calm shadows, and dense, useful product proof.
+- The board-first workflow uses three clear, same-height interactive cards rather than
+  generic feature-grid filler; their only destination is the board.
+- Person-note inspired cards align in a compact desktop grid and stack cleanly on phones.
 - Keep the page light. A compact console-like panel may support the agent-access section,
   but the landing must not become a dark developer landing page.
 

@@ -17,6 +17,17 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-07-10 — Founder landing is board-first, not import-first
+
+- Decision: Remove every direct LinkedIn archive CTA from the landing. All landing actions
+  now open the guided board; archive import remains an optional signed-in Settings step.
+- Decision: Replace blue overline pills and a colored archive callout with denser product
+  proof: a larger real board preview, aligned hoverable workflow and note cards, a
+  multi-result search surface, and a larger agent-access console.
+- Why: Visitors should understand and experience the board before considering data import.
+  The prior composition made the page feel sparse while giving archive import too much
+  prominence.
+
 ### 2026-07-10 — Founder landing leads with relationship context
 
 - Decision: Rework the landing around a founder workflow: LinkedIn ZIP archive → derived

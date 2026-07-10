@@ -572,7 +572,6 @@ const PERSON_DOUBLE_TAP_DISTANCE = 28
 const SEARCH_LINKEDIN_HINT_KEY = 'social-search-linkedin-hint-seen-v1'
 const BOARD_ONBOARDING_STORAGE_KEY = 'social-board-onboarding-done-v3'
 const BOARD_ONBOARDING_FORCE_KEY = 'social-board-onboarding-open-v3'
-const BOARD_LINKEDIN_IMPORT_OPEN_KEY = 'social-board-linkedin-import-open-v1'
 const ONBOARDING_COMPLETE_DELAY_MS = 1000
 const ONBOARDING_DOCK_GAP_PX = 12
 const ONBOARDING_TOP_CHROME_CLEARANCE_PX = 72
@@ -1348,7 +1347,6 @@ function App() {
   const onboardingStepRef = useRef(onboardingStep)
   const completedOnboardingStepRef = useRef(completedOnboardingStep)
   const onboardingDecidedRef = useRef(false)
-  const importEntryRequestedRef = useRef(false)
   const onboardingAdvanceTimerRef = useRef<number | null>(null)
   const appShellRef = useRef<HTMLElement>(null)
   const inspectorPanelRef = useRef<HTMLElement>(null)
@@ -1375,14 +1373,6 @@ function App() {
 
     setBoardToolMode('edit')
   }, [boardToolMode, isTouchLayout])
-
-  useEffect(() => {
-    if (viewMode !== 'board') return
-    if (!consumeSessionFlag(BOARD_LINKEDIN_IMPORT_OPEN_KEY)) return
-
-    importEntryRequestedRef.current = true
-    setShowSettings(true)
-  }, [viewMode])
 
   useLayoutEffect(() => {
     onboardingStepRef.current = onboardingStep
@@ -1459,7 +1449,6 @@ function App() {
     if (viewMode !== 'board') return
     if (!graphLoaded || auth.status === 'loading') return
     onboardingDecidedRef.current = true
-    if (importEntryRequestedRef.current) return
     const forced = consumeSessionFlag(BOARD_ONBOARDING_FORCE_KEY)
     if (!forced && hasLocalFlag(BOARD_ONBOARDING_STORAGE_KEY)) return
     const frame = window.requestAnimationFrame(() => {

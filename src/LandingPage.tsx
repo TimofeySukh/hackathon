@@ -3,29 +3,22 @@ import sdnLogo from './assets/sdn-logo.svg'
 import productBoardInspector from './assets/landing/product-board-inspector.png'
 
 const BOARD_ONBOARDING_FORCE_KEY = 'social-board-onboarding-open-v3'
-const BOARD_LINKEDIN_IMPORT_OPEN_KEY = 'social-board-linkedin-import-open-v1'
 
-const HERO_POINTS = [
-  'Map the people who matter before the next opportunity arrives.',
-  'Turn an archive into the relationship context that changes your next move.',
-  'Let MCP-aware agents work from the graph you actually use.',
-] as const
-
-const ARCHIVE_STEPS = [
+const BOARD_WORKFLOW_STEPS = [
   {
     number: '01',
-    title: 'Upload the archive',
-    body: 'Start with the LinkedIn ZIP you already have. Connections, messages, invitations, and posts become useful signals—not another inbox to manage.',
+    title: 'Open your board',
+    body: 'Start with the guided board. Place the first person, learn the controls, and give the relationship a visible home.',
   },
   {
     number: '02',
-    title: 'Keep the context',
-    body: 'For signed-in imports, AI turns relevant signals into derived notes on the right people, so the reason a relationship matters stays attached to it.',
+    title: 'Map what matters',
+    body: 'Use circles for companies, communities, projects, and the people who can move the next conversation forward.',
   },
   {
     number: '03',
-    title: 'Move with clarity',
-    body: 'Search the graph, open the person, and act with the introductions, history, and follow-ups already in view.',
+    title: 'Keep context close',
+    body: 'Attach the introductions, history, and follow-ups to the person, then find the reason before you need it.',
   },
 ] as const
 
@@ -53,6 +46,27 @@ const SEARCH_EXAMPLES = [
   'Recruiters I spoke with about product roles',
 ] as const
 
+const SEARCH_MATCHES = [
+  {
+    initials: 'FC',
+    title: 'Founder conversation',
+    body: 'A note and circle membership point back to a conversation before fundraising.',
+    tag: 'Notes + circle',
+  },
+  {
+    initials: 'PL',
+    title: 'Product leadership context',
+    body: 'A company circle and linked follow-up make the relevant connection easy to surface.',
+    tag: 'Company + link',
+  },
+  {
+    initials: 'RT',
+    title: 'Recruiting thread',
+    body: 'Relationship history keeps the right role and previous conversation together.',
+    tag: 'History + note',
+  },
+] as const
+
 const AGENT_CAPABILITIES = [
   ['MCP', 'Let compatible AI tools read and update the same graph.'],
   ['CLI', 'Query relationship context from the terminal.'],
@@ -75,16 +89,6 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
     event.preventDefault()
     try {
       window.sessionStorage.setItem(BOARD_ONBOARDING_FORCE_KEY, '1')
-    } catch {
-      // Navigation still provides the standard board entry point when storage is unavailable.
-    }
-    window.location.hash = '#board'
-  }
-
-  const handleOpenLinkedInImport = (event: MouseEvent) => {
-    event.preventDefault()
-    try {
-      window.sessionStorage.setItem(BOARD_LINKEDIN_IMPORT_OPEN_KEY, '1')
     } catch {
       // Navigation still provides the standard board entry point when storage is unavailable.
     }
@@ -144,42 +148,26 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
         <section className="founder-hero" aria-labelledby="landing-title">
           <div className="founder-hero__layout">
             <div className="founder-hero__copy">
-              <span className="founder-eyebrow">Relationship intelligence for founders</span>
               <h1 id="landing-title" className="founder-hero__title">
                 Your network is full of answers. <span>Stop losing them.</span>
               </h1>
               <p className="founder-hero__lead">
-                Social Datanode turns people, conversations, and follow-ups into a working relationship graph—so you know who to call before the next move.
+                Social Datanode turns people, notes, and follow-ups into a working relationship graph—so you know who to call before the next move.
               </p>
-              <ul className="founder-hero__points">
-                {HERO_POINTS.map((point) => (
-                  <li key={point}>{point}</li>
-                ))}
-              </ul>
               <div className="founder-hero__actions">
                 <button type="button" className="lp-btn lp-btn-filled founder-hero__primary" onClick={handleLaunchBoard}>
                   Open your board
                 </button>
-                <button type="button" className="lp-btn lp-btn-outlined founder-hero__secondary" onClick={handleOpenLinkedInImport}>
-                  Import LinkedIn archive
-                </button>
               </div>
-              <p className="founder-hero__reassurance">Start with one person—or with the relationships you already have.</p>
+              <p className="founder-hero__reassurance">A short guide gets your first board moving.</p>
             </div>
 
-            <figure className="founder-product-frame" aria-labelledby="product-preview-caption">
+            <figure className="founder-product-frame">
               <img
                 src={productBoardInspector}
                 alt="Social Datanode board with people grouped by company and the person inspector open"
                 className="founder-product-frame__image"
               />
-              <figcaption id="product-preview-caption" className="founder-product-frame__caption">
-                <span>Visual graph</span>
-                <span aria-hidden="true">•</span>
-                <span>Relationship context</span>
-                <span aria-hidden="true">•</span>
-                <span>Next action</span>
-              </figcaption>
             </figure>
           </div>
         </section>
@@ -188,38 +176,31 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
           <div className="founder-section__inner">
             <div className="founder-section__header founder-section__header--split">
               <div>
-                <span className="founder-eyebrow">From archive to action</span>
-                <h2 id="archive-title" className="founder-section__title">Turn the history you have into the context you need.</h2>
+                <h2 id="archive-title" className="founder-section__title">Build a relationship map you can use from day one.</h2>
               </div>
               <p className="founder-section__lead">
-                Upload a LinkedIn ZIP once. Social Datanode extracts useful relationship signals and puts the resulting context where it belongs: on people, not in another file.
+                Start with the board, not a data dump. The guide gets you moving; people, circles, notes, and links make every next conversation easier to act on.
               </p>
             </div>
 
-            <div className="archive-flow" aria-label="LinkedIn archive enrichment workflow">
-              {ARCHIVE_STEPS.map((step) => (
-                <article key={step.number} className="archive-step">
+            <div className="archive-flow" aria-label="Board-first relationship workflow">
+              {BOARD_WORKFLOW_STEPS.map((step) => (
+                <button key={step.number} type="button" className="archive-step" onClick={handleLaunchBoard}>
                   <span className="archive-step__number">{step.number}</span>
                   <h3>{step.title}</h3>
                   <p>{step.body}</p>
-                </article>
+                  <span className="archive-step__action">Open your board <span aria-hidden="true">→</span></span>
+                </button>
               ))}
             </div>
 
-            <div className="archive-assurance">
-              <span className="archive-assurance__mark" aria-hidden="true">↳</span>
-              <p><strong>The archive is not your database.</strong> Uploaded ZIP files and raw messages, invitations, and posts are not saved to the graph; the result is people, connections, and derived context.</p>
-            </div>
-            <button type="button" className="founder-inline-link" onClick={handleOpenLinkedInImport}>
-              Start with a LinkedIn archive <span aria-hidden="true">→</span>
-            </button>
+            <p className="archive-detail">Later, signed-in boards can import a LinkedIn ZIP from Settings. The ZIP and raw messages, invitations, and posts are not stored in the graph; only people, connections, and derived context remain.</p>
           </div>
         </section>
 
         <section className="founder-section" aria-labelledby="search-title">
           <div className="founder-section__inner founder-search-layout">
             <div className="founder-search-copy">
-              <span className="founder-eyebrow">Find people by what matters</span>
               <h2 id="search-title" className="founder-section__title">Search the reason, not just the name.</h2>
               <p className="founder-section__lead">
                 Smart Search reads the names, circles, and notes in your graph to bring the right relationship back into view. Each result can explain the context that made it relevant.
@@ -237,15 +218,18 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
                 <span aria-hidden="true">⌕</span>
                 <span>People I met before fundraising</span>
               </div>
-              <div className="founder-search-proof__result">
-                <div className="founder-search-proof__avatar" aria-hidden="true">AK</div>
-                <div>
-                  <strong>Context found in your graph</strong>
-                  <p>Notes, circle membership, and relationship history make the result explainable.</p>
-                </div>
-                <span className="founder-search-proof__reason">Why it matched</span>
+              <div className="founder-search-proof__results">
+                {SEARCH_MATCHES.map((match) => (
+                  <div key={match.title} className="founder-search-proof__result">
+                    <div className="founder-search-proof__avatar" aria-hidden="true">{match.initials}</div>
+                    <div>
+                      <strong>{match.title}</strong>
+                      <p>{match.body}</p>
+                    </div>
+                    <span className="founder-search-proof__reason">{match.tag}</span>
+                  </div>
+                ))}
               </div>
-              <div className="founder-search-proof__line" aria-hidden="true" />
               <p className="founder-search-proof__caption">The board stays useful after the import—not just beautiful on day one.</p>
             </div>
           </div>
@@ -254,7 +238,6 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
         <section className="founder-section founder-section--notes" aria-labelledby="notes-title">
           <div className="founder-section__inner founder-notes-layout">
             <div className="founder-notes-copy">
-              <span className="founder-eyebrow">Keep the relationship usable</span>
               <h2 id="notes-title" className="founder-section__title">The details that change your next conversation belong with the person.</h2>
               <p className="founder-section__lead">
                 Attach notes, links, action items, and the shape of the relationship to the same visual graph. Context does not disappear into a CRM field or a forgotten chat.
@@ -276,7 +259,6 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
         <section className="founder-section founder-section--agents" aria-labelledby="agents-title">
           <div className="founder-section__inner founder-agent-layout">
             <div className="founder-agent-copy">
-              <span className="founder-eyebrow">Built for agent workflows</span>
               <h2 id="agents-title" className="founder-section__title">Give your agents the context you actually own.</h2>
               <p className="founder-section__lead">
                 Social Datanode is not another isolated prompt. Use MCP, the CLI, or the API to let your tools read and work with the relationship graph behind your decisions.
@@ -305,12 +287,10 @@ export default function LandingPage({ onLogin, onSignUp, isAuthenticated }: Land
         </section>
 
         <section className="founder-closing" aria-labelledby="closing-title">
-          <span className="founder-eyebrow">Ready when you are</span>
           <h2 id="closing-title">Ready to get the context out of your head?</h2>
-          <p>Open a board for the next relationship—or import the history that is already waiting to become useful.</p>
+          <p>Open your board and make the next conversation easier to act on.</p>
           <div className="founder-closing__actions">
             <button type="button" className="lp-btn lp-btn-filled founder-closing__primary" onClick={handleLaunchBoard}>Open your board</button>
-            <button type="button" className="lp-btn lp-btn-outlined" onClick={handleOpenLinkedInImport}>Import LinkedIn archive</button>
           </div>
         </section>
       </main>
