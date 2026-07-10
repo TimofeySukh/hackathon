@@ -71,8 +71,9 @@ Reuses the Material 3 chrome language (see [`../DESIGN_SYSTEM.md`](../DESIGN_SYS
   dropdown fades/slides/scales in, and result rows stagger in by index. Active rows use
   a Material state layer instead of a hard selected outline. On mobile the open field
   grows with `flex: 1` to fill the row left of the gear and the dropdown spans that
-  width. The first-run LinkedIn URL hint uses `primary-container` and the same dropdown
-  elevation/motion as search results.
+  width. The signed-in mobile placeholder is the compact `Ask AI`; wider layouts retain
+  `Ask AI to find someone…`. The first-run LinkedIn URL hint uses `primary-container`
+  and the same dropdown elevation/motion as search results.
 - Known gaps vs. the Material 3 target: no result highlighting of the matched substring.
 
 ## Code

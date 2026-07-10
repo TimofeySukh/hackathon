@@ -17,6 +17,13 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-07-10 — Compact AI search placeholder on touch layouts
+
+- Decision: On touch layouts the signed-in search field displays `Ask AI`; wider layouts
+  keep `Ask AI to find someone…`.
+- Why: The board toolbar reserves room for the mode rail and Settings control, leaving
+  about 133 CSS pixels for input text on a 393px-wide phone. The longer phrase clipped.
+
 ### 2026-07-10 — Founder landing is board-first, not import-first
 
 - Decision: Remove every direct LinkedIn archive CTA from the landing. All landing actions
