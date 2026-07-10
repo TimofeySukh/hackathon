@@ -5806,10 +5806,11 @@ Content-Type: application/json
                     setShowSettings(false)
                     setNewAgentToken(null)
                     setAgentTokenStatus(null)
+                    setAgentSettingsTab('quick')
                     setShowAgentSettings(true)
                   }}
                 >
-                  Manage API keys
+                  Connect MCP
                 </button>
               </div>
             )}

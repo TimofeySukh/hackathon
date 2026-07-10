@@ -7,7 +7,7 @@ Supabase project secrets or allowing access to another user's graph.
 
 ## Behavior
 
-- Signed-in users open Agent API key management from Settings. The key manager is a
+- Signed-in users open MCP settings / Agent API key management by clicking **Connect MCP** in Settings. The key manager is a
   large modal overlay; opening it closes the compact Settings panel.
 - The first tab is **Quick setup** for non-technical users: create a key and copy one
   ready-to-paste instruction for an AI agent.

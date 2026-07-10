@@ -1298,3 +1298,8 @@ rediscover, write it here.
   trackpad scroll pans the board, and trackpad pinch keeps zooming around the pointer.
 - Why: Trackpad users expect two-dimensional scroll gestures to move across an infinite
   canvas, while mouse users expect the physical wheel to control zoom level.
+
+### 2026-07-10 — Rename Agent API Button to Connect MCP
+
+- Decision: Renamed the **Manage API keys** button in the Settings drawer's **Agent API** section to **Connect MCP**, opening the Agent Settings overlay directly on the **Quick setup** tab as before.
+- Why: Simplifies user flow for connecting external tools to their graph by presenting a clearer button name, while maintaining the default quick-access setup workflow.
