@@ -2735,7 +2735,7 @@ function App() {
 
   const isAiSearchActive = auth.status === 'authenticated' && shouldUseSmartSearch(debouncedSearchQuery.trim())
   const searchResults = isAiSearchActive
-    ? (aiSearchResults ?? localSearchResults)
+    ? (isSmartSearching ? [] : (aiSearchResults ?? localSearchResults))
     : localSearchResults
 
   useEffect(() => {

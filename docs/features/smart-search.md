@@ -13,7 +13,9 @@ interpret intent and a local ranker to search the graph hierarchy.
   (understand → scan notes → match → optional retry) with visible steps, explanation, and
   suggestion chips.
 - Each AI result can include an `aiReason` citing notes or circle context.
-- Local keyword results still appear instantly as a fallback until AI finishes.
+- While AI search is running, the result list stays clear so partial local keyword matches
+  do not appear as semantic answers. If AI is unavailable, the app falls back to the local
+  ranked search after the request finishes.
 - The deterministic ranker uses separate exact-name, name-token, role/headline, notes,
   circle-path, link, and coverage arms with RRF-style fusion. Results show
   `Circle › … · Role` subtitles.
