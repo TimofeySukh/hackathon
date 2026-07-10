@@ -34,7 +34,9 @@ Rules:
 - Signed-in users are **not** auto-redirected away from landing/docs/contact.
 - Auth callbacks land on the clean origin (no hash). A stored return marker opens `#board`
   after the session restores.
-- Logo on the landing page returns home; **Open board** is the primary CTA to `#board`.
+- Landing logo returns home. **Open your board** is the primary CTA to `#board` and
+  force-opens onboarding; **Import LinkedIn archive** opens `#board` with the existing
+  Settings import surface visible.
 - The board shows a compact logo control in the top-left that returns to the landing home (`#`).
 - The top-left brand on docs and contact also returns to the landing home (`#`).
   Docs no longer uses a separate Back button.
@@ -113,7 +115,8 @@ Safety invariants:
 - Guide steps show a blue completed state with a checkmark for one second after the
   matching action is performed, then auto-advance; the visible button skips a step
   manually.
-- Landing page board CTAs force-open the guide for that launch.
+- Landing **Open your board** CTAs force-open the guide for that launch. Archive-import
+  CTAs instead open the Settings import surface without forcing onboarding.
 - For signed-out/local users, the board toolbar Help button reopens the guide. Signed-in
   users do not see this toolbar Help button.
 - Mobile guide copy explicitly explains Edit / Select / Pan modes.

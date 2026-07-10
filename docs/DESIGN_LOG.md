@@ -17,6 +17,18 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-07-10 — Founder landing leads with relationship context
+
+- Decision: Rework the landing around a founder workflow: LinkedIn ZIP archive → derived
+  relationship context → explainable Smart Search → usable notes → MCP/CLI/API access.
+  The final CTA asks visitors to get the context out of their head.
+- Decision: Keep the real board-and-inspector screenshot as the main product visual and
+  use a small deck of board-note-inspired cards as supporting texture. Add a dedicated
+  archive-import CTA that opens the board Settings import surface without onboarding.
+- Why: The older landing described a manual visual board but hid the import/enrichment
+  workflow and treated agent access as a minor capability. Founders need to see both the
+  relationship outcome and the agent-native advantage without leading with privacy claims.
+
 ### 2026-07-09 — Remove the public privacy policy route
 
 - Decision: Remove the standalone privacy policy screen, its `#privacy` route, public
