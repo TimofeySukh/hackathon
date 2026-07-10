@@ -28,12 +28,13 @@ rediscover, write it here.
 - Why: The three persistent modes were difficult to discover even for the product creator,
   while independently rendered panels caused the guide and menus to cover each other.
 
-### 2026-07-10 — Compact AI search placeholder on touch layouts
+### 2026-07-10 — Compact search placeholder on touch layouts
 
-- Decision: On touch layouts the signed-in search field displays `Ask AI`; wider layouts
-  keep `Ask AI to find someone…`.
+- Decision: On touch layouts the search field always displays `Search`; wider authenticated
+  layouts keep `Ask AI to find someone…`.
 - Why: The board toolbar reserves room for the mode rail and Settings control, leaving
-  about 133 CSS pixels for input text on a 393px-wide phone. The longer phrase clipped.
+  about 133 CSS pixels for input text on a 393px-wide phone. Even `Ask AI` is unnecessary
+  context in that constrained space; the search icon and short label make the action clear.
 
 ### 2026-07-10 — Founder landing is board-first, not import-first
 

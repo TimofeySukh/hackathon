@@ -67,6 +67,7 @@ async function main() {
         result.placeholderWidth <= result.inputWidth,
         `Mobile search placeholder is clipped: ${result.placeholderWidth}px text in ${result.inputWidth}px input (${result.placeholder})`,
       )
+      assert.equal(result.placeholder, 'Search', 'Mobile search must use the compact Search placeholder.')
     } finally {
       await browser.close()
     }

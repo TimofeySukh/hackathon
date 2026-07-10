@@ -5482,9 +5482,9 @@ Content-Type: application/json
                 className="search-box__input"
                 type="text"
                 value={searchQuery}
-                placeholder={auth.status === 'authenticated'
-                  ? isTouchLayout ? 'Ask AI' : 'Ask AI to find someone…'
-                  : 'Search people or circles…'}
+                placeholder={isTouchLayout
+                  ? 'Search'
+                  : auth.status === 'authenticated' ? 'Ask AI to find someone…' : 'Search people or circles…'}
                 aria-label="Search people or circles"
                 aria-controls="board-search-results"
                 aria-activedescendant={searchResults.length > 0 ? `search-result-${searchResults[currentSearchIndex]?.kind}-${searchResults[currentSearchIndex]?.id}` : undefined}
