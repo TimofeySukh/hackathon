@@ -5932,8 +5932,8 @@ Content-Type: application/json
             ))}
           </div>
           <p className="linkedin-guide-panel__note">
-            Wait up to 24 hours. LinkedIn will email you when the archive is ready. After you
-            receive it, return here and press <strong>Import LinkedIn ZIP</strong>.
+            LinkedIn will email you when the archive is ready. After you receive it, return here
+            and press <strong>Import LinkedIn ZIP</strong>.
           </p>
           <p className="linkedin-guide-panel__note linkedin-guide-panel__note--warning">
             <strong>Important:</strong> Upload only the first archive part, which usually arrives
