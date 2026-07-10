@@ -26,8 +26,6 @@ leading positioning or opening message.
    - Explain the visual graph of people, notes, groups, and links.
    - Keep the existing real board preview as the hero product surface.
    - Primary CTA: `Open your board`, which keeps the guided-board launch behavior.
-   - Supporting action: `Import your LinkedIn archive`, which opens the board directly at
-     the LinkedIn import surface.
 
 2. **From archive to useful context.**
    - Show the truthful workflow: upload a LinkedIn ZIP, analyze its useful relationship
@@ -58,7 +56,7 @@ leading positioning or opening message.
 
 6. **Closing CTA.**
    - Use an outcome-led prompt such as `Ready to get the context out of your head?`.
-   - Repeat both paths: open the board or start with a LinkedIn archive.
+   - Repeat the board entry action only.
 
 ## Implementation boundaries
 
@@ -66,8 +64,6 @@ leading positioning or opening message.
   a code-native visual representation of the archive-to-context flow.
 - `src/styles/landing.css` owns responsive visual hierarchy, presentation of proof cards,
   and mobile layout.
-- `src/App.tsx` consumes a narrowly-scoped session flag that opens Settings at the existing
-  LinkedIn import surface after the route changes to `#board`.
 - `docs/features/landing-page.md` describes the new structure and CTA behavior.
 - `docs/AI_CONTEXT.md` reflects the new landing CTA entry point; `docs/DESIGN_LOG.md`
   records the durable decision to lead with relationship context and position agent access
@@ -81,18 +77,13 @@ part of this redesign.
 
 `Open your board` writes the existing onboarding session flag and navigates to `#board`.
 
-`Import your LinkedIn archive` writes a new, one-time session flag and navigates to
-`#board`. During board initialization, `App.tsx` consumes the flag and opens the existing
-Settings panel. It does not upload files, invoke enrichment, or bypass any existing
-consent/authentication requirement.
-
 ## Error handling and accessibility
 
-- Session storage failures remain non-blocking: both CTA handlers still navigate to the
-  board, which retains its normal default experience.
+- Session storage failures remain non-blocking: the board CTA still navigates to the board,
+  which retains its normal default experience.
 - Buttons, headings, sections, and tables/cards retain semantic labels and keyboard access.
-- The import entry point provides helpful board-local context when an archive is unavailable
-  on a phone; no unsupported mobile import promise is made in the landing copy.
+- The landing makes no unsupported mobile import promise; archive import remains product
+  context inside Settings.
 
 ## Verification
 
@@ -101,7 +92,29 @@ consent/authentication requirement.
 - Inspect the landing at desktop and phone widths for copy hierarchy, overflow, and CTA
   placement.
 - Verify `Open your board` still forces the onboarding guide.
-- Verify `Import your LinkedIn archive` opens the board and its existing Settings import
-  surface without starting an upload.
 - Confirm every archive-processing and Smart Search claim matches current code and
   `docs/AI_CONTEXT.md`.
+
+## Revision — board-first density pass
+
+The landing must lead every visitor to the board, not directly to archive import. The
+guided board is the first product experience; LinkedIn import remains an optional,
+signed-in Settings action reached after that experience.
+
+- Remove every landing CTA and inline link that opens LinkedIn import. Keep one clear
+  action throughout the page: `Open your board`.
+- Remove the blue pill-style overlines, including the founder audience label. They create
+  visual noise without helping the main story.
+- Expand the desktop composition rather than reducing content or section height. The hero
+  product image becomes materially larger, while the headline copy gains enough width to
+  avoid an unnecessarily tall stack of short lines.
+- Reframe the three workflow cards around the board-first journey: open the board, map
+  what matters, and keep context close. Every card is a same-height, keyboard-accessible
+  path to the board with a restrained hover lift.
+- Keep the LinkedIn ZIP explanation as small neutral helper copy, not a colored callout,
+  link, or call to action. It explains the later Settings option truthfully without making
+  import appear to be the first step.
+- Fill the Search, notes, and agent sections with larger, denser product proof rather than
+  creating more whitespace: a multi-result search surface, aligned note cards, and a
+  larger MCP/CLI/API console.
+- The closing section repeats only `Open your board`.
