@@ -11,7 +11,7 @@ Current product behavior (code-aligned):
 - Hash routes: landing (`#`), board (`#board`), developer docs (`#docs`), and contact
   (`#contact`).
 - Board opens on a **blank graph**: one central `You` circle only (no demo seed).
-- Canvas 2D board with circles, people, curved links, pan/zoom, edit/select/pan tool modes.
+- Canvas 2D board with circles, people, curved links, pan/zoom, and direct touch controls.
 - Create via circle context menu, double-tap, and connector drag-to-empty.
 - Inspector for rename, notes, connections, circle styling, delete (circles require
   confirmation in the inspector).
@@ -744,8 +744,11 @@ Manual verification:
 20. Create a connection between two people, reload, then delete it with Backspace or the inspector.
 21. Open search and verify name/circle matches; click a result and confirm camera fly + inspector.
 22. Paste a LinkedIn profile URL into search while signed in and verify import/enrichment.
-23. Switch board tool modes (edit / select / pan) and confirm pan mode moves the canvas on one-finger drag (mobile or touch).
-24. Sign out and confirm anonymous editing still works with local persistence.
+23. On a touch device, drag empty space to pan, drag a node to move it, and hold empty
+    space before dragging to marquee-select. Confirm no persistent mode menu is shown.
+24. During mobile onboarding, open Settings or an inspector and confirm the guide hides;
+    close the panel and confirm the guide returns at the current step.
+25. Sign out and confirm anonymous editing still works with local persistence.
 
 Supabase verification:
 

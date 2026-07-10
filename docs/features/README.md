@@ -22,8 +22,8 @@ humans or AI agents.
 ## Index
 
 - [Board canvas](board-canvas.md) — relationship graph surface: circles, people,
-  connections, pan/zoom, tool modes, create menu, inspector.
-- [Board onboarding](onboarding.md) — first-run board guide for controls and mobile modes.
+  connections, pan/zoom, direct touch controls, create menu, inspector.
+- [Board onboarding](onboarding.md) — first-run board guide for controls and mobile gestures.
 - [Person notes (Trello-style)](person-notes.md) — notes list, cards, composer, inline editing.
 - [Person connections](person-connections.md) — profile links, social handles, phone-app links, LinkedIn import links.
 - [Board search](board-search.md) — find people/circles; fly camera; LinkedIn URL import.

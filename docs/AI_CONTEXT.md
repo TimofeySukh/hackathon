@@ -92,15 +92,22 @@ Safety invariants:
 
 ## Board interaction (current)
 
-**Tool modes** (top-left vertical menu):
+**Touch controls**:
 
-- Visible only on touch/mobile layouts.
-- **Edit** — default: drag nodes, create, connect, resize.
-- **Select** — marquee multi-select.
-- **Pan** — one-finger/touch drag moves the camera; pinch zoom still works.
-- Desktop does not show the mode menu: drag empty space to pan, mouse wheel to zoom,
-  trackpad scroll to pan, trackpad pinch to zoom, right-drag to marquee select, and
+- There are no persistent touch modes. Drag empty space to pan, drag a person or circle
+  to move it, tap a node to open its details, and pinch with two fingers to zoom.
+- Hold empty space, then drag to marquee-select multiple nodes. Double-tap empty space
+  to create a person; drag from a circle centre to connect or create.
+- Desktop keeps direct mouse/trackpad controls: drag empty space to pan, mouse wheel to
+  zoom, trackpad scroll to pan, trackpad pinch to zoom, right-drag to marquee select, and
   right-click a circle to open create actions.
+
+**Mobile panels**:
+
+- Settings, Search, an inspector, create actions, multi-select actions, Agent settings,
+  and the LinkedIn guide are mutually exclusive top-level surfaces on touch layouts.
+- During onboarding, opening one of those surfaces hides the coach without discarding its
+  current step; closing the surface shows the coach again.
 
 **Onboarding**:
 
@@ -119,7 +126,7 @@ Safety invariants:
   no archive-import CTA; import remains available later from Settings.
 - For signed-out/local users, the board toolbar Help button reopens the guide. Signed-in
   users do not see this toolbar Help button.
-- Mobile guide copy explicitly explains Edit / Select / Pan modes.
+- Mobile guide copy explains direct touch controls, including hold-and-drag area selection.
 - During the Search demo step, opening empty Search shows built-in demo people from the
   temporary graph. The next step teaches LinkedIn profile link import with Timofey Sukhov
   and Velizar Seleznev examples.

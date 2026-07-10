@@ -10,10 +10,9 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
 
 - **Pan / zoom**: on desktop, drag empty space to pan, use the mouse wheel to zoom,
   trackpad scroll to pan, and trackpad pinch to zoom (`MIN_SCALE`/`MAX_SCALE` clamp). On
-  touch/mobile, pinch with two fingers to zoom. The vertical **tool mode** menu (top-left)
-  is shown only on touch/mobile layouts and switches **Edit**, **Select** (marquee), and
-  **Pan**. Pan mode makes one-finger drag move the canvas; releasing a pan gesture can
-  continue with short inertial scrolling.
+  touch/mobile, drag empty space to pan and pinch with two fingers to zoom. Releasing a
+  one-finger pan can continue with short inertial scrolling. There is no permanent mobile
+  tool mode.
 - **Move**: drag a person to reposition it or move it between circles. A person
   joins a circle only when its full avatar fits inside the circle boundary; it
   leaves when any edge crosses outside. Free-floating people (no circle) can be
@@ -91,7 +90,7 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   **Delete circle** button, which asks for confirmation first. People and connections
   can still be deleted with Backspace/Delete.
 - **Area select**: on desktop, right-drag empty space to draw a marquee selection box.
-  On touch/mobile, switch to Select mode and drag across the board.
+  On touch/mobile, hold empty space, then drag across the board.
 - **Onboarding guide**: first board visit opens a short board guide; landing CTAs
   force-open it for that launch, and signed-out/local users can reopen it from the toolbar
   Help button. Signed-in users do not see this toolbar Help button. While open, the
@@ -101,11 +100,13 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   while `Skip` manually advances. The Search step exposes built-in demo people, and the
   archive guide is taught through Settings gear -> `?`. Finishing the guide restores the
   user's previous graph and shows a success notice that the demo data was removed. The
-  mobile copy explains Edit / Select / Pan modes.
+  mobile copy explains direct touch controls and hold-and-drag selection.
 - **Home control**: a compact logo button in the top-left returns to the landing page
-  (`#`). On touch/mobile layouts it sits above the Edit / Select / Pan mode menu in a
-  vertical left rail so both controls stay reachable without overlapping the search
-  toolbar on the right.
+  (`#`). It stays clear of the search toolbar on touch/mobile layouts.
+- **Mobile panels**: Settings, Search, an inspector, create actions, multi-select
+  actions, Agent settings, and the LinkedIn guide are mutually exclusive top-level
+  surfaces. If onboarding is active, it hides while one is open and resumes at the same
+  step when it closes.
 - **Undo**: Ctrl/Cmd+Z reverts the last graph-mutating action — create, delete, move,
   resize, connect, merge, change-circle, favorite, add/delete note, and LinkedIn import.
   A whole drag or resize gesture is a single undo step. History is in-memory only (lost on

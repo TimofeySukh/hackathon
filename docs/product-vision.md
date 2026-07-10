@@ -25,7 +25,7 @@ Users should be able to open the page and immediately:
 1. start from a central node
 2. drag out a connection from any node
 3. release the cursor to create a new connected node
-4. move across the board with a trackpad, mouse drag, or mouse wheel (edit mode or dedicated pan mode on mobile)
+4. move across the board with a trackpad, mouse drag, mouse wheel, or by dragging empty space on mobile
 5. optionally sign in with Google or email to claim a personal board space
 
 6. save people, notes, tags, and connections to a private personal graph

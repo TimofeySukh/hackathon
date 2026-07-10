@@ -1,6 +1,5 @@
 export type OnboardingSurface = 'desktop' | 'mobile'
 export type OnboardingAction =
-  | 'mode'
   | 'navigate'
   | 'create-person'
   | 'create-circle'
@@ -79,16 +78,10 @@ const DESKTOP_ONBOARDING_STEPS: OnboardingStep[] = [
 
 const MOBILE_ONBOARDING_STEPS: OnboardingStep[] = [
   {
-    trigger: 'mode',
-    eyebrow: 'Board basics',
-    title: 'Use the mobile modes',
-    body: 'Use the three buttons at the top-left: Edit changes nodes, Select draws a selection box, and Pan moves the canvas with one finger.',
-  },
-  {
     trigger: 'navigate',
     eyebrow: 'Move and zoom',
     title: 'Explore the demo map',
-    body: 'This temporary board shows OpenAI, Anthropic, and Google. Switch to Pan for one-finger panning, then pinch with two fingers to zoom.',
+    body: 'This temporary board shows OpenAI, Anthropic, and Google. Drag empty space to move around, drag a person or circle to move it, and pinch with two fingers to zoom.',
   },
   {
     trigger: 'create-person',
@@ -106,7 +99,7 @@ const MOBILE_ONBOARDING_STEPS: OnboardingStep[] = [
     trigger: 'select',
     eyebrow: 'Select',
     title: 'Select a zone',
-    body: 'Switch to Select mode, then drag across the board to select people and circles in that area.',
+    body: 'Touch and hold empty space, then drag across the board to select people and circles in that area.',
   },
   {
     trigger: 'search-import',

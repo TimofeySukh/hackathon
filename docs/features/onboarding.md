@@ -32,7 +32,8 @@ creating people and circles, moving/resizing zones, selecting an area, adding a 
   - Desktop explains direct mouse/trackpad controls: drag empty space, wheel/trackpad
     zoom, double-click person creation, center-drag circle creation, and right-drag area
     selection.
-  - Mobile explains the top-left modes: Edit, Select, and Pan, plus two-finger pinch zoom.
+  - Mobile explains direct touch controls: drag empty space to pan, drag a node to move
+    it, pinch to zoom, and hold empty space before dragging to select an area.
 - Each step turns into a blue completed state with a checkmark for one second when the
   matching action is performed, then auto-advances. The visible `Skip` button is only a
   manual bypass for users who already know that control.
@@ -43,7 +44,7 @@ creating people and circles, moving/resizing zones, selecting an area, adding a 
   gear, then click the `?` next to LinkedIn Data Import. On mobile the final step shows a
   red notice that LinkedIn archive requests require a computer; users finish with `Done`
   instead of opening the desktop-only sync guide.
-- Action triggers are `mode`, `navigate`, `create-person`, `create-circle`, `organize`,
+- Action triggers are `navigate`, `create-person`, `create-circle`, `organize`,
   `select`, `search-import`, `linkedin-import`, `settings`, and `linkedin-guide`.
 - The create flow is split into two verified steps: double-click/double-tap empty space to
   add a person, then drag from a circle center to empty space and choose Add circle.
@@ -51,12 +52,10 @@ creating people and circles, moving/resizing zones, selecting an area, adding a 
 ## Design
 
 - The guide is a compact Material 3 floating coach card on desktop.
-- On touch/mobile it behaves like a bottom sheet so it stays clear of the top toolbar and
-  mode buttons. When a bottom panel is open during onboarding (inspector, create menu,
-  circle style editor, merge prompt), the coach repositions directly above that panel;
-  `ResizeObserver` in `App.tsx` sets `--onboarding-dock-offset` from the measured panel
-  height. The Settings step uses a top sheet when no bottom panel is open so the gear
-  icon stays visible.
+- On touch/mobile it behaves like a bottom sheet when the board is unobstructed. Opening
+  a top-level workspace panel (Settings, Search, inspector, create actions, multi-select
+  actions, Agent settings, or LinkedIn guide) hides the coach instead of stacking it over
+  that panel. Closing the workspace panel restores the coach at its current step.
 - The guide uses local progress dots, a dismiss button, and `Back` / `Skip` / `Done`
   actions. It does not block board interaction outside the card.
 

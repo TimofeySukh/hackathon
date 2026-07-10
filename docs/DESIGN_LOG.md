@@ -17,6 +17,17 @@ rediscover, write it here.
 
 ## Entries
 
+### 2026-07-10 — Direct touch controls and one mobile workspace panel
+
+- Decision: Remove the mobile Edit / Select / Pan switcher. On touch layouts, dragging
+  empty space pans, dragging a node moves it, tapping a node opens details, and holding
+  empty space before dragging starts area selection.
+- Decision: Settings, Search, the inspector, create actions, multi-select actions, Agent
+  settings, and the LinkedIn guide are mutually exclusive top-level mobile surfaces. The
+  onboarding coach hides while one is active and returns at the same step after it closes.
+- Why: The three persistent modes were difficult to discover even for the product creator,
+  while independently rendered panels caused the guide and menus to cover each other.
+
 ### 2026-07-10 — Compact AI search placeholder on touch layouts
 
 - Decision: On touch layouts the signed-in search field displays `Ask AI`; wider layouts

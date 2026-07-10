@@ -11,6 +11,7 @@ node_modules
 dist
 dist-ssr
 *.local
+.superpowers/
 
 # Local graph exports/recovery files may contain personal user data.
 hackathon-board-migrated.json

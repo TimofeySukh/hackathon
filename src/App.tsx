@@ -592,7 +592,7 @@ const ONBOARDING_LINKEDIN_SEARCH_EXAMPLES = [
 const CIRCLE_CREATION_DEFAULTS_KEY = 'hackathon-board:circle-creation-defaults:v1'
 const LINKEDIN_MOBILE_ARCHIVE_MESSAGE =
   'LinkedIn archive requests do not work from a phone. Please request your archive from LinkedIn on a computer, then return here to import the ZIP.'
-type BoardToolMode = 'edit' | 'pan' | 'select'
+const MOBILE_MARQUEE_HOLD_MS = 420
 
 type CircleCreationDefaults = {
   fillMode: CircleFillMode
@@ -1225,6 +1225,12 @@ function App() {
 
   const [connector, setConnector] = useState<DragConnector | null>(null)
   const [marquee, setMarquee] = useState<MarqueeState | null>(null)
+  const mobileMarqueeHoldRef = useRef<{
+    pointerId: number
+    startX: number
+    startY: number
+    timer: number | null
+  } | null>(null)
   const [createMenu, setCreateMenu] = useState<CreateMenu | null>(null)
   const [selectedItem, setSelectedItem] = useState<SelectedItem>(null)
   const [renderedInspectorItem, setRenderedInspectorItem] = useState<SelectedItem>(null)
@@ -1337,7 +1343,6 @@ function App() {
   const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight })
 
   const [showSettings, setShowSettings] = useState(false)
-  const [boardToolMode, setBoardToolMode] = useState<BoardToolMode>('edit')
   const [isTouchLayout, setIsTouchLayout] = useState(isTouchBoardLayout)
   const onboardingSurface: OnboardingSurface = isTouchLayout ? 'mobile' : 'desktop'
   const onboardingSteps = useMemo(() => getOnboardingSteps(onboardingSurface), [onboardingSurface])
@@ -1368,12 +1373,6 @@ function App() {
     return () => media.removeEventListener('change', updateTouchLayout)
   }, [])
 
-  useEffect(() => {
-    if (isTouchLayout || boardToolMode === 'edit') return
-
-    setBoardToolMode('edit')
-  }, [boardToolMode, isTouchLayout])
-
   useLayoutEffect(() => {
     onboardingStepRef.current = onboardingStep
     completedOnboardingStepRef.current = completedOnboardingStep
@@ -1394,6 +1393,7 @@ function App() {
       if (onboardingNoticeTimerRef.current !== null) {
         window.clearTimeout(onboardingNoticeTimerRef.current)
       }
+      clearMobileMarqueeHold()
     }
   }, [])
 
@@ -1610,6 +1610,16 @@ function App() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
+  const isMobileWorkspacePanelOpen = isTouchLayout && (
+    searchOpen ||
+    showSettings ||
+    showLinkedInGuide ||
+    showAgentSettings ||
+    createMenu !== null ||
+    isInspectorOpen ||
+    showCircleStylePanel ||
+    selectedPeopleIds.length + selectedCircleIds.length >= 2
+  )
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -1657,6 +1667,15 @@ function App() {
 
     if (isSameSelection) return
 
+    if (item && isTouchLayout) {
+      closeSearch()
+      setShowSettings(false)
+      setShowLinkedInGuide(false)
+      setShowAgentSettings(false)
+      setCreateMenu(null)
+      setSelectedPeopleIds([])
+      setSelectedCircleIds([])
+    }
     resetInspectorDraftState()
     setShowCircleStylePanel(false)
     setSelectedItem(item)
@@ -1700,6 +1719,48 @@ function App() {
     setAiSuggestions([])
     setIsSmartSearching(false)
     smartSearchRequestRef.current += 1
+  }
+
+  function closeMobileWorkspacePanels() {
+    if (!isTouchLayout) return
+    closeSearch()
+    setShowSettings(false)
+    setShowLinkedInGuide(false)
+    setShowAgentSettings(false)
+    setCreateMenu(null)
+    setShowCircleStylePanel(false)
+    setSelectedPeopleIds([])
+    setSelectedCircleIds([])
+    selectItem(null)
+  }
+
+  function openCreateMenu(menu: CreateMenu) {
+    closeMobileWorkspacePanels()
+    setCreateMenu(menu)
+  }
+
+  function toggleSettings() {
+    if (showSettings) {
+      setShowSettings(false)
+      return
+    }
+    closeMobileWorkspacePanels()
+    setShowSettings(true)
+    completeOnboardingAction('settings')
+  }
+
+  function toggleSearch() {
+    if (searchOpen) {
+      closeSearch()
+      return
+    }
+    closeMobileWorkspacePanels()
+    setSearchOpen(true)
+    if (!hasLocalFlag(SEARCH_LINKEDIN_HINT_KEY)) {
+      setShowSearchLinkedInHint(true)
+      markLocalFlag(SEARCH_LINKEDIN_HINT_KEY)
+    }
+    window.requestAnimationFrame(() => searchInputRef.current?.focus())
   }
 
   function graphSearchResultsToUi(
@@ -3593,26 +3654,39 @@ function App() {
     if (surface && surface.style.cursor !== value) surface.style.cursor = value
   }
 
-  function startBoardPan(event: ReactPointerEvent<HTMLDivElement>) {
-    cancelPanInertia()
-    setSelectedPeopleIds([])
-    setSelectedCircleIds([])
-    selectItem(null)
-    setOpenNotesPersonId(null)
-    panRef.current = {
+  function clearMobileMarqueeHold(pointerId?: number) {
+    const pending = mobileMarqueeHoldRef.current
+    if (!pending || (pointerId !== undefined && pending.pointerId !== pointerId)) return
+    if (pending.timer !== null) window.clearTimeout(pending.timer)
+    mobileMarqueeHoldRef.current = null
+  }
+
+  function scheduleMobileMarqueeHold(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.pointerType !== 'touch') return
+    clearMobileMarqueeHold()
+    const pending = {
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
-      originX: cameraRef.current.x,
-      originY: cameraRef.current.y,
-      lastX: event.clientX,
-      lastY: event.clientY,
-      lastT: event.timeStamp,
-      velocityX: 0,
-      velocityY: 0,
-      moved: false,
+      timer: null as number | null,
     }
-    setSurfaceCursor('grabbing')
+    pending.timer = window.setTimeout(() => {
+      if (mobileMarqueeHoldRef.current !== pending) return
+      mobileMarqueeHoldRef.current = null
+      const stillPressed = activePointersRef.current.some((pointer) => pointer.pointerId === pending.pointerId)
+      if (!stillPressed || marqueeRef.current) return
+      panRef.current = null
+      const marqueeState = {
+        startX: pending.startX,
+        startY: pending.startY,
+        currentX: pending.startX,
+        currentY: pending.startY,
+      }
+      marqueeRef.current = marqueeState
+      setMarquee(marqueeState)
+      setSurfaceCursor('crosshair')
+    }, MOBILE_MARQUEE_HOLD_MS)
+    mobileMarqueeHoldRef.current = pending
   }
 
   function handleSurfacePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
@@ -3633,6 +3707,7 @@ function App() {
     ]
 
     if (activePointersRef.current.length >= 2) {
+      clearMobileMarqueeHold()
       stopPressFeedback([
         ...(moveCircleRef.current?.liftIds ?? []),
         ...(movePersonRef.current?.liftIds ?? []),
@@ -3682,12 +3757,6 @@ function App() {
       return
     }
 
-    if (boardToolMode === 'pan' && !isRightClick) {
-      setCreateMenu(null)
-      startBoardPan(event)
-      return
-    }
-
     setCreateMenu(null)
     setOpenNotesPersonId(null)
     // A fresh gesture hasn't recorded its undo snapshot yet.
@@ -3700,7 +3769,6 @@ function App() {
 
     if (hit?.type === 'connector-handle') {
       if (isRightClick) return
-      if (boardToolMode === 'select') return
       startConnector(event, hit.sourceId, hit.sourceType, hit.x, hit.y)
       return
     }
@@ -3719,7 +3787,7 @@ function App() {
         selectItem({ type: 'person', id: hit.person.id })
         startPersonMove(event, hit.person)
       } else {
-        if (event.shiftKey || boardToolMode === 'select') {
+        if (event.shiftKey) {
           setSelectedPeopleIds((prev) => {
             let next = [...prev]
             if (selectedItem?.type === 'person' && !next.includes(selectedItem.id)) {
@@ -3761,7 +3829,7 @@ function App() {
         selectItem({ type: 'circle', id: hit.circle.id, showHandles: true })
         startCircleMove(event, hit.circle)
       } else {
-        if (event.shiftKey || boardToolMode === 'select') {
+        if (event.shiftKey) {
           setSelectedCircleIds((prev) => {
             let next = [...prev]
             if (selectedItem?.type === 'circle' && !next.includes(selectedItem.id)) {
@@ -3794,7 +3862,7 @@ function App() {
       return
     }
 
-    if (isRightClick || (boardToolMode === 'select' && (!hit || hit.type === 'circle-body' || hit.type === 'circle-edge' || hit.type === 'connection'))) {
+    if (isRightClick) {
       if (!event.shiftKey) {
         setSelectedPeopleIds([])
         setSelectedCircleIds([])
@@ -3886,6 +3954,7 @@ function App() {
       velocityY: 0,
       moved: false,
     }
+    scheduleMobileMarqueeHold(event)
   }
 
   function handleSurfacePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
@@ -3895,6 +3964,15 @@ function App() {
 
 
 
+
+    const pendingMobileMarquee = mobileMarqueeHoldRef.current
+    if (pendingMobileMarquee?.pointerId === event.pointerId) {
+      const distance = Math.hypot(
+        event.clientX - pendingMobileMarquee.startX,
+        event.clientY - pendingMobileMarquee.startY,
+      )
+      if (distance > DRAG_START_THRESHOLD) clearMobileMarqueeHold(event.pointerId)
+    }
 
     if (marqueeRef.current) {
       marqueeRef.current.currentX = event.clientX
@@ -4150,6 +4228,7 @@ function App() {
   }
 
   function handleSurfacePointerUp(event: ReactPointerEvent<HTMLDivElement>) {
+    clearMobileMarqueeHold(event.pointerId)
     activePointersRef.current = activePointersRef.current.filter((p) => p.pointerId !== event.pointerId)
     if (activePointersRef.current.length < 2) {
       pinchRef.current = null
@@ -4327,8 +4406,7 @@ function App() {
     }
 
     if (pendingSelectRef.current) {
-      if (boardToolMode !== 'select') {
-        const pendingSelection = pendingSelectRef.current
+      const pendingSelection = pendingSelectRef.current
         const selectionChanged =
           pendingSelection.type !== selectedItem?.type ||
           pendingSelection.id !== selectedItem?.id ||
@@ -4380,7 +4458,6 @@ function App() {
             }
           }
         }
-      }
       pendingSelectRef.current = null
     }
 
@@ -4433,7 +4510,7 @@ function App() {
         }
       } else {
         if (conn.sourceType === 'circle') {
-          setCreateMenu({
+          openCreateMenu({
             sourceCircleId: conn.sourceId,
             x: conn.endX,
             y: conn.endY,
@@ -4445,7 +4522,7 @@ function App() {
         } else if (conn.sourceType === 'person') {
           const person = graph.people.find((p) => p.id === conn.sourceId)
           const sourceCircleId = person ? person.circleId : 'you'
-          setCreateMenu({
+          openCreateMenu({
             sourceCircleId,
             x: conn.endX,
             y: conn.endY,
@@ -4472,7 +4549,7 @@ function App() {
 
     selectItem({ type: 'circle', id: hit.circle.id })
     const world = screenToWorld({ x: event.clientX, y: event.clientY })
-    setCreateMenu({
+    openCreateMenu({
       sourceCircleId: hit.circle.id,
       x: world.x,
       y: world.y,
@@ -5327,7 +5404,7 @@ Content-Type: application/json
   return (
     <main
       ref={appShellRef}
-      className={`app-shell ${searchOpen ? 'is-search-open' : ''} ${showSettings ? 'is-settings-open' : ''} ${selectedItem ? 'is-inspector-open' : ''} ${boardToolMode === 'pan' ? 'is-pan-mode' : ''} ${onboardingStep >= 0 ? 'is-onboarding-active' : ''} ${onboardingDocked ? 'is-onboarding-docked' : ''} ${isOnboardingSettingsStep ? 'is-onboarding-settings-step' : ''}`}
+      className={`app-shell ${searchOpen ? 'is-search-open' : ''} ${showSettings ? 'is-settings-open' : ''} ${selectedItem ? 'is-inspector-open' : ''} ${onboardingStep >= 0 ? 'is-onboarding-active' : ''} ${onboardingDocked ? 'is-onboarding-docked' : ''} ${isOnboardingSettingsStep ? 'is-onboarding-settings-step' : ''}`}
     >
       {graphLoadError && (
         <div style={{
@@ -5381,60 +5458,6 @@ Content-Type: application/json
         >
           <img src={sdnLogo} alt="" aria-hidden="true" />
         </a>
-        {isTouchLayout && (
-        <div className="board-mode-menu" aria-label="Board interaction mode">
-          <button
-            type="button"
-            className={boardToolMode === 'edit' ? 'is-active' : ''}
-            aria-label="Edit mode"
-            data-tooltip="Edit mode"
-            data-tooltip-position="right"
-            title="Edit mode"
-            aria-pressed={boardToolMode === 'edit'}
-            onClick={() => {
-              cancelPanInertia()
-              setBoardToolMode('edit')
-              completeOnboardingAction('mode')
-            }}
-          >
-            <PointerIcon />
-          </button>
-          <button
-            type="button"
-            className={boardToolMode === 'select' ? 'is-active' : ''}
-            aria-label="Select mode"
-            data-tooltip="Select mode"
-            data-tooltip-position="right"
-            title="Select mode"
-            aria-pressed={boardToolMode === 'select'}
-            onClick={() => {
-              cancelPanInertia()
-              setBoardToolMode('select')
-              setCreateMenu(null)
-              completeOnboardingAction('mode')
-            }}
-          >
-            <SelectIcon />
-          </button>
-          <button
-            type="button"
-            className={boardToolMode === 'pan' ? 'is-active' : ''}
-            aria-label="Pan mode"
-            data-tooltip="Pan mode"
-            data-tooltip-position="right"
-            title="Pan mode"
-            aria-pressed={boardToolMode === 'pan'}
-            onClick={() => {
-              cancelPanInertia()
-              setBoardToolMode('pan')
-              setCreateMenu(null)
-              completeOnboardingAction('mode')
-            }}
-          >
-            <PanIcon />
-          </button>
-        </div>
-        )}
       </div>
 
       <div className="toolbar" aria-label="Graph controls">
@@ -5448,19 +5471,7 @@ Content-Type: application/json
             aria-label="Search"
             data-tooltip="Search"
             data-tooltip-position="bottom"
-            onClick={() => {
-              if (searchOpen) {
-                closeSearch()
-              } else {
-                setShowSettings(false)
-                setSearchOpen(true)
-                if (!hasLocalFlag(SEARCH_LINKEDIN_HINT_KEY)) {
-                  setShowSearchLinkedInHint(true)
-                  markLocalFlag(SEARCH_LINKEDIN_HINT_KEY)
-                }
-                window.requestAnimationFrame(() => searchInputRef.current?.focus())
-              }
-            }}
+            onClick={toggleSearch}
           >
             <SearchIcon />
           </button>
@@ -5656,11 +5667,7 @@ Content-Type: application/json
             ref={settingsButtonRef}
             type="button"
             className="attention-badge-wrap"
-            onClick={() => {
-              if (!showSettings) closeSearch()
-              if (!showSettings) completeOnboardingAction('settings')
-              setShowSettings(!showSettings)
-            }}
+            onClick={toggleSettings}
             aria-label="Settings"
             data-tooltip="Settings"
             data-tooltip-position="bottom"
@@ -7258,7 +7265,7 @@ Content-Type: application/json
         </div>
       )}
 
-      {graphLoaded && onboardingStep >= 0 && (
+      {graphLoaded && onboardingStep >= 0 && !isMobileWorkspacePanelOpen && (
         <OnboardingCoach
           surface={onboardingSurface}
           step={onboardingStep}
@@ -9247,37 +9254,6 @@ function HelpIcon() {
       <circle cx="12" cy="12" r="9" />
       <path d="M9.75 9a2.5 2.5 0 0 1 4.54-1.43c.86 1.13.55 2.57-.56 3.31-.94.62-1.73 1.24-1.73 2.62" />
       <path d="M12 17h.01" />
-    </svg>
-  )
-}
-
-function PointerIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M5 3l9 18 2.4-7.6L21 11 5 3z" />
-      <path d="m13.5 13.5 4 4" />
-    </svg>
-  )
-}
-
-function PanIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 3v18" />
-      <path d="m8 7 4-4 4 4" />
-      <path d="m8 17 4 4 4-4" />
-      <path d="M3 12h18" />
-      <path d="m7 8-4 4 4 4" />
-      <path d="m17 8 4 4-4 4" />
-    </svg>
-  )
-}
-
-function SelectIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="3 3" />
-      <path d="M12 8v8M8 12h8" />
     </svg>
   )
 }
