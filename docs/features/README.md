@@ -33,8 +33,9 @@ humans or AI agents.
 - [Anonymous persistence](anonymous-persistence.md) — IndexedDB graph storage, legacy migration, and visible save failures.
 - [Import load testing](import-load-testing.md) — database and browser import verification.
 - [Landing page](landing-page.md) — marketing entry, hash routing, inspector demo.
+- [Developer documentation](developer-docs.md) — product-integrated MCP, CLI, and REST API guides.
 - [Agent API](agent-api.md) — revocable tokens, graph API, CLI, MCP.
 - [Real-time sync](realtime-sync.md) — Supabase Realtime for multi-tab/agent edits.
 
-**Developer docs** (API/CLI/MCP schemas on the website) live in `src/DocsPage.tsx`, not in
-this feature index.
+Public API/CLI/MCP article content remains in `src/DocsPage.tsx`; the developer documentation
+feature entry above describes its shell, navigation, search, and design behavior.

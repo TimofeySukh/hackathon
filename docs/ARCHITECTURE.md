@@ -29,7 +29,9 @@ A brand-new board is blank: a single `You` circle — **no demo seed**.
 - `src/App.tsx` is the shell and interaction host: hash routing (landing, board, docs,
   contact), chrome/panels, pointer interaction, camera, persisted-graph wiring,
   and the paint loop. Heavy canvas logic lives in `src/lib/board/`.
-- `src/LandingPage.tsx`, `DocsPage.tsx`, `ContactPage.tsx` — public routes.
+- `src/LandingPage.tsx`, `DocsPage.tsx`, `ContactPage.tsx` — public routes;
+  `src/features/docs/` owns the shared-brand docs header, navigation registry, search UI,
+  mobile drawer, and quick-start paths while `DocsPage.tsx` retains article bodies.
 - `src/lib/board/` — types, constants, colors, geometry, layout, render (spatial index,
   hit-testing, Canvas 2D).
 - `src/lib/graphPersistence.ts` — signed-in saves via `graph-api` first, RLS fallback,

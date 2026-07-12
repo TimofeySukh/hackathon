@@ -1,80 +1,9 @@
-import { useState, useMemo, useEffect, useRef, useCallback, type MouseEvent } from 'react'
-import sdnLogo from './assets/sdn-logo.svg'
-
-type Article = {
-  id: string
-  category: 'getting-started' | 'mcp' | 'cli' | 'api'
-  title: string
-  keywords: string[]
-  badge?: 'get' | 'post' | 'delete'
-  render: (copyFn: (text: string, msg: string) => void) => React.ReactNode
-}
-
-type NavGroup = {
-  id: string
-  title: string
-  articleIds: string[]
-}
-
-type NavSection = {
-  title: string
-  groups: NavGroup[]
-  collapsible?: boolean
-}
-
-const DOC_SECTIONS: NavSection[] = [
-  {
-    title: '',
-    groups: [{ id: 'intro', title: 'Getting started', articleIds: ['welcome'] }],
-  },
-  {
-    title: 'Integrations',
-    groups: [{ id: 'integrations', title: 'Clients', articleIds: ['mcp-server', 'cli-tool'] }],
-  },
-  {
-    title: 'REST API',
-    collapsible: true,
-    groups: [
-      { id: 'api-meta', title: 'Meta', articleIds: ['get-meta'] },
-      { id: 'api-search', title: 'Search', articleIds: ['get-search', 'post-search-smart'] },
-      {
-        id: 'api-people',
-        title: 'People',
-        articleIds: [
-          'post-people',
-          'post-people-import-linkedin',
-          'post-notes',
-          'post-links',
-          'delete-person',
-          'delete-notes',
-          'delete-links',
-          'post-people-avatar',
-        ],
-      },
-      {
-        id: 'api-circles',
-        title: 'Circles',
-        articleIds: ['get-circles', 'post-circles', 'patch-circles', 'delete-circles', 'post-circles-avatar'],
-      },
-      {
-        id: 'api-connections',
-        title: 'Connections',
-        articleIds: ['post-connections', 'delete-connection'],
-      },
-      {
-        id: 'api-graph',
-        title: 'Graph & batch',
-        articleIds: ['get-graph', 'put-graph', 'clear-graph', 'batch-operations'],
-      },
-    ],
-  },
-]
-
-const DEFAULT_COLLAPSED = new Set(
-  DOC_SECTIONS.flatMap((section) =>
-    section.collapsible ? section.groups.map((group) => group.id) : [],
-  ),
-)
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import DocsHeader from './features/docs/DocsHeader'
+import DocsQuickStart from './features/docs/DocsQuickStart'
+import DocsSidebar from './features/docs/DocsSidebar'
+import { DEFAULT_COLLAPSED, DOC_SECTIONS, scoreArticle, tokenizeSearch } from './features/docs/navigation'
+import type { Article } from './features/docs/types'
 
 function readArticleIdFromHash(): string {
   const hash = window.location.hash
@@ -84,35 +13,13 @@ function readArticleIdFromHash(): string {
   return 'welcome'
 }
 
-function tokenizeSearch(query: string): string[] {
-  return query
-    .trim()
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean)
+interface DocsPageProps {
+  onLogin: () => void
+  onSignUp: () => void
+  isAuthenticated: boolean
 }
 
-function scoreArticle(article: Article, tokens: string[]): number {
-  if (tokens.length === 0) return 1
-
-  const title = article.title.toLowerCase()
-  const id = article.id.toLowerCase()
-  const keywordBlob = article.keywords.join(' ').toLowerCase()
-
-  let score = 0
-  for (const token of tokens) {
-    if (!title.includes(token) && !id.includes(token) && !keywordBlob.includes(token)) {
-      return 0
-    }
-    if (title.includes(token)) score += 12
-    if (id.includes(token)) score += 10
-    if (keywordBlob.includes(token)) score += 6
-    if (article.badge === token) score += 8
-  }
-  return score
-}
-
-export default function DocsPage() {
+export default function DocsPage({ onLogin, onSignUp, isAuthenticated }: DocsPageProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
   const [activeArticleId, setActiveArticleId] = useState(readArticleIdFromHash)
@@ -121,6 +28,7 @@ export default function DocsPage() {
   const [copiedStatus, setCopiedStatus] = useState<string | null>(null)
   const contentRef = useRef<HTMLElement>(null)
   const searchRef = useRef<HTMLDivElement>(null)
+  const mobileNavTriggerRef = useRef<HTMLButtonElement>(null)
 
   const handleCopy = (text: string, msg: string) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -135,43 +43,49 @@ export default function DocsPage() {
     {
       id: 'welcome',
       category: 'getting-started',
-      title: 'Welcome & Getting Started',
+      title: 'Build with Social Datanode',
       keywords: ['welcome', 'start', 'getting started', 'intro', 'key', 'token', 'authorization'],
       render: () => (
         <div>
-          <h2>DataNode Developer Wiki</h2>
-          <p>
-            Welcome to the DataNode Developer Portal. DataNode is a social graph board application designed to model relationships, circles, and connections.
-            This portal provides everything you need to connect remote AI agents, terminal command-line interfaces (CLIs), and custom integrations directly to your social graph.
-          </p>
+          <div className="docs-hero">
+            <p className="docs-hero__eyebrow">Developer documentation</p>
+            <h1>Build with Social Datanode</h1>
+            <p className="docs-hero__lead">
+              Connect AI clients, terminal workflows, and custom integrations to the same
+              relationship graph you use on the board.
+            </p>
+          </div>
 
-          <h3>Authentication</h3>
+          <DocsQuickStart />
+
+          <h2>Authentication</h2>
           <p>
-            All API requests must be authenticated using a revocable, scoped **Agent Token**. You can generate these keys in the application:
+            Every API request uses a revocable, scoped <strong>agent token</strong>. Create one
+            from your board:
           </p>
-          <ol style={{ lineHeight: '1.6', fontSize: '14px', color: 'var(--md-on-surface-variant)' }}>
-            <li>Open the DataNode board workspace.</li>
-            <li>Click the **Settings** (gear icon) in the top right.</li>
-            <li>Select the **Agent API** panel.</li>
-            <li>Navigate to the **Keys** tab, enter a descriptive name, and click **Create key**.</li>
-            <li>Copy the generated token (`dn_live_...`) immediately. It is stored as a secure hash and will not be displayed again.</li>
+          <ol>
+            <li>Open your Social Datanode board.</li>
+            <li>Open <strong>Settings</strong> from the top-right toolbar.</li>
+            <li>Find <strong>Agent API</strong> and select <strong>Connect MCP</strong>.</li>
+            <li>Open <strong>Keys</strong>, name the key, and select <strong>Create key</strong>.</li>
+            <li>Copy the <code>dn_live_…</code> token immediately. Only its secure hash is stored.</li>
           </ol>
 
           <div className="docs-alert info">
-            <div className="docs-alert-title">Authorization Header</div>
+            <div className="docs-alert-title">Authorization header</div>
             <p className="docs-alert-body">
-              Include your token as a Bearer credential in the standard HTTP request headers:
-              <code style={{ display: 'block', marginTop: '8px', padding: '6px', background: 'rgba(0,0,0,0.05)', borderRadius: '4px', fontFamily: 'monospace' }}>
+              Send the token as a Bearer credential with every request:
+              <code className="docs-token-example">
                 Authorization: Bearer dn_live_&lt;your-token&gt;
               </code>
             </p>
           </div>
 
-          <h3>Concurrency & Revision Checking</h3>
+          <h2>Revision-safe writes</h2>
           <p>
-            To prevent concurrent edits from overwriting each other, the DataNode graph API implements optimistic revision concurrency control:
+            Social Datanode prevents concurrent clients from silently overwriting each other:
           </p>
-          <ul style={{ lineHeight: '1.6', fontSize: '14px', color: 'var(--md-on-surface-variant)' }}>
+          <ul>
             <li>Every mutation request requires an <code>expectedRevision</code> parameter.</li>
             <li>You can fetch the current revision of your graph from the <code>GET /graph/meta</code> endpoint.</li>
             <li>If the current revision on the server does not match your <code>expectedRevision</code>, the server rejects the request with a <code>409 Conflict</code> and includes the current <code>revision</code>.</li>
@@ -200,14 +114,14 @@ export default function DocsPage() {
 }`
         return (
           <div>
-            <h2>Model Context Protocol (MCP)</h2>
+            <h1>Connect with Model Context Protocol</h1>
             <p>
               The Model Context Protocol (MCP) allows LLM clients (such as Claude Desktop, Cursor, or Windsurf) to securely inspect and edit your social graph.
-              Our MCP server runs universally via `npx` without requiring a local clone.
+              The MCP server runs through <code>npx</code> without requiring a local clone.
               Tool calls return a structured JSON envelope with <code>status</code>, <code>summary</code>, <code>data</code>, and <code>next_valid_actions</code>.
             </p>
 
-            <h3>Configuration</h3>
+            <h2>Configuration</h2>
             <p>
               Add the following configuration block to your client's MCP configuration settings file (e.g., <code>claude_desktop_config.json</code>):
             </p>
@@ -222,7 +136,7 @@ export default function DocsPage() {
               </pre>
             </div>
 
-            <h3>Exposed Tools</h3>
+            <h2>Exposed tools</h2>
             <p>
               Once connected, the following tools are made available to the AI assistant. Large, experimental, bulk, or destructive changes should be preceded
               by <code>export_graph</code> or explicit user confirmation.
@@ -237,7 +151,7 @@ export default function DocsPage() {
               <tbody>
                 <tr>
                   <td className="docs-param-name">list_capabilities</td>
-                  <td>List DataNode MCP capabilities with compact risk and side-effect metadata.</td>
+                  <td>List Social Datanode MCP capabilities with compact risk and side-effect metadata.</td>
                 </tr>
                 <tr>
                   <td className="docs-param-name">search_people_and_circles</td>
@@ -331,12 +245,12 @@ export default function DocsPage() {
         const npxCmd = `npx -y --package github:TimofeySukh/hackathon datanode-cli circles`
         return (
           <div>
-            <h2>CLI Client</h2>
+            <h1>Use the CLI</h1>
             <p>
               The command-line interface (CLI) client allows you to query and edit your social graph directly from your terminal.
             </p>
 
-            <h3>Option A: Run On-The-Fly (NPX)</h3>
+            <h2>Option A: run on the fly with npx</h2>
             <p>
               Execute commands immediately without cloning or globally installing anything:
             </p>
@@ -353,7 +267,7 @@ ${npxCmd}`}</code>
               </pre>
             </div>
 
-            <h3>Option B: Global Installation</h3>
+            <h2>Option B: global installation</h2>
             <p>
               Install the CLI tool globally via npm for faster startup and native access:
             </p>
@@ -367,7 +281,7 @@ ${npxCmd}`}</code>
               </pre>
             </div>
 
-            <h3>CLI Usage Guide</h3>
+            <h2>CLI usage guide</h2>
             <p>Once installed, you can invoke the CLI with the following commands:</p>
             <table className="docs-table">
               <thead>
@@ -496,12 +410,12 @@ ${npxCmd}`}</code>
   --data /Users/velizard/Downloads/linkedin-graph-export-2026-06-14-basic/people-for-llm.jsonl`
         return (
           <div>
-            <h2>Local LinkedIn Agent Search</h2>
+            <h1>Search a local LinkedIn archive</h1>
             <p>
-              This read-only helper is separate from the authenticated DataNode CLI and MCP server. It searches compact LinkedIn export JSONL files on your machine and returns exact person ids, circle paths, notes, and links within a 30k/50k token budget for LLM context assembly.
+              This read-only helper is separate from the authenticated Social Datanode CLI and MCP server. It searches compact LinkedIn export JSONL files on your machine and returns exact person ids, circle paths, notes, and links within a 30k/50k token budget for LLM context assembly.
             </p>
 
-            <h3>Commands</h3>
+            <h2>Commands</h2>
             <div className="docs-code-container">
               <div className="docs-code-header">
                 <span>Terminal</span>
@@ -514,7 +428,7 @@ ${pinnedCmd}`}</code>
               </pre>
             </div>
 
-            <h3>Query Syntax</h3>
+            <h2>Query syntax</h2>
             <table className="docs-table">
               <thead>
                 <tr>
@@ -564,15 +478,15 @@ ${pinnedCmd}`}</code>
 }`
         return (
           <div>
-            <div className="docs-endpoint-title">
+            <h1 className="docs-endpoint-title">
               <span className="docs-method-badge get">GET</span>
               <span className="docs-endpoint-path">/graph/meta</span>
-            </div>
+            </h1>
             <p>
               Retrieves the metadata of your graph, including the current concurrency revision count and item stats. Use this revision number for subsequent mutation checks.
             </p>
 
-            <h3>Request Example</h3>
+            <h2>Request example</h2>
             <div className="docs-code-container">
               <div className="docs-code-header">
                 <span>cURL</span>
@@ -583,7 +497,7 @@ ${pinnedCmd}`}</code>
               </pre>
             </div>
 
-            <h3>Response Example (200 OK)</h3>
+            <h2>Response example (200 OK)</h2>
             <div className="docs-code-container">
               <div className="docs-code-header">
                 <span>JSON Response</span>
@@ -608,16 +522,16 @@ ${pinnedCmd}`}</code>
   -H "Authorization: Bearer dn_live_your_token"`
         return (
           <div>
-            <div className="docs-endpoint-title">
+            <h1 className="docs-endpoint-title">
               <span className="docs-method-badge get">GET</span>
               <span className="docs-endpoint-path">/search</span>
-            </div>
+            </h1>
             <p>
               Queries people and circles with deterministic hybrid ranking across exact names,
               name tokens, role/headline notes, note text, circle paths, links, and coverage.
             </p>
 
-            <h3>Query Parameters</h3>
+            <h2>Query parameters</h2>
             <table className="docs-table">
               <thead>
                 <tr>
@@ -643,7 +557,7 @@ ${pinnedCmd}`}</code>
               </tbody>
             </table>
 
-            <h3>Request Example</h3>
+            <h2>Request example</h2>
             <div className="docs-code-container">
               <div className="docs-code-header">
                 <span>cURL</span>
@@ -693,18 +607,18 @@ ${pinnedCmd}`}</code>
 }`
         return (
           <div>
-            <div className="docs-endpoint-title">
+            <h1 className="docs-endpoint-title">
               <span className="docs-method-badge post">POST</span>
               <span className="docs-endpoint-path">/search/smart</span>
-            </div>
+            </h1>
             <p>
               Runs multi-step agent search: analyze the query, scan note-backed candidates,
               match with AI (with an optional retry pass), then return ranked people/circles with
-              `aiReason`, visible `steps`, and follow-up `suggestions`. Requires the
+              <code>aiReason</code>, visible <code>steps</code>, and follow-up <code>suggestions</code>. Requires the
               <code>search:read</code> scope and the shared Edge Function secret <code>OPENROUTER_API_KEY</code>.
             </p>
 
-            <h3>Request Body</h3>
+            <h2>Request body</h2>
             <table className="docs-table">
               <thead>
                 <tr>
@@ -730,7 +644,7 @@ ${pinnedCmd}`}</code>
               </tbody>
             </table>
 
-            <h3>Request Example</h3>
+            <h2>Request example</h2>
             <div className="docs-code-container">
               <div className="docs-code-header">
                 <span>cURL</span>
@@ -741,7 +655,7 @@ ${pinnedCmd}`}</code>
               </pre>
             </div>
 
-            <h3>Response Example</h3>
+            <h2>Response example</h2>
             <div className="docs-code-container">
               <div className="docs-code-header">
                 <span>JSON Response</span>
@@ -766,13 +680,13 @@ ${pinnedCmd}`}</code>
   -H "Authorization: Bearer dn_live_your_token"`
         return (
           <div>
-            <div className="docs-endpoint-title">
+            <h1 className="docs-endpoint-title">
               <span className="docs-method-badge get">GET</span>
               <span className="docs-endpoint-path">/circles</span>
-            </div>
+            </h1>
             <p>Returns an array of all circles defined in the graph with their geometries, parent references, and customized shapes/colors.</p>
 
-            <h3>Request Example</h3>
+            <h2>Request example</h2>
             <div className="docs-code-container">
               <div className="docs-code-header">
                 <span>cURL</span>
@@ -804,13 +718,13 @@ ${pinnedCmd}`}</code>
   }'`
         return (
           <div>
-            <div className="docs-endpoint-title">
+            <h1 className="docs-endpoint-title">
               <span className="docs-method-badge post">POST</span>
               <span className="docs-endpoint-path">/people</span>
-            </div>
+            </h1>
             <p>Creates a new person node inside a target circle. The server automatically calculates a safe, non-overlapping location inside the circle boundary.</p>
 
-            <h3>Request Parameters</h3>
+            <h2>Request parameters</h2>
             <table className="docs-table">
               <thead>
                 <tr>
@@ -854,7 +768,7 @@ ${pinnedCmd}`}</code>
               </tbody>
             </table>
 
-            <h3>Request Example</h3>
+            <h2>Request example</h2>
             <div className="docs-code-container">
               <div className="docs-code-header">
                 <span>cURL</span>
@@ -884,13 +798,13 @@ ${pinnedCmd}`}</code>
   }'`
         return (
           <div>
-            <div className="docs-endpoint-title">
+            <h1 className="docs-endpoint-title">
               <span className="docs-method-badge post">POST</span>
               <span className="docs-endpoint-path">/people/import-linkedin</span>
-            </div>
+            </h1>
             <p>Imports or updates a person node inside a target circle by scraping their LinkedIn profile URL. The circle is automatically resolved or created based on the person\'s current company, with a stable palette tone assigned to newly created LinkedIn company circles.</p>
 
-            <h3>Request Parameters</h3>
+            <h2>Request parameters</h2>
             <table className="docs-table">
               <thead>
                 <tr>
@@ -916,7 +830,7 @@ ${pinnedCmd}`}</code>
               </tbody>
             </table>
 
-            <h3>Request Example</h3>
+            <h2>Request example</h2>
             <div className="docs-code-container">
               <div className="docs-code-header">
                 <span>cURL</span>
@@ -946,13 +860,13 @@ ${pinnedCmd}`}</code>
   }'`
         return (
           <div>
-            <div className="docs-endpoint-title">
+            <h1 className="docs-endpoint-title">
               <span className="docs-method-badge post">POST</span>
               <span className="docs-endpoint-path">/people/:personId/notes</span>
-            </div>
+            </h1>
             <p>Adds a text note card to an existing person's inspector panel.</p>
 
-            <h3>Request Parameters</h3>
+            <h2>Request parameters</h2>
             <table className="docs-table">
               <thead>
                 <tr>
@@ -984,7 +898,7 @@ ${pinnedCmd}`}</code>
               </tbody>
             </table>
 
-            <h3>Request Example</h3>
+            <h2>Request example</h2>
             <div className="docs-code-container">
               <div className="docs-code-header">
                 <span>cURL</span>
@@ -1016,13 +930,13 @@ ${pinnedCmd}`}</code>
   }'`
         return (
           <div>
-            <div className="docs-endpoint-title">
+            <h1 className="docs-endpoint-title">
               <span className="docs-method-badge post">POST</span>
               <span className="docs-endpoint-path">/people/:personId/links</span>
-            </div>
+            </h1>
             <p>Appends an external URL connection (like LinkedIn, Telegram, custom website) to a person's contact panel.</p>
 
-            <h3>Request Parameters</h3>
+            <h2>Request parameters</h2>
             <table className="docs-table">
               <thead>
                 <tr>
@@ -1060,7 +974,7 @@ ${pinnedCmd}`}</code>
               </tbody>
             </table>
 
-            <h3>Request Example</h3>
+            <h2>Request example</h2>
             <div className="docs-code-container">
               <div className="docs-code-header">
                 <span>cURL</span>
@@ -1091,13 +1005,13 @@ ${pinnedCmd}`}</code>
   }'`
         return (
           <div>
-            <div className="docs-endpoint-title">
+            <h1 className="docs-endpoint-title">
               <span className="docs-method-badge post">POST</span>
               <span className="docs-endpoint-path">/connections</span>
-            </div>
+            </h1>
             <p>Creates a relationship line connecting two nodes in the board graph. Nodes can be people or circles.</p>
 
-            <h3>Request Parameters</h3>
+            <h2>Request parameters</h2>
             <table className="docs-table">
               <thead>
                 <tr>
@@ -1129,7 +1043,7 @@ ${pinnedCmd}`}</code>
               </tbody>
             </table>
 
-            <h3>Request Example</h3>
+            <h2>Request example</h2>
             <div className="docs-code-container">
               <div className="docs-code-header">
                 <span>cURL</span>
@@ -1175,23 +1089,23 @@ ${pinnedCmd}`}</code>
   -d '${payload}'`
         return (
           <div>
-            <div className="docs-endpoint-title">
+            <h1 className="docs-endpoint-title">
               <span className="docs-method-badge post">POST</span>
               <span className="docs-endpoint-path">/operations</span>
-            </div>
+            </h1>
             <p>
               Executes a transactional list of operations in a single request. 
               If any operation in the list fails, the whole batch transaction fails, maintaining graph integrity.
             </p>
 
-            <h3>Supported Operation Types</h3>
+            <h2>Supported operation types</h2>
             <ul style={{ lineHeight: '1.6', fontSize: '14px', color: 'var(--md-on-surface-variant)' }}>
               <li><code>person.create</code> — create a person</li>
               <li><code>note.create</code> — add a note to a person</li>
               <li><code>link.create</code> — add a link to a person</li>
             </ul>
 
-            <h3>Request Example</h3>
+            <h2>Request example</h2>
             <div className="docs-code-container">
               <div className="docs-code-header">
                 <span>cURL</span>
@@ -1220,13 +1134,13 @@ ${pinnedCmd}`}</code>
   }'`
         return (
           <div>
-            <div className="docs-endpoint-title">
+            <h1 className="docs-endpoint-title">
               <span className="docs-method-badge delete">DELETE</span>
               <span className="docs-endpoint-path">/people/:personId</span>
-            </div>
+            </h1>
             <p>Deletes a person node from the graph and cleans up any connection lines associated with them.</p>
 
-            <h3>Request Parameters</h3>
+            <h2>Request parameters</h2>
             <table className="docs-table">
               <thead>
                 <tr>
@@ -1246,7 +1160,7 @@ ${pinnedCmd}`}</code>
               </tbody>
             </table>
 
-            <h3>Request Example</h3>
+            <h2>Request example</h2>
             <div className="docs-code-container">
               <div className="docs-code-header">
                 <span>cURL</span>
@@ -1275,13 +1189,13 @@ ${pinnedCmd}`}</code>
   }'`
         return (
           <div>
-            <div className="docs-endpoint-title">
+            <h1 className="docs-endpoint-title">
               <span className="docs-method-badge delete">DELETE</span>
               <span className="docs-endpoint-path">/people/:personId/notes/:noteId</span>
-            </div>
+            </h1>
             <p>Deletes a specific note card from a person.</p>
 
-            <h3>Request Parameters</h3>
+            <h2>Request parameters</h2>
             <table className="docs-table">
               <thead>
                 <tr>
@@ -1301,7 +1215,7 @@ ${pinnedCmd}`}</code>
               </tbody>
             </table>
 
-            <h3>Request Example</h3>
+            <h2>Request example</h2>
             <div className="docs-code-container">
               <div className="docs-code-header">
                 <span>cURL</span>
@@ -1330,13 +1244,13 @@ ${pinnedCmd}`}</code>
   }'`
         return (
           <div>
-            <div className="docs-endpoint-title">
+            <h1 className="docs-endpoint-title">
               <span className="docs-method-badge delete">DELETE</span>
               <span className="docs-endpoint-path">/people/:personId/links/:linkId</span>
-            </div>
+            </h1>
             <p>Deletes a specific social link connection from a person.</p>
 
-            <h3>Request Parameters</h3>
+            <h2>Request parameters</h2>
             <table className="docs-table">
               <thead>
                 <tr>
@@ -1356,7 +1270,7 @@ ${pinnedCmd}`}</code>
               </tbody>
             </table>
 
-            <h3>Request Example</h3>
+            <h2>Request example</h2>
             <div className="docs-code-container">
               <div className="docs-code-header">
                 <span>cURL</span>
@@ -1385,13 +1299,13 @@ ${pinnedCmd}`}</code>
   }'`
         return (
           <div>
-            <div className="docs-endpoint-title">
+            <h1 className="docs-endpoint-title">
               <span className="docs-method-badge delete">DELETE</span>
               <span className="docs-endpoint-path">/connections/:connectionId</span>
-            </div>
+            </h1>
             <p>Deletes a connector line between two nodes.</p>
 
-            <h3>Request Parameters</h3>
+            <h2>Request parameters</h2>
             <table className="docs-table">
               <thead>
                 <tr>
@@ -1411,7 +1325,7 @@ ${pinnedCmd}`}</code>
               </tbody>
             </table>
 
-            <h3>Request Example</h3>
+            <h2>Request example</h2>
             <div className="docs-code-container">
               <div className="docs-code-header">
                 <span>cURL</span>
@@ -1436,12 +1350,12 @@ ${pinnedCmd}`}</code>
   -H "Authorization: Bearer dn_live_your_token"`
         return (
           <div>
-            <div className="docs-endpoint-title">
+            <h1 className="docs-endpoint-title">
               <span className="docs-method-badge get">GET</span>
               <span className="docs-endpoint-path">/graph</span>
-            </div>
+            </h1>
             <p>Retrieves the entire graph state (circles, people, connections) and the current revision. This is useful for making backups.</p>
-            <h3>Request Example</h3>
+            <h2>Request example</h2>
             <div className="docs-code-container">
               <div className="docs-code-header">
                 <span>cURL</span>
@@ -1473,12 +1387,12 @@ ${pinnedCmd}`}</code>
   }'`
         return (
           <div>
-            <div className="docs-endpoint-title">
+            <h1 className="docs-endpoint-title">
               <span className="docs-method-badge post">PUT</span>
               <span className="docs-endpoint-path">/graph</span>
-            </div>
+            </h1>
             <p>Replaces the entire graph state with a new graph payload. Requires <code>graph:replace</code> scope. Revision conflicts return <code>409 Conflict</code> with the latest <code>revision</code>.</p>
-            <h3>Request Example</h3>
+            <h2>Request example</h2>
             <div className="docs-code-container">
               <div className="docs-code-header">
                 <span>cURL</span>
@@ -1505,12 +1419,12 @@ ${pinnedCmd}`}</code>
   }'`
         return (
           <div>
-            <div className="docs-endpoint-title">
+            <h1 className="docs-endpoint-title">
               <span className="docs-method-badge post">POST</span>
               <span className="docs-endpoint-path">/graph/clear</span>
-            </div>
+            </h1>
             <p>Clears all circles, people, and connections, resetting the graph to a single "You" circle. Requires <code>graph:replace</code> scope.</p>
-            <h3>Request Example</h3>
+            <h2>Request example</h2>
             <div className="docs-code-container">
               <div className="docs-code-header">
                 <span>cURL</span>
@@ -1540,12 +1454,12 @@ ${pinnedCmd}`}</code>
   }'`
         return (
           <div>
-            <div className="docs-endpoint-title">
+            <h1 className="docs-endpoint-title">
               <span className="docs-method-badge post">POST</span>
               <span className="docs-endpoint-path">/circles</span>
-            </div>
+            </h1>
             <p>Creates a new circle (either standalone or nested inside a parent circle). Requires <code>circles:write</code> scope.</p>
-            <h3>Request Example</h3>
+            <h2>Request example</h2>
             <div className="docs-code-container">
               <div className="docs-code-header">
                 <span>cURL</span>
@@ -1574,12 +1488,12 @@ ${pinnedCmd}`}</code>
   }'`
         return (
           <div>
-            <div className="docs-endpoint-title">
+            <h1 className="docs-endpoint-title">
               <span className="docs-method-badge post">PATCH</span>
               <span className="docs-endpoint-path">/circles/:circleId</span>
-            </div>
+            </h1>
             <p>Updates properties of a circle (name, coordinates, parentId, connectedTo, color tone, shape style, etc.). Requires <code>circles:write</code> scope.</p>
-            <h3>Request Example</h3>
+            <h2>Request example</h2>
             <div className="docs-code-container">
               <div className="docs-code-header">
                 <span>cURL</span>
@@ -1606,12 +1520,12 @@ ${pinnedCmd}`}</code>
   }'`
         return (
           <div>
-            <div className="docs-endpoint-title">
+            <h1 className="docs-endpoint-title">
               <span className="docs-method-badge delete">DELETE</span>
               <span className="docs-endpoint-path">/circles/:circleId</span>
-            </div>
+            </h1>
             <p>Deletes a circle. People in the deleted circle stay at their current positions but are detached from any circle. Nested child circles move to the deleted circle&apos;s parent. Requires <code>circles:write</code> scope.</p>
-            <h3>Request Example</h3>
+            <h2>Request example</h2>
             <div className="docs-code-container">
               <div className="docs-code-header">
                 <span>cURL</span>
@@ -1636,12 +1550,12 @@ ${pinnedCmd}`}</code>
   --data-binary "@avatar.png"`
         return (
           <div>
-            <div className="docs-endpoint-title">
+            <h1 className="docs-endpoint-title">
               <span className="docs-method-badge post">POST</span>
               <span className="docs-endpoint-path">/people/:personId/avatar</span>
-            </div>
+            </h1>
             <p>Uploads and updates a person's avatar photo. Accepts a raw binary payload (with image Content-Type) or a JSON body with <code>imageUrl</code> or <code>base64</code>. Requires <code>people:write</code> scope.</p>
-            <h3>Request Example (Raw Binary)</h3>
+            <h2>Request example (raw binary)</h2>
             <div className="docs-code-container">
               <div className="docs-code-header">
                 <span>cURL</span>
@@ -1666,12 +1580,12 @@ ${pinnedCmd}`}</code>
   --data-binary "@circle.png"`
         return (
           <div>
-            <div className="docs-endpoint-title">
+            <h1 className="docs-endpoint-title">
               <span className="docs-method-badge post">POST</span>
               <span className="docs-endpoint-path">/circles/:circleId/avatar</span>
-            </div>
+            </h1>
             <p>Uploads and updates a circle's photo. Accepts a raw binary payload (with image Content-Type) or a JSON body with <code>imageUrl</code> or <code>base64</code>. Requires <code>circles:write</code> scope.</p>
-            <h3>Request Example (Raw Binary)</h3>
+            <h2>Request example (raw binary)</h2>
             <div className="docs-code-container">
               <div className="docs-code-header">
                 <span>cURL</span>
@@ -1696,6 +1610,7 @@ ${pinnedCmd}`}</code>
       .filter((entry) => entry.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, 10)
+      .map((entry) => entry.article)
   }, [articles, searchTokens])
 
   const matchesSearch = useCallback(
@@ -1707,7 +1622,7 @@ ${pinnedCmd}`}</code>
     [articleById, searchTokens],
   )
 
-  const displayedArticle = articleById.get(activeArticleId) ?? articleById.get('welcome') ?? null
+  const displayedArticle = articleById.get(activeArticleId) ?? null
 
   const selectArticle = useCallback((id: string) => {
     setActiveArticleId(id)
@@ -1717,6 +1632,8 @@ ${pinnedCmd}`}</code>
     window.location.hash = `#docs/${id}`
     contentRef.current?.scrollTo({ top: 0 })
   }, [])
+
+  const closeMobileNav = useCallback(() => setMobileNavOpen(false), [])
 
   const toggleGroup = useCallback((groupId: string) => {
     setCollapsedGroups((prev) => {
@@ -1730,7 +1647,8 @@ ${pinnedCmd}`}</code>
   useEffect(() => {
     const syncFromHash = () => {
       const id = readArticleIdFromHash()
-      if (articleById.has(id)) setActiveArticleId(id)
+      setActiveArticleId(id)
+      setMobileNavOpen(false)
     }
     window.addEventListener('hashchange', syncFromHash)
     return () => window.removeEventListener('hashchange', syncFromHash)
@@ -1775,212 +1693,61 @@ ${pinnedCmd}`}</code>
     return () => document.removeEventListener('mousedown', handlePointerDown)
   }, [])
 
-  const handleGoHome = (event: MouseEvent) => {
-    event.preventDefault()
-    window.location.hash = ''
-  }
-
   return (
     <div className={`app-shell docs-container ${mobileNavOpen ? 'docs-nav-open' : ''}`}>
-      {/* Toast notifications */}
       {copiedStatus && (
-        <div style={{
-          position: 'fixed',
-          bottom: '24px',
-          right: '24px',
-          background: 'var(--md-on-surface)',
-          color: 'var(--md-surface)',
-          padding: '12px 24px',
-          borderRadius: 'var(--md-r-sm)',
-          fontSize: '13px',
-          boxShadow: 'var(--md-elev-3)',
-          zIndex: 9999,
-          animation: 'docsFadeIn 0.2s ease'
-        }}>
+        <div className="docs-toast" role="status" aria-live="polite">
           {copiedStatus}
         </div>
       )}
 
-      <header className="docs-header">
-        <a href="#" className="docs-brand" onClick={handleGoHome} aria-label="Back to Social Datanode home">
-          <img src={sdnLogo} alt="" aria-hidden="true" />
-          <span className="docs-brand-title">Developer Docs</span>
-        </a>
-        <div className="docs-controls">
-          <button
-            type="button"
-            className="docs-nav-toggle"
-            aria-expanded={mobileNavOpen}
-            onClick={() => setMobileNavOpen((open) => !open)}
-          >
-            {mobileNavOpen ? 'Hide menu' : 'Browse docs'}
-          </button>
-          <div className="docs-search-wrapper" ref={searchRef}>
-            <svg className="docs-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            </svg>
-            <input
-              type="search"
-              placeholder="Search endpoints, tools, topics…"
-              className="docs-search-input"
-              value={searchQuery}
-              aria-expanded={searchOpen && searchResults.length > 0}
-              aria-controls="docs-search-results"
-              onFocus={() => setSearchOpen(true)}
-              onChange={(e) => {
-                setSearchQuery(e.target.value)
-                setSearchOpen(true)
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && searchResults[0]) {
-                  e.preventDefault()
-                  selectArticle(searchResults[0].article.id)
-                }
-                if (e.key === 'Escape') {
-                  setSearchQuery('')
-                  setSearchOpen(false)
-                }
-              }}
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                className="docs-search-clear"
-                aria-label="Clear search"
-                onClick={() => {
-                  setSearchQuery('')
-                  setSearchOpen(false)
-                }}
-              >
-                ×
-              </button>
-            )}
-            {searchOpen && searchQuery.trim() && (
-              <div className="docs-search-dropdown" id="docs-search-results" role="listbox">
-                {searchResults.length > 0 ? (
-                  searchResults.map(({ article }) => (
-                    <button
-                      key={article.id}
-                      type="button"
-                      role="option"
-                      className="docs-search-result"
-                      onClick={() => selectArticle(article.id)}
-                    >
-                      <span className="docs-search-result__title">{article.title}</span>
-                      <span className="docs-search-result__meta">
-                        {article.category === 'api' ? 'REST API' : article.category === 'mcp' ? 'MCP' : article.category === 'cli' ? 'CLI' : 'Guide'}
-                      </span>
-                    </button>
-                  ))
-                ) : (
-                  <div className="docs-search-empty">No matches for “{searchQuery.trim()}”</div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
+      <DocsHeader
+        isAuthenticated={isAuthenticated}
+        mobileNavOpen={mobileNavOpen}
+        mobileNavTriggerRef={mobileNavTriggerRef}
+        onHome={() => { window.location.hash = '' }}
+        onContact={() => { window.location.hash = '#contact' }}
+        onBoard={() => { window.location.hash = '#board' }}
+        onLogin={onLogin}
+        onSignUp={onSignUp}
+        onToggleMobileNav={() => setMobileNavOpen((open) => !open)}
+        query={searchQuery}
+        searchOpen={searchOpen}
+        searchRef={searchRef}
+        searchResults={searchResults}
+        onQueryChange={(query) => {
+          setSearchQuery(query)
+          setSearchOpen(true)
+        }}
+        onSearchOpenChange={setSearchOpen}
+        onSelectArticle={selectArticle}
+      />
 
-      <aside className={`docs-sidebar ${mobileNavOpen ? 'is-open' : ''}`}>
-        {DOC_SECTIONS.map((section) => {
-          const visibleGroups = section.groups
-            .map((group) => ({
-              ...group,
-              articles: group.articleIds
-                .map((id) => articleById.get(id))
-                .filter((article): article is Article => Boolean(article))
-                .filter((article) => matchesSearch(article.id)),
-            }))
-            .filter((group) => group.articles.length > 0)
-
-          if (visibleGroups.length === 0) return null
-
-          return (
-            <div key={section.title || 'root'} className="docs-sidebar-section">
-              {section.title && (
-                <div className="docs-sidebar-section__title">{section.title}</div>
-              )}
-              {visibleGroups.map((group) => {
-                const isCollapsed = section.collapsible && collapsedGroups.has(group.id)
-                return (
-                  <div key={group.id} className="docs-sidebar-group">
-                    {section.collapsible ? (
-                      <button
-                        type="button"
-                        className="docs-sidebar-group__toggle"
-                        aria-expanded={!isCollapsed}
-                        onClick={() => toggleGroup(group.id)}
-                      >
-                        <span>{group.title}</span>
-                        <svg className={`docs-sidebar-group__chevron ${isCollapsed ? '' : 'is-open'}`} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                          <polyline points="6 9 12 15 18 9"></polyline>
-                        </svg>
-                      </button>
-                    ) : (
-                      <div className="docs-sidebar-group__label">{group.title}</div>
-                    )}
-                    {!isCollapsed && (
-                      <div className="docs-sidebar-list">
-                        {group.articles.map((article) => (
-                          <button
-                            key={article.id}
-                            type="button"
-                            className={`docs-sidebar-item ${activeArticleId === article.id ? 'is-active' : ''}`}
-                            onClick={() => selectArticle(article.id)}
-                          >
-                            <span>{article.title.replace(/^(GET|POST|PUT|PATCH|DELETE)\s+/, '')}</span>
-                            {article.badge && (
-                              <span className={`docs-sidebar-item__badge ${article.badge}`}>
-                                {article.badge}
-                              </span>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )
-        })}
-      </aside>
+      <DocsSidebar
+        activeArticleId={activeArticleId}
+        articleById={articleById}
+        collapsedGroups={collapsedGroups}
+        isOpen={mobileNavOpen}
+        matchesSearch={matchesSearch}
+        onClose={closeMobileNav}
+        onSelectArticle={selectArticle}
+        onToggleGroup={toggleGroup}
+        triggerElement={mobileNavTriggerRef.current}
+      />
 
       <main className="docs-content" ref={contentRef}>
-        {activeArticleId === 'welcome' && searchTokens.length === 0 && (
-          <div className="docs-quick-nav">
-            <button type="button" className="docs-quick-card" onClick={() => selectArticle('welcome')}>
-              <span className="docs-quick-card__label">Start here</span>
-              <strong>Authentication & basics</strong>
-              <span className="docs-quick-card__hint">Tokens, scopes, revision checks</span>
-            </button>
-            <button type="button" className="docs-quick-card" onClick={() => selectArticle('mcp-server')}>
-              <span className="docs-quick-card__label">MCP</span>
-              <strong>Connect an AI client</strong>
-              <span className="docs-quick-card__hint">Cursor, Claude Desktop, Windsurf</span>
-            </button>
-            <button type="button" className="docs-quick-card" onClick={() => selectArticle('cli-tool')}>
-              <span className="docs-quick-card__label">CLI</span>
-              <strong>Terminal commands</strong>
-              <span className="docs-quick-card__hint">npx or global install</span>
-            </button>
-            <button type="button" className="docs-quick-card" onClick={() => selectArticle('get-meta')}>
-              <span className="docs-quick-card__label">REST API</span>
-              <strong>HTTP reference</strong>
-              <span className="docs-quick-card__hint">Grouped by resource in the sidebar</span>
-            </button>
-          </div>
-        )}
-
         {displayedArticle ? (
-          <article className="docs-article is-visible" key={displayedArticle.id}>
+          <article className="docs-article" key={displayedArticle.id}>
             {displayedArticle.render(handleCopy)}
           </article>
         ) : (
           <div className="docs-no-results">
-            <h4>Page not found</h4>
-            <p>Pick a topic from the sidebar or use search above.</p>
+            <p className="docs-no-results__code">404</p>
+            <h1>Documentation page not found</h1>
+            <p>The link may be out of date. Return to the docs home or search for a topic.</p>
+            <button type="button" className="docs-button docs-button--filled" onClick={() => selectArticle('welcome')}>
+              Open docs home
+            </button>
           </div>
         )}
       </main>

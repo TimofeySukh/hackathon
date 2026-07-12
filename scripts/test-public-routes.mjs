@@ -51,8 +51,43 @@ async function main() {
         'The optimized landing image must decode at its original dimensions.',
       )
 
+      await page.getByRole('link', { name: 'Docs', exact: true }).click()
+      await page.getByRole('heading', { name: 'Build with Social Datanode', exact: true }).waitFor()
+      assert.equal(page.url(), `${baseUrl}/#docs`)
+      assert.equal(await page.locator('main h1').count(), 1, 'The docs home must have one page heading.')
+      assert.equal(await page.locator('.docs-quick-card').count(), 3, 'The docs home must expose three task-led routes.')
+      assert.match(await page.locator('.docs-brand').innerText(), /Social Datanode/)
+      assert.equal((await page.locator('body').innerText()).includes('**'), false, 'Rendered docs must not expose Markdown emphasis markers.')
+
+      const docsSearch = page.getByRole('combobox', { name: 'Search documentation' })
+      await docsSearch.fill('graph meta')
+      await page.getByRole('option', { name: /GET \/graph\/meta/ }).waitFor()
+      await docsSearch.press('Enter')
+      await page.getByRole('heading', { name: 'GET /graph/meta', exact: true }).waitFor()
+      assert.equal(page.url(), `${baseUrl}/#docs/get-meta`)
+      assert.equal(await page.locator('main h1').count(), 1, 'Reference pages must have one page heading.')
+
+      await page.goto(`${baseUrl}/#docs/does-not-exist`, { waitUntil: 'networkidle' })
+      await page.getByRole('heading', { name: 'Documentation page not found' }).waitFor()
+
+      await page.setViewportSize({ width: 393, height: 852 })
       await page.goto(`${baseUrl}/#docs`, { waitUntil: 'networkidle' })
-      await page.getByText('DataNode Developer Wiki', { exact: true }).waitFor()
+      await page.getByRole('heading', { name: 'Build with Social Datanode', exact: true }).waitFor()
+      assert.equal(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+        true,
+        'The mobile docs shell must not overflow horizontally.',
+      )
+      const authenticationBox = await page.getByRole('heading', { name: 'Authentication' }).boundingBox()
+      assert.ok(authenticationBox && authenticationBox.y < 852, 'Useful setup content must begin in the first mobile viewport.')
+
+      const contentsButton = page.getByRole('button', { name: 'Contents', exact: true })
+      await contentsButton.click()
+      const closeContentsButton = page.getByRole('button', { name: 'Close contents' })
+      await closeContentsButton.waitFor()
+      await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Close contents')
+      await closeContentsButton.click()
+      await page.waitForFunction(() => document.activeElement?.textContent?.includes('Contents'))
 
       await page.goto(`${baseUrl}/#contact`, { waitUntil: 'networkidle' })
       await page.getByRole('heading', { name: 'Talk to the team' }).waitFor()

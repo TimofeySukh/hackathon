@@ -42,7 +42,8 @@ theme toggle, stress-test slider panel, floating anonymous sign-in banner.
 
 - `src/main.tsx` — React entry.
 - `src/App.tsx` — shell: routing, board interaction host, inspector, settings, persistence wiring (~9.5k lines).
-- `src/LandingPage.tsx`, `src/DocsPage.tsx`, `src/ContactPage.tsx` — public screens.
+- `src/LandingPage.tsx`, `src/DocsPage.tsx`, `src/features/docs/`, `src/ContactPage.tsx` —
+  public screens and the developer-docs shell.
 - `src/lib/board/` — framework-free board engine (types, geometry, layout, render, hit-test).
 - `src/lib/graphPersistence.ts` — load/save, Realtime, revision conflicts.
 - `src/lib/localGraphStore.ts` — anonymous IndexedDB persistence and legacy migration.

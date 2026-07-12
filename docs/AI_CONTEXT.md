@@ -211,12 +211,13 @@ Local tools (not part of the hosted product):
 | Agent token UI API | `src/lib/agentApi.ts` |
 | Local + smart search | `src/lib/search/`, `src/lib/smartSearch.ts` |
 | LinkedIn enrichment client | `src/lib/linkedinEnrichment.ts` |
-| Landing / docs / contact | `src/LandingPage.tsx`, `DocsPage.tsx`, `ContactPage.tsx` |
+| Landing / docs / contact | `src/LandingPage.tsx`, `DocsPage.tsx`, `features/docs/`, `ContactPage.tsx` |
 | Shared UI components | `src/components/` (`M3Slider`, `SelectionIndicator`, …) |
 | Styles (Material 3 tokens) | `src/styles/` via `src/index.css` imports |
 
-Public **developer** documentation (API schemas, MCP setup) lives in `src/DocsPage.tsx` on
-the website — separate from this `docs/` product knowledge base.
+Public **developer** documentation uses `src/DocsPage.tsx` for API/CLI/MCP article content
+and `src/features/docs/` for its product-integrated header, navigation, search metadata,
+and quick-start UI. It is separate from this `docs/` product knowledge base.
 
 ---
 

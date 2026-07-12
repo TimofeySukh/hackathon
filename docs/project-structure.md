@@ -26,8 +26,15 @@ For a concise product summary see [`AI_CONTEXT.md`](AI_CONTEXT.md).
 - `App.tsx` — hash router views, board shell, inspector, settings, graph state, paint loop,
   LinkedIn import, search, auth dialog, agent settings overlay.
 - `LandingPage.tsx` — marketing landing (`#`).
-- `DocsPage.tsx` — developer documentation (`#docs`) — API, CLI, MCP setup.
+- `DocsPage.tsx` — developer documentation (`#docs`) article content and route composition.
 - `ContactPage.tsx` — team contact (`#contact`).
+
+### `src/features/docs/`
+
+- `DocsHeader.tsx` — shared product navigation, authentication actions, and docs search.
+- `DocsSidebar.tsx` — desktop contents and focus-managed mobile navigation drawer.
+- `DocsQuickStart.tsx` — task-led MCP, CLI, and REST API entry paths.
+- `navigation.ts`, `types.ts` — typed navigation/search registry and shared article types.
 
 ### `src/lib/board/` (framework-free board engine)
 

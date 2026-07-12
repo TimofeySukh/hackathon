@@ -1369,3 +1369,17 @@ rediscover, write it here.
   landing screenshot uses AVIF.
 - Why: The previous single 841 kB minified application chunk and 1.30 MB PNG made every
   first visit pay for code and bytes unrelated to the active route.
+
+### 2026-07-12 — Product-integrated developer documentation
+
+- Decision: Public developer documentation keeps the Social Datanode product identity and
+  public navigation, then presents MCP, CLI, and REST API as three task-led starting paths
+  inside a dedicated documentation shell.
+- Why: Replacing the landing header with unrelated developer-portal chrome made the docs
+  feel like a different product and hid the first useful content behind generic cards.
+- Decision: Desktop uses persistent contents, while phones use a focus-managed modal drawer
+  and horizontally peeking quick-start cards. Search is a keyboard-operable combobox backed
+  by the same typed metadata as navigation.
+- Why: Documentation must remain usable at dense desktop widths without consuming the first
+  mobile viewport with navigation. One shared registry also prevents search and navigation
+  labels from drifting apart.

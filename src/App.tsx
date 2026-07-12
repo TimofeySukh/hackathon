@@ -5241,7 +5241,7 @@ Content-Type: application/json
   "notes": [{ "body": "Met at conference" }]
 }`
 
-  if (viewMode === 'landing' || viewMode === 'contact') {
+  if (viewMode === 'landing' || viewMode === 'contact' || viewMode === 'docs') {
     const landingAuthProps = {
       onLogin: () => {
         setEmailAuthMode('signin')
@@ -5265,6 +5265,7 @@ Content-Type: application/json
         <Suspense fallback={<div className="app-shell" aria-busy="true" />}>
           {viewMode === 'landing' && <LandingPage {...landingAuthProps} />}
           {viewMode === 'contact' && <ContactPage {...landingAuthProps} />}
+          {viewMode === 'docs' && <DocsPage {...landingAuthProps} />}
         </Suspense>
         {showAuthDialog && (
           <div
@@ -5448,14 +5449,6 @@ Content-Type: application/json
         )}
         <GlobalTooltip />
       </div>
-    )
-  }
-
-  if (viewMode === 'docs') {
-    return (
-      <Suspense fallback={<div className="app-shell" aria-busy="true" />}>
-        <DocsPage />
-      </Suspense>
     )
   }
 
