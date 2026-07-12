@@ -20,7 +20,7 @@ Current product behavior (code-aligned):
   guide `?` until the guide is opened once.
 - Toolbar search: local ranked search, signed-in smart search, LinkedIn profile URL import.
 - Signed-in persistence: Supabase `user_graphs.graph` with revision-checked saves and
-  Realtime sync. Anonymous: `localStorage`.
+  Realtime sync. Anonymous: IndexedDB with one-time legacy `localStorage` migration.
 - Agent access: revocable tokens, `graph-api` Edge Function, CLI, MCP server.
 - No multiplayer, drawing tools, or sticky notes.
 
@@ -28,6 +28,8 @@ Out of scope (not built): real-time collaboration/presence, whiteboard drawing, 
 global theme toggle, stress-test UI panel.
 
 ## Local Setup
+
+Use Node.js 22 or newer. CI and deployment verification use Node.js 24.
 
 Install dependencies from the lockfile:
 
@@ -229,6 +231,21 @@ It does not touch production Supabase. The browser imports a generated LinkedIn 
 the board, then imports a board graph JSON and reloads again. The test fails unless both
 imports are written to the mock graph API and survive reload.
 
+Anonymous large-graph persistence uses a separate IndexedDB browser check:
+
+```bash
+npm run test:local-persistence
+```
+
+It imports a graph larger than 5 MB through Settings, verifies the complete graph in
+IndexedDB, reloads, and finds the last imported person through Search.
+
+Mobile board smoke checks run with:
+
+```bash
+npm run test:mobile
+```
+
 ## Auth Email E2E
 
 Production auth email uses Supabase custom SMTP pointed at Resend. Keep the Resend API
@@ -269,7 +286,8 @@ The home server polls GitHub from cron, so it does not need a public IP address,
 port forwarding, inbound SSH, or GitHub repository deploy secrets.
 
 Production does not deploy every push to `main`. A GitHub Actions manual workflow
-promotes a reviewed branch, tag, or commit SHA to the `production` branch. The server
+verifies a reviewed branch, tag, or commit SHA with `npm run quality`, then promotes it to
+the `production` branch. The server
 then notices that `production` changed and deploys it from inside the home network.
 
 Files:
@@ -707,6 +725,16 @@ Create a production build:
 ```bash
 npm run build
 ```
+
+Run the same fail-closed gate used by CI and production promotion:
+
+```bash
+npm run quality
+```
+
+This audits dependencies, requires zero lint warnings, builds the app, enforces the
+JavaScript/image size budgets, and runs the import, IndexedDB, persistence, and mobile
+browser checks plus lazy public-route smoke coverage.
 
 Run lint checks:
 

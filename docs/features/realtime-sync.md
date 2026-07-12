@@ -14,6 +14,10 @@ local edits.
 - **No unsaved local changes:** the canvas updates to the remote graph immediately.
 - **Unsaved local changes exist:** a warning banner appears, autosave pauses, and the user
   must reload to reconcile (optimistic concurrency).
+- A client that loaded an empty account still treats a later insert by another client as a
+  conflict. `expectedRevision: null` never auto-adopts the new revision for autosave.
+- Only an explicit full graph JSON import may recover an unknown revision and retry the
+  replacement once after an initial load failure.
 
 ## Design
 
@@ -27,6 +31,8 @@ local edits.
   [`../../src/lib/graphPersistence.ts`](../../src/lib/graphPersistence.ts)
 - **Key refs:** `graphRef`, `loadedGraphRevisionRef`, `loadedGraphSnapshotRef`,
   `pendingSaveGraphRef`, `pendingSaveSnapshotRef`, `isGraphStateEqual`
+- **Regression coverage:** `scripts/test-ui-import-persistence.mjs` opens two clients on an
+  empty account and verifies that the stale client cannot replace the first writer.
 
 ## Open questions / TODO
 

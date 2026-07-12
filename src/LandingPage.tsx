@@ -1,6 +1,6 @@
 import type { MouseEvent } from 'react'
 import sdnLogo from './assets/sdn-logo.svg'
-import productBoardInspector from './assets/landing/product-board-inspector.png'
+import productBoardInspector from './assets/landing/product-board-inspector.avif'
 
 const BOARD_ONBOARDING_FORCE_KEY = 'social-board-onboarding-open-v3'
 

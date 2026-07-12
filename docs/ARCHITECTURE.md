@@ -20,7 +20,8 @@ Runtime boundaries:
 
 The board is a live product. Signed-in users load and autosave through Supabase with
 revision checks and Realtime sync. Anonymous visitors edit a board persisted to
-`localStorage`. A brand-new board is blank: a single `You` circle — **no demo seed**.
+IndexedDB. Existing `localStorage` graphs migrate once after the IndexedDB write succeeds.
+A brand-new board is blank: a single `You` circle — **no demo seed**.
 
 ## Current Frontend Shape
 
@@ -33,6 +34,10 @@ revision checks and Realtime sync. Anonymous visitors edit a board persisted to
   hit-testing, Canvas 2D).
 - `src/lib/graphPersistence.ts` — signed-in saves via `graph-api` first, RLS fallback,
   Realtime subscription, revision conflicts.
+- `src/lib/localGraphStore.ts` — anonymous IndexedDB reads/writes and legacy
+  `localStorage` migration; storage failures propagate to the board UI.
+- `src/lib/csv.ts`, `src/lib/linkedinArchiveZip.ts` — reusable CSV parsing and lazily
+  loaded LinkedIn ZIP extraction.
 - `src/lib/agentApi.ts` — agent token management from Settings.
 - `src/lib/useAuth.ts` — session and auth flows.
 - `src/lib/smartSearch.ts`, `src/lib/search/graphSearch.ts` — smart and local search.
@@ -55,7 +60,7 @@ Current scope:
 - selection, dragging, group drag, resize, merge-into-subset
 - pan, cursor-centered wheel/pinch zoom, zones-only far zoom, inertial pan on mobile
 - Google and email/password auth; revision-checked Supabase autosave + Realtime sync
-- anonymous `localStorage` editing
+- anonymous IndexedDB editing with one-time legacy `localStorage` migration
 - LinkedIn ZIP import and signed-in single-profile/archive enrichment
 - per-person notes, tags, connections inside the graph blob
 - board search and signed-in smart search
@@ -80,6 +85,8 @@ Out of scope (not built):
 - Keep all graph rows user-owned and protected by RLS keyed to `auth.uid()`.
 - Keep graph writes revision-checked. A stale browser tab, CLI, or MCP agent must get a
   conflict instead of overwriting newer data.
+- Keep unknown-revision conflict recovery exclusive to explicit full graph replacement.
+  Autosave, LinkedIn merge import, and AI enrichment must fail closed on every conflict.
 - Keep agent tokens hashed at rest, scoped, revocable, and mapped to one user. API
   callers never provide `user_id`.
 - Never let a missing graph row silently overwrite a user's server data with a blank

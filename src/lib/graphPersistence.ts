@@ -448,46 +448,27 @@ export async function saveGraph(
   }
 
   const safeGraph = sanitizeGraphForJsonb(graph)
-  let data: { revision?: unknown } | null
-  let savedFromRevision = expectedRevision
+  const data = await writeGraphWithFallback(userId, safeGraph, expectedRevision, options)
+  return typeof data?.revision === 'number' ? data.revision : expectedRevision === null ? 1 : expectedRevision + 1
+}
+
+/**
+ * Replaces the graph after an initial load failure. This conflict recovery is
+ * intentionally separate from saveGraph so autosave and merge imports cannot
+ * turn an unknown revision into permission to overwrite another writer.
+ */
+export async function replaceGraphAfterUnknownRevision(
+  userId: string,
+  graph: GraphState,
+  expectedRevision: number | null,
+  options: SaveGraphOptions = {},
+): Promise<number | null> {
   try {
-    data = await writeGraphWithFallback(userId, safeGraph, expectedRevision, options)
+    return await saveGraph(userId, graph, expectedRevision, options)
   } catch (error) {
     if (!(error instanceof GraphRevisionConflictError) || expectedRevision !== null) throw error
     const latestRevision = await readLatestGraphRevision(userId, error.revision)
     if (latestRevision === null) throw error
-    savedFromRevision = latestRevision
-    data = await writeGraphWithFallback(userId, safeGraph, latestRevision, options)
-  }
-  return typeof data?.revision === 'number' ? data.revision : savedFromRevision === null ? 1 : savedFromRevision + 1
-}
-
-// ---- Local (signed-out) persistence ----------------------------------------
-// Visitors who aren't signed in still get their work saved — just in this
-// browser via localStorage instead of Supabase. Signing in switches over to the
-// cloud-backed graph above.
-
-const LOCAL_GRAPH_KEY = 'hackathon-board:local-graph'
-
-/** Returns the locally saved graph, or null when nothing is stored yet. */
-export function loadLocalGraph(): GraphState | null {
-  try {
-    const raw = window.localStorage.getItem(LOCAL_GRAPH_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as unknown
-    if (!isGraphState(parsed)) return null
-    return parsed
-  } catch (error) {
-    console.error('Failed to load local graph', error)
-    return null
-  }
-}
-
-/** Persists the graph to localStorage for signed-out visitors. */
-export function saveLocalGraph(graph: GraphState): void {
-  try {
-    window.localStorage.setItem(LOCAL_GRAPH_KEY, JSON.stringify(graph))
-  } catch (error) {
-    console.error('Failed to save local graph', error)
+    return await saveGraph(userId, graph, latestRevision, options)
   }
 }

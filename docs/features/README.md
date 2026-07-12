@@ -30,6 +30,7 @@ humans or AI agents.
 - [Smart search](smart-search.md) — signed-in natural-language search with AI interpretation.
 - [Local LinkedIn agent search](local-linkedin-agent-search.md) — read-only local JSONL retrieval (30k/50k token budgets).
 - [Authentication](auth.md) — local editing, Google/email auth, recovery, sign-in entry points.
+- [Anonymous persistence](anonymous-persistence.md) — IndexedDB graph storage, legacy migration, and visible save failures.
 - [Import load testing](import-load-testing.md) — database and browser import verification.
 - [Landing page](landing-page.md) — marketing entry, hash routing, inspector demo.
 - [Agent API](agent-api.md) — revocable tokens, graph API, CLI, MCP.

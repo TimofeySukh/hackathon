@@ -72,6 +72,7 @@ function startMockGraphApi({ port }) {
     failGraphReads: 0,
     failGraphWrites: 0,
     graphConflictIncludesRevision: true,
+    graphConflicts: 0,
     enrichmentRequests: [],
     enrichmentResponseDelayMs: 0,
   }
@@ -195,6 +196,7 @@ function startMockGraphApi({ port }) {
           return
         }
         if (body.expectedRevision !== state.revision) {
+          state.graphConflicts += 1
           jsonResponse(
             response,
             409,
@@ -471,6 +473,25 @@ async function waitForEnrichmentRequestCount(mock, expectedCount) {
   throw new Error(`Timed out waiting for ${expectedCount} LinkedIn archive enrichment request(s).`)
 }
 
+async function waitForEnrichmentRequestAfter(mock, startIndex, predicate) {
+  const startedAt = Date.now()
+  while (Date.now() - startedAt < 60000) {
+    const match = mock.state.enrichmentRequests.slice(startIndex).find(predicate)
+    if (match) return match
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+  throw new Error(`Timed out waiting for a matching LinkedIn archive enrichment request after index ${startIndex}.`)
+}
+
+async function waitForGraphConflictCount(mock, expectedCount) {
+  const startedAt = Date.now()
+  while (Date.now() - startedAt < 10000) {
+    if (mock.state.graphConflicts >= expectedCount) return
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+  throw new Error(`Timed out waiting for graph conflict ${expectedCount}; got ${mock.state.graphConflicts}.`)
+}
+
 async function waitForGraphPerson(mock, personId) {
   const startedAt = Date.now()
   while (Date.now() - startedAt < 60000) {
@@ -503,6 +524,42 @@ async function main() {
 
     await page.goto(`${vite.url}/#board`, { waitUntil: 'networkidle' })
     await waitForGraphRead(mock, 1)
+    await page.getByLabel('Settings', { exact: true }).click()
+
+    const stalePage = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
+    await stalePage.addInitScript(() => {
+      window.localStorage.clear()
+      window.localStorage.setItem('social-board-onboarding-done-v3', '1')
+    })
+    const readsBeforeStaleLoad = mock.state.reads
+    await stalePage.goto(`${vite.url}/#board`, { waitUntil: 'networkidle' })
+    await waitForGraphRead(mock, readsBeforeStaleLoad + 1)
+
+    const firstWriterGraph = buildGraphImportFixture()
+    firstWriterGraph.people[0].id = 'first-empty-account-writer'
+    await uploadAndAcceptDialog(
+      page,
+      page.locator('input[type="file"][accept="application/json,.json"]'),
+      {
+        name: 'first-empty-account-writer.json',
+        mimeType: 'application/json',
+        buffer: Buffer.from(`${JSON.stringify(firstWriterGraph)}\n`),
+      },
+    )
+    const conflictsBeforeStaleSave = mock.state.graphConflicts
+    await stalePage.locator('.graph-surface').dispatchEvent('dblclick', { clientX: 1100, clientY: 500 })
+    await waitForGraphConflictCount(mock, conflictsBeforeStaleSave + 1)
+    if (mock.state.graph?.people?.[0]?.id !== 'first-empty-account-writer') {
+      throw new Error('A stale empty-account writer overwrote the graph created by the first client.')
+    }
+    await stalePage.close()
+
+    mock.state.graph = null
+    mock.state.revision = null
+    mock.state.enrichmentRequests = []
+    const readsBeforeRaceReset = mock.state.reads
+    await page.reload({ waitUntil: 'networkidle' })
+    await waitForGraphRead(mock, readsBeforeRaceReset + 1)
     await page.getByLabel('Settings', { exact: true }).click()
 
     mock.state.enrichmentResponseDelayMs = 1500
@@ -584,6 +641,8 @@ async function main() {
       throw new Error(`ZIP import used only one LinkedIn company tone: ${JSON.stringify([...importedCompanyTones])}.`)
     }
 
+    const expectedNewPersonId = `linkedin-person-persist${args.people + 1}-person${args.people + 1}`
+    const enrichmentRequestBaseline = mock.state.enrichmentRequests.length
     const incrementalZipBuffer = await buildLinkedInZip({
       people: args.people + 1,
       companies: args.companies,
@@ -595,8 +654,11 @@ async function main() {
       buffer: incrementalZipBuffer,
     })
     await waitForImportedPeople(mock, args.people + 1)
-    const incrementalEnrichmentRequest = await waitForEnrichmentRequestCount(mock, 2)
-    const expectedNewPersonId = `linkedin-person-persist${args.people + 1}-person${args.people + 1}`
+    const incrementalEnrichmentRequest = await waitForEnrichmentRequestAfter(
+      mock,
+      enrichmentRequestBaseline,
+      (request) => (request.connections ?? []).some((connection) => connection.personId === expectedNewPersonId),
+    )
     const incrementalConnectionIds = (incrementalEnrichmentRequest.connections ?? []).map((connection) => connection.personId)
     const expectedIncrementalConnectionIds = new Set(['linkedin-person-persist1-person1', expectedNewPersonId])
     if (

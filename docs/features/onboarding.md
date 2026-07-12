@@ -24,7 +24,7 @@ creating people and circles, moving/resizing zones, selecting an area, adding a 
   Hassabis, Larry Page, Jeff Dean, and Sundar Pichai.
 - Each demo person has a role note and one profile connection so the inspector teaches
   real person-card structure.
-- Autosave/localStorage persistence ignores the temporary demo graph. Finishing or
+- Autosave/IndexedDB persistence ignores the temporary demo graph. Finishing or
   dismissing onboarding restores the user's previous saved/local graph, clears demo data,
   and shows the success notice "You successfully completed onboarding. Demo data has been
   removed."

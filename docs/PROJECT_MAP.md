@@ -16,7 +16,7 @@ Social Datanode is a live React + Vite + TypeScript product (not a local-only pr
 - Circles (nested groups), people, authored connections, pan/zoom, direct touch controls.
 - Create menu, double-tap create, drag, marquee select, resize, merge-into-subset.
 - Google and email/password auth; per-user graph in Supabase (revision-checked autosave);
-  anonymous editing in `localStorage`.
+  anonymous editing in IndexedDB with legacy `localStorage` migration.
 - LinkedIn ZIP import + signed-in single-profile/archive enrichment; board search + smart search.
 - Revocable agent tokens; graph API; CLI (`datanode-cli`); MCP server (`datanode-mcp`).
 - Landing page, developer docs page, and contact page (hash routes).
@@ -41,10 +41,12 @@ theme toggle, stress-test slider panel, floating anonymous sign-in banner.
 ### Application
 
 - `src/main.tsx` — React entry.
-- `src/App.tsx` — shell: routing, board interaction host, inspector, settings, persistence wiring (~7k lines).
+- `src/App.tsx` — shell: routing, board interaction host, inspector, settings, persistence wiring (~9.5k lines).
 - `src/LandingPage.tsx`, `src/DocsPage.tsx`, `src/ContactPage.tsx` — public screens.
 - `src/lib/board/` — framework-free board engine (types, geometry, layout, render, hit-test).
 - `src/lib/graphPersistence.ts` — load/save, Realtime, revision conflicts.
+- `src/lib/localGraphStore.ts` — anonymous IndexedDB persistence and legacy migration.
+- `src/lib/csv.ts`, `src/lib/linkedinArchiveZip.ts` — CSV parsing and lazy ZIP extraction.
 - `src/lib/useAuth.ts` — Supabase auth session and flows.
 - `src/lib/agentApi.ts` — agent token management from Settings.
 - `src/lib/smartSearch.ts`, `src/lib/search/` — local and smart search.
@@ -74,6 +76,7 @@ theme toggle, stress-test slider panel, floating anonymous sign-in banner.
 ### Deploy
 
 - `.github/workflows/deploy-social-datanode-live.yml` — production promotion to `production` branch.
+- `.github/workflows/quality.yml` — pull-request and protected-branch quality gate.
 - `.github/workflows/deploy-datanode-digitalocean-test.yml` — manual DigitalOcean test deploy.
 - `.github/workflows/shutdown-datanode-digitalocean-test.yml` — manual DigitalOcean test app deletion.
 - `.github/workflows/deploy-datanode-azure-test.yml` — manual Azure Static Web Apps test deploy.

@@ -133,8 +133,9 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   parent circle, so a parent-level person cannot visually sit inside a subset they do not
   belong to. People use a tight collision and containment radius only slightly larger than
   the visual avatar, while larger region/company circles keep their normal spacing.
-- Signed-in state autosaves to Supabase after edits; anonymous state stays in
-  `localStorage`.
+- Signed-in state autosaves to Supabase after edits; anonymous state stays in IndexedDB.
+  A legacy `localStorage` graph migrates only after its IndexedDB write succeeds, and
+  storage failures remain visible in the board error banner.
 
 ## Design
 

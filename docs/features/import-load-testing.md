@@ -71,7 +71,7 @@ not thousands of per-contact database writes.
 - Large imports are processed in chunks that yield back to the browser between batches,
   so the settings panel can repaint and the event loop is not blocked for the whole import.
 - After a successful import, the resulting graph is written immediately to the active
-  storage backend (Supabase for signed-in users, `localStorage` for anonymous users)
+  storage backend (Supabase for signed-in users, IndexedDB for anonymous users)
   before the success alert is shown. The normal debounced autosave then skips the same
   unchanged snapshot.
 - Graph persistence strips Postgres-unsafe NUL characters and replaces invalid lone
@@ -88,6 +88,9 @@ not thousands of per-contact database writes.
   or depending on client-library serialization for large graph blobs.
 - The import button is disabled while a ZIP import is running and shows `Importing...`.
 - Duplicate imported people are skipped by generated LinkedIn person id.
+- Incremental-enrichment verification identifies the new logical run from a request
+  baseline and the expected new person id. It does not assume that one import produces one
+  server request because enrichment is intentionally batched.
 
 ## Verification
 
@@ -102,6 +105,10 @@ This runs:
 - `npm run test:db-load -- --people 3000 --connections 3000`
 - `npm run test:ui-import -- --people 3000`
 - `npm run test:ui-import:persistence`
+
+Run the anonymous large-graph persistence check separately with
+`npm run test:local-persistence`; it imports more than 5 MB, reloads, and verifies Search
+against the restored IndexedDB graph.
 
 The database load test is dry-run by default. It generates the same graph payload shape
 that Supabase receives and reports the serialized size without writing anything.

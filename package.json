@@ -10,18 +10,25 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "check:bundle": "node ./scripts/check-build-output.mjs",
     "lint": "eslint .",
+    "lint:ci": "eslint . --max-warnings=0",
     "test:db-load": "node ./scripts/test-database-load.mjs",
     "test:ui-import": "node ./scripts/test-ui-import-responsiveness.mjs",
     "test:ui-import:persistence": "node ./scripts/test-ui-import-persistence.mjs",
+    "test:local-persistence": "node ./scripts/test-local-graph-persistence.mjs",
+    "test:mobile": "node ./scripts/test-mobile-search-placeholder.mjs && node ./scripts/test-mobile-overlay-exclusivity.mjs",
+    "test:public-routes": "node ./scripts/test-public-routes.mjs",
     "test:load": "npm run test:db-load -- --people 3000 --connections 3000 && npm run test:ui-import -- --people 3000 && npm run test:ui-import:persistence",
+    "test:ci": "npm run test:load && npm run test:local-persistence && npm run test:mobile && npm run test:public-routes",
+    "quality": "npm audit --audit-level=high && npm run lint:ci && npm run build && npm run check:bundle && npm run test:ci",
     "preview": "vite preview",
     "linkedin:agent-search": "node ./scripts/linkedin-agent-search.mjs",
     "datanode:cli": "node ./scripts/datanode-cli.mjs",
     "datanode:mcp": "node ./scripts/datanode-mcp.mjs"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.103.3",
+    "@supabase/supabase-js": "^2.110.2",
     "@zip.js/zip.js": "^2.8.26",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"

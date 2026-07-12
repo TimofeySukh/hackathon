@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react'
 import type { User } from '@supabase/supabase-js'
-import * as zip from '@zip.js/zip.js'
 import linkedinIcon from './assets/brands/linkedin.svg'
 import telegramIcon from './assets/brands/telegram.svg'
 import instagramIcon from './assets/brands/instagram.svg'
@@ -12,15 +11,19 @@ import websiteIcon from './assets/brands/website.svg'
 import googleIcon from './assets/brands/google.svg'
 import sdnLogo from './assets/sdn-logo.svg'
 
-zip.configure({ useWebWorkers: false })
 import { cancelPendingBoardAuthReturn, consumeAuthReturnHash, hasPendingBoardAuthReturn, useAuth } from './lib/useAuth'
-import LandingPage from './LandingPage'
-import ContactPage from './ContactPage'
-import DocsPage from './DocsPage'
 import { createAgentToken, getGraphApiBaseUrl, listAgentTokens, revokeAgentToken } from './lib/agentApi'
 import type { AgentScope, AgentTokenRecord } from './lib/agentApi'
 import { isE2EFakeAuth, supabase } from './lib/supabase'
-import { GraphRevisionConflictError, loadGraphRecord, saveGraph, loadLocalGraph, saveLocalGraph } from './lib/graphPersistence'
+import {
+  GraphRevisionConflictError,
+  loadGraphRecord,
+  replaceGraphAfterUnknownRevision,
+  saveGraph,
+} from './lib/graphPersistence'
+import { loadLocalGraph, saveLocalGraph } from './lib/localGraphStore'
+import { parseCSV } from './lib/csv'
+import type { LinkedInArchiveZipTexts } from './lib/linkedinArchiveZip'
 import { enrichLinkedInProfile } from './lib/linkedinEnrichment'
 import {
   enrichLinkedInArchiveBatch,
@@ -99,6 +102,10 @@ import {
 } from './lib/board/layout'
 import { createBoardIndex, hitTestBoard, readAnimFrame, drawBoardLayer, setBoardRepaintCallback, resolveCircleEdgeHover } from './lib/board/render'
 import { makeInitials } from './lib/board/text'
+
+const LandingPage = lazy(() => import('./LandingPage'))
+const ContactPage = lazy(() => import('./ContactPage'))
+const DocsPage = lazy(() => import('./DocsPage'))
 
 export type { CircleNode, PersonNode, Connection, GraphState, CircleTone } from './lib/board/types'
 
@@ -206,6 +213,38 @@ type SearchResult = {
   color?: string
 }
 
+function graphSearchResultsToUi(
+  results: ReturnType<typeof searchGraphByQuery>,
+  peopleById: Map<string, PersonNode>,
+  circlesById: Map<string, CircleNode>,
+): SearchResult[] {
+  return results.map((result) => {
+    if (result.type === 'person') {
+      const person = peopleById.get(result.id)
+      const circle = circlesById.get(result.circleId)
+      return {
+        kind: 'person' as const,
+        id: result.id,
+        name: result.name,
+        sub: result.subtitle,
+        aiReason: result.aiReason,
+        avatarUrl: person?.imageUrl,
+        initials: makeInitials(result.name),
+        color: circle ? getCircleColors(circle).centerBg : undefined,
+      }
+    }
+    const circle = circlesById.get(result.id)
+    return {
+      kind: 'circle' as const,
+      id: result.id,
+      name: result.name,
+      sub: result.subtitle || 'Circle',
+      aiReason: result.aiReason,
+      color: circle ? getCircleColors(circle).centerBg : undefined,
+    }
+  })
+}
+
 type LinkedInProfileImport = {
   url: string
   slug: string
@@ -259,17 +298,6 @@ type LinkedInArchiveLlmContext = {
   messages: LinkedInArchiveMessageInput[]
   invitations: LinkedInArchiveInvitationInput[]
   posts: LinkedInArchivePostInput[]
-}
-
-type LinkedInArchiveZipTexts = {
-  connectionsText: string
-  positionsText: string | null
-  richMediaText: string | null
-  recommendationsReceivedText: string | null
-  recommendationsGivenText: string | null
-  messagesText: string | null
-  invitationsText: string | null
-  sharesText: string | null
 }
 
 type LinkedInArchiveAiProgress = {
@@ -911,6 +939,7 @@ function App() {
   // The board stays hidden until then so the demo seed never flashes or gets saved.
   const [graphLoaded, setGraphLoaded] = useState(false)
   const [graphLoadError, setGraphLoadError] = useState<string | null>(null)
+  const localSaveRequestIdRef = useRef(0)
   const [onboardingCompletionNotice, setOnboardingCompletionNotice] = useState<string | null>(null)
   // Bumped when an avatar image finishes decoding, to force a board repaint.
   const [imageEpoch, setImageEpoch] = useState(0)
@@ -1121,23 +1150,39 @@ function App() {
 
   useEffect(() => {
     if (!isLocalMode) return
+    let cancelled = false
 
     setGraphLoaded(false)
     setGraphLoadError(null)
-    const saved = loadLocalGraph()
-    if (saved) {
-      const sanitized = sanitizeDefaultCircleStyles(saved)
-      loadedGraphSourceRef.current = 'local'
-      loadedGraphSnapshotRef.current = JSON.stringify(sanitized)
-      loadedGraphRevisionRef.current = null
-      setGraph(sanitized)
-    } else {
-      loadedGraphSourceRef.current = 'empty'
-      loadedGraphSnapshotRef.current = JSON.stringify(graph)
-      loadedGraphRevisionRef.current = null
+    void loadLocalGraph()
+      .then((saved) => {
+        if (cancelled) return
+        if (saved) {
+          const sanitized = sanitizeDefaultCircleStyles(saved)
+          loadedGraphSourceRef.current = 'local'
+          loadedGraphSnapshotRef.current = JSON.stringify(sanitized)
+          loadedGraphRevisionRef.current = null
+          setGraph(sanitized)
+        } else {
+          loadedGraphSourceRef.current = 'empty'
+          loadedGraphSnapshotRef.current = JSON.stringify(graphRef.current)
+          loadedGraphRevisionRef.current = null
+        }
+      })
+      .catch((error) => {
+        if (cancelled) return
+        console.error('Failed to load local graph', error)
+        loadedGraphSourceRef.current = 'local'
+        loadedGraphSnapshotRef.current = JSON.stringify(graphRef.current)
+        loadedGraphRevisionRef.current = null
+        setGraphLoadError('Your local board could not be loaded. New changes may not survive a reload until browser storage is available.')
+      })
+      .finally(() => {
+        if (!cancelled) setGraphLoaded(true)
+      })
+    return () => {
+      cancelled = true
     }
-    setGraphLoaded(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLocalMode])
 
   // Debounced local autosave for signed-out visitors.
@@ -1145,7 +1190,20 @@ function App() {
     if (onboardingDemoActiveRef.current) return
     if (!graphLoaded || !isLocalMode) return
     const timer = window.setTimeout(() => {
-      saveLocalGraph(graph)
+      const requestId = localSaveRequestIdRef.current + 1
+      localSaveRequestIdRef.current = requestId
+      void saveLocalGraph(graph)
+        .then(() => {
+          if (localSaveRequestIdRef.current !== requestId) return
+          loadedGraphSourceRef.current = 'local'
+          loadedGraphSnapshotRef.current = JSON.stringify(graph)
+          setGraphLoadError(null)
+        })
+        .catch((error) => {
+          if (localSaveRequestIdRef.current !== requestId) return
+          console.error('Failed to save local graph', error)
+          setGraphLoadError('Your local board could not be saved. Keep this tab open and retry after freeing browser storage.')
+        })
     }, 800)
     return () => window.clearTimeout(timer)
   }, [graph, graphLoaded, isLocalMode])
@@ -1153,6 +1211,7 @@ function App() {
   async function persistGraphImmediately(nextGraph: GraphState, options: {
     expectedRevision?: number | null
     signal?: AbortSignal
+    replaceAfterUnknownRevision?: boolean
   } = {}) {
     if (auth.status === 'authenticated' && userId) {
       try {
@@ -1160,7 +1219,8 @@ function App() {
         pendingSaveGraphRef.current = nextGraph
         pendingSaveSnapshotRef.current = graphJson
         const expectedRevision = options.expectedRevision ?? loadedGraphRevisionRef.current
-        const nextRevision = await saveGraph(userId, nextGraph, expectedRevision, { signal: options.signal })
+        const persist = options.replaceAfterUnknownRevision ? replaceGraphAfterUnknownRevision : saveGraph
+        const nextRevision = await persist(userId, nextGraph, expectedRevision, { signal: options.signal })
         if (options.signal?.aborted) return
         loadedGraphRevisionRef.current = nextRevision
         loadedGraphSourceRef.current = 'saved'
@@ -1180,10 +1240,14 @@ function App() {
     }
 
     if (isLocalMode) {
-      saveLocalGraph(nextGraph)
+      const requestId = localSaveRequestIdRef.current + 1
+      localSaveRequestIdRef.current = requestId
+      await saveLocalGraph(nextGraph)
+      if (localSaveRequestIdRef.current !== requestId) return
       loadedGraphSourceRef.current = 'local'
       loadedGraphSnapshotRef.current = JSON.stringify(nextGraph)
       clearPendingSave()
+      setGraphLoadError(null)
     }
     setGraph(nextGraph)
   }
@@ -1220,6 +1284,8 @@ function App() {
   const prevSelectionRef = useRef<SelectedItem>(null)
   const ringCircleIdRef = useRef<string | null>(null)
   const edgeHoverCircleIdRef = useRef<string | null>(null)
+  const startBoardAnimRef = useRef<(key: string, duration: number, morph?: CircleMorph) => void>(() => {})
+  const animateEdgeHoverToRef = useRef<(circleId: string, target: number) => void>(() => {})
 
 
 
@@ -1234,6 +1300,7 @@ function App() {
   const [createMenu, setCreateMenu] = useState<CreateMenu | null>(null)
   const [selectedItem, setSelectedItem] = useState<SelectedItem>(null)
   const [renderedInspectorItem, setRenderedInspectorItem] = useState<SelectedItem>(null)
+  const renderedInspectorItemRef = useRef<SelectedItem>(null)
   const [isInspectorOpen, setIsInspectorOpen] = useState(false)
   const isInspectorOpenRef = useRef(false)
   const inspectorCloseTimeoutRef = useRef<number | null>(null)
@@ -1243,13 +1310,17 @@ function App() {
   }, [isInspectorOpen])
 
   useEffect(() => {
+    renderedInspectorItemRef.current = renderedInspectorItem
+  }, [renderedInspectorItem])
+
+  useEffect(() => {
     if (selectedItem) {
       if (inspectorCloseTimeoutRef.current !== null) {
         window.clearTimeout(inspectorCloseTimeoutRef.current)
         inspectorCloseTimeoutRef.current = null
       }
 
-      const stayOpen = isInspectorOpenRef.current && renderedInspectorItem !== null
+      const stayOpen = isInspectorOpenRef.current && renderedInspectorItemRef.current !== null
       setRenderedInspectorItem(selectedItem)
 
       if (stayOpen) {
@@ -1527,6 +1598,11 @@ function App() {
     completeOnboardingStep(step)
   }
 
+  const completeOnboardingActionRef = useRef<(action: OnboardingAction) => void>(() => {})
+  useLayoutEffect(() => {
+    completeOnboardingActionRef.current = completeOnboardingAction
+  })
+
   function openLinkedInGuide() {
     const step = onboardingStepRef.current
     const currentTrigger = onboardingSteps[step]?.trigger
@@ -1763,36 +1839,6 @@ function App() {
     window.requestAnimationFrame(() => searchInputRef.current?.focus())
   }
 
-  function graphSearchResultsToUi(
-    results: ReturnType<typeof searchGraphByQuery>,
-  ): SearchResult[] {
-    return results.map((result) => {
-      if (result.type === 'person') {
-        const person = peopleById.get(result.id)
-        const circle = circlesById.get(result.circleId)
-        return {
-          kind: 'person' as const,
-          id: result.id,
-          name: result.name,
-          sub: result.subtitle,
-          aiReason: result.aiReason,
-          avatarUrl: person?.imageUrl,
-          initials: makeInitials(result.name),
-          color: circle ? getCircleColors(circle).centerBg : undefined,
-        }
-      }
-      const circle = circlesById.get(result.id)
-      return {
-        kind: 'circle' as const,
-        id: result.id,
-        name: result.name,
-        sub: result.subtitle || 'Circle',
-        aiReason: result.aiReason,
-        color: circle ? getCircleColors(circle).centerBg : undefined,
-      }
-    })
-  }
-
   async function handleImportLinkedInProfileFromSearch(rawValue = searchQuery) {
     if (isImportingLinkedInProfile) return
     const profileUrl = getLinkedInProfileImportUrl(rawValue)
@@ -1960,6 +2006,7 @@ function App() {
     setLinkedInArchiveAiProgress(null)
 
     try {
+      const { readLinkedInArchiveZip } = await import('./lib/linkedinArchiveZip')
       const archive = await readLinkedInArchiveZip(file)
 
       const archiveContext = buildLinkedInArchiveContext({
@@ -2109,7 +2156,7 @@ function App() {
         ? stampYouIdentity(importedGraph, auth.session.user)
         : importedGraph
       pushHistory()
-      await persistGraphImmediately(nextGraph)
+      await persistGraphImmediately(nextGraph, { replaceAfterUnknownRevision: true })
       selectItem(null)
       setSelectedPeopleIds([])
       setCreateMenu(null)
@@ -2787,13 +2834,13 @@ function App() {
           sub: isImportingLinkedInProfile ? linkedInUrl : linkedInUrl,
         }]
       : []
-    const ranked = graphSearchResultsToUi(searchGraphByQuery(
-      searchGraph,
-      q,
-      8,
-    ))
+    const ranked = graphSearchResultsToUi(
+      searchGraphByQuery(searchGraph, q, 8),
+      peopleById,
+      circlesById,
+    )
     return [...linkedInImport, ...ranked].slice(0, 8)
-  }, [debouncedSearchQuery, isImportingLinkedInProfile, searchGraph])
+  }, [debouncedSearchQuery, isImportingLinkedInProfile, searchGraph, peopleById, circlesById])
 
   const isAiSearchActive = auth.status === 'authenticated' && shouldUseSmartSearch(debouncedSearchQuery.trim())
   const searchResults = isAiSearchActive
@@ -2840,7 +2887,7 @@ function App() {
                 sub: isImportingLinkedInProfile ? linkedInUrl : linkedInUrl,
               }]
             : []
-          const ranked = graphSearchResultsToUi(mapSmartSearchResults(response.results))
+          const ranked = graphSearchResultsToUi(mapSmartSearchResults(response.results), peopleById, circlesById)
           setAiSearchResults([...linkedInImport, ...ranked].slice(0, 8))
           setAiSearchExplanation(response.explanation || null)
           setAiSearchSteps(response.steps ?? [])
@@ -3049,12 +3096,12 @@ function App() {
           : circlesById.get(prevId)
       if (node) {
         handleExitNodesRef.current.set(prevId, node)
-        startBoardAnim(`handles-out:${prevId}`, 220)
+        startBoardAnimRef.current(`handles-out:${prevId}`, 220)
       }
     }
 
     if (nextId && (nextId !== prevId || handlesTurnedOnSameCircle)) {
-      startBoardAnim(`handles:${nextId}`, 300)
+      startBoardAnimRef.current(`handles:${nextId}`, 300)
     }
   }, [selectedItem, graph.circles, graph.people, circlesById])
 
@@ -3063,11 +3110,11 @@ function App() {
     const prevRingId = ringCircleIdRef.current
 
     if (circleId && circleId !== prevRingId) {
-      if (prevRingId) startBoardAnim(`ring-out:${prevRingId}`, RING_ANIM_MS)
-      startBoardAnim(`ring:${circleId}`, RING_ANIM_MS)
+      if (prevRingId) startBoardAnimRef.current(`ring-out:${prevRingId}`, RING_ANIM_MS)
+      startBoardAnimRef.current(`ring:${circleId}`, RING_ANIM_MS)
       ringCircleIdRef.current = circleId
     } else if (!circleId && prevRingId) {
-      startBoardAnim(`ring-out:${prevRingId}`, RING_ANIM_MS)
+      startBoardAnimRef.current(`ring-out:${prevRingId}`, RING_ANIM_MS)
       ringCircleIdRef.current = null
     }
   }, [selectedItem])
@@ -3076,8 +3123,8 @@ function App() {
     const prev = edgeHoverCircleIdRef.current
     if (hoveredCircleEdgeId === prev) return
 
-    if (prev) animateEdgeHoverTo(prev, 0)
-    if (hoveredCircleEdgeId) animateEdgeHoverTo(hoveredCircleEdgeId, 1)
+    if (prev) animateEdgeHoverToRef.current(prev, 0)
+    if (hoveredCircleEdgeId) animateEdgeHoverToRef.current(hoveredCircleEdgeId, 1)
     edgeHoverCircleIdRef.current = hoveredCircleEdgeId
   }, [hoveredCircleEdgeId])
 
@@ -3527,6 +3574,11 @@ function App() {
     startScalarBoardAnim(`edge-hover:${circleId}`, EDGE_HOVER_ANIM_MS, from, target)
   }
 
+  useLayoutEffect(() => {
+    startBoardAnimRef.current = startBoardAnim
+    animateEdgeHoverToRef.current = animateEdgeHoverTo
+  })
+
   // Repaint the people canvas whenever the settled camera, people, viewport or
   // interactive set changes. (Gesture frames are handled imperatively above.)
   useEffect(() => {
@@ -3591,7 +3643,7 @@ function App() {
           x: currentCamera.x - wheelDelta(event, 'x'),
           y: currentCamera.y - wheelDelta(event, 'y'),
         })
-        completeOnboardingAction('navigate')
+        completeOnboardingActionRef.current('navigate')
         return
       }
 
@@ -3611,7 +3663,7 @@ function App() {
         x: pointer.x - before.x * nextScale,
         y: pointer.y - before.y * nextScale,
       })
-      completeOnboardingAction('navigate')
+      completeOnboardingActionRef.current('navigate')
     }
 
     surface.addEventListener('wheel', handleWheel, { passive: false })
@@ -5210,8 +5262,10 @@ Content-Type: application/json
 
     return (
       <div className="app-shell">
-        {viewMode === 'landing' && <LandingPage {...landingAuthProps} />}
-        {viewMode === 'contact' && <ContactPage {...landingAuthProps} />}
+        <Suspense fallback={<div className="app-shell" aria-busy="true" />}>
+          {viewMode === 'landing' && <LandingPage {...landingAuthProps} />}
+          {viewMode === 'contact' && <ContactPage {...landingAuthProps} />}
+        </Suspense>
         {showAuthDialog && (
           <div
             className={`auth-overlay ${showAuthDialog ? 'is-open' : ''}`}
@@ -5398,7 +5452,11 @@ Content-Type: application/json
   }
 
   if (viewMode === 'docs') {
-    return <DocsPage />
+    return (
+      <Suspense fallback={<div className="app-shell" aria-busy="true" />}>
+        <DocsPage />
+      </Suspense>
+    )
   }
 
   return (
@@ -7291,136 +7349,6 @@ Content-Type: application/json
 
 // The canvas board engine (spatial index, hit-testing, rendering) lives in
 // lib/board/render.ts; App owns chrome/inspector/menu UI and calls into it.
-
-function findZipEntryByFileName(entries: zip.Entry[], fileName: string) {
-  return entries.find((entry) => entry.filename === fileName || entry.filename.endsWith(`/${fileName}`)) ?? null
-}
-
-function isZipTextEntry(entry: zip.Entry): entry is zip.Entry & { getData: (writer: unknown) => Promise<unknown> } {
-  return 'getData' in entry && typeof entry.getData === 'function'
-}
-
-async function readZipTextEntry(entry: zip.Entry): Promise<string> {
-  if (!isZipTextEntry(entry)) {
-    throw new Error(`Could not read ${entry.filename}.`)
-  }
-  const data = await entry.getData(new zip.TextWriter())
-  if (typeof data !== 'string') {
-    throw new Error(`Could not read ${entry.filename}.`)
-  }
-  return data
-}
-
-async function readOptionalZipTextEntry(entries: zip.Entry[], fileName: string): Promise<string | null> {
-  const entry = findZipEntryByFileName(entries, fileName)
-  return entry ? readZipTextEntry(entry) : null
-}
-
-function serializeCsvCell(value: string) {
-  return /[",\n\r]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value
-}
-
-function mergeLinkedInMessageCsvTexts(primaryText: string | null, fallbackText: string | null) {
-  if (!primaryText?.trim()) return fallbackText
-  if (!fallbackText?.trim()) return primaryText
-
-  const primaryRows = parseCSV(primaryText)
-  const fallbackRows = parseCSV(fallbackText)
-  const primaryHasData = primaryRows.length > 1
-  const fallbackHasData = fallbackRows.length > 1
-  if (primaryHasData && fallbackHasData) return `${primaryText.trim()}\n${fallbackRows.slice(1).map((row) => row.map(serializeCsvCell).join(',')).join('\n')}`
-  if (primaryHasData) return primaryText
-  return fallbackText
-}
-
-async function readLinkedInArchiveZip(file: File): Promise<LinkedInArchiveZipTexts> {
-  const zipReader = new zip.ZipReader(new zip.BlobReader(file))
-  try {
-    const entries = await zipReader.getEntries()
-    const connectionsEntry = findZipEntryByFileName(entries, 'Connections.csv')
-    if (!connectionsEntry) {
-      throw new Error('Could not find Connections.csv inside the ZIP file.')
-    }
-
-    const [
-      connectionsText,
-      positionsText,
-      richMediaText,
-      recommendationsReceivedText,
-      recommendationsGivenText,
-      messagesText,
-      guideMessagesText,
-      invitationsText,
-      sharesText,
-    ] = await Promise.all([
-      readZipTextEntry(connectionsEntry),
-      readOptionalZipTextEntry(entries, 'Positions.csv'),
-      readOptionalZipTextEntry(entries, 'Rich_Media.csv'),
-      readOptionalZipTextEntry(entries, 'Recommendations_Received.csv'),
-      readOptionalZipTextEntry(entries, 'Recommendations_Given.csv'),
-      readOptionalZipTextEntry(entries, 'messages.csv'),
-      readOptionalZipTextEntry(entries, 'guide_messages.csv'),
-      readOptionalZipTextEntry(entries, 'Invitations.csv'),
-      readOptionalZipTextEntry(entries, 'Shares.csv'),
-    ])
-
-    return {
-      connectionsText,
-      positionsText,
-      richMediaText,
-      recommendationsReceivedText,
-      recommendationsGivenText,
-      messagesText: mergeLinkedInMessageCsvTexts(messagesText, guideMessagesText),
-      invitationsText,
-      sharesText,
-    }
-  } finally {
-    await zipReader.close()
-  }
-}
-
-function parseCSV(text: string): string[][] {
-  const lines: string[][] = []
-  let row: string[] = []
-  let inQuotes = false
-  let currentValue = ''
-
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i]
-    const nextChar = text[i + 1]
-
-    if (char === '"') {
-      if (inQuotes && nextChar === '"') {
-        currentValue += '"'
-        i++ // skip next quote
-      } else {
-        inQuotes = !inQuotes
-      }
-    } else if (char === ',' && !inQuotes) {
-      row.push(currentValue.trim())
-      currentValue = ''
-    } else if ((char === '\n' || char === '\r') && !inQuotes) {
-      if (char === '\r' && nextChar === '\n') {
-        i++
-      }
-      row.push(currentValue.trim())
-      if (row.length > 0 && row.some(val => val !== '')) {
-        lines.push(row)
-      }
-      row = []
-      currentValue = ''
-    } else {
-      currentValue += char
-    }
-  }
-  if (currentValue || row.length > 0) {
-    row.push(currentValue.trim())
-    if (row.some(val => val !== '')) {
-      lines.push(row)
-    }
-  }
-  return lines
-}
 
 function yieldToBrowser(): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, 0))

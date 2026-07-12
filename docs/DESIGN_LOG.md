@@ -1345,3 +1345,27 @@ rediscover, write it here.
 
 - Decision: Renamed the **Manage API keys** button in the Settings drawer's **Agent API** section to **Connect MCP**, opening the Agent Settings overlay directly on the **Quick setup** tab as before.
 - Why: Simplifies user flow for connecting external tools to their graph by presenting a clearer button name, while maintaining the default quick-access setup workflow.
+
+### 2026-07-12 — Fail-closed graph persistence and release quality gate
+
+- Decision: `saveGraph` treats every revision mismatch as a conflict, including when the
+  caller expected no graph row. Recovering an unknown revision and retrying is a separate
+  operation used only by the explicit full graph JSON import.
+- Why: Two clients can both load a fresh account before either inserts the first row.
+  Automatically adopting the winner's revision in generic autosave lets the loser replace
+  that graph and violates the stale-writer invariant.
+- Decision: Anonymous graph persistence moved from synchronous `localStorage` to IndexedDB.
+  Existing local graphs migrate only after the IndexedDB write succeeds, and storage
+  failures propagate to a visible board error instead of being logged and ignored.
+- Why: Real imported graphs can exceed the practical localStorage range; an import must not
+  report success if it will disappear after reload.
+- Decision: Pull requests, `main`, `production`, and manual production promotion use the
+  same `npm run quality` gate. Dependencies are audited, lint allows no warnings,
+  the app builds, and signed-in import, anonymous persistence, load, and mobile browser
+  checks must pass before promotion.
+- Why: A production branch move is a release action and must fail closed on the same
+  evidence contributors run locally.
+- Decision: Public pages, Supabase, and LinkedIn ZIP code ship as separate chunks; the
+  landing screenshot uses AVIF.
+- Why: The previous single 841 kB minified application chunk and 1.30 MB PNG made every
+  first visit pay for code and bytes unrelated to the active route.

@@ -47,6 +47,9 @@ For a concise product summary see [`AI_CONTEXT.md`](AI_CONTEXT.md).
 | `supabase.ts` | Browser Supabase client from Vite env vars. |
 | `useAuth.ts` | Session, Google/email auth, recovery, sign-out. |
 | `graphPersistence.ts` | Load/save graph blob; Realtime; revision conflicts. |
+| `localGraphStore.ts` | Anonymous IndexedDB persistence and one-time legacy migration. |
+| `csv.ts` | Shared CSV parser and serializer. |
+| `linkedinArchiveZip.ts` | Lazily loaded LinkedIn archive extraction. |
 | `agentApi.ts` | Agent token CRUD via graph API. |
 | `agentBoardContext.ts` | Agent-facing board context helpers. |
 | `linkedinEnrichment.ts` | Single-profile enrichment Edge Function client. |

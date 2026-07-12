@@ -4,7 +4,7 @@
 When other docs disagree with this file or with the code, trust the code and update the
 conflicting doc.
 
-Last verified against the repository: 2026-07-02.
+Last verified against the repository: 2026-07-12.
 
 ---
 
@@ -73,7 +73,7 @@ Denmark, Pandora, etc.).
 
 | Session | Storage | Path |
 |---------|---------|------|
-| Anonymous | `localStorage` | Browser-only graph JSON |
+| Anonymous | IndexedDB | Browser-only graph JSON; legacy `localStorage` data migrates once |
 | Signed-in | Supabase `user_graphs` | Revision-checked writes |
 
 Signed-in save path:
@@ -86,6 +86,8 @@ Safety invariants:
 
 - Never autosave a blank fresh graph over missing server data on load.
 - Stale writers get `409 Conflict` and must reload.
+- An unknown revision never grants autosave permission to overwrite an existing row. Only
+  an explicit full graph JSON import may recover the latest revision and retry once.
 - Agent tokens are hashed at rest; callers never pass `user_id`.
 
 ---
@@ -200,9 +202,11 @@ Local tools (not part of the hosted product):
 
 | Area | Location |
 |------|----------|
-| App shell, routing, inspector, settings, persistence wiring | `src/App.tsx` (~7k lines; extraction ongoing) |
+| App shell, routing, inspector, settings, persistence wiring | `src/App.tsx` (~9.5k lines; extraction ongoing) |
 | Board engine (geometry, layout, render, hit-test) | `src/lib/board/` |
 | Graph load/save, Realtime, revision conflicts | `src/lib/graphPersistence.ts` |
+| Anonymous IndexedDB graph storage + legacy migration | `src/lib/localGraphStore.ts` |
+| CSV and lazy LinkedIn ZIP reading | `src/lib/csv.ts`, `src/lib/linkedinArchiveZip.ts` |
 | Auth hook | `src/lib/useAuth.ts` |
 | Agent token UI API | `src/lib/agentApi.ts` |
 | Local + smart search | `src/lib/search/`, `src/lib/smartSearch.ts` |
