@@ -145,6 +145,8 @@ Safety invariants:
 
 - People and connections: Backspace/Delete.
 - Circles: **only** via inspector **Delete circle** + confirmation (not keyboard).
+- A multi-selection panel can delete all selected people and non-root circles immediately in
+  one undoable operation. Unselected contents survive and are detached or promoted as needed.
 
 **Other**:
 

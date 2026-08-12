@@ -91,6 +91,12 @@ app — everything else (toolbar, panels, inspector) is chrome around it.
   can still be deleted with Backspace/Delete.
 - **Area select**: on desktop, right-drag empty space to draw a marquee selection box.
   On touch/mobile, hold empty space, then drag across the board.
+  When at least two nodes are selected, the selection panel offers **Merge into subset**,
+  **Delete selected**, and **Cancel**. Delete selected removes all selected people and all
+  selected circles except the protected `You` root without a confirmation dialog. Unselected
+  people inside a removed circle stay at their world position and become free-floating;
+  unselected child circles move to the nearest surviving ancestor. One Ctrl/Cmd+Z restores
+  the complete deletion.
 - **Onboarding guide**: first board visit opens a short board guide; landing CTAs
   force-open it for that launch, and signed-out/local users can reopen it from the toolbar
   Help button. Signed-in users do not see this toolbar Help button. While open, the

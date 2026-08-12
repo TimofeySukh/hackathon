@@ -14,7 +14,7 @@ Social Datanode is a live React + Vite + TypeScript product (not a local-only pr
 - Full-window relationship circle graph on Canvas 2D; React owns chrome, panels, persistence.
 - Blank new board: central `You` circle only — **no demo seed**.
 - Circles (nested groups), people, authored connections, pan/zoom, direct touch controls.
-- Create menu, double-tap create, drag, marquee select, resize, merge-into-subset.
+- Create menu, double-tap create, drag, marquee select, resize, merge-into-subset, bulk delete.
 - Google and email/password auth; per-user graph in Supabase (revision-checked autosave);
   anonymous editing in IndexedDB with legacy `localStorage` migration.
 - LinkedIn ZIP import + signed-in single-profile/archive enrichment; board search + smart search.

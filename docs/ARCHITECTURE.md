@@ -59,7 +59,7 @@ Current scope:
 - central `You` circle, connected external circles, nested subset circles, people
 - create menu, double-tap create, connector drag-to-create
 - direct touch gestures with hold-and-drag marquee selection
-- selection, dragging, group drag, resize, merge-into-subset
+- selection, dragging, group drag, resize, merge-into-subset, atomic multi-selection delete
 - pan, cursor-centered wheel/pinch zoom, zones-only far zoom, inertial pan on mobile
 - Google and email/password auth; revision-checked Supabase autosave + Realtime sync
 - anonymous IndexedDB editing with one-time legacy `localStorage` migration

@@ -1,5 +1,16 @@
 # Design Log
 
+### 2026-08-12 — Multi-selection deletion is immediate and atomic
+
+- Decision: the existing multi-selection panel now offers **Delete selected** alongside
+  **Merge into subset** and **Cancel**. It deletes selected people and selected non-root
+  circles without a confirmation dialog, while the protected `You` circle remains.
+- The combined graph mutation creates one undo snapshot. Ctrl/Cmd+Z therefore restores the
+  entire deleted selection at once. Unselected people and child circles survive with repaired
+  membership and parent references, and connections to deleted nodes are removed.
+- Why: bulk selection already establishes explicit intent, so a second confirmation adds
+  friction. A single atomic undo step provides the requested recovery path.
+
 An append-only log of durable design decisions worth remembering: chosen directions,
 deliberate deviations, rejected options, and "we tried X, it didn't work" notes. This is
 the project's design memory — when something comes up that future work should not have to

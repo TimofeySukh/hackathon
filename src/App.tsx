@@ -136,6 +136,56 @@ function settleInteractionGraph(state: GraphState) {
   return shouldRunGlobalInteractionLayout(state) ? ensureContainment(state) : state
 }
 
+function deleteGraphSelection(
+  state: GraphState,
+  selectedPersonIds: string[],
+  selectedCircleIds: string[],
+): GraphState {
+  const deletedPersonIds = new Set(selectedPersonIds)
+  const deletedCircleIds = new Set(selectedCircleIds.filter((id) => id !== 'you'))
+  const circlesById = new Map(state.circles.map((circle) => [circle.id, circle]))
+
+  const nextCircles = state.circles
+    .filter((circle) => !deletedCircleIds.has(circle.id))
+    .map((circle) => {
+      let parentId = circle.parentId
+      if (parentId && deletedCircleIds.has(parentId)) {
+        const visited = new Set<string>()
+        while (parentId && deletedCircleIds.has(parentId) && !visited.has(parentId)) {
+          visited.add(parentId)
+          parentId = circlesById.get(parentId)?.parentId ?? null
+        }
+        if (!parentId || deletedCircleIds.has(parentId) || parentId === circle.id) {
+          parentId = 'you'
+        }
+      }
+
+      return {
+        ...circle,
+        parentId,
+        connectedTo: circle.connectedTo && deletedCircleIds.has(circle.connectedTo)
+          ? null
+          : circle.connectedTo,
+      }
+    })
+
+  const nextPeople = state.people
+    .filter((person) => !deletedPersonIds.has(person.id))
+    .map((person) => deletedCircleIds.has(person.circleId) ? { ...person, circleId: '' } : person)
+
+  const deletedNodeIds = new Set([...deletedPersonIds, ...deletedCircleIds])
+  const nextConnections = (state.connections || []).filter(
+    (connection) => !deletedNodeIds.has(connection.fromId) && !deletedNodeIds.has(connection.toId),
+  )
+
+  return {
+    ...state,
+    circles: nextCircles,
+    people: nextPeople,
+    connections: nextConnections,
+  }
+}
+
 function graphHasConnectionBetween(state: GraphState, fromId: string, toId: string) {
   if (fromId === toId) return true
   const matchesPair = (a: string | null | undefined, b: string | null | undefined) =>
@@ -2696,6 +2746,24 @@ function App() {
     } else if (selectedItem?.type === 'connection') {
       deleteConnection(selectedItem.id)
     }
+  }
+
+  function deleteMultiSelection() {
+    const hasDeletableSelection = selectedPeopleIds.length > 0 || selectedCircleIds.some((id) => id !== 'you')
+    if (!hasDeletableSelection) {
+      setSelectedPeopleIds([])
+      setSelectedCircleIds([])
+      selectItem(null)
+      return
+    }
+
+    pushHistory()
+    setGraph((current) => settleInteractionGraph(
+      deleteGraphSelection(current, selectedPeopleIds, selectedCircleIds),
+    ))
+    setSelectedPeopleIds([])
+    setSelectedCircleIds([])
+    selectItem(null)
   }
 
   useEffect(() => {
@@ -6065,6 +6133,13 @@ Content-Type: application/json
               onClick={handleMergeSelected}
             >
               Merge into subset
+            </button>
+            <button
+              type="button"
+              className="primary-action multi-selection-delete-action"
+              onClick={deleteMultiSelection}
+            >
+              Delete selected
             </button>
             <button
               type="button"
