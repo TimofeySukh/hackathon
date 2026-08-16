@@ -26,41 +26,8 @@ type BeginGoogleOAuthOptions = {
   signIn: (options: { redirectTo: string; skipBrowserRedirect: boolean }) => Promise<OAuthResult>
 }
 
-type CloseGoogleOAuthPopupOptions = {
-  authenticated: boolean
-  url?: string
-  close?: () => void
-}
-
-const AUTH_POPUP_SEARCH_PARAM = 'sdn_auth_popup'
-const GOOGLE_AUTH_POPUP_VALUE = 'google'
-
 export function isEmbeddedContext(target: WindowRelationship = window) {
   return target.self !== target.top
-}
-
-export function addGoogleOAuthPopupMarker(redirectTo: string, embedded: boolean) {
-  if (!embedded) return redirectTo
-
-  const url = new URL(redirectTo)
-  url.searchParams.set(AUTH_POPUP_SEARCH_PARAM, GOOGLE_AUTH_POPUP_VALUE)
-  return url.toString()
-}
-
-export function closeGoogleOAuthPopupAfterSignIn({
-  authenticated,
-  url = window.location.href,
-  close = () => window.close(),
-}: CloseGoogleOAuthPopupOptions) {
-  if (!authenticated) return false
-
-  const callbackUrl = new URL(url)
-  if (callbackUrl.searchParams.get(AUTH_POPUP_SEARCH_PARAM) !== GOOGLE_AUTH_POPUP_VALUE) {
-    return false
-  }
-
-  close()
-  return true
 }
 
 export async function beginGoogleOAuth({

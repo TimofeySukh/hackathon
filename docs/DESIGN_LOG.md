@@ -1408,7 +1408,3 @@ rediscover, write it here.
   Google sign-in keeps the existing full-page redirect.
 - Why: Google authentication pages cannot render inside an iframe, while a user-initiated
   popup can complete OAuth on the production origin without navigating the moi workspace.
-- Decision: Embedded Google OAuth adds a callback marker to its redirect URL and closes
-  that script-opened callback window as soon as Supabase restores the authenticated session.
-- Why: Without an explicit callback lifecycle, the popup remained open on the production
-  app after login and looked like moi had redirected the user out to the standalone site.
