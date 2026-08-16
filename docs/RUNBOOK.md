@@ -309,6 +309,17 @@ curl -sSI https://social.datanode.live/embed | rg -i 'content-security-policy|x-
 the verified local moi workspace origin (`http://localhost:13337`) and approved
 ChatGPT/OpenAI ancestors, and must not return `X-Frame-Options`.
 
+Supabase **Authentication → URL Configuration → Redirect URLs** must include the exact
+embedded Google callback URL:
+
+```text
+https://social.datanode.live/embed?sdn_auth_return=board
+```
+
+The embedded Google flow adds `sdn_auth_popup=google` to that callback. Verify with an OAuth
+callback probe that Supabase preserves both query parameters. If the redirect is not
+allowlisted, Supabase falls back to the configured Site URL and the popup marker is lost.
+
 What it does:
 
 - keeps deploy control in GitHub without requiring GitHub to SSH into the server

@@ -1408,3 +1408,9 @@ rediscover, write it here.
   Google sign-in keeps the existing full-page redirect.
 - Why: Google authentication pages cannot render inside an iframe, while a user-initiated
   popup can complete OAuth on the production origin without navigating the moi workspace.
+- Decision: The embedded redirect URL is explicitly allowlisted in Supabase and carries an
+  `sdn_auth_popup=google` marker. Only a top-level, authenticated callback with that marker
+  closes itself; embedded and ordinary standalone sessions never call `window.close()`.
+- Why: Supabase falls back to its Site URL when `redirectTo` is not allowlisted. Verifying
+  the provider callback before adding client behavior prevents a missing external setting
+  from being hidden behind storage heuristics or broad window-closing logic.
