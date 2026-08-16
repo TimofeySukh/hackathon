@@ -17,9 +17,11 @@ password so a database user is created without forcing profile setup.
   reset request, and password update from a Supabase recovery link.
 - The `/embed` application uses the real production origin and therefore shares the normal
   Supabase session, IndexedDB graph, and Realtime connection. Email/password authentication
-  stays inside the frame. Google authentication opens in a marked popup only when embedded;
-  after Supabase restores the session, that callback window closes itself while the board
-  remains in moi. The standalone site keeps its existing full-page redirect.
+  stays inside the frame. Google authentication opens in a marked popup only when embedded.
+  A short-lived `sessionStorage` marker is cloned into that popup before it leaves for
+  Google, so the callback closes after Supabase restores the session even when Supabase
+  falls back from the requested `/embed` redirect to the configured root Site URL. The
+  board remains in moi, and the standalone site keeps its existing full-page redirect.
 - Framing is limited to the verified local moi workspace origin (`http://localhost:13337`)
   and the hosted ChatGPT/OpenAI ancestors listed in the production nginx policy.
 - Email registration requires only an email and a password. Email confirmation is still

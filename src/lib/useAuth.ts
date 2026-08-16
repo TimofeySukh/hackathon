@@ -4,8 +4,10 @@ import type { Session } from '@supabase/supabase-js'
 import {
   addGoogleOAuthPopupMarker,
   beginGoogleOAuth,
+  clearGoogleOAuthPopupMarker,
   closeGoogleOAuthPopupAfterSignIn,
   isEmbeddedContext,
+  rememberGoogleOAuthPopup,
 } from './embeddedAuth'
 import { e2eFakeAccessToken, e2eFakeUserId, isE2EFakeAuth, supabase } from './supabase'
 
@@ -315,7 +317,10 @@ export function useAuth() {
   }, [])
 
   useEffect(() => {
-    closeGoogleOAuthPopupAfterSignIn({ authenticated: authState.status === 'authenticated' })
+    const authenticated = authState.status === 'authenticated'
+    const embedded = isEmbeddedContext()
+    closeGoogleOAuthPopupAfterSignIn({ authenticated, embedded })
+    if (authenticated && embedded) clearGoogleOAuthPopupMarker()
   }, [authState.status])
 
   const signInWithGoogle = async () => {
@@ -324,6 +329,7 @@ export function useAuth() {
     const embedded = isEmbeddedContext()
 
     rememberBoardAuthReturn()
+    if (embedded) rememberGoogleOAuthPopup()
     const { error } = await beginGoogleOAuth({
       embedded,
       redirectTo: addGoogleOAuthPopupMarker(getAuthRedirectUrl(), embedded),
@@ -349,6 +355,7 @@ export function useAuth() {
 
     if (error) {
       cancelPendingBoardAuthReturn()
+      clearGoogleOAuthPopupMarker()
       setAuthState((currentState) => ({ ...currentState, error }))
     }
   }

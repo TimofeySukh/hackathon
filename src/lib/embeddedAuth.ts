@@ -28,12 +28,17 @@ type BeginGoogleOAuthOptions = {
 
 type CloseGoogleOAuthPopupOptions = {
   authenticated: boolean
+  embedded?: boolean
   url?: string
+  storage?: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
+  now?: number
   close?: () => void
 }
 
 const AUTH_POPUP_SEARCH_PARAM = 'sdn_auth_popup'
 const GOOGLE_AUTH_POPUP_VALUE = 'google'
+const GOOGLE_AUTH_POPUP_STORAGE_KEY = 'sdn.googleOAuthPopupExpiresAt'
+const GOOGLE_AUTH_POPUP_TTL_MS = 10 * 60 * 1000
 
 export function isEmbeddedContext(target: WindowRelationship = window) {
   return target.self !== target.top
@@ -47,18 +52,59 @@ export function addGoogleOAuthPopupMarker(redirectTo: string, embedded: boolean)
   return url.toString()
 }
 
+export function rememberGoogleOAuthPopup(
+  storage: Pick<Storage, 'setItem'> = window.sessionStorage,
+  now = Date.now(),
+) {
+  try {
+    storage.setItem(GOOGLE_AUTH_POPUP_STORAGE_KEY, String(now + GOOGLE_AUTH_POPUP_TTL_MS))
+  } catch {
+    // The URL marker remains available when sessionStorage is blocked.
+  }
+}
+
+export function clearGoogleOAuthPopupMarker(
+  storage: Pick<Storage, 'removeItem'> = window.sessionStorage,
+) {
+  try {
+    storage.removeItem(GOOGLE_AUTH_POPUP_STORAGE_KEY)
+  } catch {
+    // Ignore storage access errors.
+  }
+}
+
+function hasStoredGoogleOAuthPopupMarker(
+  storage: Pick<Storage, 'getItem' | 'removeItem'>,
+  now: number,
+) {
+  try {
+    const expiresAt = Number(storage.getItem(GOOGLE_AUTH_POPUP_STORAGE_KEY) || 0)
+    if (Number.isFinite(expiresAt) && expiresAt > now) return true
+    storage.removeItem(GOOGLE_AUTH_POPUP_STORAGE_KEY)
+  } catch {
+    // The URL marker remains available when sessionStorage is blocked.
+  }
+  return false
+}
+
 export function closeGoogleOAuthPopupAfterSignIn({
   authenticated,
+  embedded = isEmbeddedContext(),
   url = window.location.href,
+  storage = window.sessionStorage,
+  now = Date.now(),
   close = () => window.close(),
 }: CloseGoogleOAuthPopupOptions) {
-  if (!authenticated) return false
+  if (!authenticated || embedded) return false
 
   const callbackUrl = new URL(url)
-  if (callbackUrl.searchParams.get(AUTH_POPUP_SEARCH_PARAM) !== GOOGLE_AUTH_POPUP_VALUE) {
+  const hasUrlMarker = callbackUrl.searchParams.get(AUTH_POPUP_SEARCH_PARAM) === GOOGLE_AUTH_POPUP_VALUE
+  const hasStorageMarker = hasStoredGoogleOAuthPopupMarker(storage, now)
+  if (!hasUrlMarker && !hasStorageMarker) {
     return false
   }
 
+  clearGoogleOAuthPopupMarker(storage)
   close()
   return true
 }
