@@ -1,50 +1,10 @@
 import assert from 'node:assert/strict'
 
-import {
-  addGoogleOAuthPopupMarker,
-  beginGoogleOAuth,
-  closeGoogleOAuthPopupAfterSignIn,
-  isEmbeddedContext,
-} from '../src/lib/embeddedAuth.ts'
+import { beginGoogleOAuth, isEmbeddedContext } from '../src/lib/embeddedAuth.ts'
 
 const sharedWindow = {}
 assert.equal(isEmbeddedContext({ self: sharedWindow, top: sharedWindow }), false)
 assert.equal(isEmbeddedContext({ self: {}, top: {} }), true)
-
-const normalRedirect = 'https://social.datanode.live/embed?sdn_auth_return=board'
-const popupRedirect = addGoogleOAuthPopupMarker(normalRedirect, true)
-assert.equal(
-  popupRedirect,
-  'https://social.datanode.live/embed?sdn_auth_return=board&sdn_auth_popup=google',
-)
-assert.equal(addGoogleOAuthPopupMarker(normalRedirect, false), normalRedirect)
-
-let callbackCloseCount = 0
-assert.equal(closeGoogleOAuthPopupAfterSignIn({
-  authenticated: false,
-  embedded: false,
-  url: popupRedirect,
-  close: () => { callbackCloseCount += 1 },
-}), false)
-assert.equal(closeGoogleOAuthPopupAfterSignIn({
-  authenticated: true,
-  embedded: true,
-  url: popupRedirect,
-  close: () => { callbackCloseCount += 1 },
-}), false)
-assert.equal(closeGoogleOAuthPopupAfterSignIn({
-  authenticated: true,
-  embedded: false,
-  url: normalRedirect,
-  close: () => { callbackCloseCount += 1 },
-}), false)
-assert.equal(closeGoogleOAuthPopupAfterSignIn({
-  authenticated: true,
-  embedded: false,
-  url: popupRedirect,
-  close: () => { callbackCloseCount += 1 },
-}), true)
-assert.equal(callbackCloseCount, 1)
 
 const standaloneCalls = []
 const standaloneResult = await beginGoogleOAuth({
@@ -109,4 +69,4 @@ assert.deepEqual(await beginGoogleOAuth({
 }), { error: 'OAuth unavailable.' })
 assert.equal(failedPopup.closed, true)
 
-console.log('Embedded Google OAuth closes only its allowlisted, marked callback popup.')
+console.log('Embedded Google OAuth preserves standalone redirects and uses a guarded popup.')

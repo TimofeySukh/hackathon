@@ -1,12 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 
-import {
-  addGoogleOAuthPopupMarker,
-  beginGoogleOAuth,
-  closeGoogleOAuthPopupAfterSignIn,
-  isEmbeddedContext,
-} from './embeddedAuth'
+import { beginGoogleOAuth, isEmbeddedContext } from './embeddedAuth'
 import { e2eFakeAccessToken, e2eFakeUserId, isE2EFakeAuth, supabase } from './supabase'
 
 type AuthStatus = 'loading' | 'anonymous' | 'authenticated' | 'unconfigured'
@@ -314,22 +309,14 @@ export function useAuth() {
     }
   }, [])
 
-  useEffect(() => {
-    closeGoogleOAuthPopupAfterSignIn({
-      authenticated: authState.status === 'authenticated',
-      embedded: isEmbeddedContext(),
-    })
-  }, [authState.status])
-
   const signInWithGoogle = async () => {
     if (!supabase) return
     const authClient = supabase
-    const embedded = isEmbeddedContext()
 
     rememberBoardAuthReturn()
     const { error } = await beginGoogleOAuth({
-      embedded,
-      redirectTo: addGoogleOAuthPopupMarker(getAuthRedirectUrl(), embedded),
+      embedded: isEmbeddedContext(),
+      redirectTo: getAuthRedirectUrl(),
       openPopup: () => window.open(
         'about:blank',
         'social-datanode-google-oauth',
