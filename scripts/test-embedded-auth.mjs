@@ -3,10 +3,8 @@ import assert from 'node:assert/strict'
 import {
   addGoogleOAuthPopupMarker,
   beginGoogleOAuth,
-  clearGoogleOAuthPopupMarker,
   closeGoogleOAuthPopupAfterSignIn,
   isEmbeddedContext,
-  rememberGoogleOAuthPopup,
 } from '../src/lib/embeddedAuth.ts'
 
 const sharedWindow = {}
@@ -22,61 +20,22 @@ assert.equal(
 assert.equal(addGoogleOAuthPopupMarker(normalRedirect, false), normalRedirect)
 
 let popupCloseCount = 0
-const popupSessionValues = new Map()
-const popupSessionStorage = {
-  getItem: (key) => popupSessionValues.get(key) ?? null,
-  setItem: (key, value) => popupSessionValues.set(key, value),
-  removeItem: (key) => popupSessionValues.delete(key),
-}
-
-rememberGoogleOAuthPopup(popupSessionStorage, 1_000)
 assert.equal(closeGoogleOAuthPopupAfterSignIn({
   authenticated: false,
-  embedded: false,
   url: popupRedirect,
-  storage: popupSessionStorage,
-  now: 1_001,
   close: () => { popupCloseCount += 1 },
 }), false)
 assert.equal(closeGoogleOAuthPopupAfterSignIn({
   authenticated: true,
-  embedded: true,
   url: normalRedirect,
-  storage: popupSessionStorage,
-  now: 1_001,
   close: () => { popupCloseCount += 1 },
 }), false)
 assert.equal(closeGoogleOAuthPopupAfterSignIn({
   authenticated: true,
-  embedded: false,
-  url: normalRedirect,
-  storage: popupSessionStorage,
-  now: 1_001,
+  url: popupRedirect,
   close: () => { popupCloseCount += 1 },
 }), true)
-assert.equal(popupSessionValues.size, 0)
-
-assert.equal(closeGoogleOAuthPopupAfterSignIn({
-  authenticated: true,
-  embedded: false,
-  url: popupRedirect,
-  storage: popupSessionStorage,
-  now: 1_001,
-  close: () => { popupCloseCount += 1 },
-}), true)
-assert.equal(popupCloseCount, 2)
-
-rememberGoogleOAuthPopup(popupSessionStorage, 1_000)
-assert.equal(closeGoogleOAuthPopupAfterSignIn({
-  authenticated: true,
-  embedded: false,
-  url: normalRedirect,
-  storage: popupSessionStorage,
-  now: 1_000 + 10 * 60 * 1000 + 1,
-  close: () => { popupCloseCount += 1 },
-}), false)
-clearGoogleOAuthPopupMarker(popupSessionStorage)
-assert.equal(popupSessionValues.size, 0)
+assert.equal(popupCloseCount, 1)
 
 const standaloneCalls = []
 const standaloneResult = await beginGoogleOAuth({
@@ -141,4 +100,4 @@ assert.deepEqual(await beginGoogleOAuth({
 }), { error: 'OAuth unavailable.' })
 assert.equal(failedPopup.closed, true)
 
-console.log('Embedded Google OAuth closes URL-marked and Site URL fallback callback popups.')
+console.log('Embedded Google OAuth preserves standalone redirects and closes its marked callback popup.')
