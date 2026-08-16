@@ -34,6 +34,10 @@ Rules:
 - The exact `/embed` path serves the same SPA for the verified local moi workspace origin
   (`http://localhost:13337`) and allowlisted ChatGPT/OpenAI ancestors. Normal routes remain
   non-embeddable and keep `X-Frame-Options: DENY`.
+- The moi view opts into `/embed?embed_auth=popup-v1#board`. Embedded Google OAuth uses an
+  isolated static callback on the same `/embed` path, a per-attempt nonce, strict
+  origin/window validation, and an acknowledgement before the popup closes. Standalone auth
+  and ordinary `/embed` do not use this bridge.
 - Signed-in users are **not** auto-redirected away from landing/docs/contact.
 - Auth callbacks land on the clean origin (no hash). A stored return marker opens `#board`
   after the session restores.

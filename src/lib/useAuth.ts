@@ -1,7 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 
 import { beginGoogleOAuth, isEmbeddedContext } from './embeddedAuth'
+import {
+  buildEmbeddedOAuthCallbackUrl,
+  completeOAuthResult,
+  createOAuthNonce,
+  isEmbeddedPopupAuthEnabled,
+  readTrustedOAuthResult,
+} from './embeddedOAuthBridge'
 import { e2eFakeAccessToken, e2eFakeUserId, isE2EFakeAuth, supabase } from './supabase'
 
 type AuthStatus = 'loading' | 'anonymous' | 'authenticated' | 'unconfigured'
@@ -212,6 +219,8 @@ function createE2EFakeSession(): Session {
 }
 
 export function useAuth() {
+  const googleOAuthPopupRef = useRef<Window | null>(null)
+  const googleOAuthNonceRef = useRef<string | null>(null)
   const [authState, setAuthState] = useState<AuthState>(() => ({
     session: isE2EFakeAuth ? createE2EFakeSession() : null,
     status: isE2EFakeAuth ? 'authenticated' : supabase ? 'loading' : 'unconfigured',
@@ -309,19 +318,68 @@ export function useAuth() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!supabase) return undefined
+    const authClient = supabase
+
+    const handleOAuthMessage = async (event: MessageEvent) => {
+      const popup = googleOAuthPopupRef.current
+      const nonce = googleOAuthNonceRef.current
+      if (!popup || !nonce) return
+
+      const result = readTrustedOAuthResult(event, {
+        expectedOrigin: window.location.origin,
+        expectedPopup: popup,
+        expectedNonce: nonce,
+      })
+      if (!result) return
+
+      const acknowledgement = await completeOAuthResult(result, (tokens) => authClient.auth.setSession(tokens))
+
+      popup.postMessage(
+        acknowledgement,
+        window.location.origin,
+      )
+      googleOAuthPopupRef.current = null
+      googleOAuthNonceRef.current = null
+
+      if (!acknowledgement.ok) {
+        setAuthState((currentState) => ({
+          ...currentState,
+          error: acknowledgement.error ?? 'Google sign-in failed.',
+        }))
+      }
+    }
+
+    window.addEventListener('message', handleOAuthMessage)
+    return () => window.removeEventListener('message', handleOAuthMessage)
+  }, [])
+
   const signInWithGoogle = async () => {
     if (!supabase) return
     const authClient = supabase
+    const embedded = isEmbeddedContext()
+    const usePopupBridge = embedded && isEmbeddedPopupAuthEnabled()
+    const oauthNonce = usePopupBridge ? createOAuthNonce() : null
 
     rememberBoardAuthReturn()
     const { error } = await beginGoogleOAuth({
-      embedded: isEmbeddedContext(),
-      redirectTo: getAuthRedirectUrl(),
-      openPopup: () => window.open(
-        'about:blank',
-        'social-datanode-google-oauth',
-        'popup,width=520,height=720',
-      ),
+      embedded,
+      redirectTo: usePopupBridge && oauthNonce
+        ? buildEmbeddedOAuthCallbackUrl(window.location.origin, oauthNonce)
+        : getAuthRedirectUrl(),
+      openPopup: () => {
+        const popup = window.open(
+          'about:blank',
+          'social-datanode-google-oauth',
+          'popup,width=520,height=720',
+        )
+        if (popup && usePopupBridge && oauthNonce) {
+          googleOAuthPopupRef.current = popup
+          googleOAuthNonceRef.current = oauthNonce
+        }
+        return popup
+      },
       signIn: async ({ redirectTo, skipBrowserRedirect }) => {
         const result = await authClient.auth.signInWithOAuth({
           provider: 'google',
@@ -338,6 +396,8 @@ export function useAuth() {
     })
 
     if (error) {
+      googleOAuthPopupRef.current = null
+      googleOAuthNonceRef.current = null
       cancelPendingBoardAuthReturn()
       setAuthState((currentState) => ({ ...currentState, error }))
     }

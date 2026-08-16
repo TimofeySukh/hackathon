@@ -303,11 +303,14 @@ compare both public responses:
 ```bash
 curl -sSI https://social.datanode.live/ | rg -i 'content-security-policy|x-frame-options'
 curl -sSI https://social.datanode.live/embed | rg -i 'content-security-policy|x-frame-options'
+curl -sSI 'https://social.datanode.live/embed?sdn_auth_popup_callback=v1&sdn_auth_nonce=probe' | rg -i 'content-security-policy|cross-origin-opener-policy|x-frame-options|cache-control'
 ```
 
 `/` must retain `frame-ancestors 'none'` and `X-Frame-Options: DENY`. `/embed` must list only
 the verified local moi workspace origin (`http://localhost:13337`) and approved
-ChatGPT/OpenAI ancestors, and must not return `X-Frame-Options`.
+ChatGPT/OpenAI ancestors, and must not return `X-Frame-Options`. The callback response must
+use `frame-ancestors 'none'`, `Cross-Origin-Opener-Policy: unsafe-none`,
+`X-Frame-Options: DENY`, and `Cache-Control: no-cache, no-store, must-revalidate`.
 
 What it does:
 
@@ -666,6 +669,13 @@ return target in browser `localStorage` and `sessionStorage`. Supabase callback
 parameters also render the board route while the session is restored, even if the provider
 or allowlist handling drops the custom return parameter.
 For a stable multi-device login flow, prefer one deployed frontend origin on your server instead of ad-hoc local ports.
+
+The moi production view uses
+`/embed?embed_auth=popup-v1#board`. Supabase Auth URL Configuration must additionally allow
+the exact callback URL
+`https://social.datanode.live/embed?sdn_auth_return=board`. The app adds the callback flag
+and nonce as extra query parameters for each embedded Google login. Do not add wildcards or
+relax the normal site framing policy.
 
 If a teammate runs Vite on a different port such as `5173`, `5174`, or `5175`, or opens the app through a LAN IP instead of `localhost`, that exact origin must be in the Supabase Auth URL configuration.
 
