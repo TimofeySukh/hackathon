@@ -31,6 +31,8 @@ Remote **agents** (CLI / MCP) can read and write the same graph through a revisi
 
 Rules:
 
+- The exact `/embed` path serves the same SPA for the allowlisted ChatGPT/OpenAI moi
+  ancestors. Normal routes remain non-embeddable and keep `X-Frame-Options: DENY`.
 - Signed-in users are **not** auto-redirected away from landing/docs/contact.
 - Auth callbacks land on the clean origin (no hash). A stored return marker opens `#board`
   after the session restores.

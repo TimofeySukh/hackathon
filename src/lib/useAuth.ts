@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 
+import { beginGoogleOAuth, isEmbeddedContext } from './embeddedAuth'
 import { e2eFakeAccessToken, e2eFakeUserId, isE2EFakeAuth, supabase } from './supabase'
 
 type AuthStatus = 'loading' | 'anonymous' | 'authenticated' | 'unconfigured'
@@ -310,17 +311,35 @@ export function useAuth() {
 
   const signInWithGoogle = async () => {
     if (!supabase) return
+    const authClient = supabase
 
     rememberBoardAuthReturn()
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: getAuthRedirectUrl(),
+    const { error } = await beginGoogleOAuth({
+      embedded: isEmbeddedContext(),
+      redirectTo: getAuthRedirectUrl(),
+      openPopup: () => window.open(
+        'about:blank',
+        'social-datanode-google-oauth',
+        'popup,width=520,height=720',
+      ),
+      signIn: async ({ redirectTo, skipBrowserRedirect }) => {
+        const result = await authClient.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo,
+            skipBrowserRedirect,
+          },
+        })
+        return {
+          data: { url: result.data.url },
+          error: result.error,
+        }
       },
     })
 
     if (error) {
-      setAuthState((currentState) => ({ ...currentState, error: error.message }))
+      cancelPendingBoardAuthReturn()
+      setAuthState((currentState) => ({ ...currentState, error }))
     }
   }
 

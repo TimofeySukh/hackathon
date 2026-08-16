@@ -15,6 +15,10 @@ password so a database user is created without forcing profile setup.
   auth dialog as the board.
 - The dialog supports Google sign-in, email sign-in, email/password registration, password
   reset request, and password update from a Supabase recovery link.
+- The `/embed` application uses the real production origin and therefore shares the normal
+  Supabase session, IndexedDB graph, and Realtime connection. Email/password authentication
+  stays inside the frame. Google authentication opens in a popup only when embedded; the
+  standalone site keeps its existing full-page redirect.
 - Email registration requires only an email and a password. Email confirmation is still
   required when enabled in Supabase.
 - After registration that needs confirmation, the dialog keeps the email address and offers
@@ -47,7 +51,8 @@ password so a database user is created without forcing profile setup.
 
 ## Code
 
-- Main file(s): `src/App.tsx`, `src/lib/useAuth.ts`, `src/styles/panels.css`.
+- Main file(s): `src/App.tsx`, `src/lib/useAuth.ts`, `src/lib/embeddedAuth.ts`,
+  `src/styles/panels.css`.
 - Key functions / components: `useAuth`, `openSignInModal`, `handleEmailAuthSubmit`,
   `handleResendConfirmation`, auth dialog JSX in `App`.
 - Related state: `showSignInModal`, `emailAuthMode`, `emailAuthBusy`, `emailAuthNotice`,

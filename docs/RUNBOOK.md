@@ -296,6 +296,18 @@ Files:
 - `deploy/social-datanode-live/auto-deploy/social-datanode-live-autodeploy.sh`
 - `deploy/social-datanode-live/auto-deploy/social-datanode-live-autodeploy.cron`
 
+The exact `/embed` response is the only production document that permits framing. Verify
+that exception locally with `npm run test:embed` and an nginx syntax check. After deployment,
+compare both public responses:
+
+```bash
+curl -sSI https://social.datanode.live/ | rg -i 'content-security-policy|x-frame-options'
+curl -sSI https://social.datanode.live/embed | rg -i 'content-security-policy|x-frame-options'
+```
+
+`/` must retain `frame-ancestors 'none'` and `X-Frame-Options: DENY`. `/embed` must list only
+the approved ChatGPT/OpenAI ancestors and must not return `X-Frame-Options`.
+
 What it does:
 
 - keeps deploy control in GitHub without requiring GitHub to SSH into the server
@@ -814,6 +826,7 @@ for live task ownership and status. Durable technical direction lives in `docs/`
 
 - `npm run build`
 - `npm run lint`
+- `npm run test:embed`
 - `npm run test:load`
 - Manual browser check of drag navigation, wheel and trackpad navigation, theme persistence, persisted graph editing, local search, and LinkedIn import
 - Manual Supabase auth check when credentials and Google OAuth are configured

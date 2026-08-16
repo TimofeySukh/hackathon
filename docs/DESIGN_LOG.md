@@ -1394,3 +1394,16 @@ rediscover, write it here.
 - Why: Documentation must remain usable at dense desktop widths without consuming the first
   mobile viewport with navigation. One shared registry also prevents search and navigation
   labels from drifting apart.
+
+### 2026-08-16 — Isolated production embed for moi
+
+- Decision: The exact `/embed` response serves the production SPA to an explicit
+  ChatGPT/OpenAI `frame-ancestors` allowlist and omits `X-Frame-Options`; every existing
+  route keeps the original framing denial.
+- Why: The moi workspace needs the real production origin for Supabase sessions, IndexedDB,
+  Realtime, and graph persistence. Relaxing the whole site or mirroring bundles into an
+  opaque origin would either create a clickjacking risk or break authentication and storage.
+- Decision: Google OAuth opens a guarded popup only when the app is embedded. Standalone
+  Google sign-in keeps the existing full-page redirect.
+- Why: Google authentication pages cannot render inside an iframe, while a user-initiated
+  popup can complete OAuth on the production origin without navigating the moi workspace.
