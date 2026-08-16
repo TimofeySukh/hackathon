@@ -1408,3 +1408,12 @@ rediscover, write it here.
   Google sign-in keeps the existing full-page redirect.
 - Why: Google authentication pages cannot render inside an iframe, while a user-initiated
   popup can complete OAuth on the production origin without navigating the moi workspace.
+- Decision: The moi-only `embed_auth=popup-v1` mode returns Google OAuth to a static callback
+  selected by `sdn_auth_popup_callback=v1`. The callback keeps its opener with
+  `Cross-Origin-Opener-Policy: unsafe-none`, cannot be framed, transfers tokens only to the
+  exact same-origin popup opener with a cryptographic nonce, and closes only after the
+  iframe validates the message and installs the Supabase session.
+- Why: letting the full SPA process the popup callback applies its normal opener policy and
+  can sever `window.opener`; storage markers also cannot reliably move a session between
+  the popup and embedded browsing context. The isolated handshake changes neither ordinary
+  production login nor ordinary `/embed` behavior.
