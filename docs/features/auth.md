@@ -17,14 +17,8 @@ password so a database user is created without forcing profile setup.
   reset request, and password update from a Supabase recovery link.
 - The `/embed` application uses the real production origin and therefore shares the normal
   Supabase session, IndexedDB graph, and Realtime connection. Email/password authentication
-  stays inside the frame. The moi URL opts into `embed_auth=popup-v1`: Google authentication
-  then opens in a popup, while the standalone site and ordinary `/embed` keep their existing
-  behavior.
-- Embedded Google OAuth returns to a dedicated static callback selected only by
-  `sdn_auth_popup_callback=v1`. The callback sends the implicit tokens to the exact opener
-  with a per-attempt nonce; the iframe validates origin, popup identity, and nonce before
-  installing the Supabase session and acknowledging success. The popup closes only after
-  that acknowledgement.
+  stays inside the frame. Google authentication opens in a popup only when embedded; the
+  standalone site keeps its existing full-page redirect.
 - Framing is limited to the verified local moi workspace origin (`http://localhost:13337`)
   and the hosted ChatGPT/OpenAI ancestors listed in the production nginx policy.
 - Email registration requires only an email and a password. Email confirmation is still
@@ -60,8 +54,7 @@ password so a database user is created without forcing profile setup.
 ## Code
 
 - Main file(s): `src/App.tsx`, `src/lib/useAuth.ts`, `src/lib/embeddedAuth.ts`,
-  `src/lib/embeddedOAuthBridge.ts`, `public/auth/popup-callback.js`,
-  `deploy/social-datanode-live/nginx.conf`, `src/styles/panels.css`.
+  `src/styles/panels.css`.
 - Key functions / components: `useAuth`, `openSignInModal`, `handleEmailAuthSubmit`,
   `handleResendConfirmation`, auth dialog JSX in `App`.
 - Related state: `showSignInModal`, `emailAuthMode`, `emailAuthBusy`, `emailAuthNotice`,
