@@ -25,7 +25,11 @@ const embedBlock = extractBlock(source, 'location = /embed {')
 assert.match(serverBlock, /frame-ancestors 'none'/, 'Normal production responses must remain non-embeddable.')
 assert.match(serverBlock, /X-Frame-Options "DENY"/, 'Normal production responses must retain X-Frame-Options DENY.')
 
-assert.match(embedBlock, /frame-ancestors https:\/\/chatgpt\.com https:\/\/\*\.chatgpt\.com https:\/\/\*\.openai\.com;/)
+assert.match(
+  embedBlock,
+  /frame-ancestors http:\/\/localhost:13337 https:\/\/chatgpt\.com https:\/\/\*\.chatgpt\.com https:\/\/\*\.openai\.com;/,
+  'The embed route must allow the verified local moi workspace origin and hosted ChatGPT origins.',
+)
 assert.doesNotMatch(embedBlock, /frame-ancestors 'none'/)
 assert.doesNotMatch(embedBlock, /X-Frame-Options/)
 assert.match(embedBlock, /Cache-Control "no-cache, no-store, must-revalidate"/)

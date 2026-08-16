@@ -1398,8 +1398,9 @@ rediscover, write it here.
 ### 2026-08-16 — Isolated production embed for moi
 
 - Decision: The exact `/embed` response serves the production SPA to an explicit
-  ChatGPT/OpenAI `frame-ancestors` allowlist and omits `X-Frame-Options`; every existing
-  route keeps the original framing denial.
+  `frame-ancestors` allowlist containing the verified local moi workspace origin
+  (`http://localhost:13337`) plus ChatGPT/OpenAI hosts, and omits `X-Frame-Options`; every
+  existing route keeps the original framing denial.
 - Why: The moi workspace needs the real production origin for Supabase sessions, IndexedDB,
   Realtime, and graph persistence. Relaxing the whole site or mirroring bundles into an
   opaque origin would either create a clickjacking risk or break authentication and storage.

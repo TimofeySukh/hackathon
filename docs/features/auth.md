@@ -19,6 +19,8 @@ password so a database user is created without forcing profile setup.
   Supabase session, IndexedDB graph, and Realtime connection. Email/password authentication
   stays inside the frame. Google authentication opens in a popup only when embedded; the
   standalone site keeps its existing full-page redirect.
+- Framing is limited to the verified local moi workspace origin (`http://localhost:13337`)
+  and the hosted ChatGPT/OpenAI ancestors listed in the production nginx policy.
 - Email registration requires only an email and a password. Email confirmation is still
   required when enabled in Supabase.
 - After registration that needs confirmation, the dialog keeps the email address and offers

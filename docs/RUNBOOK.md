@@ -306,7 +306,8 @@ curl -sSI https://social.datanode.live/embed | rg -i 'content-security-policy|x-
 ```
 
 `/` must retain `frame-ancestors 'none'` and `X-Frame-Options: DENY`. `/embed` must list only
-the approved ChatGPT/OpenAI ancestors and must not return `X-Frame-Options`.
+the verified local moi workspace origin (`http://localhost:13337`) and approved
+ChatGPT/OpenAI ancestors, and must not return `X-Frame-Options`.
 
 What it does:
 
